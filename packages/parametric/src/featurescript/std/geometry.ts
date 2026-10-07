@@ -7,6 +7,7 @@ import {
     ANGLE,
     describeValue,
     expectArray,
+    expectMap,
     expectNumber,
     FsArray,
     FsMap,
@@ -46,14 +47,17 @@ export const vec = {
         return [a[0] / n, a[1] / n, a[2] / n];
     },
     /**
-     * A unit vector perpendicular to `a` (deterministic): world X projected off `a`, or
-     * world Y when `a` is (nearly) along X — so the default planes get the x axes
-     * Onshape gives them (Top and Front: +X, Right: +Y).
+     * A unit vector perpendicular to `a`, exactly as Onshape's `perpendicularVector` picks it
+     * (so `plane(origin, normal)` gets Onshape's x axis): cross a world axis chosen by
+     * these near-1 ratios, which keep likely inputs away from unstable ties, with `a`.
      */
     perpendicular: (a: Vec3): Vec3 => {
-        const n = vec.normalize(a);
-        const helper: Vec3 = Math.abs(n[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
-        return vec.normalize(vec.sub(helper, vec.scale(n, vec.dot(helper, n))));
+        const [x, y, z] = a.map(Math.abs);
+        if (x * x + y * y + z * z < 1e-16) return [1, 0, 0];
+        let different: Vec3;
+        if (x > 1.0366636528619326 * y) different = x > 0.9517029893922334 * z ? [0, 0, 1] : [0, 1, 0];
+        else different = y > 0.9204199474553859 * z ? [1, 0, 0] : [0, 1, 0];
+        return vec.normalize(vec.cross(different, a));
     },
 };
 
@@ -522,7 +526,18 @@ function scaleUnits2(units: Units): Units {
 
 function installPlanesAndLines(std: StdBuilder): void {
     std.fn("plane", (args) => {
-        expectArgCount(args, 2, 3, "plane");
+        expectArgCount(args, 1, 3, "plane");
+        if (args.length === 1) {
+            // plane(cSys): the coordinate system's XY plane.
+            const cSys = expectMap(args[0], "plane coordinate system");
+            return makePlane(
+                makePlaneData(
+                    readPoint(cSys.field("origin"), "cSys.origin"),
+                    readDirection(cSys.field("zAxis"), "cSys.zAxis"),
+                    readDirection(cSys.field("xAxis"), "cSys.xAxis"),
+                ),
+            );
+        }
         return makePlane(
             makePlaneData(
                 readPoint(args[0], "plane origin"),

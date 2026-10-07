@@ -156,12 +156,16 @@ describe("modifiers", () => {
         expect(shapes[0].volume()).toBeCloseTo(1500 - 8, 4);
     });
 
-    test("shell removes a face and hollows the rest", () => {
+    // Onshape's opShell contract: negative thickness shells inward, positive grows outward.
+    test.each([
+        { thickness: -1, volume: 1000 - 8 * 8 * 9 },
+        { thickness: 1, volume: 12 * 12 * 11 - 1000 },
+    ])("shell with thickness $thickness mm removes a face and hollows the rest", ({ thickness, volume }) => {
         const { shapes } = build(`
             fCuboid(context, id + "cube", { "corner1" : vector(0, 0, 0) * mm, "corner2" : vector(10, 10, 10) * mm });
-            opShell(context, id + "shell", { "entities" : qFarthestAlong(qCreatedBy(id + "cube", EntityType.FACE), Z_DIRECTION), "thickness" : 1 * mm });`);
+            opShell(context, id + "shell", { "entities" : qFarthestAlong(qCreatedBy(id + "cube", EntityType.FACE), Z_DIRECTION), "thickness" : ${thickness} * mm });`);
         expect(shapes).toHaveLength(1);
-        expect(shapes[0].volume()).toBeCloseTo(1000 - 8 * 8 * 9, 2);
+        expect(shapes[0].volume()).toBeCloseTo(volume, 2);
     });
 });
 

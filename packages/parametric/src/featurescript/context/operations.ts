@@ -54,7 +54,15 @@ import {
     MM_PER_METER,
     toKernelPlane,
 } from "./fsContext";
-import { curveTypeOf, facePlane, ownerBodies, relatedEntities, resolveQuery, surfaceTypeOf } from "./queries";
+import {
+    curveTypeOf,
+    facePlane,
+    isQuery,
+    ownerBodies,
+    relatedEntities,
+    resolveQuery,
+    surfaceTypeOf,
+} from "./queries";
 
 // ------------------------------------------------------------------ Shared helpers
 
@@ -423,10 +431,7 @@ function installPrimitives(std: StdBuilder): void {
         const radius = lengthMm(definition.field("radius"), "radius");
         if (radius <= 0) fail("fSphere radius must be positive");
         ctx.addBody(
-            kernel(
-                shapeFactory.sphere(mm(readPoint(definition.field("center"), "center")), radius),
-                "fSphere",
-            ),
+            kernel(shapeFactory.sphere(sphereCenter(ctx, definition.field("center")), radius), "fSphere"),
             id,
         );
         return undefined;
@@ -482,6 +487,16 @@ function installPrimitives(std: StdBuilder): void {
     });
 }
 
+/** As std's `fSphere`: the center is optional (the origin), a vertex query, or a point. */
+function sphereCenter(ctx: FsContext, value: FsValue): XYZ {
+    if (value === undefined) return new XYZ(0, 0, 0);
+    if (!isQuery(value)) return mm(readPoint(value, "center"));
+    const vertex = resolveQuery(ctx, value).find((ref) => ref.kind === "VERTEX");
+    if (vertex === undefined) fail("fSphere center must be a vertex");
+    const point = vertex.body.vertices()[vertex.index].point();
+    return new XYZ(point.x, point.y, point.z);
+}
+
 function installSweeps(std: StdBuilder): void {
     std.fn("opExtrude", (args) => {
         const [ctx, id, definition] = definitionOf(args, "opExtrude");
@@ -496,12 +511,15 @@ function installSweeps(std: StdBuilder): void {
     std.fn("opRevolve", (args) => {
         const [ctx, id, definition] = definitionOf(args, "opRevolve");
         const axis = readLine(definition.field("axis"), "axis");
-        const forward = angleDeg(definition.field("angleForward"), "angleForward");
-        const back =
-            definition.field("angleBack") === undefined
-                ? 0
-                : angleDeg(definition.field("angleBack"), "angleBack");
-        revolveEntities(ctx, id, resolveQuery(ctx, definition.field("entities")), axis, forward, back);
+        const { startDeg, spanDeg } = revolveSpan(definition);
+        revolveEntities(
+            ctx,
+            id,
+            resolveQuery(ctx, definition.field("entities")),
+            axis,
+            -startDeg,
+            spanDeg + startDeg,
+        );
         return undefined;
     });
     std.fn("opSweep", (args) => {
@@ -543,12 +561,19 @@ function installSweeps(std: StdBuilder): void {
         const t1 = optionalLengthMm(definition.field("thickness1"), "thickness1");
         const t2 = optionalLengthMm(definition.field("thickness2"), "thickness2");
         if (t1 + t2 <= 0) fail("opThicken needs a positive total thickness");
+        const slab = (face: IFace, thickness: number): IShape => {
+            const shape = ctx.track(
+                kernel(shapeFactory.makeThickSolidBySimple(face, thickness), "opThicken"),
+            );
+            // The kernel hands back the along-the-normal slab inside out (negative volume):
+            // flip it, or a boolean with it acts on its complement.
+            if (shape.volume() < 0) shape.reserve();
+            return shape;
+        };
         for (const { face } of facesOf(resolveQuery(ctx, definition.field("entities")))) {
             const parts: IShape[] = [];
-            if (t1 > 0)
-                parts.push(ctx.track(kernel(shapeFactory.makeThickSolidBySimple(face, t1), "opThicken")));
-            if (t2 > 0)
-                parts.push(ctx.track(kernel(shapeFactory.makeThickSolidBySimple(face, -t2), "opThicken")));
+            if (t1 > 0) parts.push(slab(face, t1));
+            if (t2 > 0) parts.push(slab(face, -t2));
             const shape =
                 parts.length === 1
                     ? parts[0]
@@ -595,6 +620,35 @@ function loftSection(ctx: FsContext, refs: EntityRef[], index: number): IVertex 
     return wireOf(ctx, edgeRefsOf(refs), `opLoft profile ${index}`);
 }
 
+/**
+ * Where a revolve starts and how far it turns, in degrees. Two forms: `angleForward` /
+ * `angleBack` (the revolve turns `angleForward` on from the profile and `angleBack` the
+ * other way), and the bounds form std's `revolve` feature passes — `startBoundAngle` and
+ * `endBoundAngle`, both measured forward, equal meaning a full turn.
+ */
+function revolveSpan(definition: FsMap): { startDeg: number; spanDeg: number } {
+    if (definition.field("angleForward") === undefined && definition.has("endBoundAngle")) {
+        for (const bound of ["endBound", "startBound"]) {
+            const value = definition.field(bound);
+            if (value !== undefined && optionalEnum(value, "RevolveBoundingType", bound, "BLIND") !== "BLIND")
+                fail("A revolve up to a face, part or vertex is not supported");
+        }
+        const end = angleDeg(definition.field("endBoundAngle"), "endBoundAngle");
+        const start = definition.has("startBoundAngle")
+            ? angleDeg(definition.field("startBoundAngle"), "startBoundAngle")
+            : 0;
+        const span = (((end - start) % 360) + 360) % 360;
+        const startDeg = start > 180 ? start - 360 : start;
+        return { startDeg, spanDeg: span < 1e-9 ? 360 : span };
+    }
+    const forward = angleDeg(definition.field("angleForward"), "angleForward");
+    const back =
+        definition.field("angleBack") === undefined
+            ? 0
+            : angleDeg(definition.field("angleBack"), "angleBack");
+    return { startDeg: -back, spanDeg: forward + back };
+}
+
 function revolveEntities(
     ctx: FsContext,
     opId: string,
@@ -607,7 +661,7 @@ function revolveEntities(
     if (total <= 1e-9) fail("Revolve angle must be positive");
     const kernelAxis = new Line({ point: mm(axis.origin), direction: xyz(axis.direction) });
     const rotateBack =
-        backDeg > 0
+        Math.abs(backDeg) > 1e-12
             ? kernelMatrix(rotationAffine(axis.origin, axis.direction, (-backDeg * Math.PI) / 180))
             : undefined;
     const bodies: FsBody[] = [];
@@ -666,7 +720,7 @@ function installModifiers(std: StdBuilder): void {
     });
     std.fn("opShell", (args) => {
         const [ctx, id, definition] = definitionOf(args, "opShell");
-        shellOp(ctx, id, definition);
+        shellOp(ctx, id, definition, "operation");
         return undefined;
     });
     std.fn("opBoolean", (args) => {
@@ -676,7 +730,12 @@ function installModifiers(std: StdBuilder): void {
     });
 }
 
-function shellOp(ctx: FsContext, opId: string, definition: FsMap): void {
+/**
+ * Shells solids. `opShell` follows Onshape's operation contract — positive thickness grows
+ * outward, negative shells inward — while the `shell` feature takes a positive thickness
+ * kept inside the boundary, `oppositeDirection` flipping it outward.
+ */
+function shellOp(ctx: FsContext, opId: string, definition: FsMap, form: "operation" | "feature"): void {
     const thickness = lengthMm(definition.field("thickness"), "thickness");
     if (Math.abs(thickness) < 1e-9) fail("Shell thickness must be non-zero");
     const refs = resolveQuery(ctx, definition.field("entities"));
@@ -686,9 +745,7 @@ function shellOp(ctx: FsContext, opId: string, definition: FsMap): void {
         ...refs.filter((ref) => ref.kind === "BODY").map((ref) => ref.body),
     ]);
     if (bodies.size === 0) fail("Shell needs faces to remove (or bodies to hollow)");
-    // Positive thickness keeps the material inside the original boundary; `oppositeDirection`
-    // (the shell feature's "outward") flips it.
-    const sign = definition.field("oppositeDirection") === true ? 1 : -1;
+    const sign = form === "operation" || definition.field("oppositeDirection") === true ? 1 : -1;
     for (const body of bodies) {
         if (body.kind !== "SOLID") continue;
         const faces = faceRefs.filter((ref) => ref.body === body).map((ref) => body.faces()[ref.index]);
@@ -1007,7 +1064,7 @@ function installFeatures(std: StdBuilder): void {
     });
     std.fn("shell", (args) => {
         const [ctx, id, definition] = definitionOf(args, "shell");
-        shellOp(ctx, id, definition);
+        shellOp(ctx, id, definition, "feature");
         return undefined;
     });
     std.fn("booleanBodies", (args) => {

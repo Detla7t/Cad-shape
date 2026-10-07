@@ -9,6 +9,7 @@ import {
     FsQuantity,
     type FsValue,
     fail,
+    formatNumber,
     NO_UNITS,
     quantity,
     scaleUnits,
@@ -134,6 +135,9 @@ function additive(op: "+" | "-", left: FsValue, right: FsValue): FsValue {
 
 function appendId(id: FsArray, right: FsValue): FsArray {
     if (typeof right === "string") return new FsArray([...id.items, right], "Id");
+    // `id + 2` appends "2" (a decimal point becomes "_", as Id components cannot hold one).
+    if (typeof right === "number")
+        return new FsArray([...id.items, formatNumber(right).replace(".", "_")], "Id");
     if (right instanceof FsArray) return new FsArray([...id.items, ...right.items], "Id");
     fail(`Cannot append a ${describeValue(right)} to an Id`);
 }
