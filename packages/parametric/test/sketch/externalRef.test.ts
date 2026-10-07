@@ -5,6 +5,7 @@ import {
     type AsyncController,
     BoundingBox,
     CancelableCommand,
+    CommandStore,
     EditableShapeNode,
     type I18nKeys,
     type ICameraController,
@@ -2432,18 +2433,20 @@ describe("ProjectSketchEdges command", () => {
         const { ProjectSketchEdges } = await import("../../src/sketch/commands/sketchProjectEdges");
         // the app supplies command options through the static property cache
         // (readProperties in beforeExecute) — prime it, then restore isolation
+        // (options are remembered per command, under its registered key)
         const cache: Map<string, any> = (CancelableCommand as any)._propertiesCache;
-        const hadRole = cache.has("role");
-        const previousRole = cache.get("role");
+        const key = `${CommandStore.getComandData(ProjectSketchEdges)?.key ?? ProjectSketchEdges.name}.role`;
+        const hadRole = cache.has(key);
+        const previousRole = cache.get(key);
         const getActive = rs.spyOn(SketchEditor, "getActive").mockReturnValue(editor as any);
         try {
-            if (role === undefined) cache.delete("role");
-            else cache.set("role", role);
+            if (role === undefined) cache.delete(key);
+            else cache.set(key, role);
             await (new ProjectSketchEdges() as ICommand).execute({ activeView: { document: {} } } as any);
         } finally {
             getActive.mockRestore();
-            if (hadRole) cache.set("role", previousRole);
-            else cache.delete("role");
+            if (hadRole) cache.set(key, previousRole);
+            else cache.delete(key);
         }
     }
 

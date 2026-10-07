@@ -196,8 +196,16 @@ export class ParametricBodyNode
     setRollbackIndex(index: number | undefined): boolean {
         const clamped = index === undefined ? undefined : Math.max(0, Math.min(index, this.features.length));
         if (this._rollbackIndex === clamped) return true;
+        const previous = this._rollbackIndex;
         this._rollbackIndex = clamped;
-        const result = this.generateShape();
+        let result: Result<IShape>;
+        try {
+            result = this.generateShape();
+        } catch {
+            // A throwing replay must not leave the index pointing at a position never built.
+            this._rollbackIndex = previous;
+            return false;
+        }
         if (!result.isOk) return false;
         this.shape = result;
         this.document.visual.update();
@@ -636,9 +644,18 @@ export class ParametricBodyNode
                 timeline.push({ shape: input, faceIds, edgeIds });
                 const feature = features[index];
                 if (feature.suppressed) continue;
-                this.followReferencedSketches(feature, followedSketches);
-                this.refreshConsumedTools(feature);
-                const step = this.evaluateFeatureStep(feature, scope, input, faceIds, edgeIds, nextCache);
+                let step: ReturnType<typeof this.evaluateFeatureStep>;
+                try {
+                    this.followReferencedSketches(feature, followedSketches);
+                    this.refreshConsumedTools(feature);
+                    step = this.evaluateFeatureStep(feature, scope, input, faceIds, edgeIds, nextCache);
+                } catch (error) {
+                    // A kernel query that throws (reading a degenerate edge's curve) fails this
+                    // feature like any other error, instead of escaping the run and leaving the
+                    // body showing a stale or rolled-back shape with no error on any row.
+                    const message = error instanceof Error ? error.message : String(error);
+                    return this.abandonChain(feature, message, nextCache, features);
+                }
                 if (!step.isOk) return this.abandonChain(feature, step.error, nextCache, features);
                 input = step.value.shape;
                 faceIds = step.value.faceIds;

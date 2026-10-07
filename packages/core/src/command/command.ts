@@ -6,6 +6,7 @@ import { type AsyncController, type IDisposable, Observable, PubSub, type Result
 import { EMPTY_SCOPE, type ParameterValue, resolveUnitSpec, type Scope } from "../parameters/expression";
 import type { UnitSpec } from "../parameters/unitSpec";
 import { type Property, PropertyUtils, property } from "../property";
+import { CommandStore } from "./commandStore";
 
 export interface ICommand {
     execute(application: IApplication): Promise<void>;
@@ -156,21 +157,26 @@ export abstract class CancelableCommand extends Observable implements ICancelabl
         PropertyUtils.getProperties(this).forEach((x) => {
             const key = this.cacheKeyOfProperty(x);
             if (CancelableCommand._propertiesCache.has(key)) {
-                this.setPrivateValue(key as keyof this, CancelableCommand._propertiesCache.get(key));
+                this.setPrivateValue(x.name as keyof this, CancelableCommand._propertiesCache.get(key));
             }
         });
     }
 
     private saveProperties() {
         PropertyUtils.getProperties(this).forEach((x) => {
-            const key = this.cacheKeyOfProperty(x);
-            const prop = (this as any)[key];
+            const prop = (this as any)[x.name];
             if (typeof prop === "function") return;
-            CancelableCommand._propertiesCache.set(key, prop);
+            CancelableCommand._propertiesCache.set(this.cacheKeyOfProperty(x), prop);
         });
     }
 
+    /**
+     * Remembered per command: two commands' same-named options are unrelated (a Bead's
+     * `height` must not open with the Pittsburgh lip's). Keyed by the registered command
+     * key, which survives minification, falling back to the class name.
+     */
     private cacheKeyOfProperty(property: Property) {
-        return property.name;
+        const owner = CommandStore.getComandData(this)?.key ?? this.constructor.name;
+        return `${owner}.${property.name}`;
     }
 }

@@ -9,6 +9,7 @@ import {
     type ICommand,
     type IDisposable,
     isCancelableCommand,
+    property,
 } from "../src";
 import { CommandStore } from "../src/command/commandStore";
 import {
@@ -680,6 +681,79 @@ describe("Command System", () => {
                 const allCommands = CommandStore.getAllCommands();
                 expect(allCommands.length).toBe(0);
             });
+        });
+    });
+
+    describe("remembered options", () => {
+        /** Two commands with an unrelated option of the same name. */
+        class FirstLengthCommand extends CancelableCommand {
+            @property("common.length")
+            get length() {
+                return this.getPrivateValue("length", 1);
+            }
+            set length(value: number) {
+                this.setProperty("length", value);
+            }
+            protected override async executeAsync(): Promise<void> {}
+            open() {
+                this.beforeExecute();
+            }
+            close() {
+                this.afterExecute();
+            }
+        }
+        class SecondLengthCommand extends FirstLengthCommand {
+            override get length() {
+                return this.getPrivateValue("length", 2);
+            }
+            override set length(value: number) {
+                this.setProperty("length", value);
+            }
+        }
+
+        test("a command reopens with the option values it was last closed with", () => {
+            const first = new FirstLengthCommand();
+            first.open();
+            first.length = 7;
+            first.close();
+
+            const again = new FirstLengthCommand();
+            again.open();
+            expect(again.length).toBe(7);
+            again.close();
+        });
+
+        test("another command's same-named option does not carry over", () => {
+            const first = new FirstLengthCommand();
+            first.open();
+            first.length = 9;
+            first.close();
+
+            const second = new SecondLengthCommand();
+            second.open();
+            expect(second.length).toBe(2);
+            second.close();
+        });
+
+        test("registered commands are remembered under their command key", () => {
+            CommandStore.registerCommand(SecondLengthCommand, { key: "test.secondLength" as any, icon: "" });
+            try {
+                const second = new SecondLengthCommand();
+                second.open();
+                second.length = 5;
+                second.close();
+
+                const first = new FirstLengthCommand();
+                first.open();
+                expect(first.length).not.toBe(5);
+                first.close();
+                const again = new SecondLengthCommand();
+                again.open();
+                expect(again.length).toBe(5);
+                again.close();
+            } finally {
+                CommandStore.unregisterCommand(SecondLengthCommand);
+            }
         });
     });
 });

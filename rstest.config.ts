@@ -6,7 +6,7 @@ import packages from "./package.json" with { type: "json" };
 const configDir = import.meta.dirname;
 
 export default defineConfig({
-    exclude: ["**/cpp/**"],
+    exclude: ["**/cpp/**", "**/.claude/**"],
     coverage: {
         exclude: ["**/wasm/lib/**", "**/test-utils/**"],
     },

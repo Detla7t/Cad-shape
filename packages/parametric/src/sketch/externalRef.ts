@@ -3,6 +3,7 @@
 
 import {
     CurveUtils,
+    type ICurve,
     type IDocument,
     type IEdge,
     type IShape,
@@ -52,13 +53,26 @@ export interface ExternalResolveResult {
 }
 
 /**
+ * An edge's underlying curve, or undefined for a degenerate edge: it has no 3D curve and
+ * reading one throws (a chamfer run into a fillet can leave one on the body).
+ */
+function basisCurveOf(edge: IEdge): ICurve | undefined {
+    try {
+        return edge.curve.basisCurve;
+    } catch {
+        return undefined;
+    }
+}
+
+/**
  * Sketch-UV geometry of a world-coordinate edge, or undefined when the curve
  * cannot be represented as a sketch entity: only lines and circles (full or
  * trimmed to an arc) are supported, and a circle's axis must be parallel to the
  * plane normal — otherwise its projection would be an ellipse.
  */
 export function edgeSnapshotUV(plane: Plane, edge: IEdge): ExternalSnapshot | undefined {
-    const basis = edge.curve.basisCurve;
+    const basis = basisCurveOf(edge);
+    if (basis === undefined) return undefined;
     if (CurveUtils.isLine(basis)) {
         return { type: "line", params: [...toUV(plane, edge.startPoint()), ...toUV(plane, edge.endPoint())] };
     }
@@ -83,7 +97,8 @@ export function edgeSnapshotUV(plane: Plane, edge: IEdge): ExternalSnapshot | un
  * to the plane normal). Other curve kinds are never coplanar-projectable.
  */
 export function isEdgeCoplanarWithPlane(plane: Plane, edge: IEdge): boolean {
-    const basis = edge.curve.basisCurve;
+    const basis = basisCurveOf(edge);
+    if (basis === undefined) return false;
     const onPlane = (point: XYZ) => point.distanceTo(plane.project(point)) <= Precision.Distance;
     if (CurveUtils.isLine(basis)) {
         return onPlane(edge.startPoint()) && onPlane(edge.endPoint());
@@ -529,8 +544,8 @@ function lineSplitCovers(ref: { start: XYZLike; end: XYZLike }, edges: IEdge[]):
     if (direction === undefined) return false;
     const spans: [number, number][] = [];
     for (const edge of edges) {
-        const basis = edge.curve.basisCurve;
-        if (!CurveUtils.isLine(basis)) continue;
+        const basis = basisCurveOf(edge);
+        if (basis === undefined || !CurveUtils.isLine(basis)) continue;
         const edgeStart = edge.startPoint();
         const edgeDirection = edge.endPoint().sub(edgeStart).normalize();
         if (edgeDirection === undefined || !directionsParallel(edgeDirection, direction)) {
@@ -556,8 +571,8 @@ function circleSplitCovers(plane: Plane, ref: ExternalRefData, edges: IEdge[]): 
     const axis = new XYZ(stored.axis).normalize();
     if (axis === undefined) return false;
     const candidates = edges.filter((edge) => {
-        const basis = edge.curve.basisCurve;
-        if (!CurveUtils.isCircle(basis)) return false;
+        const basis = basisCurveOf(edge);
+        if (basis === undefined || !CurveUtils.isCircle(basis)) return false;
         if (basis.center.distanceTo(center) > MATCH_TOLERANCE) return false;
         if (Math.abs(basis.radius - stored.radius) > MATCH_TOLERANCE) return false;
         const candidateAxis = basis.axis.normalize();
@@ -594,8 +609,12 @@ function arcCoverageSpans(
     for (const edge of candidates) {
         let start = edge.startPoint();
         let end = edge.endPoint();
-        const basis = edge.curve.basisCurve;
-        if (CurveUtils.isCircle(basis) && basis.axis.normalize()!.dot(plane.normal) < 0) {
+        const basis = basisCurveOf(edge);
+        if (
+            basis !== undefined &&
+            CurveUtils.isCircle(basis) &&
+            basis.axis.normalize()!.dot(plane.normal) < 0
+        ) {
             [start, end] = [end, start];
         }
         // a candidate spanning the full circle covers everything
