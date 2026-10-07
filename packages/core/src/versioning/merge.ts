@@ -5,9 +5,9 @@ import { InternalClassName } from "../serialize";
 import { summarizeValue } from "./diff";
 import { isJsonObject, type JsonObject, type JsonValue, jsonEquals, toJsonValue } from "./hash";
 import type { IObjectStore } from "./objectStore";
-import { type NodeObj, type ObjectHash, SHARD_COUNT, shardOf } from "./objects";
+import { type NodeObj, type ObjectHash, SHARD_COUNT, shardOf, type TreeObj } from "./objects";
 import { joinProperty, loadPart, type Part, type SeqItem, storePart, VersioningRoles } from "./parts";
-import { getNode, getTree, treeNodes } from "./snapshot";
+import { CONFIGURATION_ROLE, getNode, getTree, treeNodes } from "./snapshot";
 import { type MergeChunk, mergeText, resolveMergeChunks, type TextChoice } from "./textDiff";
 
 /**
@@ -115,6 +115,7 @@ class TreeMerger {
             "components",
             "Components",
         );
+        const configuration = this.mergeConfiguration(b, o, t);
 
         const merged = new Map<string, ObjectHash>();
         const ids = new Set([
@@ -138,7 +139,32 @@ class TreeMerger {
             variables,
             materials,
             components,
+            ...(configuration === undefined ? {} : { configuration }),
         });
+    }
+
+    /**
+     * The configuration inputs, merged like the variables. A side without the (optional) part
+     * has no inputs — it merges as an empty collection, and an empty result drops the part.
+     */
+    private mergeConfiguration(b: TreeObj | undefined, o: TreeObj, t: TreeObj): ObjectHash | undefined {
+        if (
+            b?.configuration === undefined &&
+            o.configuration === undefined &&
+            t.configuration === undefined
+        ) {
+            return undefined;
+        }
+        const empty = storePart(this.store, { kind: "seq", role: CONFIGURATION_ROLE, items: [] });
+        const merged = this.mergePart(
+            b === undefined ? undefined : (b.configuration ?? empty),
+            o.configuration ?? empty,
+            t.configuration ?? empty,
+            "configuration",
+            "Configuration",
+        );
+        const part = loadPart(this.store, merged);
+        return part.kind === "seq" && part.items.length === 0 ? undefined : merged;
     }
 
     private side(hashes: Map<string, ObjectHash>): Side {

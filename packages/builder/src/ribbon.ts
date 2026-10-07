@@ -159,7 +159,7 @@ export const ParametricRibbonProfiles: RibbonProfileExtra[] = [
             },
             {
                 groupName: "ribbon.group.other",
-                items: ["feature.variable", "variable.newStudio"],
+                items: ["feature.variable", "variable.newStudio", "configuration.edit"],
             },
         ],
     },

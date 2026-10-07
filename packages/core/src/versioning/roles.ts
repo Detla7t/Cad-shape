@@ -19,6 +19,13 @@ VersioningRoles.register("variable", {
     fieldLabel: (_item, path) => path,
 });
 
+VersioningRoles.register("configurationInput", {
+    itemLabel: (value, items, index) => `Input ${nameLabel("#")(value, items, index)}`,
+    fieldLabel: (_item, path) => path,
+    formatValue: (_item, _path, value) =>
+        value !== null && typeof value === "object" ? JSON.stringify(value) : String(value ?? "—"),
+});
+
 VersioningRoles.register("material", {
     itemLabel: (value, items, index) => `Material ${nameLabel("#")(value, items, index)}`,
     formatValue: (_item, path, value) =>

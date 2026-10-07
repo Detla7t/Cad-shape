@@ -16,6 +16,7 @@ import { ElementWorkspace } from "./elements";
 import { FloatPanel } from "./floatPanel";
 import { ProjectView } from "./project";
 import { PropertyView } from "./property";
+import { ConfigurationBar, showConfigurationPanel } from "./property/configuration";
 import { MaterialDataContent, MaterialEditor } from "./property/material";
 import { showVariablesPanel } from "./property/variables";
 import { RibbonUI } from "./ribbon";
@@ -82,6 +83,8 @@ export class Editor extends HTMLElement {
                 { className: style.root },
                 new RibbonUI(this.app, this.ribbonContent),
                 this._contentEl,
+                // The active configuration, one click away whichever element is open.
+                new ConfigurationBar(this.app),
                 this._workspace.strip,
                 new Statusbar(style.statusbar),
             ),
@@ -234,6 +237,7 @@ export class Editor extends HTMLElement {
     connectedCallback(): void {
         PubSub.default.sub("editMaterial", this._handleMaterialEdit);
         PubSub.default.sub("editVariables", this._handleVariablesEdit);
+        PubSub.default.sub("editConfiguration", this._handleConfigurationEdit);
         PubSub.default.sub("openCommandContext", this.openContext);
         PubSub.default.sub("closeCommandContext", this.closeContext);
         PubSub.default.sub("toggleChatPanel", this.toggleChat);
@@ -244,6 +248,7 @@ export class Editor extends HTMLElement {
     disconnectedCallback(): void {
         PubSub.default.remove("editMaterial", this._handleMaterialEdit);
         PubSub.default.remove("editVariables", this._handleVariablesEdit);
+        PubSub.default.remove("editConfiguration", this._handleConfigurationEdit);
         PubSub.default.remove("openCommandContext", this.openContext);
         PubSub.default.remove("closeCommandContext", this.closeContext);
         PubSub.default.remove("toggleChatPanel", this.toggleChat);
@@ -285,6 +290,10 @@ export class Editor extends HTMLElement {
 
     private readonly _handleVariablesEdit = (document: IDocument, onApplied: () => void) => {
         showVariablesPanel(document, onApplied);
+    };
+
+    private readonly _handleConfigurationEdit = (document: IDocument) => {
+        showConfigurationPanel(document);
     };
 }
 

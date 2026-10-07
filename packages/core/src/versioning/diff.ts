@@ -6,7 +6,7 @@ import { canonicalJson, isJsonObject, type JsonValue, jsonEquals } from "./hash"
 import type { IObjectStore } from "./objectStore";
 import type { NodeObj, ObjectHash, TreeObj } from "./objects";
 import { joinProperty, loadPart, type Part, type SeqItem, VersioningRoles } from "./parts";
-import { getNode, getTree, readMeta, treeNodes } from "./snapshot";
+import { CONFIGURATION_ROLE, getNode, getTree, readMeta, treeNodes } from "./snapshot";
 import { diffLines, lineStats } from "./textDiff";
 
 /**
@@ -65,6 +65,8 @@ export interface DocumentDiff {
     readonly materials: readonly DetailChange[];
     readonly components: readonly DetailChange[];
     readonly meta: readonly DetailChange[];
+    /** Configuration inputs added, removed, reordered and edited. */
+    readonly configuration: readonly DetailChange[];
 }
 
 export function isEmptyDiff(diff: DocumentDiff): boolean {
@@ -73,7 +75,8 @@ export function isEmptyDiff(diff: DocumentDiff): boolean {
         diff.variables.length === 0 &&
         diff.materials.length === 0 &&
         diff.components.length === 0 &&
-        diff.meta.length === 0
+        diff.meta.length === 0 &&
+        diff.configuration.length === 0
     );
 }
 
@@ -106,7 +109,7 @@ export function diffTrees(store: IObjectStore, from: ObjectHash | undefined, to:
     const a = indexTree(store, from);
     const b = indexTree(store, to)!;
     if (a !== undefined && from === to)
-        return { nodes: [], variables: [], materials: [], components: [], meta: [] };
+        return { nodes: [], variables: [], materials: [], components: [], meta: [], configuration: [] };
 
     const nodes: NodeDiff[] = [];
     const reordered = reorderedChildren(a, b);
@@ -154,7 +157,23 @@ export function diffTrees(store: IObjectStore, from: ObjectHash | undefined, to:
         materials: diffCollection(store, a?.tree.materials, b.tree.materials, "materials"),
         components: diffCollection(store, a?.tree.components, b.tree.components, "components"),
         meta: diffMeta(store, a?.tree.meta, b.tree.meta),
+        configuration: diffOptionalCollection(store, a?.tree.configuration, b.tree.configuration),
     };
+}
+
+/** The configuration inputs' changes — a side without a part has none (see `TreeObj.configuration`). */
+function diffOptionalCollection(
+    store: IObjectStore,
+    before: ObjectHash | undefined,
+    after: ObjectHash | undefined,
+): DetailChange[] {
+    if (before === after) return [];
+    const items = (hash: ObjectHash | undefined): readonly SeqItem[] => {
+        if (hash === undefined) return [];
+        const part = loadPart(store, hash);
+        return part.kind === "seq" ? part.items : [];
+    };
+    return diffSeq(items(before), items(after), CONFIGURATION_ROLE, "configuration");
 }
 
 /** Node ids depth-first from the root; nodes the walk does not reach follow in id order. */
@@ -475,6 +494,7 @@ export function summarizeDiff(diff: DocumentDiff, limit = 40): string[] {
     for (const detail of diff.variables) lines.push(`Variables › ${describeDetail(detail)}`);
     for (const detail of diff.materials) lines.push(`Materials › ${describeDetail(detail)}`);
     for (const detail of diff.components) lines.push(`Components › ${describeDetail(detail)}`);
+    for (const detail of diff.configuration) lines.push(`Configuration › ${describeDetail(detail)}`);
     for (const detail of diff.meta) lines.push(`Document › ${describeDetail(detail)}`);
     if (lines.length > limit) {
         const rest = lines.length - limit;

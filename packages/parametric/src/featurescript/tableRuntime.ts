@@ -88,6 +88,8 @@ export interface TableRun {
     /** The table's `definition`, in native values (`adaptHostValue` converts for Onshape's std). */
     readonly definition: FsMap;
     readonly variables?: ReadonlyMap<string, FsValue>;
+    /** Which of `variables` are configuration variables. */
+    readonly configurationVariables?: ReadonlySet<string>;
     readonly format?: TableFormatOptions;
 }
 
@@ -96,6 +98,7 @@ export function runTable(run: TableRun): TableRunResult {
     try {
         for (const body of run.bodies) context.addHostBody(body.shape).name = body.name;
         for (const [name, value] of run.variables ?? []) context.variables.set(name, value);
+        for (const name of run.configurationVariables ?? []) context.configurationVariables.add(name);
         run.interpreter.resetBudget();
         const definition = run.interpreter.adaptHostValue(run.definition);
         const callable =

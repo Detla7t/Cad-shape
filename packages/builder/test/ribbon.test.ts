@@ -192,6 +192,7 @@ describe("ParametricRibbonProfiles", () => {
             "featurescript.tables",
             "feature.variable",
             "variable.newStudio",
+            "configuration.edit",
         ]);
     });
 });

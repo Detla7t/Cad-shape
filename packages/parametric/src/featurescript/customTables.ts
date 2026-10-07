@@ -12,7 +12,12 @@ import {
 } from "@chili3d/core";
 import type { FeatureScriptParameterValue } from "../features/feature";
 import { bodyKindOf } from "./context/fsContext";
-import { documentVariables, plainDefinition, plainParameterRows } from "./featureScriptFeature";
+import {
+    configurationVariableNames,
+    documentVariables,
+    plainDefinition,
+    plainParameterRows,
+} from "./featureScriptFeature";
 import type { FeatureSpec } from "./featureSpec";
 import type { FeatureStudioNode } from "./featureStudioNode";
 import type { TableExport } from "./lang/interpreter";
@@ -151,6 +156,7 @@ export function evaluateCustomTable(
             bodies: parts.bodies,
             definition: definition.value,
             variables: documentVariables(scope),
+            configurationVariables: configurationVariableNames(scope),
             format,
         });
     } catch (error) {

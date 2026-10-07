@@ -1,0 +1,89 @@
+/* Part of the Chili3d Project, under the AGPL-3.0 License.
+   See LICENSE file in the project root for full license information. */
+
+.bar {
+    display: flex;
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 12px;
+    min-height: 30px;
+    padding: 2px 10px;
+    box-sizing: border-box;
+    border-top: 1px solid var(--border-color);
+    background-color: var(--title-background);
+    font-size: 0.9em;
+    user-select: none;
+}
+
+.icon {
+    flex: none;
+    width: 14px;
+    height: 14px;
+    color: var(--primary-color);
+}
+
+.title {
+    font-weight: 600;
+    color: var(--foreground-secondary-color);
+}
+
+.item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.name {
+    color: var(--foreground-secondary-color);
+}
+
+.control {
+    box-sizing: border-box;
+    max-width: 160px;
+    padding: 2px 6px;
+    font-size: 0.95em;
+    color: var(--foreground-color);
+    background-color: var(--input-background-color);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+
+    &:focus {
+        border-color: var(--primary-color);
+        outline: none;
+    }
+
+    &[type="checkbox"] {
+        width: 14px;
+        height: 14px;
+    }
+
+    &:not(select):not([type="checkbox"]) {
+        width: 80px;
+    }
+}
+
+.edit {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    margin-left: auto;
+    padding: 0;
+    color: var(--foreground-secondary-color);
+    background: none;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+
+    svg {
+        width: 13px;
+        height: 13px;
+    }
+
+    &:hover {
+        color: var(--foreground-color);
+        background-color: var(--hover-background-color);
+    }
+}

@@ -1,0 +1,74 @@
+/* Part of the Chili3d Project, under the AGPL-3.0 License.
+   See LICENSE file in the project root for full license information. */
+
+.root {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 280px;
+}
+
+.inputRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.label {
+    font-size: 0.9em;
+    color: var(--foreground-secondary-color);
+}
+
+.inputSelect,
+.field {
+    box-sizing: border-box;
+    min-width: 0;
+    padding: 3px 6px;
+    font-size: 0.95em;
+    color: var(--foreground-color);
+    background-color: var(--input-background-color);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+
+    &:focus {
+        border-color: var(--primary-color);
+        outline: none;
+    }
+}
+
+.inputSelect {
+    flex: 1 1 auto;
+}
+
+.header,
+.row {
+    display: grid;
+    grid-template-columns: 120px minmax(140px, 1fr);
+    gap: 8px;
+    align-items: center;
+}
+
+.header {
+    font-size: 0.85em;
+    font-weight: 600;
+    color: var(--foreground-secondary-color);
+}
+
+.rows {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 280px;
+    overflow-y: auto;
+}
+
+.option {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.empty {
+    max-width: 300px;
+    color: var(--foreground-muted-color);
+}

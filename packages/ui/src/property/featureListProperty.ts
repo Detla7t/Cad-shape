@@ -2,7 +2,9 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    assignActiveArm,
     Binding,
+    configuredArmSource,
     type FeatureItem,
     type FeatureParameter,
     type FeatureReference,
@@ -11,14 +13,17 @@ import {
     type IDocument,
     type IFeatureListNode,
     type INode,
+    isConfiguredValue,
     Localize,
     PubSub,
+    selectConfiguredArm,
     Transaction,
     type UnitSpec,
 } from "@chili3d/core";
 import { button, div, input, option, select, span, svg } from "@chili3d/element";
 import { showDialog } from "../dialog";
 import commonStyle from "./common.module.css";
+import { type ConfigureGridKind, showConfigureGrid } from "./configuration/configureGrid";
 import style from "./featureListProperty.module.css";
 import inputStyle from "./input.module.css";
 
@@ -172,15 +177,19 @@ export class FeatureListProperty extends HTMLElement {
                 textContent: param.label ?? new Localize(param.display),
             }),
             this.parameterEditor(item, param),
+            ...(this.isConfigurable(param) ? [this.configureButton(item, param)] : []),
         );
     }
 
     private parameterEditor(item: FeatureItem, param: FeatureParameter) {
         if (typeof param.value === "boolean") {
+            const configured = this.configuredOf(param);
             return input({
                 type: "checkbox",
                 checked: param.value,
-                onclick: (e) => this.applyChecked(item, param.key, (e.target as HTMLInputElement).checked),
+                className: configured === undefined ? "" : style.configuredValue,
+                title: configured === undefined ? "" : this.configuredTitle(configured),
+                onclick: (e) => this.applyChecked(item, param, (e.target as HTMLInputElement).checked),
             });
         }
         if (param.pick !== undefined) return this.pickParam(item, param);
@@ -188,12 +197,94 @@ export class FeatureListProperty extends HTMLElement {
         return this.textParamInput(item, param);
     }
 
+    // --- configured parameters ---
+
+    /**
+     * Whether the row offers Configure: a numeric slot always (it resolves through
+     * `resolveUnitSpec`, which selects the arm) unless the feature says otherwise; a checkbox,
+     * dropdown or free-text slot only when the feature says it selects arms itself.
+     */
+    private isConfigurable(param: FeatureParameter): boolean {
+        if (param.pick !== undefined) return false;
+        if (param.configurable !== undefined) return param.configurable;
+        return typeof param.value !== "boolean" && param.options === undefined && param.text !== true;
+    }
+
+    /** The stored `configure(…)` of a configured slot. */
+    private configuredOf(param: FeatureParameter): string | undefined {
+        if (param.configured !== undefined) return param.configured;
+        return isConfiguredValue(param.value) ? param.value : undefined;
+    }
+
+    private configuredTitle(configured: string): string {
+        return I18n.translate("configuration.configured{0}", configured) ?? configured;
+    }
+
+    private gridKind(param: FeatureParameter): ConfigureGridKind {
+        if (typeof param.value === "boolean") return "boolean";
+        if (param.options !== undefined) return "options";
+        return param.text === true ? "text" : "expression";
+    }
+
+    private configureButton(item: FeatureItem, param: FeatureParameter) {
+        const configured = this.configuredOf(param);
+        return button(
+            {
+                className:
+                    configured === undefined ? style.configure : `${style.configure} ${style.configureOn}`,
+                title: new Localize("configuration.configure"),
+                onclick: (e: MouseEvent) => {
+                    e.stopPropagation();
+                    showConfigureGrid(
+                        this.document,
+                        {
+                            kind: this.gridKind(param),
+                            stored: configured ?? param.value,
+                            options: param.options,
+                        },
+                        (value) => this.applyValue(item, param.key, value),
+                    );
+                },
+            },
+            svg({ icon: "icon-layer-group" }),
+        );
+    }
+
+    /**
+     * What an edit of the slot stores: a typed `configure(…)` as is; otherwise, on a configured
+     * slot, the configured value with the ACTIVE configuration's arm replaced (Onshape edits a
+     * configured parameter for the configuration on screen); else the plain value.
+     */
+    private editedValue(
+        param: FeatureParameter,
+        value: number | string | boolean,
+    ): number | string | boolean {
+        const configured = this.configuredOf(param);
+        if (configured === undefined || isConfiguredValue(value)) return value;
+        const source =
+            param.options !== undefined
+                ? configuredArmSource(String(value), { text: true })
+                : configuredArmSource(value, { text: param.text === true });
+        const assigned = assignActiveArm(configured, this.document.variables.evaluate().scope, source);
+        return assigned.isOk ? assigned.value : value;
+    }
+
     /** A closed set of choices (e.g. a FeatureScript enum): a dropdown, applied on change. */
     private optionParam(item: FeatureItem, param: FeatureParameter) {
+        const configured = this.configuredOf(param);
         return select(
             {
-                className: `${inputStyle.box} ${style.select}`,
-                onchange: (e) => this.applyValue(item, param.key, (e.target as HTMLSelectElement).value),
+                className:
+                    configured === undefined
+                        ? `${inputStyle.box} ${style.select}`
+                        : `${inputStyle.box} ${style.select} ${style.configuredValue}`,
+                title: configured === undefined ? "" : this.configuredTitle(configured),
+                onchange: (e) =>
+                    this.applyValue(
+                        item,
+                        param.key,
+                        this.editedValue(param, (e.target as HTMLSelectElement).value),
+                    ),
             },
             ...(param.options ?? []).map((choice) =>
                 option({
@@ -223,19 +314,25 @@ export class FeatureListProperty extends HTMLElement {
 
     private textParamInput(item: FeatureItem, param: FeatureParameter) {
         const { key, unit } = param;
-        const value = param.value as number | string;
+        const configured = this.configuredOf(param);
+        // The stored text — what focusing reveals for editing; a configured slot's is its
+        // `configure(…)`, while the box at rest shows what the active configuration selects.
+        const raw = configured ?? String(param.value);
+        const display = this.displayValue(param, configured);
         const expected = unitSpecLabelKey(unit);
+        const unitTitle = expected === undefined ? "" : (I18n.translate(expected) ?? "");
         return input({
-            className: inputStyle.box,
-            value: this.formatParameterValue(value),
+            className:
+                configured === undefined ? inputStyle.box : `${inputStyle.box} ${style.configuredValue}`,
+            value: display,
             // What the slot measures — the value may be an expression, and the rebuild
             // rejects one of the wrong unit, so say up front what fits.
-            title: expected === undefined ? "" : (I18n.translate(expected) ?? ""),
+            title: configured === undefined ? unitTitle : this.configuredTitle(configured),
             // Reveal the raw value for editing; blur without a change
             // restores the trimmed display.
             onfocus: (e) => {
                 const box = e.target as HTMLInputElement;
-                box.value = String(value);
+                box.value = raw;
                 box.select();
             },
             onkeydown: (e) => this.handleKeyDown(e, item, key),
@@ -243,9 +340,19 @@ export class FeatureListProperty extends HTMLElement {
                 const box = e.target as HTMLInputElement;
                 this.applyParameter(box, item, key);
                 // A applied change re-renders the list, detaching this box.
-                if (box.isConnected) box.value = this.formatParameterValue(value);
+                if (box.isConnected) box.value = display;
             },
         });
+    }
+
+    /** The box at rest: the value trimmed, or for a configured slot the active configuration's value. */
+    private displayValue(param: FeatureParameter, configured: string | undefined): string {
+        if (configured === undefined || param.configured !== undefined) {
+            // A feature that reports `configured` already hands the selected value in `value`.
+            return this.formatParameterValue(param.value as number | string);
+        }
+        const selected = selectConfiguredArm(configured, this.document.variables.evaluate().scope);
+        return selected.isOk ? this.formatParameterValue(selected.value) : configured;
     }
 
     private readonly handleKeyDown = (e: KeyboardEvent, item: FeatureItem, key: string) => {
@@ -274,6 +381,7 @@ export class FeatureListProperty extends HTMLElement {
                 item.suppressed ? "features.unsuppress" : "features.suppress",
                 () => this.toggleSuppressed(item),
             ],
+            ["icon-layer-group", "features.configureSuppression", () => this.configureSuppression(item)],
             ["icon-delete", "common.delete", () => this.removeItem(item)],
         );
         const menu = div(
@@ -421,16 +529,18 @@ export class FeatureListProperty extends HTMLElement {
 
     // --- feature actions ---
 
-    private applyChecked(item: FeatureItem, key: string, checked: boolean) {
+    private applyChecked(item: FeatureItem, param: FeatureParameter, checked: boolean) {
+        const value = this.editedValue(param, checked);
         Transaction.execute(this.document, "edit feature", () => {
-            this.node.setFeatureParameter(item.id, key, checked);
+            this.node.setFeatureParameter(item.id, param.key, value);
             this.document.visual.update();
         });
     }
 
     private applyParameter(box: HTMLInputElement, item: FeatureItem, key: string) {
         const parameter = item.parameters.find((x) => x.key === key);
-        const current = parameter?.value;
+        const current =
+            parameter === undefined ? undefined : (this.configuredOf(parameter) ?? parameter.value);
         // Free text is taken as typed (an empty string included); everything else is a
         // number or an expression and cannot be empty.
         const text = parameter?.text === true ? box.value : box.value.trim();
@@ -444,10 +554,10 @@ export class FeatureListProperty extends HTMLElement {
         // it surfaces as a feature error on the row.
         const asNumber = Number(text);
         const value = parameter?.text !== true && Number.isFinite(asNumber) ? asNumber : text;
-        this.applyValue(item, key, value);
+        this.applyValue(item, key, parameter === undefined ? value : this.editedValue(parameter, value));
     }
 
-    private applyValue(item: FeatureItem, key: string, value: number | string) {
+    private applyValue(item: FeatureItem, key: string, value: number | string | boolean) {
         Transaction.execute(this.document, "edit feature", () => {
             this.node.setFeatureParameter(item.id, key, value);
             this.document.visual.update();
@@ -461,11 +571,38 @@ export class FeatureListProperty extends HTMLElement {
         });
     }
 
+    /**
+     * Suppress / unsuppress. A feature whose suppression is configured changes for the active
+     * configuration only — the other configurations keep theirs.
+     */
     private toggleSuppressed(item: FeatureItem) {
+        let suppressed: boolean | string = !item.suppressed;
+        if (item.suppressionConfigured !== undefined) {
+            const scope = this.document.variables.evaluate().scope;
+            const assigned = assignActiveArm(
+                item.suppressionConfigured,
+                scope,
+                configuredArmSource(!item.suppressed),
+            );
+            if (assigned.isOk) suppressed = assigned.value;
+        }
+        this.setSuppressed(item, suppressed);
+    }
+
+    private setSuppressed(item: FeatureItem, suppressed: boolean | string) {
         Transaction.execute(this.document, "toggle feature", () => {
-            this.node.setFeatureSuppressed(item.id, !item.suppressed);
+            this.node.setFeatureSuppressed(item.id, suppressed);
             this.document.visual.update();
         });
+    }
+
+    /** Suppression per configuration, edited in the same grid as a configured checkbox. */
+    private configureSuppression(item: FeatureItem) {
+        showConfigureGrid(
+            this.document,
+            { kind: "boolean", stored: item.suppressionConfigured ?? item.suppressed === true },
+            (value) => this.setSuppressed(item, value === true || value === false ? value : String(value)),
+        );
     }
 }
 

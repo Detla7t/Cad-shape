@@ -9,6 +9,7 @@ import {
     type IEdge,
     type IFace,
     type INode,
+    isConfiguredValue,
     LENGTH_UNITS,
     Matrix4,
     type ParameterValue,
@@ -556,7 +557,11 @@ function runEditFeatureOp(state: State, op: EditFeatureOp): void {
             body.renameFeature(op.featureId, typeof op.value === "string" ? op.value : "");
             return;
         case "suppress":
-            body.setFeatureSuppressed(op.featureId, op.value === true);
+            // A `configure(…)` string suppresses per configuration; anything else is a flag.
+            body.setFeatureSuppressed(
+                op.featureId,
+                isConfiguredValue(op.value) ? op.value : op.value === true,
+            );
             break;
         case "moveTo":
             if (typeof op.index !== "number") throw new Error('"moveTo" requires a numeric "index"');

@@ -39,6 +39,8 @@ export interface DocumentSnapshot {
     readonly variables: readonly SeqItem[];
     readonly materials: readonly SeqItem[];
     readonly components: readonly SeqItem[];
+    /** The configuration inputs; absent (or empty) for a document without configurations. */
+    readonly configuration?: readonly SeqItem[];
 }
 
 export interface DocumentMeta {
@@ -171,7 +173,20 @@ export function readTree(store: IObjectStore, treeHash: ObjectHash): DocumentSna
         variables: readSeq(store, tree.variables),
         materials: readSeq(store, tree.materials),
         components: readSeq(store, tree.components),
+        configuration: tree.configuration === undefined ? [] : readSeq(store, tree.configuration),
     };
+}
+
+/** The seq role of the configuration inputs. */
+export const CONFIGURATION_ROLE = "configurationInput";
+
+/**
+ * The tree part of the configuration inputs — undefined when there are none, so the tree of
+ * a document without configurations is the same object it was before they existed.
+ */
+export function storeConfiguration(store: IObjectStore, items: readonly SeqItem[]): ObjectHash | undefined {
+    if (items.length === 0) return undefined;
+    return storePart(store, { kind: "seq", role: CONFIGURATION_ROLE, items: [...items] });
 }
 
 /**
@@ -194,7 +209,8 @@ export function writeSnapshot(store: IObjectStore, snapshot: DocumentSnapshot): 
         materials: storePart(store, { kind: "seq", role: "material", items: [...snapshot.materials] }),
         components: storePart(store, { kind: "seq", role: "component", items: [...snapshot.components] }),
     };
-    return store.put(tree);
+    const configuration = storeConfiguration(store, snapshot.configuration ?? []);
+    return store.put(configuration === undefined ? tree : { ...tree, configuration });
 }
 
 /** Node ids in tree order (pre-order from the root, children in order); unreachable ids are left out. */
@@ -234,6 +250,9 @@ export function snapshotToSerialized(
     for (const [id, node] of snapshot.nodes) for (const child of node.children ?? []) parents.set(child, id);
     for (const id of preorder(snapshot))
         nodes.push(serializedNode(id, snapshot.nodes.get(id)!, parents.get(id)));
+    const inputs = (snapshot.configuration ?? []).map((x) => x.value);
+    // The active configuration is not versioned: a snapshot opens on every input's default.
+    const configuration = inputs.length === 0 ? {} : { configuration: { inputs, active: {} } };
     return {
         [InternalClassName]: "Document",
         version,
@@ -247,5 +266,6 @@ export function snapshotToSerialized(
         variables: snapshot.variables.map((x) => x.value),
         acts: [...snapshot.meta.acts],
         userData: snapshot.meta.userData,
+        ...configuration,
     };
 }

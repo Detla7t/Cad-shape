@@ -28,6 +28,7 @@ import {
     evaluateFeature,
     type FeatureData,
     type FilletFeatureData,
+    isFeatureSuppressed,
 } from "../features/feature";
 import { reportSilentIdLoss } from "../features/idDiagnostics";
 import { allProfiles, profileEntitiesOf, sketchProfiles } from "../features/profileBuilder";
@@ -395,7 +396,7 @@ function evaluateChainSnapshot(host: ReselectHost, features: FeatureData[]): Res
     let input: IShape | undefined;
     const scope = host.document.variables.evaluate().scope;
     for (const feature of features) {
-        if (feature.suppressed) continue;
+        if (isFeatureSuppressed(feature, scope)) continue;
         const result = evaluateFeature(feature, { document: host.document, host, input, scope });
         if (!result.isOk) {
             input?.dispose();

@@ -5,6 +5,14 @@ import type { IDocument } from "../document";
 import type { NodeRecord } from "../foundation/history";
 import { HistoryObservable } from "../foundation/observer";
 import { type INode, NodeUtils } from "../model/node";
+import {
+    type ActiveConfigurationData,
+    type ConfigurationData,
+    type ConfigurationInputData,
+    configurationInputValue,
+    parseActiveConfiguration,
+    parseConfigurationInputs,
+} from "./configuration";
 import { EMPTY_SCOPE, type EvaluatedValue, isConstantName, resolveUnitSpec, type Scope } from "./expression";
 import { isVariableType, unitSpecOfType } from "./unitSpec";
 import { type IVariableSource, parseVariableItems, type VariableData } from "./variableData";
@@ -79,9 +87,61 @@ export function evaluateVariableLayers(
     layers: readonly VariableLayer[],
     base: Scope = EMPTY_SCOPE,
 ): EvaluatedVariables {
+    return evaluateDocumentScope(undefined, layers, base);
+}
+
+/** Names the configuration layer in the shadowing warnings of the layers above it. */
+export const CONFIGURATION_LAYER = "the configuration";
+
+/**
+ * The whole document scope: the configuration's inputs in the active configuration first
+ * (the lowest layer), then `layers` lowest first, as `evaluateVariableLayers` resolves them.
+ * Input rows report by input id, like variable rows.
+ */
+export function evaluateDocumentScope(
+    configuration: ConfigurationData | undefined,
+    layers: readonly VariableLayer[],
+    base: Scope = EMPTY_SCOPE,
+): EvaluatedVariables {
     const result = accumulator(base);
+    if (configuration !== undefined) evaluateConfigurationLayer(configuration, result);
     for (const layer of layers) evaluateLayer(layer.items, layer.name, result);
     return result;
+}
+
+function evaluateConfigurationLayer(configuration: ConfigurationData, result: Accumulator): void {
+    const defined = new Set<string>();
+    for (const input of configuration.inputs) {
+        if (input === null || typeof input !== "object") continue;
+        const error = evaluateConfigurationInput(input, configuration.active, result, defined);
+        if (error !== undefined) result.errors.set(String(input.id), error);
+    }
+}
+
+/** Resolves one configuration input into `result`; returns the error message when it cannot. */
+function evaluateConfigurationInput(
+    input: ConfigurationInputData,
+    active: ActiveConfigurationData,
+    result: Accumulator,
+    defined: Set<string>,
+): string | undefined {
+    if (typeof input.name !== "string" || !NAME_PATTERN.test(input.name)) {
+        return `Invalid configuration input name: ${String(input.name)}`;
+    }
+    if (isConstantName(input.name)) return `Configuration input name shadows a constant: ${input.name}`;
+    if (defined.has(input.name)) return `Duplicate configuration input name: ${input.name}`;
+    defined.add(input.name);
+    const value = configurationInputValue(input, active, result.scope);
+    if (!value.isOk) return value.error;
+    const id = String(input.id);
+    if (result.scope.has(input.name)) {
+        const origin = result.origins.get(input.name) ?? "a lower layer";
+        result.warnings.set(id, `Shadows ${input.name} from ${origin}`);
+    }
+    result.scope.set(input.name, value.value);
+    result.values.set(id, value.value);
+    result.origins.set(input.name, CONFIGURATION_LAYER);
+    return undefined;
 }
 
 function evaluateLayer(items: readonly VariableData[], layer: string | undefined, result: Accumulator): void {
@@ -137,22 +197,48 @@ function evaluateVariable(
  * SCOPE, which is more than the table: every Variable Studio in the document adds a layer
  * beneath it.
  *
- * Precedence, lowest to highest (see `evaluateVariableLayers`):
+ * Precedence, lowest to highest (see `evaluateDocumentScope`):
+ *   0. The configuration: its inputs in the active configuration (`configuration.ts`) — a
+ *      list input as its option index carrying the option name, a checkbox as 1 / 0, a
+ *      configuration variable as its value.
  *   1. Variable Studios, in model-tree order (the order of their element tabs). Each sees
- *      the studios before it, and may shadow their names.
+ *      the configuration and the studios before it, and may shadow their names.
  *   2. This table. It sees every studio, and shadows any studio name it redefines.
  * A name repeated within one layer is an error on the later row; shadowing across layers
- * is allowed and reported as a warning on the shadowing row. (Configurations, when they
- * come, slot in as a layer below the studios.)
+ * is allowed and reported as a warning on the shadowing row.
  *
- * Everything that resolves an expression reads `evaluate().scope`, so a studio reaches
- * feature parameters, sketch dimensions and FeatureScript's `getVariable` with no change
- * at the call sites; listeners re-derive on the `"scope"` notification, which fires when
- * any layer changes — a table write, a studio edit, a studio added, removed or moved.
+ * Everything that resolves an expression reads `evaluate().scope`, so a studio — or the
+ * active configuration — reaches feature parameters, sketch dimensions and FeatureScript's
+ * `getVariable` with no change at the call sites; listeners re-derive on the `"scope"`
+ * notification, which fires when any layer changes — a table write, a studio edit, a studio
+ * added, removed or moved, a configuration input edited, another configuration activated.
  */
 export interface IVariableTable extends IVariableSource {
     get variablesJson(): string;
     set variablesJson(value: string);
+    /**
+     * The configuration inputs, as JSON (a `ConfigurationInputData[]`). A recorded property:
+     * an input edit is one undo step, captured by version control.
+     */
+    get configurationJson(): string;
+    set configurationJson(value: string);
+    readonly configurationInputs: readonly ConfigurationInputData[];
+    /**
+     * One write, one notification, one undo step. `active`, when given, is switched to in the
+     * same notification and stays unrecorded — what keeps the active choice on an input or
+     * option that was just renamed, with one rebuild rather than two.
+     */
+    setConfigurationInputs(inputs: readonly ConfigurationInputData[], active?: ActiveConfigurationData): void;
+    /**
+     * The active configuration, as JSON (an `ActiveConfigurationData`). NOT recorded:
+     * switching configurations is a view of the document, not an edit — it never enters the
+     * undo stack or the version history — but it is saved with the document. A switch bumps
+     * the revision and notifies `"scope"` like any layer change, so everything rebuilds.
+     */
+    get activeConfigurationJson(): string;
+    set activeConfigurationJson(value: string);
+    readonly activeConfiguration: ActiveConfigurationData;
+    setActiveConfiguration(active: ActiveConfigurationData): void;
     /**
      * Bumped by every change of the scope — any layer, undo and redo included — BEFORE
      * the notifications go out. Consumers de-duplicate on it.
@@ -167,6 +253,25 @@ export interface IVariableTable extends IVariableSource {
      * re-scopes and notifies when the layers actually differ.
      */
     notifyScopeChanged(): void;
+}
+
+/**
+ * The configuration as a document saves it (`configuration: {inputs, active}`), or undefined
+ * for a document without one — which then serializes exactly as it did before configurations.
+ */
+export function documentConfiguration(table: IVariableTable): ConfigurationData | undefined {
+    const inputs = table.configurationInputs;
+    const active = table.activeConfiguration;
+    if (inputs.length === 0 && Object.keys(active).length === 0) return undefined;
+    return { inputs, active };
+}
+
+/** Restores a saved `configuration` key onto `table` (inputs first, then the active choice). */
+export function restoreConfiguration(table: IVariableTable, data: unknown): void {
+    if (data === null || typeof data !== "object") return;
+    const { inputs, active } = data as Partial<ConfigurationData>;
+    table.setConfigurationInputs(Array.isArray(inputs) ? inputs : []);
+    table.setActiveConfiguration(active !== null && typeof active === "object" ? active : {});
 }
 
 /** The table's own name in shadowing warnings — never shown, as nothing sits above it. */
@@ -187,6 +292,8 @@ export class VariableTable extends HistoryObservable implements IVariableTable {
     constructor(document: IDocument) {
         super(document);
         this.setPrivateValue("variablesJson", "[]");
+        this.setPrivateValue("configurationJson", "[]");
+        this.setPrivateValue("activeConfigurationJson", "{}");
         // Adding, removing or moving a studio changes the scope — undo of a studio's
         // creation included, which arrives here as a plain node removal.
         document.modelManager.addNodeObserver(this.handleNodesChanged);
@@ -204,6 +311,60 @@ export class VariableTable extends HistoryObservable implements IVariableTable {
 
     get items(): readonly VariableData[] {
         return parseVariableItems(this.variablesJson, "variable table");
+    }
+
+    get configurationJson(): string {
+        return this.getPrivateValue("configurationJson");
+    }
+
+    set configurationJson(value: string) {
+        if (this.setProperty("configurationJson", value, () => this._revision++)) this.emitScopeChanged();
+    }
+
+    get configurationInputs(): readonly ConfigurationInputData[] {
+        return parseConfigurationInputs(this.configurationJson);
+    }
+
+    setConfigurationInputs(
+        inputs: readonly ConfigurationInputData[],
+        active?: ActiveConfigurationData,
+    ): void {
+        const oldActive = this.activeConfigurationJson;
+        const nextActive = active === undefined ? oldActive : JSON.stringify(active);
+        // The active choice lands first and silently, so the input write's one revision bump
+        // and one "scope" notification cover both.
+        if (nextActive !== oldActive) this.setPrivateValue("activeConfigurationJson", nextActive);
+        const written = this.setProperty("configurationJson", JSON.stringify(inputs), () => this._revision++);
+        if (nextActive === oldActive) {
+            if (written) this.emitScopeChanged();
+            return;
+        }
+        if (!written) this._revision++;
+        this.emitPropertyChanged("activeConfigurationJson", oldActive);
+        this.emitScopeChanged();
+    }
+
+    get activeConfigurationJson(): string {
+        return this.getPrivateValue("activeConfigurationJson");
+    }
+
+    set activeConfigurationJson(value: string) {
+        // Deliberately not `setProperty`: that would record the switch as an undo step and a
+        // microversion. The revision still moves before the notifications go out.
+        const old = this.activeConfigurationJson;
+        if (old === value) return;
+        this.setPrivateValue("activeConfigurationJson", value);
+        this._revision++;
+        this.emitPropertyChanged("activeConfigurationJson", old);
+        this.emitScopeChanged();
+    }
+
+    get activeConfiguration(): ActiveConfigurationData {
+        return parseActiveConfiguration(this.activeConfigurationJson);
+    }
+
+    setActiveConfiguration(active: ActiveConfigurationData): void {
+        this.activeConfigurationJson = JSON.stringify(active);
     }
 
     get revision(): number {
@@ -225,7 +386,11 @@ export class VariableTable extends HistoryObservable implements IVariableTable {
                 items: studio.items,
             }));
             layers.push({ name: TABLE_LAYER, items: this.items });
-            this._evaluated = { revision: this._revision, result: evaluateVariableLayers(layers) };
+            const configuration = { inputs: this.configurationInputs, active: this.activeConfiguration };
+            this._evaluated = {
+                revision: this._revision,
+                result: evaluateDocumentScope(configuration, layers),
+            };
         }
         return this._evaluated.result;
     }

@@ -321,15 +321,15 @@ describe("FeatureListProperty", () => {
         expect(node.activateReference).toHaveBeenCalledWith("b1", "sketchId");
     });
 
-    test("the more menu opens with rename/suppress/delete entries", () => {
+    test("the more menu opens with rename/suppress/configure suppression/delete entries", () => {
         const doc = createMockDocument();
         const node = featureNode([]);
         const prop = new FeatureListProperty(doc, node);
         const menu = openMenu(prop);
 
-        expect(menu.querySelectorAll(".fl-menu-item").length).toBe(3);
+        expect(menu.querySelectorAll(".fl-menu-item").length).toBe(4);
 
-        clickMenuItem(menu, 2);
+        clickMenuItem(menu, 3);
         expect(node.removeFeature).toHaveBeenCalledWith("b1");
         expect(document.body.querySelector(".fl-menu")).toBeNull();
     });

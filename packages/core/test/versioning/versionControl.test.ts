@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    type ConfigurationInputData,
     DocumentVersionControl,
     exportHistory,
     FolderNode,
@@ -9,9 +10,12 @@ import {
     type IStorage,
     importHistory,
     PhongMaterial,
+    readTree,
     Serializer,
     StorageHistoryPersistence,
+    snapshotToSerialized,
     Transaction,
+    type TreeObj,
     VERSION_HISTORY_ENTRY_PROVIDER,
 } from "../../src";
 import { TestDocument } from "../../test-utils";
@@ -475,4 +479,79 @@ describe("DocumentVersionControl", () => {
             expect(importHistory(document, {}).isOk).toBe(false);
         });
     });
+
+    describe("configuration", () => {
+        const size = (options: string[]): ConfigurationInputData => ({
+            kind: "list",
+            id: "c-size",
+            name: "Size",
+            options: options.map((name) => ({ id: `o-${name}`, name })),
+        });
+        const editInputs = (inputs: ConfigurationInputData[]) =>
+            Transaction.execute(document, "edit configuration", () =>
+                document.variables.setConfigurationInputs(inputs),
+            );
+
+        test("a document without configuration inputs keeps the tree it always had", () => {
+            const tree = store(vc).get(vc.headCommit().tree) as TreeObj;
+            expect(tree.configuration).toBeUndefined();
+        });
+
+        test("captures input edits as microversions with a semantic summary", async () => {
+            editInputs([size(["S", "L"])]);
+            await settle();
+            expect(vc.headCommit().summary).toEqual(["Configuration › Added Input Size"]);
+            const tree = store(vc).get(vc.headCommit().tree) as TreeObj;
+            expect(readTree(store(vc), vc.headCommit().tree).configuration?.map((x) => x.id)).toEqual([
+                "c-size",
+            ]);
+            expect(tree.configuration).not.toBeUndefined();
+        });
+
+        test("switching the active configuration is a view: no microversion", async () => {
+            editInputs([size(["S", "L"])]);
+            await settle();
+            const head = vc.head;
+            document.variables.setActiveConfiguration({ Size: "L" });
+            await settle();
+            expect(vc.flush()).toBeUndefined();
+            expect(vc.head).toBe(head);
+        });
+
+        test("restore brings the inputs back; the active choice falls back when it no longer fits", async () => {
+            editInputs([size(["S", "L"])]);
+            await settle();
+            const v1 = vc.head;
+            editInputs([size(["S", "L", "XL"])]);
+            document.variables.setActiveConfiguration({ Size: "XL" });
+            await settle();
+
+            vc.restore(v1);
+            expect(document.variables.configurationInputs).toEqual([size(["S", "L"])]);
+            expect(document.variables.scope.get("Size")?.option).toBe("S");
+            // The snapshot form a version opens as carries the inputs too.
+            const serialized = snapshotToSerialized(readTree(store(vc), vc.commit(v1).tree), "doc-1", "1");
+            expect(serialized["configuration"]).toEqual({ inputs: [size(["S", "L"])], active: {} });
+        });
+
+        test("merges inputs added on another branch", async () => {
+            vc.createBranch("Feature");
+            editInputs([size(["S", "L"])]);
+            await settle();
+            const feature = vc.head;
+            vc.switchBranch("Main");
+            expect(document.variables.configurationInputs).toEqual([]);
+            add(document, folder(document, "A"));
+            await settle();
+            const preview = vc.previewMerge(feature);
+            expect(preview.conflicts).toEqual([]);
+            expect(preview.incoming.configuration).toHaveLength(1);
+            expect(vc.merge(preview).isOk).toBe(true);
+            expect(document.variables.configurationInputs.map((x) => x.name)).toEqual(["Size"]);
+        });
+    });
 });
+
+function store(control: DocumentVersionControl) {
+    return control.store;
+}

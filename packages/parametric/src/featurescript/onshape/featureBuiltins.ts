@@ -114,17 +114,29 @@ export function installFeatureBuiltins(define: BuiltinRegistry, bridge: StdBridg
         if (definition.has("defaultValue")) return definition.field("defaultValue");
         fail(`Variable "${name}" not found`);
     });
-    const allVariables = (context: FsContext, withDescriptions: boolean) => {
+    /**
+     * Every variable on the context. Std's two-argument overloads pass
+     * `{ includeConfiguration }`: false leaves the configuration variables out; the
+     * one-argument form includes them, as Onshape's does.
+     */
+    const allVariables = (args: FsValue[], withDescriptions: boolean) => {
+        const context = FsContext.of(args[0]);
+        const options = args[1];
+        const includeConfiguration =
+            !(options instanceof FsMap) ||
+            !options.has("includeConfiguration") ||
+            options.field("includeConfiguration") !== false;
         const result = new FsMap();
         for (const [name, value] of context.variables) {
+            if (!includeConfiguration && context.configurationVariables.has(name)) continue;
             const std = bridge.toStd(value);
             const description = featureState(context).descriptions.get(name) ?? "";
             result.set(name, withDescriptions ? fsMap({ value: std, description }) : std);
         }
         return result;
     };
-    define("getAllVariables", (args) => allVariables(FsContext.of(args[0]), false));
-    define("getAllVariablesAndDescriptions", (args) => allVariables(FsContext.of(args[0]), true));
+    define("getAllVariables", (args) => allVariables(args, false));
+    define("getAllVariablesAndDescriptions", (args) => allVariables(args, true));
     define("setQueryVariable", (args) => {
         const [context, definition] = variableArgs(args);
         featureState(context).queryVariables.set(String(definition.field("name")), definition.field("value"));

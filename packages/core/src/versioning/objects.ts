@@ -17,7 +17,8 @@ import type { JsonObject, JsonValue } from "./hash";
  *                 │                   part = json | text | seq{[id, item]} | rec{field → part}
  *                 ├─ variables (seq of variables by id)
  *                 ├─ materials (seq by material id)
- *                 └─ components (seq by component id)
+ *                 ├─ components (seq by component id)
+ *                 └─ configuration? (seq of configuration inputs by id)
  * ```
  *
  * Big composite properties are split into finer objects by `PropertySplitter`s (see
@@ -82,6 +83,12 @@ export interface TreeObj {
     readonly variables: ObjectHash;
     readonly materials: ObjectHash;
     readonly components: ObjectHash;
+    /**
+     * The configuration inputs (seq by input id). Absent when the document has none, so a
+     * document without configurations hashes exactly as it did before they existed. The
+     * active configuration is not versioned: switching it is a view, not an edit.
+     */
+    readonly configuration?: ObjectHash;
 }
 
 /**

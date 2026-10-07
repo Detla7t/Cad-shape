@@ -259,6 +259,8 @@ export interface FsRunNotes {
 export class FsContext {
     readonly bodies: FsBody[] = [];
     readonly variables = new Map<string, FsValue>();
+    /** Names in `variables` that are configuration variables — `getAllVariables` can leave them out. */
+    readonly configurationVariables = new Set<string>();
     readonly notes: FsRunNotes = { warnings: [], infos: [] };
     /** Ids (`/`-joined) of the operations that changed geometry, in run order. */
     readonly operations: string[] = [];
