@@ -189,6 +189,28 @@ You can also deploy with Docker:
 docker compose up -d   # Builds and serves the app at http://localhost:8080
 ```
 
+### 3D Printing with PrusaSlicer (optional)
+
+A CAM Studio printer setup slices in the browser with the built-in slicer, or with your installed
+[PrusaSlicer](https://www.prusa3d.com/prusaslicer/) through a small local bridge (the "PrusaSlicer (local)"
+operation). Both read the same PrusaSlicer print / filament / printer presets; "Open in PrusaSlicer" exports the
+job as a PrusaSlicer project (`.3mf`) instead.
+
+Start the bridge on the computer that has PrusaSlicer (Node.js 18+, no extra packages):
+
+```bash
+node scripts/prusa-slicer-bridge.mjs                         # http://127.0.0.1:7781, runs `prusa-slicer`
+node scripts/prusa-slicer-bridge.mjs --slicer "/Applications/PrusaSlicer.app/Contents/MacOS/PrusaSlicer"
+node scripts/prusa-slicer-bridge.mjs --slicer "C:\Program Files\Prusa3D\PrusaSlicer\prusa-slicer-console.exe"
+node scripts/prusa-slicer-bridge.mjs --origin https://your-chili3d-host   # allow a deployed app (dev origins are allowed)
+```
+
+`PRUSA_SLICER`, `CHILI3D_BRIDGE_PORT` and `CHILI3D_ORIGINS` (comma-separated) set the same options. The bridge
+listens on 127.0.0.1 only, answers `GET /health` with the PrusaSlicer version, and for `POST /slice` runs
+`prusa-slicer --export-gcode --dont-arrange --load job.ini --output job.gcode job.3mf` in a temporary directory
+and returns the G-code. Set the operation's "Bridge URL" (or the machine's `prusaSlicerBridgeUrl` option) when it
+runs elsewhere.
+
 ## Code Style
 
 - **TypeScript**: Biome for linting and formatting — 4-space indent, 110-char line width, double quotes, semicolons always
