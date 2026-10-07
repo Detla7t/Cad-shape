@@ -36,7 +36,15 @@ import {
     Repository,
     type VersionInfo,
 } from "./repository";
-import { type NodeContent, nodeContent, nodeObject, readTree, seqItems, storeShards } from "./snapshot";
+import {
+    type NodeContent,
+    nodeContent,
+    nodeObject,
+    readTree,
+    seqItems,
+    storeConfiguration,
+    storeShards,
+} from "./snapshot";
 
 /**
  * Version control for one live document — Onshape's model:
@@ -151,6 +159,8 @@ export class DocumentVersionControl {
     private readonly listeners = new Set<ChangeListener>();
     private meta?: ObjectHash;
     private variables?: ObjectHash;
+    /** Undefined while the document has no configuration inputs (see `TreeObj.configuration`). */
+    private configuration?: ObjectHash;
     private materials?: ObjectHash;
     private components?: ObjectHash;
     private dirtyAll = true;
@@ -427,6 +437,11 @@ export class DocumentVersionControl {
                 role: "variable",
                 items: seqItems(this.document.variables.items, (x) => x.id),
             });
+            // The configuration inputs live on the same object, so they are dirty together.
+            this.configuration = storeConfiguration(
+                this.store,
+                seqItems(this.document.variables.configurationInputs ?? [], (x) => x.id),
+            );
         }
         if (this.dirtyAll || this.dirtyMaterials || this.materials === undefined) {
             this.materials = storePart(this.store, {
@@ -459,6 +474,7 @@ export class DocumentVersionControl {
             variables: this.variables,
             materials: this.materials,
             components: this.components,
+            ...(this.configuration === undefined ? {} : { configuration: this.configuration }),
         };
         return this.store.put(tree);
     }
@@ -677,6 +693,7 @@ export class DocumentVersionControl {
                         object.variables,
                         object.materials,
                         object.components,
+                        ...(object.configuration === undefined ? [] : [object.configuration]),
                         ...object.shards,
                     );
                     break;

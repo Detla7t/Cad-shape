@@ -13,6 +13,7 @@ import {
     Result,
     type Scope,
     ShapeTypes,
+    selectConfiguredBoolean,
     type TrackedShape,
     type XYZLike,
 } from "@chili3d/core";
@@ -23,8 +24,12 @@ import type { ProfileRef } from "./profileRef";
 export interface FeatureBase {
     readonly id: string;
     readonly type: string;
-    /** Suppressed features are skipped during evaluation and shown dimmed in the panel. */
-    readonly suppressed?: boolean;
+    /**
+     * Suppressed features are skipped during evaluation and shown dimmed in the panel. A
+     * `configure(…)` value over a list or checkbox input suppresses per configuration — read
+     * it through `isFeatureSuppressed`, never as a truthy flag.
+     */
+    readonly suppressed?: boolean | string;
     /** User-assigned display name, overriding the kind's default in the feature panel. */
     readonly name?: string;
 }
@@ -446,4 +451,19 @@ export function evaluateFeature(feature: FeatureData, context: FeatureContext): 
     const handler = handlers.get(feature.type);
     if (handler === undefined) return Result.err(`Unknown feature type: ${feature.type}`);
     return handler.evaluate(feature, context);
+}
+
+/**
+ * Whether `feature` is suppressed in the active configuration. `suppressed` is `true`/`false`
+ * or a configured value over a list or checkbox input (`configure(Holes, true: false, false:
+ * true)`); one that cannot be resolved reports why, and the feature then stays in.
+ */
+export function featureSuppression(feature: FeatureBase, scope: Scope): Result<boolean> {
+    return selectConfiguredBoolean(feature.suppressed ?? false, scope);
+}
+
+/** `featureSuppression`, with an unresolvable configured suppression counting as not suppressed. */
+export function isFeatureSuppressed(feature: FeatureBase, scope: Scope): boolean {
+    const suppressed = featureSuppression(feature, scope);
+    return suppressed.isOk && suppressed.value;
 }

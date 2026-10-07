@@ -7,6 +7,7 @@ import {
     type IDocument,
     type IFace,
     type IShape,
+    isConfiguredValue,
     LENGTH_UNITS,
     Matrix4,
     type ParameterValue,
@@ -14,6 +15,7 @@ import {
     resolveUnitSpec,
     type Scope,
     ShapeTypes,
+    selectConfiguredArm,
     UNITLESS,
     type UnitSpec,
     XYZ,
@@ -177,7 +179,7 @@ export function plainParameterRows(
     const preview = previewDefinition(spec, scope, stored);
     return spec.parameters
         .filter((parameter) => parameter.kind !== "query" && isParameterVisible(spec, parameter, preview))
-        .map((parameter) => toFeatureParameter(stored(parameter), parameter));
+        .map((parameter) => toFeatureParameter(stored(parameter), parameter, scope));
 }
 
 /** One stored (non-query) value as the FeatureScript value the feature receives. */
@@ -186,6 +188,15 @@ function convertValue(
     value: FeatureScriptParameterValue,
     scope: Scope,
 ): Result<FsValue> {
+    // A configured value (`configure(Size, "S": …, "L": …)`) picks its active arm first; the
+    // numeric kinds get the same through `resolveUnitSpec`.
+    if (parameter.kind === "boolean" || parameter.kind === "string" || parameter.kind === "enum") {
+        if (isConfiguredValue(value)) {
+            const selected = selectConfiguredArm(value, scope);
+            if (!selected.isOk) return Result.err(`${parameter.label}: ${selected.error}`);
+            value = selected.value;
+        }
+    }
     switch (parameter.kind) {
         case "boolean":
             return Result.ok(value === true || value === "true");
@@ -228,10 +239,15 @@ function convertValue(
     }
 }
 
-/** The document's variables as FeatureScript values, for `getVariable`. */
+/**
+ * The document's variables as FeatureScript values, for `getVariable`. List and checkbox
+ * configuration inputs are left out — Onshape hands FeatureScript only the configuration
+ * VARIABLES; a list or checkbox reaches a feature through the parameters it configures.
+ */
 export function documentVariables(scope: Scope): Map<string, FsValue> {
     const variables = new Map<string, FsValue>();
-    for (const [name, { value, unit }] of scope) {
+    for (const [name, { value, unit, option }] of scope) {
+        if (option !== undefined) continue;
         if (unit.length === 1 && unit.angle === 0)
             variables.set(name, new FsQuantity(value / MM_PER_METER, LENGTH));
         else if (unit.angle === 1 && unit.length === 0)
@@ -239,6 +255,15 @@ export function documentVariables(scope: Scope): Map<string, FsValue> {
         else variables.set(name, value);
     }
     return variables;
+}
+
+/** The names among `documentVariables` that are configuration variables (`getAllVariables`' flag). */
+export function configurationVariableNames(scope: Scope): Set<string> {
+    const names = new Set<string>();
+    for (const [name, entry] of scope) {
+        if (entry.configuration === true && entry.option === undefined) names.add(name);
+    }
+    return names;
 }
 
 // ------------------------------------------------------------------ Entity picks
@@ -363,6 +388,7 @@ function evaluateFeatureScript(feature: FeatureScriptFeatureData, context: Featu
             input: context.input,
             instanceId: instanceIdOf(feature),
             variables: documentVariables(context.scope),
+            configurationVariables: configurationVariableNames(context.scope),
             definition: (fsContext) =>
                 buildDefinition(
                     feature,
@@ -518,7 +544,7 @@ const featureScriptHandler: FeatureHandler<FeatureScriptFeatureData> = {
         const preview = previewDefinition(spec, scope, (parameter) => storedValue(feature, parameter));
         return spec.parameters
             .filter((parameter) => isParameterVisible(spec, parameter, preview))
-            .map((parameter) => toFeatureParameter(storedValue(feature, parameter), parameter));
+            .map((parameter) => toFeatureParameter(storedValue(feature, parameter), parameter, scope));
     },
 
     setParameter(feature, key, value, document) {
@@ -528,7 +554,10 @@ const featureScriptHandler: FeatureHandler<FeatureScriptFeatureData> = {
                 : specOf(document, feature)?.parameters.find((p) => p.key === key);
         let stored: FeatureScriptParameterValue = value;
         if (parameter?.kind === "string" || parameter?.kind === "enum") stored = String(value);
-        if (parameter?.kind === "boolean") stored = value === true || value === "true";
+        // A configured checkbox keeps its `configure(…)`; the rebuild selects the arm.
+        if (parameter?.kind === "boolean") {
+            stored = isConfiguredValue(value) ? value : value === true || String(value) === "true";
+        }
         return { ...feature, definition: { ...feature.definition, [key]: stored } };
     },
 
@@ -555,18 +584,39 @@ function specOf(document: IDocument, feature: FeatureScriptFeatureData): Feature
     return resolved.isOk ? resolved.value.spec : undefined;
 }
 
+/**
+ * A checkbox, dropdown or text slot's configured value: the stored `configure(…)` and what the
+ * active configuration selects from it (the stored text itself when nothing can be selected —
+ * the rebuild reports why).
+ */
+function configuredDisplay(
+    value: FeatureScriptParameterValue,
+    scope: Scope,
+): { readonly configured: string; readonly selected: ParameterValue } | undefined {
+    if (!isConfiguredValue(value)) return undefined;
+    const selected = selectConfiguredArm(value, scope);
+    return { configured: value, selected: selected.isOk ? selected.value : value };
+}
+
 function toFeatureParameter(
     value: FeatureScriptParameterValue,
     parameter: FsParameterSpec,
+    scope: Scope,
 ): FeatureParameter {
     const base = { key: parameter.key, display: "featurescript.parameter" as const, label: parameter.label };
+    const configured = configuredDisplay(value, scope);
+    const shown = configured === undefined ? value : configured.selected;
+    const flags = {
+        configurable: true,
+        ...(configured === undefined ? {} : { configured: configured.configured }),
+    };
     switch (parameter.kind) {
         case "boolean":
-            return { ...base, value: value === true || value === "true" };
+            return { ...base, ...flags, value: shown === true || shown === "true" };
         case "enum":
-            return { ...base, value: String(value), options: parameter.options ?? [] };
+            return { ...base, ...flags, value: String(shown), options: parameter.options ?? [] };
         case "string":
-            return { ...base, value: String(value), text: true };
+            return { ...base, ...flags, value: String(shown), text: true };
         case "query":
             return {
                 ...base,

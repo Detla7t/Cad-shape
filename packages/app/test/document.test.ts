@@ -2,15 +2,18 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    type ConfigurationInputData,
     History,
     type IApplication,
     InternalClassName,
     ModelManager,
     ObservableCollection,
+    unpackProject,
 } from "@chili3d/core";
 import { createMockApplication } from "@chili3d/core/test-utils";
 import { afterEach, beforeEach, describe, expect, rs, test } from "@rstest/core";
 import { Document } from "../src/document";
+import { buildProjectFiles } from "../src/project/projectFile";
 
 describe("Document", () => {
     let mockApp: IApplication;
@@ -177,6 +180,57 @@ describe("Document", () => {
             } finally {
                 loaded?.dispose();
             }
+        });
+    });
+
+    describe("configuration", () => {
+        const inputs: ConfigurationInputData[] = [
+            {
+                kind: "list",
+                id: "c1",
+                name: "Size",
+                options: [
+                    { id: "s", name: "S" },
+                    { id: "l", name: "L" },
+                ],
+                defaultOption: "s",
+            },
+            { kind: "checkbox", id: "c2", name: "Holes", defaultValue: false },
+        ];
+
+        test("a document without configuration inputs serializes no configuration key", () => {
+            expect(Object.hasOwn(document.serialize(), "configuration")).toBe(false);
+        });
+
+        test("round-trips inputs and the active configuration through Document.load", async () => {
+            document.variables.setConfigurationInputs(inputs);
+            document.variables.setActiveConfiguration({ Size: "L", Holes: true });
+            document.variables.setItems([
+                { id: "v1", name: "w", expression: 'configure(Size, "S": 10, "L": 30)', type: "length" },
+            ]);
+            const serialized = document.serialize();
+            expect(serialized["configuration"]).toEqual({ inputs, active: { Size: "L", Holes: true } });
+
+            const loaded = await Document.load(mockApp, JSON.parse(JSON.stringify(serialized)));
+            try {
+                expect(loaded).not.toBeUndefined();
+                expect(loaded!.variables.configurationInputs).toEqual(inputs);
+                expect(loaded!.variables.activeConfiguration).toEqual({ Size: "L", Holes: true });
+                // Restored before the variables resolve: the configured variable takes the L arm.
+                expect(loaded!.variables.evaluate().scope.get("w")?.value).toBe(30);
+            } finally {
+                loaded?.dispose();
+            }
+        });
+
+        test("travels inside a .chili3d project's document.json", async () => {
+            document.variables.setConfigurationInputs(inputs);
+            document.variables.setActiveConfiguration({ Size: "L" });
+            const files = await buildProjectFiles(document, { now: new Date(0) });
+            expect(files.isOk).toBe(true);
+            const project = unpackProject(files.value);
+            expect(project.isOk).toBe(true);
+            expect(project.value.document["configuration"]).toEqual({ inputs, active: { Size: "L" } });
         });
     });
 

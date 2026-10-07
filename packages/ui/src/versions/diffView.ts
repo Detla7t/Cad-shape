@@ -68,6 +68,7 @@ function diffSections(diff: DocumentDiff, sideBySide: boolean): HTMLElement[] {
         );
     }
     const collections: [string, readonly DetailChange[]][] = [
+        ["Configuration", diff.configuration],
         ["Variables", diff.variables],
         ["Materials", diff.materials],
         ["Components", diff.components],

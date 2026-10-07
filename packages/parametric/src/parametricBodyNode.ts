@@ -12,6 +12,7 @@ import {
     type INode,
     type INodeLinkedList,
     type IShape,
+    isConfiguredValue,
     isPropertyChanged,
     NodeChildList,
     type NodeRecord,
@@ -41,7 +42,13 @@ import {
 } from "./features/bodyTracking";
 import type { EdgeRef } from "./features/edgeRef";
 import { findSketch } from "./features/extrude";
-import type { BooleanFeatureData, ExtrudeFeatureData, FeatureScriptFeatureData } from "./features/feature";
+import {
+    type BooleanFeatureData,
+    type ExtrudeFeatureData,
+    type FeatureScriptFeatureData,
+    featureSuppression,
+    isFeatureSuppressed,
+} from "./features/feature";
 import type { ProfileRef } from "./features/profileRef";
 import { syncNodeWatches } from "./nodeWatch";
 import { danglingProfileRefs, SketchNode } from "./sketch/sketchNode";
@@ -283,6 +290,7 @@ export class ParametricBodyNode
     // ------------------------------------------------------------------ Feature list editing
 
     featureItems(): readonly FeatureItem[] {
+        const scope = this.document.variables.evaluate().scope;
         return this.features.map((feature) => {
             const handler = featureHandler(feature.type);
             const display = handler?.display;
@@ -295,7 +303,10 @@ export class ParametricBodyNode
                         ? display(feature)
                         : (display ?? ("common.name" as I18nKeys)),
                 icon: typeof icon === "function" ? icon(feature) : icon,
-                suppressed: feature.suppressed === true,
+                suppressed: isFeatureSuppressed(feature, scope),
+                ...(isConfiguredValue(feature.suppressed)
+                    ? { suppressionConfigured: feature.suppressed }
+                    : {}),
                 error: this._featureErrors.get(feature.id),
                 warning: this._featureWarnings.get(feature.id),
                 reselectable: handler?.reselectable === true,
@@ -345,7 +356,7 @@ export class ParametricBodyNode
         this.setFeaturesEmitShapeChanged(features);
     }
 
-    setFeatureSuppressed(featureId: string, suppressed: boolean): void {
+    setFeatureSuppressed(featureId: string, suppressed: boolean | string): void {
         const features = this.features.map((feature) =>
             feature.id === featureId ? { ...feature, suppressed } : feature,
         );
@@ -643,7 +654,12 @@ export class ParametricBodyNode
             for (let index = 0; index < features.length && index < stop; index++) {
                 timeline.push({ shape: input, faceIds, edgeIds });
                 const feature = features[index];
-                if (feature.suppressed) continue;
+                // Configured suppression resolves against the active configuration; one that
+                // cannot (an input deleted, an option without a value) keeps the feature in and
+                // says why on its row.
+                const suppressed = featureSuppression(feature, scope);
+                if (!suppressed.isOk) this._featureWarnings.set(feature.id, suppressed.error);
+                else if (suppressed.value) continue;
                 let step: ReturnType<typeof this.evaluateFeatureStep>;
                 try {
                     this.followReferencedSketches(feature, followedSketches);
@@ -855,10 +871,12 @@ export class ParametricBodyNode
      */
     private markUnresolvedExternalRefs(features: FeatureData[]): void {
         const checked = new Map<string, boolean>();
+        const scope = this.document.variables.evaluate().scope;
         const stop = this._rollbackIndex ?? features.length;
         for (let index = 0; index < features.length && index < stop; index++) {
             const feature = features[index];
-            if (feature.suppressed || !("sketchId" in feature) || feature.sketchId === undefined) continue;
+            if (isFeatureSuppressed(feature, scope)) continue;
+            if (!("sketchId" in feature) || feature.sketchId === undefined) continue;
             let dangling = checked.get(feature.sketchId);
             if (dangling === undefined) {
                 const sketch = findSketch(this.document, feature.sketchId);

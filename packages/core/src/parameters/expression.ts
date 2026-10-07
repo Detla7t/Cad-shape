@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import { Result } from "../foundation/result";
+import { selectConfiguredArm } from "./configuredValue";
 import {
     ANGLE_UNITS,
     combineUnitSpecs,
@@ -20,6 +21,14 @@ export type ParameterValue = number | string;
 export interface EvaluatedValue {
     readonly value: number;
     readonly unit: UnitSpec;
+    /**
+     * Set on the scope entry of a list or checkbox configuration input: the active option's
+     * name (`"M"`), or `"true"`/`"false"` for a checkbox. `value` is then the option's index
+     * (a checkbox's 1 or 0). It is what `configure(Size, …)` selects its arm by.
+     */
+    readonly option?: string;
+    /** Set on every entry of the configuration layer (lists, checkboxes and configuration variables). */
+    readonly configuration?: boolean;
 }
 
 /** Named values an expression resolves against, each carrying its declared unit. */
@@ -115,10 +124,17 @@ export function evaluateExpression(source: string, scope: Scope): Result<Evaluat
  * Resolves a feature parameter to a concrete number against the variable scope,
  * rejecting a unit that does not fit the slot. A unitless result fits any slot —
  * the same adoptability literals have.
+ *
+ * A configured value (`configure(Size, "S": 10, "L": w * 2)`) first selects the arm of the
+ * active configuration, and only that arm is evaluated — which is what makes every numeric
+ * slot resolving through here (feature parameters, sketch datums, sheet metal, FeatureScript
+ * numbers, variables themselves) configurable without knowing about configurations.
  */
 export function resolveUnitSpec(value: ParameterValue, scope: Scope, expected: UnitSpec): Result<number> {
-    if (typeof value === "number") return Result.ok(value);
-    const evaluated = evaluateExpression(value, scope);
+    const selected = selectConfiguredArm(value, scope);
+    if (!selected.isOk) return Result.err(selected.error);
+    if (typeof selected.value === "number") return Result.ok(selected.value);
+    const evaluated = evaluateExpression(selected.value, scope);
     if (!evaluated.isOk) return Result.err(evaluated.error);
     const actual = evaluated.value.unit;
     if (!unitSpecEquals(actual, UNITLESS) && !unitSpecEquals(actual, expected)) {

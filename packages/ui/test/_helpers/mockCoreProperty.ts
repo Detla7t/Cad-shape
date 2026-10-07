@@ -13,6 +13,10 @@ import { rs } from "@rstest/core";
 
 rs.mock("@chili3d/core", () => {
     const actual = rs.hoisted(() => require("@chili3d/core"));
+    // The configured-value and configuration helpers are pure; the mid-init snapshot of core
+    // can miss them (see `coreMocks.ts`), so they come straight from their modules.
+    const configuredValue = rs.hoisted(() => require("../../../core/src/parameters/configuredValue"));
+    const configuration = rs.hoisted(() => require("../../../core/src/parameters/configuration"));
     const {
         LocalizeMock,
         BindingMock,
@@ -24,6 +28,8 @@ rs.mock("@chili3d/core", () => {
     } = rs.hoisted(() => require("./coreMocks"));
     return {
         ...actual,
+        ...configuredValue,
+        ...configuration,
         Localize: LocalizeMock,
         Binding: BindingMock,
         PathBinding: PathBindingMock,

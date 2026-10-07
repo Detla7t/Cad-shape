@@ -5,6 +5,7 @@ import {
     type Act,
     Constants,
     DocumentVersionControl,
+    documentConfiguration,
     History,
     I18n,
     type IApplication,
@@ -20,6 +21,7 @@ import {
     Observable,
     ObservableCollection,
     PubSub,
+    restoreConfiguration,
     type Serialized,
     Serializer,
     StorageHistoryPersistence,
@@ -68,7 +70,7 @@ export class Document extends Observable implements IDocument {
     }
 
     serialize(): Serialized {
-        const serialized = {
+        const serialized: Serialized = {
             [InternalClassName]: "Document",
             version: __DOCUMENT_VERSION__,
             id: this.id,
@@ -78,6 +80,9 @@ export class Document extends Observable implements IDocument {
             acts: this.acts.map((x) => Serializer.serializeObject(x)),
             userData: this.userData,
         };
+        // Additive: a document without configurations serializes exactly as before.
+        const configuration = documentConfiguration(this.variables);
+        if (configuration !== undefined) serialized["configuration"] = configuration;
         return serialized;
     }
 
@@ -151,7 +156,8 @@ export class Document extends Observable implements IDocument {
         const document = new Document(app, data["name"], data["id"]);
         document.history.disabled = true;
         // Before the models: a body's feature chain resolves its parameters against
-        // the table, and deserializing a body rebuilds it.
+        // the scope — the configuration and the table — and deserializing a body rebuilds it.
+        restoreConfiguration(document.variables, data["configuration"]);
         document.variables.setItems(data["variables"] ?? []);
         document.acts.push(...data["acts"].map((x: Serialized) => Serializer.deserializeObject(document, x)));
         if (data["userData"]) {

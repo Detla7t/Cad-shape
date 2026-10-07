@@ -316,9 +316,9 @@ describe("PropertyView", () => {
 
             handler!(doc, [node as INode]);
 
-            // The menu holds rename/suppress/delete only — no reselect entry.
+            // The menu holds rename/suppress/configure suppression/delete only — no reselect entry.
             const menu = openMoreMenu(pv);
-            expect(menu.querySelectorAll("div").length).toBe(3);
+            expect(menu.querySelectorAll("div").length).toBe(4);
             expect(menu.querySelector('svg[icon="icon-sync-alt"]')).toBeNull();
             menu.remove();
         });

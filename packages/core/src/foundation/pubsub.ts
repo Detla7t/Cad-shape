@@ -24,6 +24,7 @@ export interface PubSubEventMap {
     displayHome: (show: boolean) => void;
     documentClosed: (document: IDocument) => void;
     editMaterial: (document: IDocument, material: Material, callback: (material: Material) => void) => void;
+    editConfiguration: (document: IDocument) => void;
     editVariables: (document: IDocument, onApplied: () => void) => void;
     executeCommand: (commandName: CommandKeys) => void;
     modelUpdate: (model: INode) => void;

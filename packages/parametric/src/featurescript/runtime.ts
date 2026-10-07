@@ -136,6 +136,8 @@ export interface FeatureRun {
     /** The root Id of this feature instance (the feature's id in the body). */
     readonly instanceId: string;
     readonly variables?: ReadonlyMap<string, FsValue>;
+    /** Which of `variables` are configuration variables. */
+    readonly configurationVariables?: ReadonlySet<string>;
 }
 
 export interface FeatureRunResult {
@@ -156,6 +158,7 @@ export function runFeature(run: FeatureRun): FeatureRunResult {
     try {
         if (run.input !== undefined) context.addHostBody(run.input);
         for (const [name, value] of run.variables ?? []) context.variables.set(name, value);
+        for (const name of run.configurationVariables ?? []) context.configurationVariables.add(name);
         const definition = run.interpreter.adaptHostValue(run.definition(context));
         const callable =
             run.feature.module.exports.get(run.feature.name) ??

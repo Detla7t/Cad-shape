@@ -30,6 +30,19 @@ export interface FeatureParameter {
      * as "2 edges") with a button that starts `reselectShapes(featureId, key)`.
      */
     readonly pick?: { readonly kinds: readonly ("edge" | "face" | "vertex")[] };
+    /**
+     * Whether the panel offers to configure the slot (`configure(…)` per configuration). A
+     * numeric slot is configurable unless this is `false` — it resolves through
+     * `resolveUnitSpec`, which selects the arm; a checkbox, dropdown or free-text slot only
+     * when its feature sets this, as only such a feature knows to select the arm.
+     */
+    readonly configurable?: boolean;
+    /**
+     * The stored `configure(…)` value when the slot is configured; `value` is then what the
+     * active configuration selects (a checkbox's boolean, a dropdown's option), for display.
+     * A numeric slot may leave this unset and hand the configured value in `value` itself.
+     */
+    readonly configured?: string;
 }
 
 export interface FeatureParameterOption {
@@ -57,8 +70,10 @@ export interface FeatureItem {
     readonly name?: string;
     /** Iconfont key shown before the display name (e.g. "icon-fillet"). */
     readonly icon?: string;
-    /** Suppressed features are skipped on rebuild and shown dimmed. */
+    /** Suppressed features are skipped on rebuild and shown dimmed — in the active configuration. */
     readonly suppressed?: boolean;
+    /** The `configure(…)` value of a feature whose suppression is configured. */
+    readonly suppressionConfigured?: string;
     /** Set when this feature failed to rebuild — the panel highlights the row and keeps it expanded. */
     readonly error?: string;
     /**
@@ -82,7 +97,8 @@ export interface FeatureItem {
 export interface IFeatureListNode {
     featureItems(): readonly FeatureItem[];
     setFeatureParameter(featureId: string, key: string, value: number | string | boolean): void;
-    setFeatureSuppressed(featureId: string, suppressed: boolean): void;
+    /** `true`/`false`, or a `configure(…)` value over a list or checkbox input (configured suppression). */
+    setFeatureSuppressed(featureId: string, suppressed: boolean | string): void;
     moveFeature(featureId: string, offset: -1 | 1): void;
     /** Moves a feature to an absolute index in one step; panels fall back to `moveFeature`. */
     moveFeatureTo?(featureId: string, index: number): void;

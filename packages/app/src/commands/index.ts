@@ -5,6 +5,7 @@ export * from "./aiChatCommand";
 export * from "./application";
 export * from "./boolean";
 export * from "./checkShape";
+export * from "./configuration";
 export * from "./create";
 export * from "./createActCommand";
 export * from "./createCommand";

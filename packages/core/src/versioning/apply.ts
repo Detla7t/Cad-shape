@@ -8,6 +8,7 @@ import type { Material } from "../material";
 import type { Component } from "../model/component";
 import { isFeatureListNode } from "../model/featureList";
 import { type INode, type INodeLinkedList, NodeUtils } from "../model/node";
+import type { ConfigurationInputData } from "../parameters/configuration";
 import type { VariableData } from "../parameters/variableData";
 import { InternalClassName, type Serialized, Serializer } from "../serialize";
 import { jsonEquals } from "./hash";
@@ -88,7 +89,14 @@ class SnapshotPatch {
     }
 
     run(): void {
-        // Variables first: a body resolves its parameters against them when it rebuilds.
+        // The configuration and the variables first: a body resolves its parameters against
+        // them when it rebuilds. Only the inputs are versioned; the active choice stays, and an
+        // input it no longer fits falls back to its default.
+        const inputs = (this.target.configuration ?? []).map(
+            (x) => x.value,
+        ) as unknown as ConfigurationInputData[];
+        if (!jsonEquals(this.document.variables.configurationInputs, inputs))
+            this.document.variables.setConfigurationInputs(inputs);
         const variables = this.target.variables.map((x) => x.value) as unknown as VariableData[];
         if (!jsonEquals(this.document.variables.items, variables))
             this.document.variables.setItems(variables);
