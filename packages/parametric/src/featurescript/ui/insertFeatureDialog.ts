@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { I18n, type IDocument, PubSub } from "@chili3d/core";
+import { I18n, type IDocument, PubSub, showPartStudio } from "@chili3d/core";
 import { ParametricBodyNode } from "../../parametricBodyNode";
 import type { FeatureStudioNode } from "../featureStudioNode";
 import { customFeatures, insertCustomFeature } from "../insertFeature";
@@ -75,6 +75,8 @@ export function showInsertFeatureDialog(document: IDocument, studio?: FeatureStu
                 if (entry === undefined) return;
                 const result = insertCustomFeature(document, entry, body);
                 if (!result.isOk) PubSub.default.pub("showToast", "error.default:{0}", result.error);
+                // Inserted from a studio's tab: show the body taking the new feature.
+                else showPartStudio(document);
             },
         },
         { content: "common.cancel", onclick: () => {} },

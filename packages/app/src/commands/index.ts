@@ -15,4 +15,5 @@ export * from "./measure";
 export * from "./modify";
 export * from "./redo";
 export * from "./undo";
+export * from "./variableStudio";
 export * from "./workingPlane";

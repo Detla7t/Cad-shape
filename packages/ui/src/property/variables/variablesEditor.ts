@@ -38,31 +38,62 @@ export class VariablesEditor extends HTMLElement {
     private readonly rows = new Map<string, HTMLElement>();
     /** The open description editor, when one is up (see `editDescription`). */
     private popup: HTMLElement | undefined;
+    /** False between a disconnect and the next connect: the rows may have gone stale. */
+    private listening = false;
 
     constructor(private readonly content: VariablesDataContent) {
         super();
         this.className = style.root;
         this.render();
-        this.content.document.variables.onPropertyChanged(this.handleVariablesChanged);
+        this.listen();
+    }
+
+    connectedCallback(): void {
+        // Re-attached after a disconnect (a view moved, a panel re-docked): catch up on
+        // whatever changed while nothing was listening.
+        if (this.listening) return;
+        this.listen();
+        this.render();
     }
 
     disconnectedCallback(): void {
+        this.dispose();
+    }
+
+    /** Stops following the document; the element can be dropped after this. */
+    dispose(): void {
+        this.listening = false;
+        this.content.source.removePropertyChanged(this.handleVariablesChanged);
         this.content.document.variables.removePropertyChanged(this.handleVariablesChanged);
         this.popup?.remove();
         this.popup = undefined;
     }
 
+    /** The edited list (its rows) and the document scope (every row's value) — one or two objects. */
+    private listen(): void {
+        this.listening = true;
+        this.content.source.onPropertyChanged(this.handleVariablesChanged);
+        this.content.document.variables.onPropertyChanged(this.handleVariablesChanged);
+    }
+
     /**
-     * The table changed behind the panel's back — an undo, a redo, or a second panel on the
-     * same document. Without this the rows kept describing a table that no longer exists,
-     * and a stale row is a dead control: its id is gone, so its edits write nothing.
+     * The edited list changed behind the panel's back — an undo, a redo, or a second panel on
+     * the same list. Without this the rows kept describing a list that no longer exists, and
+     * a stale row is a dead control: its id is gone, so its edits write nothing.
      *
      * The panel's own writes are skipped: those rows are already on screen, and rebuilding
      * them would take the focus out of the field being edited. The write notifies from
      * inside `setItems`, so this has to be asked WHILE it is in flight — see `isWriting`.
+     *
+     * Any layer of the scope changing (`"scope"`) only refreshes the value column: a Variable
+     * Studio edit can change what a table row — or a later studio's row — resolves to.
      */
-    private readonly handleVariablesChanged = (property: string) => {
-        if (property !== "variablesJson") return;
+    private readonly handleVariablesChanged = (property: string, source: unknown) => {
+        if (property === "scope") {
+            this.refreshValues();
+            return;
+        }
+        if (property !== "variablesJson" || source !== this.content.source) return;
         if (this.content.isWriting) return;
         this.render();
     };
@@ -314,6 +345,10 @@ export class VariablesEditor extends HTMLElement {
      * feedback: a row that fails to resolve (bad name, unknown identifier, wrong unit) shows
      * its message there in place of a value and the row is tinted, exactly where the user is
      * looking — and the same check is what gates the dialog's confirm.
+     *
+     * The value is the row's OWN (`values`, by id), not the scope's entry for its name: a
+     * studio row shadowed by the table still shows what it resolved to. A row that shadows a
+     * lower layer resolves normally and carries the warning as a marker and a tooltip.
      */
     private refreshValues(evaluated: EvaluatedVariables = this.content.evaluate()): void {
         for (const item of this.content.items) {
@@ -324,15 +359,19 @@ export class VariablesEditor extends HTMLElement {
             // the expression rather than the value.
             if (window.document.activeElement === cell) continue;
             const error = evaluated.errors.get(item.id);
-            const value = evaluated.scope.get(item.name)?.value;
+            const warning = evaluated.warnings.get(item.id);
+            const value = evaluated.values.get(item.id)?.value;
             cell.value = error ?? (value === undefined ? "" : this.formatValue(value));
             cell.className =
                 error === undefined
                     ? `${style.cell} ${style.field} ${style.value}`
                     : `${style.cell} ${style.field} ${style.value} ${style.error}`;
             // The cell shows what the expression came to; hovering reveals the expression.
-            cell.title = error ?? item.expression;
-            row.className = error === undefined ? style.row : `${style.row} ${style.errorRow}`;
+            cell.title =
+                error ?? (warning === undefined ? item.expression : `${warning}\n${item.expression}`);
+            if (error !== undefined) row.className = `${style.row} ${style.errorRow}`;
+            else if (warning !== undefined) row.className = `${style.row} ${style.warningRow}`;
+            else row.className = style.row;
         }
     }
 

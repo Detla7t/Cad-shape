@@ -386,10 +386,10 @@ export class SketchEditor implements IDisposable {
      * A parameter edit while the session is live: push the new scope into the solver,
      * re-solve and commit so the geometry follows. Rare but real — the parameters dialog is
      * modal over a session that stays open behind it, and another view of the same document
-     * can edit the table at any time.
+     * can edit the table at any time. `"scope"` covers a Variable Studio edit as well.
      */
     private readonly handleVariablesChanged = (property: string) => {
-        if (property !== "variablesJson" || this.disposed) return;
+        if (property !== "scope" || this.disposed) return;
         if (!this.solver.setScope(this.variableScope())) {
             // Nothing moved, but a datum that just stopped resolving (its parameter was
             // deleted or renamed) is only visible on its own annotation — redraw them so

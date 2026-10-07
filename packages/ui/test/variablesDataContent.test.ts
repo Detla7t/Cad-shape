@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import type { VariableData, VariableType } from "@chili3d/core";
+import { Transaction, type VariableData, VariableStudioNode, type VariableType } from "@chili3d/core";
 import { TestDocument } from "@chili3d/core/test-utils";
 import { describe, expect, rs, test } from "@rstest/core";
 import { VariablesDataContent } from "../src/property/variables/variablesDataContent";
@@ -100,5 +100,47 @@ describe("VariablesDataContent", () => {
 
         expect(content.evaluate().errors.size).toBe(0);
         expect(document.variables.items[1].type).toBe("angle");
+    });
+});
+
+describe("VariablesDataContent bound to a Variable Studio", () => {
+    function studioContent(items: VariableData[]) {
+        const document = new TestDocument();
+        const studio = new VariableStudioNode({ document, name: "Variable Studio 1", items });
+        Transaction.execute(document, "add", () => document.modelManager.addNode(studio));
+        const onApplied = rs.fn();
+        return {
+            document,
+            studio,
+            onApplied,
+            content: new VariablesDataContent(document, onApplied, studio),
+        };
+    }
+
+    test("writes to the studio, not the table, as one undo step", async () => {
+        const { document, studio, content, onApplied } = studioContent([variable("s1", "w", "40")]);
+        const undoBefore = document.history.undoCount();
+
+        content.setField("s1", "expression", "50");
+
+        expect(studio.items[0].expression).toBe("50");
+        expect(document.variables.items).toEqual([]);
+        expect(document.history.undoCount()).toBe(undoBefore + 1);
+        expect(onApplied).toHaveBeenCalledTimes(1);
+        expect(document.variables.evaluate().scope.get("w")?.value).toBe(50);
+
+        await document.history.undo();
+        expect(studio.items[0].expression).toBe("40");
+        expect(document.variables.evaluate().scope.get("w")?.value).toBe(40);
+    });
+
+    test("evaluates in the document scope, so the table can use the studio's variables", () => {
+        const { document, content } = studioContent([variable("s1", "w", "40")]);
+        Transaction.execute(document, "table", () =>
+            document.variables.setItems([variable("t1", "d", "w + 2")]),
+        );
+        const evaluated = content.evaluate();
+        expect(evaluated.values.get("s1")?.value).toBe(40);
+        expect(evaluated.values.get("t1")?.value).toBe(42);
     });
 });

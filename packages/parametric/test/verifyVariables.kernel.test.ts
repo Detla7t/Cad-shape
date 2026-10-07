@@ -6,8 +6,8 @@
  *
  * - the table (`core/src/parameters/variableTable.ts`) is ordered, typed (length / angle /
  *   unitless) and unit-checked; feature parameters and sketch dimensions reference its rows
- *   by BARE name (`w * 2`) — Onshape's `#w` and unit literals (`10 mm`) are not accepted, and
- *   a broken row does not claim its name (a `test.fails` pins the duplicate-name bug);
+ *   by bare name (`w * 2`) or Onshape's `#w` — unit literals (`10 mm`) are not accepted —
+ *   and a broken row still claims its name;
  * - one table edit re-solves the sketches and rebuilds the bodies that read it
  *   (`variableSync.ts`), and undo / redo of that edit rebuild them back;
  * - a body's expressions and the table survive a serialize → deserialize round trip;
@@ -150,19 +150,17 @@ describe("the document variable table", () => {
 
     // Onshape writes a variable reference as `#w` in every expression field; Chili3d's
     // expression language uses the bare name and rejects the hash.
-    test("references are bare names — Onshape's `#name` syntax is not accepted (gap)", () => {
+    test("references are bare names or Onshape's `#name`, which names variables only", () => {
         const scope = new Map([["w", { value: 40, unit: { length: 1, angle: 0 } }]]);
         expect(evaluateExpression("w * 2", scope).value?.value).toBe(80);
-        const hashed = evaluateExpression("#w * 2", scope);
-        expect(hashed.isOk).toBe(false);
-        expect(hashed.error).toBe("Unexpected character: #");
+        expect(evaluateExpression("#w * 2", scope).value?.value).toBe(80);
+        expect(evaluateExpression("#pi", scope).error).toBe("Unknown variable: pi");
+        expect(evaluateExpression("#", scope).error).toBe("Expected a variable name after #");
     });
 
-    // BUG: a name is claimed only once its row RESOLVES (`defined.add` follows the evaluation in
-    // `variableTable.ts`), so while the first `w` is broken a second `w` silently takes the name —
-    // and fixing the first one later flips every reference over to it. Remove `.fails` once the
-    // patch (claim the name before evaluating the expression) lands.
-    test.fails("a duplicate name is reported even while the first row fails to resolve", () => {
+    // A name is claimed before its row resolves: while the first `w` is broken a second `w`
+    // is the duplicate, not a silent stand-in that fixing the first would flip references from.
+    test("a duplicate name is reported even while the first row fails to resolve", () => {
         const { scope, errors } = evaluateVariables([length("w", "nope", "v1"), length("w", "5", "v2")]);
         expect(errors.get("v1")).toBe("Unknown identifier: nope");
         expect(errors.get("v2")).toBe("Duplicate variable name: w");

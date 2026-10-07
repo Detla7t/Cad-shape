@@ -3,4 +3,6 @@
 
 export * from "./expression";
 export * from "./unitSpec";
+export * from "./variableData";
+export * from "./variableStudioNode";
 export * from "./variableTable";

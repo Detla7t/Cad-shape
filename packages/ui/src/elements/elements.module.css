@@ -1,0 +1,228 @@
+/* Part of the Chili3d Project, under the AGPL-3.0 License.
+   See LICENSE file in the project root for full license information. */
+
+/* ------------------------------------------------------------ the element strip */
+
+.strip {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    flex: 0 0 auto;
+    height: 30px;
+    box-sizing: border-box;
+    border-top: 1px solid var(--border-color);
+    background-color: var(--background-color);
+    user-select: none;
+}
+
+.add {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    margin: 3px 2px 3px 4px;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--foreground-color);
+    cursor: pointer;
+
+    &:hover {
+        background-color: var(--hover-background-color);
+    }
+}
+
+.addIcon {
+    width: 14px;
+    height: 14px;
+}
+
+.tabs {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+        display: none;
+    }
+}
+
+.tab {
+    position: relative;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+    max-width: 220px;
+    padding: 0 12px;
+    font-size: 12px;
+    color: var(--foreground-secondary-color);
+    border-right: 1px solid var(--border-color);
+    cursor: default;
+
+    &:hover {
+        background-color: var(--panel-hover-background-color);
+        color: var(--foreground-color);
+    }
+}
+
+.active {
+    background-color: var(--panel-background-color);
+    color: var(--foreground-color);
+
+    /* Onshape marks the open element with a bar on the edge facing the content. */
+    &::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background-color: var(--primary-color);
+    }
+}
+
+.icon {
+    flex: 0 0 auto;
+    width: 14px;
+    height: 14px;
+}
+
+.name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.rename {
+    width: 140px;
+    padding: 1px 4px;
+    font-size: 12px;
+    border: 1px solid var(--primary-color);
+    border-radius: 3px;
+    background-color: var(--input-background-color);
+    color: var(--input-text-color);
+    outline: none;
+}
+
+/* ------------------------------------------------------------ menus */
+
+.menu {
+    position: fixed;
+    z-index: 1000;
+    min-width: 180px;
+    padding: 4px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background-color: var(--panel-background-color);
+    box-shadow: var(--panel-shadow);
+    font-size: 12px;
+    color: var(--foreground-color);
+}
+
+.menuItem {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+
+    &:hover {
+        background-color: var(--hover-background-color);
+    }
+}
+
+.menuIcon {
+    width: 14px;
+    height: 14px;
+    flex: 0 0 auto;
+}
+
+.disabled {
+    opacity: 0.45;
+    cursor: default;
+
+    &:hover {
+        background-color: transparent;
+    }
+}
+
+/* ------------------------------------------------------------ element views */
+
+.frame {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    background-color: var(--panel-background-color);
+    color: var(--foreground-color);
+}
+
+.placeholder {
+    margin: auto;
+    opacity: 0.7;
+}
+
+.confirm {
+    max-width: 360px;
+    padding: 8px 0;
+    line-height: 1.5;
+}
+
+/* ------------------------------------------------------------ Variable Studio */
+
+.variableStudio {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    max-width: 900px;
+    height: 100%;
+    min-height: 0;
+    box-sizing: border-box;
+    margin: 0 auto;
+    padding: 16px 20px;
+}
+
+.studioHeader {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.studioIcon {
+    width: 18px;
+    height: 18px;
+}
+
+.studioTitle {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.studioHint {
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--foreground-secondary-color);
+}
+
+.studioBody {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+}

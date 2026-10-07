@@ -4,9 +4,9 @@
 import { Result } from "../foundation/result";
 import { sha256Hex } from "../foundation/utils/sha256";
 import { InternalClassName, type Serialized } from "../serialize";
+import { PART_STUDIO_KIND } from "../ui/documentElements";
 import { isValidProjectPrefix } from "./projectExtensions";
 import {
-    PART_STUDIO_KIND,
     PROJECT_DOCUMENT_PATH,
     PROJECT_FILE_REF_KEY,
     PROJECT_FORMAT,

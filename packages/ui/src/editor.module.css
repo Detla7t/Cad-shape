@@ -30,6 +30,24 @@
         }
     }
 
+    /* The Part Studio element: the modeling layout (sidebar + viewport). */
+    & .partStudio {
+        display: flex;
+        flex-direction: row;
+        flex: 1 1 auto;
+        width: 0;
+        min-width: 0;
+    }
+
+    /* Where the other elements' views mount, one shown at a time (see ElementWorkspace). */
+    & .elementViews {
+        position: relative;
+        flex: 1 1 auto;
+        width: 0;
+        min-width: 0;
+        background-color: var(--panel-background-color);
+    }
+
     & .viewportContainer {
         position: relative;
         background-color: var(--viewport-background-color);
@@ -100,6 +118,17 @@
         flex-direction: column-reverse;
         min-height: 0;
         position: relative;
+
+        & .partStudio {
+            flex-direction: column-reverse;
+            width: 100%;
+            min-height: 0;
+        }
+
+        & .elementViews {
+            width: 100%;
+            min-height: 0;
+        }
 
         & .viewportContainer {
             height: auto;

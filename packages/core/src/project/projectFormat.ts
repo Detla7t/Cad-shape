@@ -27,9 +27,6 @@ export const PROJECT_HISTORY_FOLDER = "history/";
 /** The key that replaces an externalized property in `document.json`: `{ "$file": "<path>" }`. */
 export const PROJECT_FILE_REF_KEY = "$file";
 
-/** The Part Studio element: the document's model tree (every geometric node). */
-export const PART_STUDIO_KIND = "partStudio";
-
 /** One element (tab) of the document. */
 export interface ProjectElement {
     readonly id: string;
