@@ -2,7 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import { StockSim } from "../lib/chili_rs.js";
-import { assertRustReady } from "./index";
+import { assertRustReady } from "./runtime";
 
 /**
  * Stock material-removal simulation (the `stocksim` crate): a 3-axis Z-map of the stock cut

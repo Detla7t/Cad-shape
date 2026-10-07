@@ -1,6 +1,97 @@
 /* @ts-self-types="./chili_rs.d.ts" */
 
 /**
+ * A containment tree: loop indices by decreasing area, and per loop its parent (-1: none) and depth.
+ */
+export class PolygonNesting {
+    static __wrap(ptr) {
+        const obj = Object.create(PolygonNesting.prototype);
+        obj.__wbg_ptr = ptr;
+        PolygonNestingFinalization.register(obj, obj.__wbg_ptr, obj);
+        return obj;
+    }
+    __destroy_into_raw() {
+        const ptr = this.__wbg_ptr;
+        this.__wbg_ptr = 0;
+        PolygonNestingFinalization.unregister(this);
+        return ptr;
+    }
+    free() {
+        const ptr = this.__destroy_into_raw();
+        wasm.__wbg_polygonnesting_free(ptr, 0);
+    }
+    /**
+     * @returns {Uint32Array}
+     */
+    take_depth() {
+        const ret = wasm.polygonnesting_take_depth(this.__wbg_ptr);
+        var v1 = getArrayU32FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
+        return v1;
+    }
+    /**
+     * @returns {Uint32Array}
+     */
+    take_order() {
+        const ret = wasm.polygonnesting_take_order(this.__wbg_ptr);
+        var v1 = getArrayU32FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
+        return v1;
+    }
+    /**
+     * @returns {Int32Array}
+     */
+    take_parent() {
+        const ret = wasm.polygonnesting_take_parent(this.__wbg_ptr);
+        var v1 = getArrayI32FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
+        return v1;
+    }
+}
+if (Symbol.dispose) PolygonNesting.prototype[Symbol.dispose] = PolygonNesting.prototype.free;
+
+/**
+ * Result paths, flat. `take_coords` / `take_lengths` move the arrays out.
+ */
+export class PolygonPaths {
+    static __wrap(ptr) {
+        const obj = Object.create(PolygonPaths.prototype);
+        obj.__wbg_ptr = ptr;
+        PolygonPathsFinalization.register(obj, obj.__wbg_ptr, obj);
+        return obj;
+    }
+    __destroy_into_raw() {
+        const ptr = this.__wbg_ptr;
+        this.__wbg_ptr = 0;
+        PolygonPathsFinalization.unregister(this);
+        return ptr;
+    }
+    free() {
+        const ptr = this.__destroy_into_raw();
+        wasm.__wbg_polygonpaths_free(ptr, 0);
+    }
+    /**
+     * @returns {Float64Array}
+     */
+    take_coords() {
+        const ret = wasm.polygonpaths_take_coords(this.__wbg_ptr);
+        var v1 = getArrayF64FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 8, 8);
+        return v1;
+    }
+    /**
+     * @returns {Uint32Array}
+     */
+    take_lengths() {
+        const ret = wasm.polygonpaths_take_lengths(this.__wbg_ptr);
+        var v1 = getArrayU32FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
+        return v1;
+    }
+}
+if (Symbol.dispose) PolygonPaths.prototype[Symbol.dispose] = PolygonPaths.prototype.free;
+
+/**
  * A 3-axis stock simulation: a box of material cut by straight moves of tools (see the
  * `stocksim` crate). Millimetres, in the moves' frame.
  */
@@ -313,6 +404,111 @@ export class StockSimMesh {
 if (Symbol.dispose) StockSimMesh.prototype[Symbol.dispose] = StockSimMesh.prototype.free;
 
 /**
+ * A boolean of two regions, each filled by its fill rule: clean loops, outer boundaries
+ * counter-clockwise each followed by its (clockwise) holes.
+ * @param {string} op
+ * @param {Float64Array} subject_coords
+ * @param {Uint32Array} subject_lengths
+ * @param {Float64Array} clip_coords
+ * @param {Uint32Array} clip_lengths
+ * @param {string} fill
+ * @param {number} scale
+ * @returns {PolygonPaths}
+ */
+export function polygon_boolean(op, subject_coords, subject_lengths, clip_coords, clip_lengths, fill, scale) {
+    const ptr0 = passStringToWasm0(op, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ptr1 = passArrayF64ToWasm0(subject_coords, wasm.__wbindgen_malloc);
+    const len1 = WASM_VECTOR_LEN;
+    const ptr2 = passArray32ToWasm0(subject_lengths, wasm.__wbindgen_malloc);
+    const len2 = WASM_VECTOR_LEN;
+    const ptr3 = passArrayF64ToWasm0(clip_coords, wasm.__wbindgen_malloc);
+    const len3 = WASM_VECTOR_LEN;
+    const ptr4 = passArray32ToWasm0(clip_lengths, wasm.__wbindgen_malloc);
+    const len4 = WASM_VECTOR_LEN;
+    const ptr5 = passStringToWasm0(fill, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len5 = WASM_VECTOR_LEN;
+    const ret = wasm.polygon_boolean(ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3, ptr4, len4, ptr5, len5, scale);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return PolygonPaths.__wrap(ret[0]);
+}
+
+/**
+ * The parts of open polylines inside (or outside) a region filled by `fill`.
+ * @param {Float64Array} line_coords
+ * @param {Uint32Array} line_lengths
+ * @param {Float64Array} region_coords
+ * @param {Uint32Array} region_lengths
+ * @param {string} fill
+ * @param {string} keep
+ * @param {number} scale
+ * @returns {PolygonPaths}
+ */
+export function polygon_clip_polylines(line_coords, line_lengths, region_coords, region_lengths, fill, keep, scale) {
+    const ptr0 = passArrayF64ToWasm0(line_coords, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ptr1 = passArray32ToWasm0(line_lengths, wasm.__wbindgen_malloc);
+    const len1 = WASM_VECTOR_LEN;
+    const ptr2 = passArrayF64ToWasm0(region_coords, wasm.__wbindgen_malloc);
+    const len2 = WASM_VECTOR_LEN;
+    const ptr3 = passArray32ToWasm0(region_lengths, wasm.__wbindgen_malloc);
+    const len3 = WASM_VECTOR_LEN;
+    const ptr4 = passStringToWasm0(fill, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len4 = WASM_VECTOR_LEN;
+    const ptr5 = passStringToWasm0(keep, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len5 = WASM_VECTOR_LEN;
+    const ret = wasm.polygon_clip_polylines(ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3, ptr4, len4, ptr5, len5, scale);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return PolygonPaths.__wrap(ret[0]);
+}
+
+/**
+ * How closed loops nest (containment, any orientation).
+ * @param {Float64Array} coords
+ * @param {Uint32Array} lengths
+ * @returns {PolygonNesting}
+ */
+export function polygon_nesting(coords, lengths) {
+    const ptr0 = passArrayF64ToWasm0(coords, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ptr1 = passArray32ToWasm0(lengths, wasm.__wbindgen_malloc);
+    const len1 = WASM_VECTOR_LEN;
+    const ret = wasm.polygon_nesting(ptr0, len0, ptr1, len1);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return PolygonNesting.__wrap(ret[0]);
+}
+
+/**
+ * Closed loops offset by `delta` mm (positive grows the region; roles by orientation).
+ * @param {Float64Array} coords
+ * @param {Uint32Array} lengths
+ * @param {number} delta
+ * @param {string} join
+ * @param {number} join_parameter
+ * @param {number} scale
+ * @returns {PolygonPaths}
+ */
+export function polygon_offset(coords, lengths, delta, join, join_parameter, scale) {
+    const ptr0 = passArrayF64ToWasm0(coords, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ptr1 = passArray32ToWasm0(lengths, wasm.__wbindgen_malloc);
+    const len1 = WASM_VECTOR_LEN;
+    const ptr2 = passStringToWasm0(join, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len2 = WASM_VECTOR_LEN;
+    const ret = wasm.polygon_offset(ptr0, len0, ptr1, len1, delta, ptr2, len2, join_parameter, scale);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return PolygonPaths.__wrap(ret[0]);
+}
+
+/**
  * The module's version (the workspace version), for a loaded-module check.
  * @returns {string}
  */
@@ -354,6 +550,12 @@ function __wbg_get_imports() {
     };
 }
 
+const PolygonNestingFinalization = (typeof FinalizationRegistry === 'undefined')
+    ? { register: () => {}, unregister: () => {} }
+    : new FinalizationRegistry(ptr => wasm.__wbg_polygonnesting_free(ptr, 1));
+const PolygonPathsFinalization = (typeof FinalizationRegistry === 'undefined')
+    ? { register: () => {}, unregister: () => {} }
+    : new FinalizationRegistry(ptr => wasm.__wbg_polygonpaths_free(ptr, 1));
 const StockSimFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_stocksim_free(ptr, 1));
@@ -369,6 +571,11 @@ function getArrayF32FromWasm0(ptr, len) {
 function getArrayF64FromWasm0(ptr, len) {
     ptr = ptr >>> 0;
     return getFloat64ArrayMemory0().subarray(ptr / 8, ptr / 8 + len);
+}
+
+function getArrayI32FromWasm0(ptr, len) {
+    ptr = ptr >>> 0;
+    return getInt32ArrayMemory0().subarray(ptr / 4, ptr / 4 + len);
 }
 
 function getArrayU32FromWasm0(ptr, len) {
@@ -390,6 +597,14 @@ function getFloat64ArrayMemory0() {
         cachedFloat64ArrayMemory0 = new Float64Array(wasm.memory.buffer);
     }
     return cachedFloat64ArrayMemory0;
+}
+
+let cachedInt32ArrayMemory0 = null;
+function getInt32ArrayMemory0() {
+    if (cachedInt32ArrayMemory0 === null || cachedInt32ArrayMemory0.byteLength === 0) {
+        cachedInt32ArrayMemory0 = new Int32Array(wasm.memory.buffer);
+    }
+    return cachedInt32ArrayMemory0;
 }
 
 function getStringFromWasm0(ptr, len) {
@@ -523,6 +738,7 @@ function __wbg_finalize_init(instance, module) {
     wasmModule = module;
     cachedFloat32ArrayMemory0 = null;
     cachedFloat64ArrayMemory0 = null;
+    cachedInt32ArrayMemory0 = null;
     cachedUint32ArrayMemory0 = null;
     cachedUint8ArrayMemory0 = null;
     wasm.__wbindgen_start();

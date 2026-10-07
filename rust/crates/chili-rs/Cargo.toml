@@ -11,4 +11,5 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 wasm-bindgen.workspace = true
+polygon = { path = "../polygon" }
 stocksim = { path = "../stocksim" }

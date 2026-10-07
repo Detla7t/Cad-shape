@@ -10,8 +10,5 @@
         "@chili3d/parametric": "*",
         "@chili3d/rs": "*",
         "@chili3d/wasm": "*"
-    },
-    "dependencies": {
-        "clipper2-js": "^1.2.4"
     }
 }

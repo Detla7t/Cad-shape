@@ -2,7 +2,6 @@
 // See LICENSE file in the project root for full license information.
 
 import { Result } from "@chili3d/core";
-import type { IPoint64 } from "clipper2-js";
 import type { CamMesh } from "../../model/operation";
 import type { ToolpathData, ToolpathMove, Vec3 } from "../../model/toolpath";
 import { estimatePrintTime, formatPrintDuration, type PrintKinematics } from "../gcode/estimate";
@@ -17,6 +16,7 @@ import {
     weldMesh,
 } from "../geometry/mesh";
 import {
+    type IntPoint,
     intersection,
     islands,
     mm,
@@ -252,7 +252,7 @@ class PrintPlanner {
     readonly writer: ToolpathWriter;
     skirt: Paths = [];
     brim: Paths = [];
-    private seamAnchors: IPoint64[] = [];
+    private seamAnchors: IntPoint[] = [];
     private readonly vars: Record<string, MacroValue>;
     private fan = -1;
 
@@ -496,7 +496,7 @@ class PrintPlanner {
                 w.extrudePath(loop.points, true, widths.perimeter, h, speed);
             }
         }
-        const anchors: IPoint64[] = [];
+        const anchors: IntPoint[] = [];
         const remaining = [...layer.islands];
         while (remaining.length > 0) {
             const at = this.position();
@@ -534,16 +534,16 @@ class PrintPlanner {
         w.moves.push(...moves.slice(0, split), ...header, ...moves.slice(split));
     }
 
-    private position(): IPoint64 {
+    private position(): IntPoint {
         return { x: Math.round(this.writer.x * SCALE), y: Math.round(this.writer.y * SCALE) };
     }
 
     private seamFor(
         loop: Path,
-        from: IPoint64,
+        from: IntPoint,
         external: boolean,
-        anchors: IPoint64[],
-        islandSeam?: IPoint64,
+        anchors: IntPoint[],
+        islandSeam?: IntPoint,
     ): number {
         switch (this.settings.seamPosition) {
             case "nearest":
@@ -570,14 +570,14 @@ class PrintPlanner {
         }
     }
 
-    private writePerimeters(loops: readonly PerimeterLoop[], layerIndex: number, anchors: IPoint64[]) {
+    private writePerimeters(loops: readonly PerimeterLoop[], layerIndex: number, anchors: IntPoint[]) {
         if (loops.length === 0) return;
         const s = this.settings;
         const w = this.writer;
         const depths = [...new Set(loops.map((loop) => loop.depth))].sort((a, b) =>
             s.externalPerimetersFirst ? a - b : b - a,
         );
-        let islandSeam: IPoint64 | undefined;
+        let islandSeam: IntPoint | undefined;
         // The external loop's seam guides the inner loops' (aligned seams).
         const externalContours = loops.filter((loop) => loop.depth === 0 && !loop.hole);
         if (externalContours.length > 0) {
@@ -853,18 +853,18 @@ function pseudoRandom(seed: number): number {
 }
 
 /** Convex hull (Andrew's monotone chain) of integer points, counter-clockwise. */
-export function convexHull(points: readonly IPoint64[]): Path {
+export function convexHull(points: readonly IntPoint[]): Path {
     const sorted = [...points].sort((a, b) => a.x - b.x || a.y - b.y);
     if (sorted.length < 3) return sorted;
-    const cross = (o: IPoint64, a: IPoint64, b: IPoint64) =>
+    const cross = (o: IntPoint, a: IntPoint, b: IntPoint) =>
         (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
-    const lower: IPoint64[] = [];
+    const lower: IntPoint[] = [];
     for (const p of sorted) {
         while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0)
             lower.pop();
         lower.push(p);
     }
-    const upper: IPoint64[] = [];
+    const upper: IntPoint[] = [];
     for (let i = sorted.length - 1; i >= 0; i--) {
         const p = sorted[i];
         while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0)
