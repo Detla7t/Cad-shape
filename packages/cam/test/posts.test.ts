@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    asciiCommentText,
     type CamProgram,
     formatGCodeNumber,
     GCodeWriter,
@@ -554,6 +555,34 @@ const PLATE: ToolpathData[] = [
         ],
     },
 ];
+
+describe("comments in ASCII", () => {
+    test.each([
+        ["Face: tool Ø12.7", "Face: tool D12.7"],
+        ["taper 3°", "taper 3 deg"],
+        ["Ébauche ×2 — fin", "Ebauche x2 - fin"],
+        ["钻孔 1", "1"],
+        ["two\nlines", "two lines"],
+    ])("%j is written %j", (text, expected) => {
+        expect(asciiCommentText(text)).toBe(expected);
+    });
+
+    test.each(["fanuc", "haas", "linuxcnc", "grbl", "mach3"])("%s writes only printable ASCII", (id) => {
+        const named = {
+            ...MILL_PROGRAM,
+            tools: new Map(
+                [...MILL_PROGRAM.tools].map(([key, tool]) => [key, { ...tool, name: `${tool.name} Ø` }]),
+            ),
+            toolpaths: MILL_PROGRAM.toolpaths.map((path) => ({
+                ...path,
+                label: `${path.label ?? ""} Ø6 × 2, 90°`,
+            })),
+        };
+        const text = post(id, named);
+        expect(text).toMatch(/^[\x20-\x7e\n%]*$/);
+        expect(text.toUpperCase()).toContain("D6 X 2, 90 DEG");
+    });
+});
 
 describe("2D cutting posts", () => {
     test("plasma: pierce delays as G4, torch height control on after the pierce and off before the stop", () => {
