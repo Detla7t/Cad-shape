@@ -159,15 +159,20 @@ export function rebaseOperations(
     });
 }
 
-/** A first tool guess per operation category: drills for hole cycles, balls for 3D finishing. */
+/**
+ * A first tool guess per operation category: drills for hole cycles, end mills for roughing
+ * (a ball's finishing stepover would clear the stock in hair-thin rings), balls for 3D finishing.
+ */
 function suitableTool(handler: CamOperationHandler, tools: readonly ToolData[]): ToolData | undefined {
     const wanted = /drill|bore|tap|spot/i.test(handler.type)
         ? ["drill", "spotDrill", "tap"]
-        : handler.category === "3d" || handler.category === "5axis"
-          ? ["ballEndmill", "bullNose", "flatEndmill"]
-          : /engrav|chamfer|deburr/i.test(handler.type)
-            ? ["chamfer", "vBit", "engraver"]
-            : ["flatEndmill", "bullNose", "jet", "wire", "nozzle"];
+        : /rough/i.test(handler.type)
+          ? ["flatEndmill", "bullNose", "ballEndmill"]
+          : handler.category === "3d" || handler.category === "5axis"
+            ? ["ballEndmill", "bullNose", "flatEndmill"]
+            : /engrav|chamfer|deburr/i.test(handler.type)
+              ? ["chamfer", "vBit", "engraver"]
+              : ["flatEndmill", "bullNose", "jet", "wire", "nozzle"];
     for (const kind of wanted) {
         const tool = tools.find((x) => x.kind === kind);
         if (tool !== undefined) return tool;

@@ -248,6 +248,19 @@ test("changing the machine moves its operations to the new machine's defaults an
     expect(studio.setups[0].operations[0].toolId).toBe("torch");
 });
 
+test("3D roughing starts with an end mill, 3D finishing with a ball", () => {
+    const { studio, view } = setup();
+    click(view.element, '[data-action="add-setup"]');
+    const add = () => must<HTMLSelectElement>(view.element, 'select[data-action="add-operation"]');
+    change(add(), "zLevelRoughing");
+    change(add(), "parallel3d");
+    const [roughing, finishing] = studio.setups[0].operations;
+    // generic-3-axis: t1 is the 10 mm flat end mill, t3 the 6 mm ball (0.4 mm stepover).
+    expect(roughing.toolId).toBe("t1");
+    expect(roughing.params["stepover"]).toBe(4);
+    expect(finishing.toolId).toBe("t3");
+});
+
 test("suppressing, reordering and deleting operations are undoable edits", () => {
     const { doc, studio, view } = setup();
     click(view.element, '[data-action="add-setup"]');
