@@ -15,8 +15,8 @@ import {
 import { rectilinearLines } from "../../src/additive/slicer/infill";
 
 /**
- * The slicer's polygon layer over clipper2-js, pinned where that library (1.2.4) goes wrong:
- * skewed offsets, in-place edits of its inputs, open-path clipping.
+ * The slicer's polygon layer on the Rust polygon kernel, pinned where its former library
+ * (clipper2-js 1.2.4) went wrong: skewed offsets, in-place edits of its inputs, open-path clipping.
  */
 
 const square = (x0: number, y0: number, x1: number, y1: number) =>

@@ -1,9 +1,8 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import type { IPoint64 } from "clipper2-js";
 import type { ToolpathMove } from "../../model/toolpath";
-import { mm, type Path, SCALE } from "../geometry/polygons";
+import { type IntPoint, mm, type Path, SCALE } from "../geometry/polygons";
 import { extrusionArea } from "../prusa/settings";
 import { formatNumber } from "../prusa/values";
 
@@ -196,7 +195,7 @@ export class ToolpathWriter {
     ) {
         if (points.length < 2) return;
         this.travel(mm(points[0].x), mm(points[0].y), options.noRetract);
-        const route: IPoint64[] = closed ? [...points.slice(1), points[0]] : points.slice(1);
+        const route: IntPoint[] = closed ? [...points.slice(1), points[0]] : points.slice(1);
         if (closed && options.seamGap && options.seamGap > 0)
             trimEnd(route, points[0], options.seamGap * SCALE);
         for (const p of route) this.extrudeTo(mm(p.x), mm(p.y), width, height, speed, options.flow);
@@ -216,7 +215,7 @@ export function mayMove(code: string): boolean {
 }
 
 /** Shortens a route (starting after `start`) by `gap` units at its end. */
-function trimEnd(route: IPoint64[], start: IPoint64, gap: number) {
+function trimEnd(route: IntPoint[], start: IntPoint, gap: number) {
     let remaining = gap;
     while (route.length > 0 && remaining > 0) {
         const end = route[route.length - 1];

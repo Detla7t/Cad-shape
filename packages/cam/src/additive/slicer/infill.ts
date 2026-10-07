@@ -1,9 +1,16 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import type { IPoint64 } from "clipper2-js";
 import { type RegionIndex, scanLines, segmentInside } from "../geometry/lineClip";
-import { clipLines, offset, type Path, type Paths, SCALE, signedArea } from "../geometry/polygons";
+import {
+    clipLines,
+    type IntPoint,
+    offset,
+    type Path,
+    type Paths,
+    SCALE,
+    signedArea,
+} from "../geometry/polygons";
 
 /**
  * Fill patterns as centre lines clipped to a region, and the ordering that turns them into
@@ -61,7 +68,7 @@ export function gyroidLines(
     const step = Math.max(0.05, Math.min(0.5, toleranceMm / scale));
     const samples = Math.ceil((aMax - aMin) / step) + 2;
     const lines: Paths = [];
-    const toPoint = (a: number, b: number): IPoint64 => {
+    const toPoint = (a: number, b: number): IntPoint => {
         const [u, v] = swap ? [b, a] : [a, b];
         const x = (u * cos - v * sin) * scale;
         const y = (u * sin + v * cos) * scale;
@@ -108,7 +115,7 @@ export interface OrderedPath {
     readonly closed: boolean;
 }
 
-const distSq = (a: IPoint64, b: IPoint64) => (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
+const distSq = (a: IntPoint, b: IntPoint) => (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
 
 /**
  * Orders open polylines greedily by nearest endpoint (each may be reversed), from `start`.
@@ -117,8 +124,8 @@ const distSq = (a: IPoint64, b: IPoint64) => (a.x - b.x) ** 2 + (a.y - b.y) ** 2
  */
 export function orderPolylines(
     lines: Paths,
-    start: IPoint64,
-    connect?: { readonly maxDistanceMm: number; readonly isInside: (a: IPoint64, b: IPoint64) => boolean },
+    start: IntPoint,
+    connect?: { readonly maxDistanceMm: number; readonly isInside: (a: IntPoint, b: IntPoint) => boolean },
 ): OrderedPath[] {
     const remaining = lines.filter((line) => line.length >= 2);
     const used = new Uint8Array(remaining.length);
@@ -164,8 +171,8 @@ export function orderPolylines(
 /** Orders closed loops by nearest vertex; each loop starts at the vertex `seam` picks. */
 export function orderLoops(
     loops: Paths,
-    start: IPoint64,
-    seam: (loop: Path, from: IPoint64) => number,
+    start: IntPoint,
+    seam: (loop: Path, from: IntPoint) => number,
 ): OrderedPath[] {
     const remaining = loops.filter((loop) => loop.length >= 3);
     const used = new Uint8Array(remaining.length);
@@ -195,7 +202,7 @@ export function orderLoops(
 }
 
 /** Whether a straight connector stays inside a region. */
-export function connectorInside(region: RegionIndex, a: IPoint64, b: IPoint64): boolean {
+export function connectorInside(region: RegionIndex, a: IntPoint, b: IntPoint): boolean {
     return segmentInside(region, a, b);
 }
 
@@ -210,7 +217,7 @@ export function rearVertex(loop: Path): number {
     return best;
 }
 
-export function nearestVertex(loop: Path, to: IPoint64): number {
+export function nearestVertex(loop: Path, to: IntPoint): number {
     let best = 0;
     let bestSq = Number.POSITIVE_INFINITY;
     for (let i = 0; i < loop.length; i++) {

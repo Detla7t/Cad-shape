@@ -1,13 +1,13 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import type { IPoint64 } from "clipper2-js";
+import type { IntPoint } from "./polygons";
 
 /**
- * Clipping open lines to a region, without clipper2-js: its open-path clipping (1.2.4) drops
- * diagonal and vertical lines and returns pieces outside the region. Regions here are clean
- * (outer loops and holes that do not overlap, as booleans return them), so even-odd crossing
- * parity decides inside. Edges are bucketed in horizontal bands for speed.
+ * Region queries for the slicer's fill: exact scan lines, and whether a connector between two
+ * fill lines stays inside. Regions here are clean (outer loops and holes that do not overlap, as
+ * booleans return them), so even-odd crossing parity decides inside. Edges are bucketed in
+ * horizontal bands for speed. (Polylines are clipped by the polygon kernel: `clipLines`.)
  */
 
 type Pt = { readonly x: number; readonly y: number };
@@ -113,59 +113,6 @@ export class RegionIndex {
     }
 }
 
-const lerp = (a: Pt, b: Pt, t: number): IPoint64 => ({
-    x: Math.round(a.x + (b.x - a.x) * t),
-    y: Math.round(a.y + (b.y - a.y) * t),
-});
-
-/** The parts of polylines inside a region, as polylines (pieces joined across vertices). */
-export function clipPolylines(lines: readonly (readonly Pt[])[], index: RegionIndex): IPoint64[][] {
-    const out: IPoint64[][] = [];
-    if (index.empty) return out;
-    for (const line of lines) {
-        let current: IPoint64[] | undefined;
-        for (let i = 0; i + 1 < line.length; i++) {
-            const a = line[i];
-            const b = line[i + 1];
-            if (a.x === b.x && a.y === b.y) continue;
-            const ts = [0, ...index.crossings(a, b), 1];
-            for (let k = 0; k + 1 < ts.length; k++) {
-                const t0 = ts[k];
-                const t1 = ts[k + 1];
-                if (t1 - t0 < 1e-12) continue;
-                const inside = index.contains({
-                    x: a.x + (b.x - a.x) * ((t0 + t1) / 2),
-                    y: a.y + (b.y - a.y) * ((t0 + t1) / 2),
-                });
-                if (!inside) {
-                    if (current) out.push(current);
-                    current = undefined;
-                    continue;
-                }
-                const start = lerp(a, b, t0);
-                const end = lerp(a, b, t1);
-                const last = current?.[current.length - 1];
-                if (current && (t0 === 0 || (last?.x === start.x && last?.y === start.y))) current.push(end);
-                else {
-                    if (current) out.push(current);
-                    current = [start, end];
-                }
-            }
-        }
-        if (current) out.push(current);
-    }
-    return out.map(dedupe).filter((piece) => piece.length >= 2);
-}
-
-function dedupe(path: IPoint64[]): IPoint64[] {
-    const out: IPoint64[] = [];
-    for (const p of path) {
-        const last = out[out.length - 1];
-        if (!last || last.x !== p.x || last.y !== p.y) out.push(p);
-    }
-    return out;
-}
-
 /**
  * Parallel scan lines through a region: lines at `angle` radians from +X, one every `pitch`
  * units at offsets `k · pitch + phase` (perpendicular distance from the origin), clipped
@@ -176,7 +123,7 @@ export function scanLines(
     angle: number,
     pitch: number,
     phase: number,
-): IPoint64[][] {
+): IntPoint[][] {
     const cos = Math.cos(angle);
     const sin = Math.sin(angle);
     // Rotate by −angle: lines become horizontal (v = const).
@@ -191,7 +138,7 @@ export function scanLines(
             maxV = Math.max(maxV, p.v);
         }
     }
-    const out: IPoint64[][] = [];
+    const out: IntPoint[][] = [];
     if (!Number.isFinite(minV)) return out;
     const first = Math.ceil((minV - phase) / pitch);
     const last = Math.floor((maxV - phase) / pitch);
@@ -204,7 +151,7 @@ export function scanLines(
         }
     }
     edges.sort((p, q) => Math.min(p.av, p.bv) - Math.min(q.av, q.bv));
-    const back = (u: number, v: number): IPoint64 => ({
+    const back = (u: number, v: number): IntPoint => ({
         x: Math.round(u * cos - v * sin),
         y: Math.round(u * sin + v * cos),
     });
