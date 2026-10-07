@@ -44,18 +44,22 @@ left half-built.
   new body, with "body" it runs against that body's current shape. "parameters" are definition
   fields: lengths in mm, angles in degrees (numbers or expressions), booleans, enum member names.
 
-FeatureScript. A custom feature is an exported defineFeature constant; its precondition declares the
-parameters (isLength/isAngle/isInteger/isReal with bounds, "is boolean", "is SomeEnum", "is Query"),
-and the body calls std operations on the context. Lengths carry units (10 * mm, 1 * inch); queries
-select entities (qCreatedBy(id + "extrude1", EntityType.FACE), qSketchRegion(id + "sketch1"),
-qHostBody(EntityType.EDGE) for the body the feature runs on). Supported: sketches (newSketch,
+FeatureScript. Studios run on Onshape's own std library (version 3083), exactly as in Onshape: begin
+every studio with FeatureScript 3083; and import(path : "onshape/std/geometry.fs", version : "3083.0");.
+A custom feature is an exported defineFeature constant with a "Feature Type Name" annotation; its
+precondition declares the parameters (isLength/isAngle/isInteger/isReal with bounds, "is boolean",
+"is SomeEnum", "is Query"), and the body calls std operations on the context. Lengths carry std units
+(10 * millimeter, 1 * inch, 30 * degree — std has no "mm" abbreviation); queries select entities
+(qCreatedBy(id + "extrude1", EntityType.FACE), qSketchRegion(id + "sketch1"), and the Chili3d
+extension qHostBody(EntityType.EDGE) for the body the feature runs on). Supported: sketches (newSketch,
 newSketchOnPlane, skLineSegment, skCircle, skArc, skRectangle, skPolyline, skRegularPolygon, skSlot,
 skSolve), extrude/revolve (and opExtrude/opRevolve with BLIND or THROUGH_ALL), fillet/chamfer,
 opBoolean/booleanBodies, opShell, opSweep, opLoft, opThicken, opTransform, opPattern,
 linearPattern/circularPattern/mirror, fCuboid/fCylinder/fCone/fSphere, ev* measurements, and the
-math/vector/plane/transform std. End a feature by deleting its helper sketches (opDeleteBodies).
+math/vector/plane/transform std — and std's own code built on them. End a feature by deleting its
+helper sketches (opDeleteBodies).
 Example:
- { op: "studio", id: "st", name: "Bosses", source: "FeatureScript 2384;\nannotation { "Feature Type Name" : "Boss" }\nexport const boss = defineFeature(function(context is Context, id is Id, definition is map)\n precondition { annotation { "Name" : "Diameter" } isLength(definition.d, NONNEGATIVE_LENGTH_BOUNDS); }\n { fCylinder(context, id + "c", { "bottomCenter" : vector(0, 0, 0) * mm, "topCenter" : vector(0, 0, 10) * mm, "radius" : definition.d / 2 }); },\n { "d" : 8 * mm });" }
+ { op: "studio", id: "st", name: "Bosses", source: "FeatureScript 3083;\nimport(path : "onshape/std/geometry.fs", version : "3083.0");\nannotation { "Feature Type Name" : "Boss" }\nexport const boss = defineFeature(function(context is Context, id is Id, definition is map)\n precondition { annotation { "Name" : "Diameter" } isLength(definition.d, NONNEGATIVE_LENGTH_BOUNDS); }\n { fCylinder(context, id + "c", { "bottomCenter" : vector(0, 0, 0) * millimeter, "topCenter" : vector(0, 0, 10) * millimeter, "radius" : definition.d / 2 }); },\n { "d" : 8 * millimeter });" }
  { op: "featurescript", id: "b1", studio: "st", feature: "boss", parameters: { d: 12 } }
 
 Variables. Every feature parameter (extrude depth/startOffset, revolve angle, fillet radius,

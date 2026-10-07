@@ -6,7 +6,7 @@
  * precondition's parameters (with conditional visibility), parameter edits and
  * document variables rebuild the body, editing the studio's source rebuilds every body
  * that uses it (and undo restores it), and stable ids let a downstream fillet follow an
- * edge the custom feature created.
+ * edge the custom feature created. Studios run on Onshape's own std library, as in the app.
  */
 
 import { readFileSync } from "node:fs";
@@ -19,8 +19,10 @@ import { captureEdgeRef } from "../../src/features/edgeRef";
 import type { FeatureData, FeatureScriptFeatureData } from "../../src/features/feature";
 import { DEFAULT_STUDIO_SOURCE, FeatureStudioNode } from "../../src/featurescript/featureStudioNode";
 import { customFeatures, newFeatureScriptFeature } from "../../src/featurescript/insertFeature";
+import { provideOnshapeStd } from "../../src/featurescript/runtime";
 import { ParametricBodyNode } from "../../src/parametricBodyNode";
 import "../sketch/setup";
+import { ONSHAPE_STD } from "./_helpers/onshapeStd";
 
 const WASM_BINARY = readFileSync(
     path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../wasm/lib/chili-wasm.wasm"),
@@ -33,7 +35,10 @@ beforeAll(async () => {
         writable: true,
         configurable: true,
     });
+    provideOnshapeStd(ONSHAPE_STD);
 });
+
+afterAll(() => provideOnshapeStd(undefined));
 
 function newDoc(): TestDocument {
     const doc = new TestDocument({ application: createMockApplication() });
@@ -154,7 +159,7 @@ export const boss = defineFeature(function(context is Context, id is Id, definit
         const plane = evPlane(context, { "face" : top });
         const sketch1 = newSketchOnPlane(context, id + "sketch", { "sketchPlane" : plane });
         if (definition.shape == BossShape.ROUND)
-            skCircle(sketch1, "c", { "center" : vector(0, 0) * mm, "radius" : definition.size / 2 });
+            skCircle(sketch1, "c", { "center" : vector(0, 0) * millimeter, "radius" : definition.size / 2 });
         else
             skRectangle(sketch1, "r", { "firstCorner" : vector(-1, -1) * definition.size / 2, "secondCorner" : vector(1, 1) * definition.size / 2 });
         skSolve(sketch1);
@@ -164,7 +169,7 @@ export const boss = defineFeature(function(context is Context, id is Id, definit
             "operationType" : NewBodyOperationType.ADD
         });
         opDeleteBodies(context, id + "clean", { "entities" : qCreatedBy(id + "sketch", EntityType.BODY) });
-    }, { "size" : 10 * mm, "height" : 5 * mm });
+    }, { "size" : 10 * millimeter, "height" : 5 * millimeter });
 
 annotation { "Feature Type Name" : "Chamfer picked edges" }
 export const chamferPicked = defineFeature(function(context is Context, id is Id, definition is map)
@@ -179,11 +184,12 @@ export const chamferPicked = defineFeature(function(context is Context, id is Id
         if (isQueryEmpty(context, definition.edges))
             throw regenError("Pick edges to chamfer", ["edges"]);
         opChamfer(context, id + "chamfer", { "entities" : definition.edges, "width" : definition.width });
-    }, { "width" : 1 * mm });
+    }, { "width" : 1 * millimeter });
 `;
 
 /** A 20 mm cube body, centered on the origin in X/Y, made by a custom feature. */
 const CUBE_SOURCE = `FeatureScript 2384;
+import(path : "onshape/std/geometry.fs", version : "2384.0");
 annotation { "Feature Type Name" : "Cube" }
 export const cube = defineFeature(function(context is Context, id is Id, definition is map)
     precondition
@@ -193,10 +199,10 @@ export const cube = defineFeature(function(context is Context, id is Id, definit
     }
     {
         fCuboid(context, id + "cube", {
-            "corner1" : vector(-definition.size / 2, -definition.size / 2, 0 * mm),
+            "corner1" : vector(-definition.size / 2, -definition.size / 2, 0 * millimeter),
             "corner2" : vector(definition.size / 2, definition.size / 2, definition.size)
         });
-    }, { "size" : 20 * mm });
+    }, { "size" : 20 * millimeter });
 `;
 
 describe("custom features on a host body", () => {
@@ -273,7 +279,8 @@ describe("custom features on a host body", () => {
         const edges = body.shape.value.findSubShapes(ShapeTypes.edge) as IEdge[];
         const index = edges.findIndex((edge) => edge.startPoint().z > 19.9 && edge.endPoint().z > 19.9);
         const edgeId = body.edgeIdAt(index);
-        expect(edgeId).toMatch(/:e:cube:/);
+        // Scoped to the operation that made it: std's fCuboid sketches, then extrudes.
+        expect(edgeId).toMatch(/:e:cube\/extrude:/);
         Transaction.execute(doc, "fillet", () =>
             body.setFeaturesEmitShapeChanged([
                 ...body.features,
@@ -322,16 +329,18 @@ describe("studio edits", () => {
         addStudio(
             doc,
             `FeatureScript 2384;
-export function plateSize() returns ValueWithUnits { return 12 * mm; }`,
+import(path : "onshape/std/geometry.fs", version : "2384.0");
+export function plateSize() returns ValueWithUnits { return 12 * millimeter; }`,
             "Library",
         );
         const user = addStudio(
             doc,
             `FeatureScript 2384;
+import(path : "onshape/std/geometry.fs", version : "2384.0");
 import(path : "Library", version : "");
 annotation { "Feature Type Name" : "Library plate" }
 export const libraryPlate = defineFeature(function(context is Context, id is Id, definition is map) precondition {} {
-    fCuboid(context, id + "b", { "corner1" : vector(0, 0, 0) * mm, "corner2" : vector(plateSize(), plateSize(), 1 * mm) });
+    fCuboid(context, id + "b", { "corner1" : vector(0, 0, 0) * millimeter, "corner2" : vector(plateSize(), plateSize(), 1 * millimeter) });
 });`,
             "User",
         );

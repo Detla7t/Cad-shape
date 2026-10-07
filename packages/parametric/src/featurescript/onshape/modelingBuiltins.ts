@@ -2,7 +2,6 @@
 // See LICENSE file in the project root for full license information.
 
 import { FsContext } from "../context/fsContext";
-import type { Interpreter } from "../lang/interpreter";
 import {
     FsArray,
     FsMap,
@@ -14,10 +13,10 @@ import {
     fsMap,
     isCallable,
     LENGTH,
-    type NativeCallContext,
     type NativeFunction,
 } from "../lang/values";
-import { createInterpreter } from "../runtime";
+import { createNativeInterpreter } from "../nativeStd";
+import { makePlane, makePlaneData, readPlane, type Vec3, vec } from "../std/geometry";
 import type { StdBridge } from "./bridge";
 import type { BuiltinRegistry } from "./registry";
 
@@ -27,18 +26,10 @@ import type { BuiltinRegistry } from "./registry";
  * each call translates its arguments with the bridge, runs the kernel implementation and
  * translates the result back.
  */
-export function installModelingBuiltins(
-    define: BuiltinRegistry,
-    interpreter: Interpreter,
-    bridge: StdBridge,
-): void {
+export function installModelingBuiltins(define: BuiltinRegistry, bridge: StdBridge): void {
     // The kernel implementations live in a native-std interpreter; only their functions are used.
-    const kernelStd = createInterpreter();
-    const site: NativeCallContext = {
-        call: (fn, args) => interpreter.callFunction(fn, args),
-        print: (text) => interpreter.print(text),
-        isType: (value, type) => kernelStd.isNamedType(value, type),
-    };
+    const kernelStd = createNativeInterpreter();
+    const isType = (value: FsValue, type: string) => kernelStd.isNamedType(value, type);
     const kernel = (name: string): NativeFunction => {
         const fn = kernelStd.std.vars.get(name)?.value;
         if (!isCallable(fn) || fn.kind !== "native") fail(`No kernel implementation of ${name}`);
@@ -47,9 +38,9 @@ export function installModelingBuiltins(
     /** `@name(args)` → kernel `localName(args)`, with an optional rewrite of the translated arguments. */
     const forward = (name: string, localName = name, adapt?: (args: FsValue[]) => FsValue[]) => {
         const fn = kernel(localName);
-        define(name, (args) => {
+        define(name, (args, site) => {
             const local = args.map((value) => bridge.toLocal(value));
-            return bridge.toStd(fn.impl(adapt === undefined ? local : adapt(local), site));
+            return bridge.toStd(fn.impl(adapt === undefined ? local : adapt(local), { ...site, isType }));
         });
     };
     /** Renames one field of the definition map (argument 1) — `{ "faces" : q }` → `{ "entities" : q }`. */
@@ -91,6 +82,17 @@ export function installModelingBuiltins(
 
     forward("opSphere", "fSphere");
 
+    // The frame a planar face coplanar with `plane` gets: world X projected into the plane,
+    // world Y when the normal runs along X — the x axes of the default Top, Front and Right planes.
+    define("alignCanonically", (args) => {
+        const definition = bridge.toLocal(args[1]);
+        if (!(definition instanceof FsMap)) fail("alignCanonically needs { plane }");
+        const plane = readPlane(definition.field("plane"), "plane");
+        const helper: Vec3 = Math.abs(plane.normal[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
+        const x = vec.sub(helper, vec.scale(plane.normal, vec.dot(helper, plane.normal)));
+        return bridge.toStd(makePlane(makePlaneData(plane.origin, plane.normal, vec.normalize(x))));
+    });
+
     // Feature patterns: no feature runs inside one here, so every remaining transform is identity.
     const identity = () =>
         fsMap({
@@ -108,11 +110,11 @@ export function installModelingBuiltins(
     };
     forward("evaluateQuery", "evaluateQuery", unwrapQuery);
     forward("isQueryEmpty", "isQueryEmpty", unwrapQuery);
-    define("evaluateQueryCount", (args) => {
-        const result = kernel("evaluateQuery").impl(
-            unwrapQuery(args.map((value) => bridge.toLocal(value))),
-            site,
-        );
+    define("evaluateQueryCount", (args, site) => {
+        const result = kernel("evaluateQuery").impl(unwrapQuery(args.map((value) => bridge.toLocal(value))), {
+            ...site,
+            isType,
+        });
         return result instanceof FsArray ? result.size : 0;
     });
 

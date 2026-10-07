@@ -3,8 +3,8 @@
 
 /**
  * The official FeatureScript slot tutorials (FsDoc tutorials 1-3, verbatim) and std's own
- * features, each run on BOTH standard libraries: Onshape's real std source (version 2960,
- * on the `@` built-ins) and the native std Feature Studios use. Every case checks the
+ * features, each run on BOTH standard libraries: Onshape's real std source (version 3083,
+ * on the `@` built-ins) and the native TypeScript std. Every case checks the
  * resulting volume against the analytic value.
  */
 
@@ -56,8 +56,8 @@ let studioCount = 0;
 /** Runs `body` as a Part Studio's build function; returns the solid volume (mm³) and any feature errors. */
 function partStudio(std: "onshape" | "native", imports: string, body: string) {
     const interpreter = interpreters[std];
-    const source = `FeatureScript 2960;
-import(path : "onshape/std/geometry.fs", version : "2960.0");
+    const source = `FeatureScript 3083;
+import(path : "onshape/std/geometry.fs", version : "3083.0");
 ${imports}
 export function build(context is Context)
 {

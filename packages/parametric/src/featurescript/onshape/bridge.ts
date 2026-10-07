@@ -228,7 +228,9 @@ export class StdBridge {
 
     toStd(value: FsValue): FsValue {
         if (value instanceof FsQuantity) return this.quantity(value.value, value.units);
-        if (value instanceof FsEnumValue) return this.enumValue(value.type.name, value.name);
+        // Only the native std's enums need translating; a studio's or std's own pass as they are.
+        if (value instanceof FsEnumValue)
+            return value.type.id.startsWith("std::") ? this.enumValue(value.type.name, value.name) : value;
         if (value instanceof FsArray)
             return new FsArray(
                 value.items.map((item) => this.toStd(item)),
@@ -273,13 +275,23 @@ export class StdBridge {
     }
 
     /** The only kernel-layer query a native hands back is a transient one. */
+    /** The kernel-layer queries the host and the natives build: entity picks and their unions. */
     private stdQuery(local: FsMap): FsMap {
         const type = local.field("queryType") as string;
-        if (type !== "TRANSIENT") fail(`Cannot return a ${type} query to std code`);
-        return fsMap(
-            { queryType: this.enumValue("QueryType", "TRANSIENT"), transientId: local.field("transientId") },
-            "Query",
-        );
+        const queryType = this.enumValue("QueryType", type);
+        switch (type) {
+            case "TRANSIENT":
+                return fsMap({ queryType, transientId: local.field("transientId") }, "Query");
+            case "NOTHING":
+                return fsMap({ queryType }, "Query");
+            case "UNION": {
+                const subqueries = local.field("subqueries");
+                if (!(subqueries instanceof FsArray)) fail("A union query needs its subqueries");
+                return fsMap({ queryType, subqueries: this.toStd(subqueries) }, "Query");
+            }
+            default:
+                fail(`Cannot hand a ${type} query to std code`);
+        }
     }
 }
 

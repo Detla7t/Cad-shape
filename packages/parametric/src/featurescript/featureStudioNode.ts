@@ -57,8 +57,8 @@ export function isFeatureStudioNode(node: unknown): node is FeatureStudioNode {
 }
 
 /** The starting point of a new studio: a parameterized feature that shows the main moving parts. */
-export const DEFAULT_STUDIO_SOURCE = `FeatureScript 2384;
-import(path : "onshape/std/geometry.fs", version : "2384.0");
+export const DEFAULT_STUDIO_SOURCE = `FeatureScript 3083;
+import(path : "onshape/std/geometry.fs", version : "3083.0");
 
 annotation { "Feature Type Name" : "Rounded Plate" }
 export const roundedPlate = defineFeature(function(context is Context, id is Id, definition is map)

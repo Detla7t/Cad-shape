@@ -2,8 +2,9 @@
 // See LICENSE file in the project root for full license information.
 
 import { type ContextSnapshot, FsContext } from "../context/fsContext";
-import { FsMap, type FsValue, fsMap } from "../lang/values";
+import { FsEnumValue, FsMap, type FsValue, fail, fsMap } from "../lang/values";
 import { idString } from "../std/feature";
+import type { StdBridge } from "./bridge";
 import type { BuiltinRegistry } from "./registry";
 
 /**
@@ -15,6 +16,8 @@ import type { BuiltinRegistry } from "./registry";
 interface FeatureState {
     readonly snapshots: Map<string, ContextSnapshot>;
     readonly status: Map<string, FsMap>;
+    readonly descriptions: Map<string, string>;
+    readonly queryVariables: Map<string, FsValue>;
 }
 
 const states = new WeakMap<FsContext, FeatureState>();
@@ -22,7 +25,12 @@ const states = new WeakMap<FsContext, FeatureState>();
 export function featureState(context: FsContext): FeatureState {
     let state = states.get(context);
     if (state === undefined) {
-        state = { snapshots: new Map(), status: new Map() };
+        state = {
+            snapshots: new Map(),
+            status: new Map(),
+            descriptions: new Map(),
+            queryVariables: new Map(),
+        };
         states.set(context, state);
     }
     return state;
@@ -33,7 +41,23 @@ export function reportedStatus(context: FsContext, id: string): FsMap | undefine
     return states.get(context)?.status.get(id);
 }
 
-export function installFeatureBuiltins(define: BuiltinRegistry): void {
+export type StatusKind = "OK" | "INFO" | "WARNING" | "ERROR";
+
+/** A reported status as its kind and a readable message (the custom message, else the error enum). */
+export function describeStatus(status: FsMap): { kind: StatusKind; message: string } {
+    const name = (value: FsValue) =>
+        value instanceof FsEnumValue ? value.name : typeof value === "string" ? value : "";
+    const kind = (name(status.field("statusType")) || "OK") as StatusKind;
+    const custom = status.field("statusMsg");
+    if (typeof custom === "string" && custom !== "") return { kind, message: custom };
+    const words = name(status.field("statusEnum")).toLowerCase().replace(/_/g, " ");
+    return {
+        kind,
+        message: words === "" ? kind.toLowerCase() : words.charAt(0).toUpperCase() + words.slice(1),
+    };
+}
+
+export function installFeatureBuiltins(define: BuiltinRegistry, bridge: StdBridge): void {
     const target = (args: FsValue[]): [FeatureState, FsContext, string] => {
         const context = FsContext.of(args[0]);
         return [featureState(context), context, idString(args[1])];
@@ -70,6 +94,51 @@ export function installFeatureBuiltins(define: BuiltinRegistry): void {
         state.status.delete(id);
         return undefined;
     });
+    // Variables: the document's (set by the runner) and those features attach.
+    const variableArgs = (args: FsValue[]): [FsContext, FsMap] => {
+        if (!(args[1] instanceof FsMap)) fail("Expected a variable definition map");
+        return [FsContext.of(args[0]), args[1]];
+    };
+    define("setVariable", (args) => {
+        const [context, definition] = variableArgs(args);
+        const name = String(definition.field("name"));
+        context.variables.set(name, definition.field("value"));
+        const description = definition.field("description");
+        if (typeof description === "string") featureState(context).descriptions.set(name, description);
+        return undefined;
+    });
+    define("getVariable", (args) => {
+        const [context, definition] = variableArgs(args);
+        const name = String(definition.field("name"));
+        if (context.variables.has(name)) return bridge.toStd(context.variables.get(name));
+        if (definition.has("defaultValue")) return definition.field("defaultValue");
+        fail(`Variable "${name}" not found`);
+    });
+    const allVariables = (context: FsContext, withDescriptions: boolean) => {
+        const result = new FsMap();
+        for (const [name, value] of context.variables) {
+            const std = bridge.toStd(value);
+            const description = featureState(context).descriptions.get(name) ?? "";
+            result.set(name, withDescriptions ? fsMap({ value: std, description }) : std);
+        }
+        return result;
+    };
+    define("getAllVariables", (args) => allVariables(FsContext.of(args[0]), false));
+    define("getAllVariablesAndDescriptions", (args) => allVariables(FsContext.of(args[0]), true));
+    define("setQueryVariable", (args) => {
+        const [context, definition] = variableArgs(args);
+        featureState(context).queryVariables.set(String(definition.field("name")), definition.field("value"));
+        return undefined;
+    });
+    define("getQueryVariable", (args) => {
+        const [context, definition] = variableArgs(args);
+        const name = String(definition.field("name"));
+        const value = featureState(context).queryVariables.get(name);
+        if (value !== undefined) return value;
+        if (definition.has("defaultValue")) return definition.field("defaultValue");
+        fail(`Query variable "${name}" not found`);
+    });
+
     // Error highlighting and parameter bookkeeping have no UI here.
     for (const name of [
         "setErrorEntities",

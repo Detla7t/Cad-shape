@@ -27,6 +27,7 @@ export default defineConfig({
                     // Mirror rspack.config.ts: load .wasm as an asset URL instead of a
                     // native webassembly module (which would instantiate at import time).
                     { test: /\.wasm$/, type: "asset" },
+                    { test: /\.json\.gz$/, type: "asset/resource" },
                 ],
             },
         },

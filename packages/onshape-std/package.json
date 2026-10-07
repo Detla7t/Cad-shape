@@ -1,0 +1,7 @@
+{
+    "name": "@chili3d/onshape-std",
+    "version": "0.7.1",
+    "description": "Onshape's FeatureScript standard library (std 3083, MIT) as one bundled asset, for running Feature Studios on the real std",
+    "main": "src/index.ts",
+    "type": "module"
+}

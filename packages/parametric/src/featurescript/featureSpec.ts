@@ -12,9 +12,9 @@ import {
     FsQuantity,
     type FsValue,
     LENGTH,
+    type Units,
     unitsEqual,
 } from "./lang/values";
-import { boundRange } from "./std/core";
 
 /**
  * Reads a custom feature's `precondition` the way Onshape's feature dialog does: every
@@ -384,16 +384,60 @@ function filterKinds(expression: Expression): QueryEntityKind[] | undefined {
     return kinds.size === 0 ? undefined : [...kinds];
 }
 
+/**
+ * A quantity in either std: a native one, or Onshape's std `ValueWithUnits` map
+ * (`{ "value" : 0.0254, "unit" : { "meter" : 1 } }`).
+ */
+function quantityOf(value: FsValue): { value: number; units: Units } | undefined {
+    if (value instanceof FsQuantity) return value;
+    if (!(value instanceof FsMap)) return undefined;
+    const magnitude = value.field("value");
+    const unit = value.field("unit");
+    if (typeof magnitude !== "number" || !(unit instanceof FsMap)) return undefined;
+    const exponent = (key: string) => {
+        const e = unit.field(key);
+        return typeof e === "number" ? e : 0;
+    };
+    return {
+        value: magnitude,
+        units: {
+            meter: exponent("meter"),
+            radian: exponent("radian"),
+            kilogram: exponent("kilogram"),
+            second: exponent("second"),
+        },
+    };
+}
+
+/** The SI factor a bound-spec key stands for: `(millimeter)` → 0.001; a bare number is itself. */
+function unitFactor(key: FsValue): number | undefined {
+    return typeof key === "number" ? key : quantityOf(key)?.value;
+}
+
+/** `[min, ..., max]` of a bound spec in SI units (map specs: the entry holding the range). */
+function boundRange(spec: FsValue): { min: number; max: number } | undefined {
+    const range = (values: FsArray, factor: number) => {
+        const min = values.items[0];
+        const max = values.items[values.items.length - 1];
+        return typeof min === "number" && typeof max === "number"
+            ? { min: min * factor, max: max * factor }
+            : undefined;
+    };
+    if (spec instanceof FsArray) return range(spec, 1);
+    if (!(spec instanceof FsMap)) return undefined;
+    for (const [key, value] of spec.pairs()) {
+        if (value instanceof FsArray) return range(value, unitFactor(key) ?? 1);
+    }
+    return undefined;
+}
+
 /** A FeatureScript default in app units for a numeric kind. */
 function appValue(value: FsValue, kind: "length" | "angle" | "integer" | "real"): number | undefined {
+    const q = quantityOf(value);
     if (kind === "length")
-        return value instanceof FsQuantity && unitsEqual(value.units, LENGTH)
-            ? round(value.value * MM_PER_M)
-            : undefined;
+        return q !== undefined && unitsEqual(q.units, LENGTH) ? round(q.value * MM_PER_M) : undefined;
     if (kind === "angle")
-        return value instanceof FsQuantity && unitsEqual(value.units, ANGLE)
-            ? round(value.value * DEG_PER_RAD)
-            : undefined;
+        return q !== undefined && unitsEqual(q.units, ANGLE) ? round(q.value * DEG_PER_RAD) : undefined;
     return typeof value === "number" ? value : undefined;
 }
 
@@ -412,7 +456,7 @@ function boundDefault(spec: FsValue, kind: "length" | "angle" | "integer" | "rea
     const scale = kind === "length" ? MM_PER_M : kind === "angle" ? DEG_PER_RAD : 1;
     let fallback: number | undefined;
     for (const [key, value] of spec.pairs()) {
-        const unit = key instanceof FsQuantity ? key.value : typeof key === "number" ? key : undefined;
+        const unit = unitFactor(key);
         if (unit === undefined) continue;
         const local = value instanceof FsArray ? value.items[1] : value;
         if (typeof local !== "number") continue;
@@ -438,7 +482,7 @@ export function isParameterVisible(
 ): boolean {
     if (parameter.conditions.length === 0) return true;
     const env = new Environment(spec.feature.module.env);
-    env.define(spec.definitionName, definition);
+    env.define(spec.definitionName, spec.interpreter.adaptHostValue(definition));
     return parameter.conditions.every((condition) => {
         try {
             const value = spec.interpreter.evaluate(condition.expression, env);

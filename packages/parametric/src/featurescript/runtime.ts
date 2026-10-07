@@ -2,25 +2,20 @@
 // See LICENSE file in the project root for full license information.
 
 import type { IShape } from "@chili3d/core";
-import { installEvaluation } from "./context/evaluation";
 import { type FsBody, FsContext } from "./context/fsContext";
-import { installOperations } from "./context/operations";
-import { installQueries } from "./context/queries";
-import { installSketch } from "./context/sketch";
 import { FsError, FsRuntimeError } from "./lang/errors";
-import {
-    type FeatureExport,
+import type {
+    FeatureExport,
     Interpreter,
-    type ModuleInstance,
-    type ModuleResolver,
-    type ModuleSource,
+    ModuleInstance,
+    ModuleResolver,
+    ModuleSource,
 } from "./lang/interpreter";
 import type { FsMap, FsValue } from "./lang/values";
-import { installCore } from "./std/core";
-import { installEnums } from "./std/enums";
-import { installFeatureSupport, makeId } from "./std/feature";
-import { installGeometry } from "./std/geometry";
-import { StdBuilder } from "./std/registry";
+import { createNativeInterpreter } from "./nativeStd";
+import { describeStatus, reportedStatus } from "./onshape/featureBuiltins";
+import { createOnshapeInterpreter, type OnshapeStdSource } from "./onshape/onshapeStd";
+import { makeId } from "./std/feature";
 
 /**
  * The FeatureScript runtime surface the rest of the app uses: build an interpreter with
@@ -34,23 +29,50 @@ export interface InterpreterSetup {
     readonly maxSteps?: number;
 }
 
-/** An interpreter with every std module installed. */
+// ------------------------------------------------------------------ The std library
+
+let onshapeStd: OnshapeStdSource | undefined;
+let onshapeBase: Interpreter | undefined;
+
+/**
+ * Makes Onshape's own std library (`@chili3d/onshape-std`) the FeatureScript std: from now
+ * on every interpreter is a fork of one interpreter that loads the std modules once. Until
+ * it is provided (and in tests that never provide it) studios run on the native std.
+ */
+export function provideOnshapeStd(source: OnshapeStdSource | undefined): void {
+    onshapeStd = source;
+    onshapeBase = undefined;
+}
+
+export function onshapeStdVersion(): number | undefined {
+    return onshapeStd?.version;
+}
+
+function onshapeInterpreter(source: OnshapeStdSource): Interpreter {
+    onshapeBase ??= createOnshapeInterpreter({ std: source });
+    return onshapeBase;
+}
+
+/**
+ * Loads (parses and instantiates) the std modules behind `geometry.fs` now, so the first
+ * studio compile does not pay for it. A no-op on the native std.
+ */
+export function warmUpStd(): void {
+    if (onshapeStd === undefined) return;
+    onshapeInterpreter(onshapeStd).load({
+        path: "std-warm-up",
+        source: `FeatureScript ${onshapeStd.version};\nimport(path : "onshape/std/geometry.fs", version : "");\n`,
+    });
+}
+
+/** An interpreter on the current std: a fork over Onshape's std once provided, else the native std. */
 export function createInterpreter(setup: InterpreterSetup = {}): Interpreter {
-    const interpreter = new Interpreter({
+    if (onshapeStd === undefined) return createNativeInterpreter(setup);
+    return onshapeInterpreter(onshapeStd).fork({
         print: setup.print,
         resolveModule: setup.resolveModule,
         maxSteps: setup.maxSteps,
     });
-    const std = new StdBuilder(interpreter);
-    installEnums(std);
-    installCore(std);
-    installGeometry(std);
-    installFeatureSupport(std);
-    installQueries(std);
-    installSketch(std);
-    installOperations(std);
-    installEvaluation(std);
-    return interpreter;
 }
 
 export interface CompileResult {
@@ -111,11 +133,19 @@ export function runFeature(run: FeatureRun): FeatureRunResult {
     try {
         if (run.input !== undefined) context.addHostBody(run.input);
         for (const [name, value] of run.variables ?? []) context.variables.set(name, value);
-        const definition = run.definition(context);
+        const definition = run.interpreter.adaptHostValue(run.definition(context));
         const callable =
             run.feature.module.exports.get(run.feature.name) ??
             run.feature.module.env.lookup(run.feature.name)?.value;
         run.interpreter.callFunction(callable, [context.value, makeId([run.instanceId]), definition]);
+        // Onshape's std reports a top-level feature's failure as its status instead of throwing.
+        const status = reportedStatus(context, run.instanceId);
+        if (status !== undefined) {
+            const { kind, message } = describeStatus(status);
+            if (kind === "ERROR") throw new FsRuntimeError(message);
+            if (kind === "WARNING") context.notes.warnings.push(message);
+            if (kind === "INFO") context.notes.infos.push(message);
+        }
         return {
             context,
             bodies: context.bodies.filter((body) => body.isModelGeometry),

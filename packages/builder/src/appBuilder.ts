@@ -90,6 +90,9 @@ export class AppBuilder {
     }
 
     useParametric(): this {
+        // Onshape's FeatureScript std library (~1 MB): start fetching now, alongside the rest of startup.
+        const onshapeStd = import("@chili3d/onshape-std").then((std) => std.loadOnshapeStd());
+        onshapeStd.catch(() => {}); // handled where it is awaited
         this._inits.push(async () => {
             Logger.info("initializing parametric");
 
@@ -97,6 +100,16 @@ export class AppBuilder {
             // serializers, and exposes the sketch ribbon contributions
             const parametric = await import("@chili3d/parametric");
             await parametric.initGarlic();
+            try {
+                parametric.provideOnshapeStd(parametric.onshapeStdFromBundle(await onshapeStd));
+                // Parse and instantiate the std once the app is idle, not on the first studio compile.
+                whenIdle(() => parametric.warmUpStd());
+            } catch (error) {
+                Logger.warn(
+                    "Onshape's std library is unavailable; Feature Studios run on the built-in std",
+                    error,
+                );
+            }
             this._ribbonExtras.push(
                 ...parametric.SketchRibbonProfiles,
                 ...ParametricRibbonProfiles,
@@ -200,4 +213,16 @@ export class AppBuilder {
     protected getServices(): IService[] {
         return [new CommandService(), new HotkeyService()];
     }
+}
+
+function whenIdle(task: () => void): void {
+    const run = () => {
+        try {
+            task();
+        } catch (error) {
+            Logger.warn("FeatureScript std warm-up failed", error);
+        }
+    };
+    if (typeof requestIdleCallback === "function") requestIdleCallback(run, { timeout: 5000 });
+    else setTimeout(run, 1000);
 }

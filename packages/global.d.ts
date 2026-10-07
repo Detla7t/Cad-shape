@@ -26,6 +26,11 @@ declare module "*.jpg" {
     export default path;
 }
 
+declare module "*.json.gz" {
+    const url: string;
+    export default url;
+}
+
 declare module "*.sass";
 
 // @rstest/core's JestAssertion interface extends jest.Matchers (normally provided

@@ -137,6 +137,8 @@ export class ModuleInstance {
     readonly exports = new Map<string, FsValue>();
     /** Names an `export import` passes on; exported with their final (merged) value. */
     readonly reexported = new Set<string>();
+    /** Names bound by imports — the module's own declaration of one shadows it. */
+    readonly imported = new Set<string>();
     readonly namespaces = new Map<string, ModuleInstance>();
     readonly features: FeatureExport[] = [];
 
@@ -156,6 +158,20 @@ export function isStdPath(path: string): boolean {
     return path.startsWith("onshape/std/") || path.startsWith("chili3d/std/") || path === "std";
 }
 
+/**
+ * Onshape's std `defineFeature(feature, defaults)` returns a closure over its arguments; an
+ * annotated (`"Feature Type Name"`) export of one is a feature whose precondition and
+ * defaults are the wrapped function's.
+ */
+function stdFeatureDefinition(wrapper: UserFunction, annotation: FsMap): FeatureDefinition | undefined {
+    if (annotation.field("Feature Type Name") === undefined) return undefined;
+    const scope = wrapper.closure as Environment;
+    const fn = scope.vars.get("feature")?.value;
+    const defaults = scope.vars.get("defaults")?.value;
+    if (!isCallable(fn) || fn.kind !== "user" || fn.params.length !== 3) return undefined;
+    return defaults instanceof FsMap ? { fn, defaults } : { fn };
+}
+
 /** A top-level constant not evaluated yet (see `Interpreter.force`). */
 class LazyConst {
     state: "pending" | "evaluating" | "done" = "pending";
@@ -166,6 +182,9 @@ class LazyConst {
         readonly item: ConstDeclaration,
     ) {}
 }
+
+/** Every module's top-level environment → the module (shared by forks of one interpreter). */
+const moduleByEnv = new WeakMap<Environment, ModuleInstance>();
 
 // ------------------------------------------------------------------ Control-flow signals
 
@@ -210,15 +229,21 @@ export const NOT_HANDLED = Symbol("not handled");
  * once per interpreter and shared by everything that imports them.
  */
 export class Interpreter {
-    readonly std = new Environment();
+    readonly std: Environment;
     /** `@name` built-ins — the native layer Onshape's std source calls into. */
-    readonly builtins = new Map<string, FsValue>();
+    readonly builtins: Map<string, FsValue>;
+    /**
+     * Converts a value the host built (a feature's definition) into this interpreter's
+     * value world — identity for the native std; Onshape's std wants its own maps.
+     */
+    adaptHostValue: (value: FsValue) => FsValue = (value) => value;
     private readonly ambientStd: boolean;
+    /** Set on a fork: std modules, built-ins and std operators come from the parent. */
+    private readonly parent?: Interpreter;
     private readonly modules = new Map<string, ModuleInstance>();
     private readonly loading = new Set<string>();
-    private readonly moduleByEnv = new WeakMap<Environment, ModuleInstance>();
     private readonly userOperators = new Map<string, UserFunction[]>();
-    private readonly nativeOperators = new Map<string, NativeOperator[]>();
+    private readonly nativeOperators: Map<string, NativeOperator[]>;
     private steps = 0;
     private depth = 0;
     private readonly maxSteps: number;
@@ -226,14 +251,36 @@ export class Interpreter {
     private readonly printer: (text: string) => void;
     private readonly resolveModule?: ModuleResolver;
 
-    constructor(options: InterpreterOptions = {}) {
+    constructor(options: InterpreterOptions = {}, parent?: Interpreter) {
         this.maxSteps = options.maxSteps ?? 50_000_000;
         this.maxDepth = options.maxDepth ?? 400;
         this.printer = options.print ?? (() => {});
         this.resolveModule = options.resolveModule;
-        this.ambientStd = options.ambientStd ?? true;
-        // Language-level constants, below every std.
-        this.std.define("inf", Number.POSITIVE_INFINITY);
+        this.parent = parent;
+        if (parent !== undefined) {
+            this.ambientStd = parent.ambientStd;
+            this.std = parent.std;
+            this.builtins = parent.builtins;
+            this.nativeOperators = parent.nativeOperators;
+            this.adaptHostValue = parent.adaptHostValue;
+        } else {
+            this.ambientStd = options.ambientStd ?? true;
+            this.std = new Environment();
+            this.builtins = new Map();
+            this.nativeOperators = new Map();
+            // Language-level constants, below every std.
+            this.std.define("inf", Number.POSITIVE_INFINITY);
+        }
+    }
+
+    /**
+     * A lightweight interpreter over the same std: std modules (loaded once, in the
+     * parent), built-ins and std operators are shared; studio modules, the printer, the
+     * module resolver and the step budget are the fork's own — so recompiling a studio
+     * never sees another compilation's modules, and never reloads the std.
+     */
+    fork(options: Omit<InterpreterOptions, "ambientStd"> = {}): Interpreter {
+        return new Interpreter(options, this);
     }
 
     print(text: string): void {
@@ -265,11 +312,13 @@ export class Interpreter {
             const value = module.exports.get(name);
             return value instanceof LazyConst ? this.force(value) : value;
         }
-        return undefined;
+        return this.parent?.findExport(name);
     }
 
     /** Parses and instantiates a module (cached by path + source). Throws FsError. */
     load(source: ModuleSource): ModuleInstance {
+        // A fork's std modules live in the parent, loaded once for every fork.
+        if (this.parent !== undefined && this.lazyModule(source.path)) return this.parent.load(source);
         const key = `${source.path}\u0000${source.source}`;
         const cached = this.modules.get(key);
         if (cached !== undefined) return cached;
@@ -290,7 +339,7 @@ export class Interpreter {
     private instantiate(path: string, program: Program): ModuleInstance {
         const env = new Environment(this.std);
         const module = new ModuleInstance(path, program, env);
-        this.moduleByEnv.set(env, module);
+        moduleByEnv.set(env, module);
         for (const item of program.body) {
             if (item.kind === "Import")
                 this.importModule(module, item.path, item.namespace, item.exported, item.pos);
@@ -315,6 +364,7 @@ export class Interpreter {
                     });
                     break;
                 case "Type":
+                    this.shadowImport(module, item.name);
                     env.declare(
                         item.name,
                         typeValue(this.userType(item.name, item.typecheck, env)),
@@ -323,6 +373,7 @@ export class Interpreter {
                     );
                     break;
                 case "Enum":
+                    this.shadowImport(module, item.name);
                     env.declare(item.name, this.makeEnum(path, item), true, item.pos);
                     break;
                 case "Operator": {
@@ -339,8 +390,9 @@ export class Interpreter {
         // later one, and a std table nothing uses is never built. A Feature Studio forces
         // them all here, so its mistakes surface when it compiles.
         for (const item of program.body) {
-            if (item.kind === "Const")
-                env.declare(item.name, new LazyConst(module, item) as never, true, item.pos);
+            if (item.kind !== "Const") continue;
+            this.shadowImport(module, item.name);
+            env.declare(item.name, new LazyConst(module, item) as never, true, item.pos);
         }
         if (!this.lazyModule(path)) {
             for (const item of program.body)
@@ -361,6 +413,19 @@ export class Interpreter {
                 this.collectFeature(module, item.name, binding?.value, item.annotations, env);
         }
         return module;
+    }
+
+    /** A module's own declaration replaces an imported binding of the same name. */
+    private shadowImport(module: ModuleInstance, name: string): void {
+        if (!module.imported.delete(name)) return;
+        module.env.vars.delete(name);
+        module.reexported.delete(name);
+    }
+
+    /** A fork resolves std modules through its parent, studios through its own resolver. */
+    private resolveSource(path: string): ModuleSource | undefined {
+        if (this.parent !== undefined && this.lazyModule(path)) return this.parent.resolveSource(path);
+        return this.resolveModule?.(path);
     }
 
     /** Modules whose constants stay lazy after loading: the std source. */
@@ -401,7 +466,7 @@ export class Interpreter {
         pos: SourcePosition,
     ): void {
         if (this.ambientStd && isStdPath(path)) return;
-        const source = this.resolveModule?.(path);
+        const source = this.resolveSource(path);
         if (source === undefined) throw new FsRuntimeError(`Cannot find the module "${path}" to import`, pos);
         let imported: ModuleInstance;
         try {
@@ -418,6 +483,7 @@ export class Interpreter {
         }
         for (const [name, value] of imported.exports) {
             const own = module.env.vars.get(name);
+            module.imported.add(name);
             if (own === undefined) module.env.define(name, value);
             else if (own.value !== value) {
                 // Overloads of one name spread over modules (`toString` for each type)
@@ -440,8 +506,12 @@ export class Interpreter {
         annotations: MapLiteral[],
         env: Environment,
     ): void {
-        if (!isCallable(value) || value.kind !== "native" || value.feature === undefined) return;
+        if (!isCallable(value) || value.kind === "overloads") return;
+        if (value.kind === "native" && value.feature === undefined) return;
+        if (annotations.length === 0 && value.kind === "user") return;
         const annotation = this.evaluateAnnotations(annotations, env);
+        const definition = value.kind === "native" ? value.feature : stdFeatureDefinition(value, annotation);
+        if (definition === undefined) return;
         const displayName = annotation.field("Feature Type Name");
         const description = annotation.field("Feature Type Description");
         module.features.push({
@@ -449,7 +519,7 @@ export class Interpreter {
             displayName: typeof displayName === "string" ? displayName : name,
             description: typeof description === "string" ? description : undefined,
             annotation,
-            definition: value.feature,
+            definition,
             module,
         });
     }
@@ -513,7 +583,12 @@ export class Interpreter {
      * kept as the set's fallback, so `toString(value is MyType)` extends std's `toString`.
      */
     private bindFunction(env: Environment, name: string, fn: UserFunction): void {
-        const own = env.vars.get(name);
+        let own = env.vars.get(name);
+        const module = moduleByEnv.get(env);
+        if (own !== undefined && module?.imported.has(name) && !isCallable(own.value)) {
+            this.shadowImport(module, name);
+            own = undefined;
+        }
         if (own !== undefined) {
             const existing = own.value;
             if (isCallable(existing) && existing.kind === "overloads") {
@@ -778,7 +853,7 @@ export class Interpreter {
     private moduleOf(env: Environment): ModuleInstance | undefined {
         let current: Environment | undefined = env;
         while (current !== undefined) {
-            const module = this.moduleByEnv.get(current);
+            const module = moduleByEnv.get(current);
             if (module !== undefined) return module;
             current = current.parent;
         }
@@ -1204,7 +1279,7 @@ export class Interpreter {
         right: FsValue,
         pos?: SourcePosition,
     ): FsValue | typeof NOT_HANDLED {
-        if (this.userOperators.size === 0) return NOT_HANDLED;
+        if (!this.hasUserOperators()) return NOT_HANDLED;
         switch (operator) {
             case ">":
                 return this.tryUserOperator("<", [right, left], pos);
@@ -1230,13 +1305,24 @@ export class Interpreter {
         args: FsValue[],
         pos?: SourcePosition,
     ): FsValue | typeof NOT_HANDLED {
-        const candidates = this.userOperators.get(operator);
-        if (candidates === undefined) return NOT_HANDLED;
+        const candidates = this.operatorsFor(operator);
+        if (candidates.length === 0) return NOT_HANDLED;
         // Only values carrying a custom tag can reach a user overload — plain numbers and
         // strings never pay for the dispatch.
         if (!args.some((arg) => isContainer(arg) && arg.tag !== undefined)) return NOT_HANDLED;
         const candidate = this.selectOverload(candidates, args);
         return candidate === undefined ? NOT_HANDLED : this.callUser(candidate, args, pos);
+    }
+
+    private hasUserOperators(): boolean {
+        return this.userOperators.size > 0 || (this.parent?.hasUserOperators() ?? false);
+    }
+
+    /** Operator overloads visible here: the parent's (std) and this interpreter's own. */
+    private operatorsFor(operator: string): readonly UserFunction[] {
+        const own = this.userOperators.get(operator) ?? [];
+        const inherited = this.parent?.operatorsFor(operator) ?? [];
+        return inherited.length === 0 ? own : own.length === 0 ? inherited : [...inherited, ...own];
     }
 
     // ------------------------------------------------------------------ Assignment

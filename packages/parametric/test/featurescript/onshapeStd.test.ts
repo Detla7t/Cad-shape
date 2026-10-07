@@ -2,7 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 /**
- * Onshape's own FeatureScript standard library (version 2960, 265 modules, ~146k lines)
+ * Onshape's own FeatureScript standard library (version 3083, 276 modules, ~150k lines)
  * run on this interpreter: every module parses, `geometry.fs` loads with its whole import
  * graph, and the examples std documents (`@example \`expr\` returns \`value\``) evaluate
  * to the values its documentation states.
@@ -14,7 +14,7 @@ import { createOnshapeInterpreter } from "../../src/featurescript/onshape/onshap
 import { describeError } from "../../src/featurescript/runtime";
 import { ONSHAPE_STD, STD_BUNDLE } from "./_helpers/onshapeStd";
 
-const GEOMETRY = 'FeatureScript 2960;\nimport(path : "onshape/std/geometry.fs", version : "2960.0");\n';
+const GEOMETRY = 'FeatureScript 3083;\nimport(path : "onshape/std/geometry.fs", version : "3083.0");\n';
 
 test("every std module parses", () => {
     const failures: string[] = [];
@@ -25,7 +25,7 @@ test("every std module parses", () => {
             failures.push(`${name}: ${(error as Error).message}`);
         }
     }
-    expect(Object.keys(STD_BUNDLE.files)).toHaveLength(265);
+    expect(Object.keys(STD_BUNDLE.files)).toHaveLength(276);
     expect(failures).toEqual([]);
 });
 

@@ -39,6 +39,11 @@ export default defineConfig({
                 type: "asset",
             },
             {
+                // Onshape's std library bundle: always its own file, fetched at startup.
+                test: /\.json\.gz$/,
+                type: "asset/resource",
+            },
+            {
                 test: /\.(j|t)s$/,
                 loader: "builtin:swc-loader",
                 options: {

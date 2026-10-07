@@ -6,6 +6,7 @@
     "devDependencies": {
         "@chili3d/app": "*",
         "@chili3d/i18n": "*",
+        "@chili3d/onshape-std": "*",
         "@chili3d/parametric": "*",
         "@chili3d/three": "*",
         "@chili3d/ui": "*",

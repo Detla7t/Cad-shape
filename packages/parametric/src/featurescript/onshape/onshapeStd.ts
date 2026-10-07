@@ -41,7 +41,9 @@ export function createOnshapeInterpreter(setup: OnshapeInterpreterSetup): Interp
         maxSteps: setup.maxSteps,
         ambientStd: false,
     });
-    installOnshapeBuiltins(interpreter, setup.std.version);
+    const bridge = installOnshapeBuiltins(interpreter, setup.std.version);
+    // A feature's definition is built natively (quantities, string-typed queries); std wants its own maps.
+    interpreter.adaptHostValue = (value) => bridge.toStd(value);
     return interpreter;
 }
 
