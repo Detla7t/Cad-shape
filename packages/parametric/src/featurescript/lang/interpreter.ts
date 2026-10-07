@@ -90,7 +90,9 @@ export interface TypeDefinition {
 
 const BUILTIN_TYPES: Record<string, (value: FsValue) => boolean> = {
     number: (v) => typeof v === "number",
-    string: (v) => typeof v === "string",
+    // An enum value is a string to `is string` — std passes `ErrorStringEnum.X` to `message is string`
+    // parameters (bridgingCurve.fs); an overload on the enum type still wins, being more specific.
+    string: (v) => typeof v === "string" || v instanceof FsEnumValue,
     boolean: (v) => typeof v === "boolean",
     undefined: (v) => v === undefined,
     map: (v) => v instanceof FsMap,
