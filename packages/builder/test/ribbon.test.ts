@@ -180,6 +180,7 @@ describe("ParametricRibbonProfiles", () => {
             "featurescript.insert",
             "featurescript.newStudio",
             "featurescript.editStudio",
+            "featurescript.tables",
             "feature.variable",
         ]);
     });

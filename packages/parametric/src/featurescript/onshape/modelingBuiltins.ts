@@ -172,6 +172,11 @@ export function installModelingBuiltins(define: BuiltinRegistry, bridge: StdBrid
     forward("evArea", "evArea", renameField("faces", "entities"));
     forward("evVolume", "evVolume", renameField("bodies", "entities"));
     forward("evBox", "evBox3d");
+
+    // Properties: bodies keep a name (custom tables read their parts' names); any other
+    // property is accepted and reads back as unset.
+    forward("setProperty");
+    forward("getProperty");
 }
 
 /** An enum field of an operation's definition (argument 2) by member name: `ExtendedToolBodyType.SOLID` → "SOLID". */

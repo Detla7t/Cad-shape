@@ -12,6 +12,7 @@ import { installEnums } from "./std/enums";
 import { installFeatureSupport } from "./std/feature";
 import { installGeometry } from "./std/geometry";
 import { StdBuilder } from "./std/registry";
+import { installTables } from "./std/table";
 
 /**
  * An interpreter on the native std: the std implemented directly in TypeScript, with
@@ -36,5 +37,6 @@ export function createNativeInterpreter(
     installSketch(std);
     installOperations(std);
     installEvaluation(std);
+    installTables(std);
     return interpreter;
 }

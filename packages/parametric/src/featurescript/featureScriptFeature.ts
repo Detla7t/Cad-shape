@@ -110,22 +110,74 @@ const UNITS: Partial<Record<FsParameterSpec["kind"], UnitSpec>> = {
     real: UNITLESS,
 };
 
+/** The value a parameter holds: stored by key, the spec default when absent. */
+type StoredValues = (parameter: FsParameterSpec) => FeatureScriptParameterValue;
+
+const storedIn =
+    (values: Readonly<Record<string, FeatureScriptParameterValue>>): StoredValues =>
+    (parameter) =>
+        values[parameter.key] ?? parameter.defaultValue;
+
 /**
  * A definition built from stored values without resolving entity picks — what the panel
  * evaluates visibility conditions against. Unresolvable numeric expressions become
  * undefined, so a condition on them simply does not hold.
  */
-function previewDefinition(feature: FeatureScriptFeatureData, spec: FeatureSpec, scope: Scope): FsMap {
+function previewDefinition(spec: FeatureSpec, scope: Scope, stored: StoredValues): FsMap {
     const definition = new FsMap();
     for (const parameter of spec.parameters) {
         if (parameter.kind === "query") {
             definition.set(parameter.key, query("NOTHING"));
             continue;
         }
-        const value = convertValue(parameter, storedValue(feature, parameter), scope);
+        const value = convertValue(parameter, stored(parameter), scope);
         if (value.isOk) definition.set(parameter.key, value.value);
     }
     return definition;
+}
+
+/**
+ * The definition a custom table runs on, from values stored by key (the spec's default
+ * for a missing key). Query parameters have no picks here and pass an empty query; a
+ * hidden parameter's bad value is skipped, a visible one's is the error.
+ */
+export function plainDefinition(
+    spec: FeatureSpec,
+    values: Readonly<Record<string, FeatureScriptParameterValue>>,
+    scope: Scope,
+): Result<FsMap> {
+    const stored = storedIn(values);
+    const preview = previewDefinition(spec, scope, stored);
+    const definition = new FsMap();
+    for (const parameter of spec.parameters) {
+        if (parameter.kind === "query") {
+            definition.set(parameter.key, query("NOTHING"));
+            continue;
+        }
+        const value = convertValue(parameter, stored(parameter), scope);
+        if (!value.isOk) {
+            if (!isParameterVisible(spec, parameter, preview)) continue;
+            return Result.err(value.error);
+        }
+        definition.set(parameter.key, value.value);
+    }
+    return Result.ok(definition);
+}
+
+/**
+ * The parameters a panel shows for values stored by key: the visible ones, as feature
+ * panel rows (query parameters are left out — a table has no entity picks).
+ */
+export function plainParameterRows(
+    spec: FeatureSpec,
+    values: Readonly<Record<string, FeatureScriptParameterValue>>,
+    scope: Scope,
+): FeatureParameter[] {
+    const stored = storedIn(values);
+    const preview = previewDefinition(spec, scope, stored);
+    return spec.parameters
+        .filter((parameter) => parameter.kind !== "query" && isParameterVisible(spec, parameter, preview))
+        .map((parameter) => toFeatureParameter(stored(parameter), parameter));
 }
 
 /** One stored (non-query) value as the FeatureScript value the feature receives. */
@@ -177,7 +229,7 @@ function convertValue(
 }
 
 /** The document's variables as FeatureScript values, for `getVariable`. */
-function documentVariables(scope: Scope): Map<string, FsValue> {
+export function documentVariables(scope: Scope): Map<string, FsValue> {
     const variables = new Map<string, FsValue>();
     for (const [name, { value, unit }] of scope) {
         if (unit.length === 1 && unit.angle === 0)
@@ -373,7 +425,7 @@ function buildDefinition(
         if (picks.value.edgeAnchors !== undefined) edgeAnchors.push(...picks.value.edgeAnchors);
         else if ((value.edges?.length ?? 0) > 0) anchorsIncomplete();
     }
-    const preview = previewDefinition(feature, spec, context.scope);
+    const preview = previewDefinition(spec, context.scope, (parameter) => storedValue(feature, parameter));
     for (const parameter of spec.parameters) {
         if (parameter.kind === "query") {
             if (!definition.has(parameter.key)) definition.set(parameter.key, query("NOTHING"));
@@ -463,10 +515,10 @@ const featureScriptHandler: FeatureHandler<FeatureScriptFeatureData> = {
         if (!resolved.isOk) return [];
         const { spec } = resolved.value;
         const scope = document.variables.evaluate().scope;
-        const preview = previewDefinition(feature, spec, scope);
+        const preview = previewDefinition(spec, scope, (parameter) => storedValue(feature, parameter));
         return spec.parameters
             .filter((parameter) => isParameterVisible(spec, parameter, preview))
-            .map((parameter) => toFeatureParameter(feature, parameter));
+            .map((parameter) => toFeatureParameter(storedValue(feature, parameter), parameter));
     },
 
     setParameter(feature, key, value, document) {
@@ -503,8 +555,10 @@ function specOf(document: IDocument, feature: FeatureScriptFeatureData): Feature
     return resolved.isOk ? resolved.value.spec : undefined;
 }
 
-function toFeatureParameter(feature: FeatureScriptFeatureData, parameter: FsParameterSpec): FeatureParameter {
-    const value = storedValue(feature, parameter);
+function toFeatureParameter(
+    value: FeatureScriptParameterValue,
+    parameter: FsParameterSpec,
+): FeatureParameter {
     const base = { key: parameter.key, display: "featurescript.parameter" as const, label: parameter.label };
     switch (parameter.kind) {
         case "boolean":

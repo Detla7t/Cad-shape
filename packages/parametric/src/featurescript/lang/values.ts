@@ -235,9 +235,14 @@ export interface NativeFunction {
     readonly impl: (args: FsValue[], site: NativeCallContext) => FsValue;
     /** Set on the value `defineFeature` returns: what the feature UI and the body read. */
     readonly feature?: FeatureDefinition;
+    /** Set on the value `defineTable` returns: the table function, `(context, definition)`. */
+    readonly table?: FeatureDefinition;
 }
 
-/** A custom feature: the wrapped function plus the defaults `defineFeature` was given. */
+/**
+ * A custom feature (or table): the wrapped function plus the defaults `defineFeature` was
+ * given — a table's wrapped function takes `(context, definition)` and has no defaults in std.
+ */
 export interface FeatureDefinition {
     readonly fn: UserFunction;
     readonly defaults?: FsMap;

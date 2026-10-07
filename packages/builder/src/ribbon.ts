@@ -137,7 +137,10 @@ export const ParametricRibbonProfiles: RibbonProfileExtra[] = [
             },
             {
                 groupName: "ribbon.group.featureScript",
-                items: ["featurescript.insert", ["featurescript.newStudio", "featurescript.editStudio"]],
+                items: [
+                    "featurescript.insert",
+                    ["featurescript.newStudio", "featurescript.editStudio", "featurescript.tables"],
+                ],
             },
             {
                 groupName: "ribbon.group.other",
