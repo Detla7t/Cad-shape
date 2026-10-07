@@ -2,11 +2,13 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    type DataTable,
     type IEdge,
     type IFace,
     type IShape,
     type IVertex,
     Plane,
+    type Result,
     ShapeTypes,
     type TrackedShape,
     XYZ,
@@ -250,6 +252,9 @@ export function historySource(body: FsBody): HistorySource {
     };
 }
 
+/** Finds a document data table by reference (`findDataTable`); what `getDataTable` reads. */
+export type FsDataTableSource = (reference: string) => Result<DataTable>;
+
 /** What a run reports besides geometry. */
 export interface FsRunNotes {
     readonly warnings: string[];
@@ -261,6 +266,8 @@ export class FsContext {
     readonly variables = new Map<string, FsValue>();
     /** Names in `variables` that are configuration variables — `getAllVariables` can leave them out. */
     readonly configurationVariables = new Set<string>();
+    /** The document's data tables, set by the runner; undefined when the run has no document. */
+    dataTables: FsDataTableSource | undefined;
     readonly notes: FsRunNotes = { warnings: [], infos: [] };
     /** Ids (`/`-joined) of the operations that changed geometry, in run order. */
     readonly operations: string[] = [];

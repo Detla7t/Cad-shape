@@ -13,7 +13,17 @@ import {
     parseActiveConfiguration,
     parseConfigurationInputs,
 } from "./configuration";
-import { EMPTY_SCOPE, type EvaluatedValue, isConstantName, resolveUnitSpec, type Scope } from "./expression";
+import { dataTablesKey, isDataTableNode } from "./dataTable";
+import {
+    EMPTY_SCOPE,
+    type EvaluatedValue,
+    isConstantName,
+    resolveUnitSpec,
+    type Scope,
+    type ScopeContext,
+    scopeContext,
+    withScopeContext,
+} from "./expression";
 import { isVariableType, unitSpecOfType } from "./unitSpec";
 import { type IVariableSource, parseVariableItems, type VariableData } from "./variableData";
 import { isVariableStudioNode, type VariableStudioNode } from "./variableStudioNode";
@@ -48,9 +58,11 @@ interface Accumulator {
     readonly origins: Map<string, string>;
 }
 
-function accumulator(base: Scope): Accumulator {
+function accumulator(base: Scope, context = scopeContext(base)): Accumulator {
     return {
-        scope: new Map(base),
+        // The scope being built carries the base's context (or the one given): a row's
+        // `data(...)` call finds the document's tables through it.
+        scope: withScopeContext(new Map(base), context),
         errors: new Map(),
         warnings: new Map(),
         values: new Map(),
@@ -86,8 +98,9 @@ export function evaluateVariables(
 export function evaluateVariableLayers(
     layers: readonly VariableLayer[],
     base: Scope = EMPTY_SCOPE,
+    context?: ScopeContext,
 ): EvaluatedVariables {
-    return evaluateDocumentScope(undefined, layers, base);
+    return evaluateDocumentScope(undefined, layers, base, context);
 }
 
 /** Names the configuration layer in the shadowing warnings of the layers above it. */
@@ -96,14 +109,16 @@ export const CONFIGURATION_LAYER = "the configuration";
 /**
  * The whole document scope: the configuration's inputs in the active configuration first
  * (the lowest layer), then `layers` lowest first, as `evaluateVariableLayers` resolves them.
- * Input rows report by input id, like variable rows.
+ * Input rows report by input id, like variable rows. `context` (the document and its data
+ * tables' token) rides along the scope, so `data(...)` resolves in every layer.
  */
 export function evaluateDocumentScope(
     configuration: ConfigurationData | undefined,
     layers: readonly VariableLayer[],
     base: Scope = EMPTY_SCOPE,
+    context?: ScopeContext,
 ): EvaluatedVariables {
-    const result = accumulator(base);
+    const result = accumulator(base, context ?? scopeContext(base));
     if (configuration !== undefined) evaluateConfigurationLayer(configuration, result);
     for (const layer of layers) evaluateLayer(layer.items, layer.name, result);
     return result;
@@ -207,11 +222,16 @@ function evaluateVariable(
  * A name repeated within one layer is an error on the later row; shadowing across layers
  * is allowed and reported as a warning on the shadowing row.
  *
+ * The scope also carries the document (`scopeContext`), so registered expression functions —
+ * `data("Prices", "B3")` — read its data tables, and a `token` fingerprinting those tables:
+ * a data source that changes re-scopes the document like a studio edit does.
+ *
  * Everything that resolves an expression reads `evaluate().scope`, so a studio — or the
  * active configuration — reaches feature parameters, sketch dimensions and FeatureScript's
  * `getVariable` with no change at the call sites; listeners re-derive on the `"scope"`
  * notification, which fires when any layer changes — a table write, a studio edit, a studio
- * added, removed or moved, a configuration input edited, another configuration activated.
+ * added, removed or moved, a configuration input edited, another configuration activated,
+ * a data source refreshed.
  */
 export interface IVariableTable extends IVariableSource {
     get variablesJson(): string;
@@ -387,9 +407,14 @@ export class VariableTable extends HistoryObservable implements IVariableTable {
             }));
             layers.push({ name: TABLE_LAYER, items: this.items });
             const configuration = { inputs: this.configurationInputs, active: this.activeConfiguration };
+            const tables = dataTablesKey(this.document);
+            const context: ScopeContext = {
+                document: this.document,
+                ...(tables === "" ? {} : { token: tables }),
+            };
             this._evaluated = {
                 revision: this._revision,
-                result: evaluateDocumentScope(configuration, layers),
+                result: evaluateDocumentScope(configuration, layers, EMPTY_SCOPE, context),
             };
         }
         return this._evaluated.result;
@@ -413,17 +438,23 @@ export class VariableTable extends HistoryObservable implements IVariableTable {
         return this.document.modelManager.findNodes(isVariableStudioNode).filter(isVariableStudioNode);
     }
 
-    /** What the studio layers hold: which studios, in which order, with which variables. */
+    /**
+     * What the layers outside the table hold: which studios, in which order, with which
+     * variables — and which data tables, at which revisions (`dataTablesKey`).
+     */
     private layersKey(): string {
-        return this.studios()
+        const studios = this.studios()
             .map((studio) => `${studio.id}\u0000${studio.variablesJson}`)
             .join("\u0001");
+        const tables = dataTablesKey(this.document);
+        return tables === "" ? studios : `${studios}\u0003${tables}`;
     }
 
     private readonly handleNodesChanged = (records: NodeRecord[]) => {
         // A folder may carry studios in or out with it (and a loaded document arrives as
         // one record for its root), so any list node is worth a look.
-        const touched = (node: INode) => isVariableStudioNode(node) || NodeUtils.isLinkedListNode(node);
+        const touched = (node: INode) =>
+            isVariableStudioNode(node) || NodeUtils.isLinkedListNode(node) || isDataTableNode(node);
         if (records.some((record) => touched(record.node))) this.notifyScopeChanged();
     };
 

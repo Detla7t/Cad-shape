@@ -1,6 +1,8 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
+import type { IDocument } from "../document";
+import type { IDisposable } from "../foundation/disposable";
 import { Result } from "../foundation/result";
 import { selectConfiguredArm } from "./configuredValue";
 import {
@@ -35,6 +37,70 @@ export interface EvaluatedValue {
 export type Scope = ReadonlyMap<string, EvaluatedValue>;
 
 export const EMPTY_SCOPE: Scope = new Map();
+
+/**
+ * What a scope carries besides its names — kept beside the map (a `WeakMap`), not in it, so
+ * every consumer that iterates the scope (FeatureScript's `getVariable`, the variables panel)
+ * sees variables only.
+ *
+ * - `document`: the document the scope was built for. Registered functions read it — `data()`
+ *   finds its tables there.
+ * - `token`: a fingerprint of the out-of-band state those functions read (the document's data
+ *   tables). A cache keyed on the scope's entries must fold it in: a refreshed table changes
+ *   what `data("Dims", "B2")` returns without changing any entry.
+ */
+export interface ScopeContext {
+    readonly document?: IDocument;
+    readonly token?: string;
+}
+
+const SCOPE_CONTEXTS = new WeakMap<Scope, ScopeContext>();
+
+/** Attaches `context` to `scope` (returned for chaining); `undefined` leaves it bare. */
+export function withScopeContext<T extends Scope>(scope: T, context: ScopeContext | undefined): T {
+    if (context !== undefined) SCOPE_CONTEXTS.set(scope, context);
+    return scope;
+}
+
+/** The context `withScopeContext` attached to `scope`, if any. */
+export function scopeContext(scope: Scope): ScopeContext | undefined {
+    return SCOPE_CONTEXTS.get(scope);
+}
+
+/** A function argument: a number with its unit, or a quoted text literal (`"Parts"`). */
+export type ExpressionArgument = EvaluatedValue | string;
+
+/** What a registered function sees besides its arguments. */
+export interface ExpressionFunctionContext {
+    /** The scope the expression resolves against. */
+    readonly scope: Scope;
+    /** `scopeContext(scope)?.document` — undefined for a bare scope (a unit test, a preview). */
+    readonly document: IDocument | undefined;
+}
+
+/**
+ * A function contributed by another module (`data`, `lookup`, … from `@chili3d/data`). It gets
+ * its arguments already evaluated — text literals as strings — and answers a value with its unit
+ * or an error; it must not throw (a throw is reported as the expression's error all the same).
+ */
+export type ExpressionFunction = (
+    args: readonly ExpressionArgument[],
+    context: ExpressionFunctionContext,
+) => Result<EvaluatedValue>;
+
+export interface ExpressionFunctionOptions {
+    /** Fewest arguments; default 0. */
+    readonly minArgs?: number;
+    /** Most arguments; default unlimited. */
+    readonly maxArgs?: number;
+}
+
+interface RegisteredFunction {
+    readonly fn: ExpressionFunction;
+    readonly arity: readonly [number, number];
+}
+
+const REGISTERED_FUNCTIONS = new Map<string, RegisteredFunction>();
 
 /**
  * Trigonometric functions take degrees and inverse ones return degrees, matching the
@@ -101,8 +167,42 @@ export function isConstantName(name: string): boolean {
 }
 
 /**
+ * Adds a function to every expression — feature parameters, sketch dimensions, variable rows,
+ * FeatureScript parameters — without core knowing its module. Built-in functions and constants
+ * cannot be replaced (an expression must mean the same thing whichever modules are loaded); a
+ * second registration of the same name replaces the first. Disposing unregisters it.
+ */
+export function registerExpressionFunction(
+    name: string,
+    fn: ExpressionFunction,
+    options: ExpressionFunctionOptions = {},
+): IDisposable {
+    if (!/^[A-Za-z_]\w*$/.test(name)) throw new Error(`Invalid expression function name: ${name}`);
+    if (Object.hasOwn(FUNCTIONS, name) || isConstantName(name)) {
+        throw new Error(`Expression function "${name}" is built in`);
+    }
+    const entry: RegisteredFunction = {
+        fn,
+        arity: [options.minArgs ?? 0, options.maxArgs ?? Number.POSITIVE_INFINITY],
+    };
+    REGISTERED_FUNCTIONS.set(name, entry);
+    return {
+        dispose: () => {
+            if (REGISTERED_FUNCTIONS.get(name) === entry) REGISTERED_FUNCTIONS.delete(name);
+        },
+    };
+}
+
+/** The names `registerExpressionFunction` added, in registration order. */
+export function registeredExpressionFunctions(): readonly string[] {
+    return [...REGISTERED_FUNCTIONS.keys()];
+}
+
+/**
  * Safe arithmetic expression evaluator (no `eval`): `+ - * / %`, parentheses, unary
- * minus, the functions above, `pi`/`e`, and identifiers resolved from `scope`.
+ * minus, the functions above, `pi`/`e`, and identifiers resolved from `scope` — plus the
+ * functions other modules register (`registerExpressionFunction`), whose arguments may be
+ * quoted text: `data("Prices", "B3")`. Text is an argument only, never a value.
  *
  * Every value carries a `UnitSpec`, and each operation propagates it: `+ - %` require
  * both sides to agree (a unitless side adopts the other's unit), `* /` add and
@@ -265,6 +365,7 @@ class Parser {
         if (/\d|\./.test(ch)) return this.parseNumber();
         if (/[A-Za-z_]/.test(ch)) return this.parseIdentifier();
         if (ch === "#") return this.parseVariableReference();
+        if (ch === '"' || ch === "'") return Result.err("Text is only allowed as a function argument");
         return Result.err(`Unexpected character: ${ch}`);
     }
 
@@ -315,12 +416,12 @@ class Parser {
 
     private parseFunction(name: string): Result<EvaluatedValue> {
         this.pos++;
-        const args: EvaluatedValue[] = [];
+        const args: ExpressionArgument[] = [];
         this.skipSpaces();
         if (this.source[this.pos] !== ")") {
             for (;;) {
-                const arg = this.parseExpression();
-                if (!arg.isOk) return arg;
+                const arg = this.parseArgument();
+                if (!arg.isOk) return Result.err(arg.error);
                 args.push(arg.value);
                 this.skipSpaces();
                 if (this.source[this.pos] !== ",") break;
@@ -332,10 +433,57 @@ class Parser {
         this.pos++;
         // `FUNCTIONS[name]` alone would find `Object.prototype.toString` and call it.
         const fn = Object.hasOwn(FUNCTIONS, name) ? FUNCTIONS[name] : undefined;
-        if (fn === undefined) return Result.err(`Unknown function: ${name}`);
-        const unit = functionUnitSpec(name, args);
+        if (fn === undefined) return this.callRegistered(name, args);
+        const numbers: EvaluatedValue[] = [];
+        for (const arg of args) {
+            if (typeof arg === "string") return Result.err(`${name}() expects numbers, got text "${arg}"`);
+            numbers.push(arg);
+        }
+        const unit = functionUnitSpec(name, numbers);
         if (!unit.isOk) return Result.err(unit.error);
-        return Result.ok({ value: fn(...args.map((x) => x.value)), unit: unit.value });
+        return Result.ok({ value: fn(...numbers.map((x) => x.value)), unit: unit.value });
+    }
+
+    /** One argument: a whole text literal, or an expression. */
+    private parseArgument(): Result<ExpressionArgument> {
+        this.skipSpaces();
+        const quote = this.source[this.pos];
+        if (quote !== '"' && quote !== "'") return this.parseExpression();
+        const text = this.parseText(quote);
+        if (!text.isOk) return text;
+        this.skipSpaces();
+        const next = this.source[this.pos];
+        if (next !== "," && next !== ")")
+            return Result.err("Text is only allowed as a whole function argument");
+        return text;
+    }
+
+    /** A quoted literal (`"Parts"` or `'Parts'`); a backslash escapes the next character. */
+    private parseText(quote: string): Result<string> {
+        this.pos++;
+        let text = "";
+        while (this.pos < this.source.length) {
+            const ch = this.source[this.pos++];
+            if (ch === quote) return Result.ok(text);
+            if (ch === "\\" && this.pos < this.source.length) text += this.source[this.pos++];
+            else text += ch;
+        }
+        return Result.err("Unterminated text: missing closing quote");
+    }
+
+    private callRegistered(name: string, args: readonly ExpressionArgument[]): Result<EvaluatedValue> {
+        const registered = REGISTERED_FUNCTIONS.get(name);
+        if (registered === undefined) return Result.err(`Unknown function: ${name}`);
+        const [min, max] = registered.arity;
+        if (args.length < min || args.length > max) {
+            return Result.err(`${name}() expects ${describeArity(registered.arity)}, got ${args.length}`);
+        }
+        const context = { scope: this.scope, document: scopeContext(this.scope)?.document };
+        try {
+            return registered.fn(args, context);
+        } catch (error) {
+            return Result.err(`${name}(): ${error instanceof Error ? error.message : String(error)}`);
+        }
     }
 }
 

@@ -3,6 +3,7 @@
 
 import {
     type FeatureParameter,
+    findDataTable,
     type IDocument,
     type IShape,
     isConsumedTool,
@@ -157,6 +158,7 @@ export function evaluateCustomTable(
             definition: definition.value,
             variables: documentVariables(scope),
             configurationVariables: configurationVariableNames(scope),
+            dataTables: (reference) => findDataTable(document, reference),
             format,
         });
     } catch (error) {

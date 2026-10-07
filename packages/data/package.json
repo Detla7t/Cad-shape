@@ -1,0 +1,15 @@
+{
+    "name": "@chili3d/data",
+    "version": "0.7.1",
+    "description": "Data sources (CSV, Excel, ODS, JSON, SQLite, REST and SQL-over-HTTP, Google Sheets / Excel Online) and the resolver that lets expressions and FeatureScript read them",
+    "main": "src/index.ts",
+    "type": "module",
+    "devDependencies": {
+        "@chili3d/core": "*",
+        "@chili3d/element": "*",
+        "@types/sql.js": "^1.4.11"
+    },
+    "dependencies": {
+        "sql.js": "^1.14.2"
+    }
+}

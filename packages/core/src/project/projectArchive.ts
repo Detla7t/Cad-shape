@@ -2,12 +2,14 @@
 // See LICENSE file in the project root for full license information.
 
 import { Result } from "../foundation/result";
+import { base64ToBytes, bytesToBase64 } from "../foundation/utils/base64";
 import { sha256Hex } from "../foundation/utils/sha256";
 import { InternalClassName, type Serialized } from "../serialize";
 import { PART_STUDIO_KIND } from "../ui/documentElements";
 import { isValidProjectPrefix } from "./projectExtensions";
 import {
     PROJECT_DOCUMENT_PATH,
+    PROJECT_FILE_ENCODING_KEY,
     PROJECT_FILE_REF_KEY,
     PROJECT_FORMAT,
     PROJECT_FORMAT_VERSION,
@@ -21,7 +23,7 @@ import {
     type ProjectFileRole,
     type ProjectGeometryCacheEntry,
     type ProjectManifest,
-    projectSourceElementSpec,
+    projectSourceElementSpecs,
     safeProjectFileName,
 } from "./projectFormat";
 
@@ -134,15 +136,26 @@ export function packProject(input: ProjectPackInput): Result<ProjectFiles> {
     const sources = new Map<string, { data: Uint8Array; role: ProjectFileRole }>();
     const usedNames = new Map<string, Set<string>>();
     for (const node of nodes.value) {
-        const spec = projectSourceElementSpec(String(node[InternalClassName]));
-        if (spec === undefined || typeof node[spec.field] !== "string") continue;
-        const used = usedNames.get(spec.folder) ?? new Set<string>();
-        usedNames.set(spec.folder, used);
-        const name = typeof node["name"] === "string" ? node["name"] : spec.kind;
-        const path = spec.folder + safeProjectFileName(name, spec.extension, used);
-        sources.set(path, { data: utf8(node[spec.field] as string), role: "source" });
-        node[spec.field] = { [PROJECT_FILE_REF_KEY]: path };
-        elements.push({ id: String(node["id"]), kind: spec.kind, name, path });
+        let element: ProjectElement | undefined;
+        for (const spec of projectSourceElementSpecs(String(node[InternalClassName]))) {
+            const value = node[spec.field];
+            if (typeof value !== "string" || (spec.skipEmpty === true && value === "")) continue;
+            const base64 = spec.encoding === "base64";
+            const data = base64 ? base64ToBytes(value) : utf8(value);
+            // Content that is not the base64 it claims to be stays inline rather than be lost.
+            if (data === undefined) continue;
+            const used = usedNames.get(spec.folder) ?? new Set<string>();
+            usedNames.set(spec.folder, used);
+            const name = typeof node["name"] === "string" ? node["name"] : spec.kind;
+            const extension = spec.extensionOf?.(node) ?? spec.extension;
+            const path = spec.folder + safeProjectFileName(name, extension, used);
+            sources.set(path, { data, role: "source" });
+            node[spec.field] = base64
+                ? { [PROJECT_FILE_REF_KEY]: path, [PROJECT_FILE_ENCODING_KEY]: "base64" }
+                : { [PROJECT_FILE_REF_KEY]: path };
+            element ??= { id: String(node["id"]), kind: spec.kind, name, path };
+        }
+        if (element !== undefined) elements.push(element);
     }
     for (const element of input.elements ?? []) {
         if (!elements.some((existing) => existing.id === element.id)) elements.push(element);
@@ -278,19 +291,28 @@ function inlineSources(
 ): Result<void> {
     for (const node of nodes) {
         for (const [key, value] of Object.entries(node)) {
-            if (!isRecord(value)) continue;
-            const keys = Object.keys(value);
-            if (keys.length !== 1 || keys[0] !== PROJECT_FILE_REF_KEY) continue;
+            if (!isRecord(value) || !isFileReference(value)) continue;
             const path = value[PROJECT_FILE_REF_KEY];
             if (typeof path !== "string") return Result.err(`document.json has a bad file reference`);
             const bytes = files.get(path);
             if (bytes === undefined) return Result.err(`The project is missing ${path}`);
+            if (value[PROJECT_FILE_ENCODING_KEY] === "base64") {
+                node[key] = bytesToBase64(bytes);
+                continue;
+            }
             const text = decodeText(bytes, path);
             if (!text.isOk) return Result.err(text.error);
             node[key] = text.value;
         }
     }
     return Result.ok(undefined);
+}
+
+/** `{ "$file": path }`, optionally with `"$encoding"` — and nothing else. */
+function isFileReference(value: Record<string, unknown>): boolean {
+    const keys = Object.keys(value);
+    if (!keys.includes(PROJECT_FILE_REF_KEY)) return false;
+    return keys.every((key) => key === PROJECT_FILE_REF_KEY || key === PROJECT_FILE_ENCODING_KEY);
 }
 
 function checkListedFiles(manifest: ProjectManifest, files: ReadonlyMap<string, Uint8Array>): string[] {

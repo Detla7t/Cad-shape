@@ -208,6 +208,20 @@ export const SheetMetalRibbonProfiles: RibbonProfileExtra[] = [
     },
 ];
 
+/** `useData()`: Data Sources beside Variable Studios on the parametric tab. */
+export const DataRibbonProfiles: RibbonProfileExtra[] = [
+    {
+        tabName: "ribbon.tab.parametric",
+        before: "ribbon.tab.manager",
+        groups: [
+            {
+                groupName: "ribbon.group.data",
+                items: ["data.newSource", "data.refreshAll"],
+            },
+        ],
+    },
+];
+
 /**
  * The CAM tab, applied by `AppBuilder.useCam`: CAM Studios (setups, tools, operations,
  * posts) and regenerating every toolpath of the document.
