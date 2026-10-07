@@ -139,11 +139,7 @@ export class StdBridge {
                     ...kind,
                 });
             case "LOOP_EDGES":
-                return query("ADJACENT", {
-                    query: sub("subquery"),
-                    adjacencyType: "EDGE",
-                    entityType: "EDGE",
-                });
+                return query(type, { query: sub("subquery") });
             case "LARGEST":
             case "SMALLEST":
                 return query(type, { query: sub("subquery") });
@@ -176,19 +172,17 @@ export class StdBridge {
                 });
             case "MODIFIABLE_ENTITY_FILTER":
                 return this.queryOrArray(q.field("subquery")) as FsMap;
-            // No meshes, flattened or active sheet metal, forms or composite parts exist here:
-            // asking for them finds nothing, excluding them keeps everything.
+            // No meshes, flattened or active sheet metal or forms exist here: asking for them
+            // finds nothing, excluding them keeps everything.
             case "MESH_GEOMETRY_FILTER":
             case "ACTIVE_SM_FILTER":
             case "SM_FLAT_FILTER":
-            case "SM_FORM_FILTER":
-            case "CONSUMED": {
+            case "SM_FORM_FILTER": {
                 const field = {
                     MESH_GEOMETRY_FILTER: "meshGeometryFilter",
                     ACTIVE_SM_FILTER: "activeSheetMetal",
                     SM_FLAT_FILTER: "flatFilter",
                     SM_FORM_FILTER: "formFilter",
-                    CONSUMED: "consumed",
                 }[type];
                 const wanted = q.field(field);
                 const yes = wanted instanceof FsEnumValue ? wanted.name === "YES" : wanted === true;
@@ -203,10 +197,33 @@ export class StdBridge {
                     value: q.field("valueToMatchExactly"),
                     hasValue: q.has("valueToMatchExactly"),
                 });
-            case "COMPOSITE_PART_TYPE_FITLER":
             case "CONTAINED_IN_COMPOSITE":
+                return query(type, { query: sub("compositeParts") });
             case "COMPOSITE_CONTAINING":
-                return query("NOTHING");
+                return query(type, {
+                    query: sub("bodies"),
+                    ...(q.has("compositePartType")
+                        ? { compositePartType: q.field("compositePartType") }
+                        : {}),
+                });
+            case "COMPOSITE_PART_TYPE_FITLER":
+                return query("COMPOSITE_PART_TYPE_FILTER", {
+                    query: sub("subquery"),
+                    compositePartType: q.field("compositePartType"),
+                });
+            case "CONSUMED":
+                return query(type, { query: sub("subquery"), consumed: q.field("consumed") });
+            case "OP_HOLE_PROFILE":
+            case "OP_HOLE_FACE":
+                return query(type, {
+                    featureId: q.field("featureId"),
+                    name: q.field("name"),
+                    ...(q.field("identity") === undefined ? {} : { identity: sub("identity") }),
+                });
+            case "MATE_CONNECTOR":
+                return query(type, { query: sub("subquery") });
+            case "NAMED":
+                return query(type, { name: q.field("name") });
             // Operation-history queries: `makeQuery(id, "IMPRINT", ...)` names the faces a sketch made.
             case "IMPRINT":
                 // With `derivedFrom`: only what the operation made from those entities (see `queryTypes.ts`).
@@ -220,6 +237,12 @@ export class StdBridge {
                     // In Onshape a sketch's edges come from its `sketchId + "wireOp"` operation.
                     featureId: stripSuffix(q.field("operationId"), "wireOp"),
                     sketchEntityId: q.field("sketchEntityId"),
+                    ...kind,
+                });
+            case "SPLIT":
+                return query("SPLIT", {
+                    featureId: q.field("operationId"),
+                    back: q.field("isFromBackBody") === true,
                     ...kind,
                 });
             case "SWEPT_FACE":
@@ -288,12 +311,10 @@ export class StdBridge {
                 return q.has("operationId")
                     ? query("CREATED_BY", { featureId: q.field("operationId"), ...kind })
                     : query("NOTHING");
-            // Nothing here is a mesh, a flat pattern, a std sheet metal definition or an opHole
-            // result, and kernel tolerances stay within the default: these find nothing.
+            // Nothing here is a mesh, a flat pattern or a std sheet metal definition, and kernel
+            // tolerances stay within the default: these find nothing.
             case "TOLERANCE_FILTER":
             case "SOURCE_MESH":
-            case "OP_HOLE_PROFILE":
-            case "OP_HOLE_FACE":
             case "CORRESPONDING_IN_FLAT":
             case "SM_DEFINITION_ENTITY_FILTER":
             case "SM_APPLICATION_TYPE_FILTER":

@@ -417,6 +417,44 @@ function shellFaces(ref: EntityRef): EntityRef[] {
     }
 }
 
+/**
+ * `qLoopEdges`: the boundary of the joined seed faces, and the whole chain of laminar (or
+ * wire) edges each laminar seed edge runs in — its loop. A two-sided seed edge is itself.
+ */
+function loopEdges(refs: readonly EntityRef[]): EntityRef[] {
+    const result: EntityRef[] = [];
+    const faces = onlyKind(refs, "FACE");
+    const faceKeys = new Set(faces.map(entityKey));
+    for (const face of faces) {
+        for (const edge of subEntities(face, "EDGE")) {
+            const sides = edgeSides(edge);
+            if (!sides.seam && sides.faces.filter((f) => faceKeys.has(entityKey(f))).length === 1)
+                result.push(edge);
+        }
+    }
+    for (const seed of onlyKind(refs, "EDGE")) {
+        const topology = edgeTopologyOf(seed);
+        if (topology === "TWO_SIDED") {
+            result.push(seed);
+            continue;
+        }
+        const seen = new Set([entityKey(seed)]);
+        const stack = [seed];
+        while (stack.length > 0) {
+            const edge = stack.pop() as EntityRef;
+            result.push(edge);
+            for (const vertex of subEntities(edge, "VERTEX")) {
+                for (const next of relatedEntities(vertex, "EDGE")) {
+                    if (seen.has(entityKey(next)) || edgeTopologyOf(next) !== topology) continue;
+                    seen.add(entityKey(next));
+                    stack.push(next);
+                }
+            }
+        }
+    }
+    return dedupe(result);
+}
+
 /** `qLoopBoundedFaces`: the faces on the far side of the face's loop through the edge, up to the face. */
 function loopBoundedFaces(refs: readonly EntityRef[]): EntityRef[] {
     const face = refs.find((ref) => ref.kind === "FACE");
@@ -573,6 +611,11 @@ function filletRadius(ref: EntityRef, joins: JoinCache): number | undefined {
             if (entityKey(other) !== entityKey(ref)) smooth.add(entityKey(other));
     }
     return smooth.size >= 2 ? radius : undefined;
+}
+
+/** Is the face a fillet: a blend joining at least two neighbouring faces smoothly? */
+export function isFilletFace(ref: EntityRef): boolean {
+    return filletRadius(ref, new JoinCache()) !== undefined;
 }
 
 /** The common axis of a planar face bounded only by coaxial circles (a hole floor, a counterbore step). */
@@ -944,6 +987,7 @@ const RESOLVERS: Record<string, (ctx: FsContext, value: FsMap) => EntityRef[]> =
         return onlyKind(sub(ctx, value), "EDGE").filter((ref) => edgeConvexity(ref) === wanted);
     },
     LOOP_BOUNDED_FACES: (ctx, value) => loopBoundedFaces(sub(ctx, value)),
+    LOOP_EDGES: (ctx, value) => loopEdges(sub(ctx, value)),
     FACE_OR_EDGE_BOUNDED_FACES: (ctx, value) => boundedFaces(sub(ctx, value)),
     LOOP_AROUND_FACE: (ctx, value) => dedupe(onlyKind(sub(ctx, value), "FACE").flatMap(outerLoop)),
     SHELL_CONTAINING_FACE: (ctx, value) => dedupe(onlyKind(sub(ctx, value), "FACE").flatMap(shellFaces)),
@@ -1066,17 +1110,8 @@ export function installQueryTypes(std: StdBuilder): void {
     std.fn("qCoincidentFilter", (args) => query("COINCIDENT", { query: args[0], target: args[1] }));
     std.fn("qCoEdge", (args) => query("COEDGE", { face: args[0], edge: args[1] }));
     std.fn("qAxis", (args) => query("AXIS", { query: args[0], axis: args[1] }));
-    // Nothing here is a mesh, a composite part, a flat pattern or an opHole result.
-    std.fn("qConsumed", (args) =>
-        enumName(args[1], "Consumed", "consumed") === "YES" ? query("NOTHING") : (args[0] as FsMap),
-    );
-    for (const name of [
-        "qSourceMesh",
-        "qCorrespondingInFlat",
-        "qPartsAttachedTo",
-        "qOpHoleProfile",
-        "qOpHoleFace",
-    ])
+    // Nothing here is a mesh or a flat pattern (`qConsumed`: compositeParts.ts; hole queries: holeOperation.ts).
+    for (const name of ["qSourceMesh", "qCorrespondingInFlat", "qPartsAttachedTo"])
         std.fn(name, () => query("NOTHING"));
     std.fn("qToleranceFilter", () => query("NOTHING"));
 

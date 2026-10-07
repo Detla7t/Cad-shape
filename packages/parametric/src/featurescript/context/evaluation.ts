@@ -15,11 +15,14 @@ import {
     VOLUME,
 } from "../lang/values";
 import {
+    coordSystemAffine,
+    invertAffine,
     makeCoordSystem,
     makeLine,
     makePlane,
     makePlaneData,
     point,
+    readCoordSystem,
     readPoint,
     readVector,
     type Vec3,
@@ -27,6 +30,7 @@ import {
 } from "../std/geometry";
 import { arg, type StdBuilder } from "../std/registry";
 import { type EntityRef, entityShape, FsContext, MM_PER_METER } from "./fsContext";
+import { kernelMatrix } from "./operations";
 import { curveTypeOf, facePlane, measureOf, resolveQuery, samplePoints, surfaceTypeOf } from "./queries";
 
 /**
@@ -128,6 +132,16 @@ export function installEvaluation(std: StdBuilder): void {
         const refs = resolveQuery(ctx, definition.field("axis"));
         const ref = refs[0];
         if (ref === undefined) fail("evAxis resolved to nothing");
+        // A mate connector's axis is its z axis; with `allowSketchPoints`, a sketch point's
+        // axis runs along its sketch's normal.
+        const connector = ref.body.flags.mateConnector;
+        if (connector !== undefined)
+            return makeLine({ origin: connector.origin, direction: connector.zAxis });
+        const plane = ref.body.flags.plane;
+        if (ref.kind === "VERTEX" && ref.body.flags.sketch === true && plane !== undefined) {
+            if (definition.field("allowSketchPoints") !== true) fail("evAxis: a sketch point is not an axis");
+            return makeLine({ origin: toM(ref.body.vertices()[ref.index].point()), direction: plane.normal });
+        }
         return makeLine(axisOfEntity(ref));
     });
     std.fn("evLength", (args) => {
@@ -157,8 +171,16 @@ export function installEvaluation(std: StdBuilder): void {
         if (refs.length === 0) fail("evBox3d resolved to nothing");
         const min: Vec3 = [Infinity, Infinity, Infinity];
         const max: Vec3 = [-Infinity, -Infinity, -Infinity];
+        // With `cSys`, the box is aligned with that coordinate system (corners in its coordinates).
+        const cSys = definition.field("cSys");
+        const toLocal =
+            cSys === undefined
+                ? undefined
+                : kernelMatrix(invertAffine(coordSystemAffine(readCoordSystem(cSys, "cSys"))));
         for (const ref of refs) {
-            const box = entityShape(ref).boundingBox();
+            const shape = toLocal === undefined ? entityShape(ref) : entityShape(ref).transformedMul(toLocal);
+            const box = shape.boundingBox();
+            if (toLocal !== undefined) shape.dispose();
             min[0] = Math.min(min[0], box.min.x);
             min[1] = Math.min(min[1], box.min.y);
             min[2] = Math.min(min[2], box.min.z);

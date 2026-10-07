@@ -1,11 +1,19 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
+import { installCompositeParts } from "./context/compositeParts";
+import { installCurveOperations } from "./context/curveOperations";
+import { installDirectEdits } from "./context/directEdit";
 import { installEvaluation } from "./context/evaluation";
+import { installHoleOperation } from "./context/holeOperation";
+import { installMateConnectors } from "./context/mateConnectors";
+import { installMergeContexts } from "./context/mergeContexts";
 import { installOperations } from "./context/operations";
 import { installQueries } from "./context/queries";
 import { installQueryTypes } from "./context/queryTypes";
 import { installSketch } from "./context/sketch";
+import { installSplitFaces } from "./context/splitFaces";
+import { installSplitOperations } from "./context/splitOperations";
 import { Interpreter, type ModuleResolver } from "./lang/interpreter";
 import { installCore } from "./std/core";
 import { installEnums } from "./std/enums";
@@ -36,6 +44,14 @@ export function createNativeInterpreter(
     installQueryTypes(std);
     installSketch(std);
     installOperations(std);
+    installSplitOperations(std);
+    installSplitFaces(std);
+    installDirectEdits(std);
+    installCurveOperations(std);
+    installCompositeParts(std);
+    installMateConnectors(std);
+    installHoleOperation(std);
+    installMergeContexts(std);
     installEvaluation(std);
     installTables(std);
     return interpreter;

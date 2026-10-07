@@ -9,7 +9,8 @@
  *
  * The "known gaps" blocks assert the correct result of std features that are expected to
  * work but do not yet (bridge conversions, kernel ops, a missing bookkeeping built-in);
- * they fail until fixed. Features that are simply unimplemented (split part, draft, hole,
+ * they fail until fixed. Splitting, direct-editing, hole and mate connector features are
+ * covered by `stdOperations.kernel.test.ts`; features that are simply unimplemented (draft,
  * feature/face patterns, up-to bounds, sheet metal) are not tested here.
  */
 
