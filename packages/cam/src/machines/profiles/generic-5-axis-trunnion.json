@@ -1,0 +1,87 @@
+{
+    "id": "generic-5-axis-trunnion",
+    "name": "Generic 5-axis trunnion (A/C)",
+    "vendor": "Generic",
+    "kind": "mill",
+    "linearAxes": [
+        { "name": "X", "min": -300, "max": 300 },
+        { "name": "Y", "min": -250, "max": 250 },
+        { "name": "Z", "min": -400, "max": 0 }
+    ],
+    "rotaryAxes": [
+        { "name": "A", "direction": [1, 0, 0], "min": -120, "max": 30, "carrier": "table" },
+        { "name": "C", "direction": [0, 0, 1], "carrier": "table" }
+    ],
+    "kinematics": {
+        "type": "table-table",
+        "chain": ["A", "C"],
+        "tableCenter": [0, 0, -250],
+        "toolCenterPointControl": false
+    },
+    "spindle": { "minRpm": 100, "maxRpm": 15000, "powerKw": 15 },
+    "maxFeed": 12000,
+    "rapidFeed": 30000,
+    "post": { "id": "fanuc-30i-5axis" },
+    "tools": [
+        {
+            "id": "t1",
+            "number": 1,
+            "name": "10 mm flat endmill",
+            "kind": "flatEndmill",
+            "diameter": 10,
+            "fluteLength": 22,
+            "overallLength": 75,
+            "stickout": 35,
+            "flutes": 3,
+            "holder": { "diameter": 32, "length": 50 },
+            "cutting": {
+                "spindleRpm": 9000,
+                "feed": 1500,
+                "plungeFeed": 350,
+                "stepdown": 3,
+                "stepover": 4,
+                "coolant": "flood"
+            }
+        },
+        {
+            "id": "t2",
+            "number": 2,
+            "name": "6 mm ball endmill",
+            "kind": "ballEndmill",
+            "diameter": 6,
+            "fluteLength": 12,
+            "overallLength": 70,
+            "stickout": 30,
+            "flutes": 2,
+            "holder": { "diameter": 25, "length": 50 },
+            "cutting": {
+                "spindleRpm": 15000,
+                "feed": 2000,
+                "plungeFeed": 400,
+                "stepdown": 0.5,
+                "stepover": 0.3,
+                "coolant": "mist"
+            }
+        },
+        {
+            "id": "t3",
+            "number": 3,
+            "name": "8 mm bull nose R1",
+            "kind": "bullNose",
+            "diameter": 8,
+            "cornerRadius": 1,
+            "fluteLength": 16,
+            "overallLength": 70,
+            "stickout": 30,
+            "flutes": 4,
+            "cutting": {
+                "spindleRpm": 11000,
+                "feed": 1800,
+                "plungeFeed": 350,
+                "stepdown": 1,
+                "stepover": 2,
+                "coolant": "flood"
+            }
+        }
+    ]
+}

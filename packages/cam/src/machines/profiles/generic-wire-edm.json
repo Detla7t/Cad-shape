@@ -1,0 +1,33 @@
+{
+    "id": "generic-wire-edm",
+    "name": "Generic wire EDM (Ø0.25, ±30° taper)",
+    "vendor": "Generic",
+    "kind": "wireEdm",
+    "linearAxes": [
+        { "name": "X", "min": 0, "max": 350 },
+        { "name": "Y", "min": 0, "max": 250 },
+        { "name": "Z", "min": 0, "max": 220 },
+        { "name": "U", "min": -60, "max": 60 },
+        { "name": "V", "min": -60, "max": 60 }
+    ],
+    "maxFeed": 50,
+    "rapidFeed": 1000,
+    "wire": {
+        "wireDiameter": 0.25,
+        "sparkGap": 0.02,
+        "maxTaper": 30,
+        "programPlaneHeight": 0,
+        "uvPlaneHeight": 100
+    },
+    "post": { "id": "wire-iso" },
+    "tools": [
+        {
+            "id": "wire",
+            "number": 1,
+            "name": "Brass wire Ø0.25",
+            "kind": "wire",
+            "diameter": 0.25,
+            "cutting": { "feed": 4 }
+        }
+    ]
+}

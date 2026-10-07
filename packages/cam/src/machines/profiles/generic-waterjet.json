@@ -1,0 +1,25 @@
+{
+    "id": "generic-waterjet",
+    "name": "Generic waterjet (5 ft × 10 ft)",
+    "vendor": "Generic",
+    "kind": "waterjet",
+    "linearAxes": [
+        { "name": "X", "min": 0, "max": 3048 },
+        { "name": "Y", "min": 0, "max": 1524 },
+        { "name": "Z", "min": -150, "max": 0 }
+    ],
+    "maxFeed": 10000,
+    "rapidFeed": 15000,
+    "cutting": { "kerf": 0.8, "pierceDelay": 1.5, "pierceHeight": 3, "cutHeight": 2, "abrasiveRate": 0.35 },
+    "post": { "id": "waterjet" },
+    "tools": [
+        {
+            "id": "jet",
+            "number": 1,
+            "name": "Abrasive jet Ø0.8 (0.33 orifice / 0.76 tube)",
+            "kind": "jet",
+            "diameter": 0.8,
+            "cutting": { "feed": 400 }
+        }
+    ]
+}

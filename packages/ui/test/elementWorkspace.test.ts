@@ -87,11 +87,22 @@ class ScriptNode extends Node {
     protected onParentVisibleChanged(): void {}
 }
 
+/** An element kind shown beside the viewport, like a CAM Studio. */
+@serializable()
+class PanelNode extends Node {
+    constructor(options: { document: IDocument; name: string; id?: string }) {
+        super(options.document, options.name, options.id ?? Id.generate());
+    }
+    protected onVisibleChanged(): void {}
+    protected onParentVisibleChanged(): void {}
+}
+
 interface FakeView {
     readonly element: HTMLElement;
     readonly node: ScriptNode;
     readonly dispose: ReturnType<typeof rs.fn>;
     readonly activated: ReturnType<typeof rs.fn>;
+    readonly deactivated: ReturnType<typeof rs.fn>;
 }
 
 let views: FakeView[] = [];
@@ -110,7 +121,13 @@ beforeEach(() => {
         registerElementView("script", (node) => {
             const element = document.createElement("div");
             element.textContent = `editor of ${node.name}`;
-            const view = { element, node: node as ScriptNode, dispose: rs.fn(), activated: rs.fn() };
+            const view = {
+                element,
+                node: node as ScriptNode,
+                dispose: rs.fn(),
+                activated: rs.fn(),
+                deactivated: rs.fn(),
+            };
             views.push(view);
             return view;
         }),
@@ -258,6 +275,44 @@ describe("switching elements", () => {
         tabOf(strip, script.id).click();
         expect(views).toHaveLength(1);
         expect(views[0].activated).toHaveBeenCalledTimes(2);
+    });
+
+    test("switching away tells the view it is no longer the shown one", () => {
+        const { doc, strip } = setup();
+        const script = add(doc, new ScriptNode({ document: doc, name: "Script 1" }));
+        tabOf(strip, script.id).click();
+        expect(views[0].deactivated).not.toHaveBeenCalled();
+        tabOf(strip, PART_STUDIO_ID).click();
+        expect(views[0].deactivated).toHaveBeenCalledTimes(1);
+    });
+
+    test("an element beside the viewport keeps the Part Studio's viewport in view", () => {
+        const { doc, strip, partStudio, viewArea } = setup();
+        registrations.push(
+            registerElementKind({
+                kind: "panel",
+                icon: "icon-cog",
+                display: "featurescript.studio",
+                isElement: (node) => node instanceof PanelNode,
+                besideViewport: true,
+            }),
+            registerElementView("panel", () => ({
+                element: document.createElement("div"),
+                dispose: rs.fn(),
+            })),
+        );
+        const panel = add(doc, new PanelNode({ document: doc, name: "Panel 1" }));
+        const script = add(doc, new ScriptNode({ document: doc, name: "Script 1" }));
+        tabOf(strip, panel.id).click();
+        expect([isHidden(partStudio), isHidden(viewArea)]).toEqual([false, false]);
+        expect(partStudio.hasAttribute("data-viewport-only")).toBe(true);
+        expect(viewArea.hasAttribute("data-beside-viewport")).toBe(true);
+
+        // A full-size element takes the whole area again.
+        tabOf(strip, script.id).click();
+        expect([isHidden(partStudio), isHidden(viewArea)]).toEqual([true, false]);
+        expect(partStudio.hasAttribute("data-viewport-only")).toBe(false);
+        expect(viewArea.hasAttribute("data-beside-viewport")).toBe(false);
     });
 
     test("only the active element's view is visible", () => {

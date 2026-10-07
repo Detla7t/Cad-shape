@@ -3,6 +3,7 @@
 
 import type { Result } from "@chili3d/core";
 import type { MachineKind, MachineProfileData } from "./machine";
+import type { CamParameterSpec } from "./operation";
 import type { SetupData } from "./setup";
 import type { ToolData } from "./tool";
 import type { ToolpathData } from "./toolpath";
@@ -27,6 +28,10 @@ export interface PostProcessor {
     readonly machineKinds: readonly MachineKind[];
     /** File extension of its output, with the dot: ".nc", ".gcode", ".iso". */
     readonly extension: string;
+    /** The options the post panel shows (keys of `options`), when the post has any. */
+    readonly parameters?: readonly CamParameterSpec[];
+    /** Option values used where `options` (and the machine's `post.options`) say nothing. */
+    readonly defaultOptions?: Readonly<Record<string, unknown>>;
     post(program: CamProgram, options?: Readonly<Record<string, unknown>>): Result<string>;
 }
 

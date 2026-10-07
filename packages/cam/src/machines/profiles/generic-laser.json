@@ -1,0 +1,25 @@
+{
+    "id": "generic-laser",
+    "name": "Generic laser cutter (CO2 / fiber)",
+    "vendor": "Generic",
+    "kind": "laser",
+    "linearAxes": [
+        { "name": "X", "min": 0, "max": 1300 },
+        { "name": "Y", "min": 0, "max": 900 },
+        { "name": "Z", "min": -50, "max": 0 }
+    ],
+    "maxFeed": 30000,
+    "rapidFeed": 40000,
+    "cutting": { "kerf": 0.2, "pierceDelay": 0.2, "cutHeight": 1 },
+    "post": { "id": "laser-generic", "options": { "power": 1000 } },
+    "tools": [
+        {
+            "id": "beam",
+            "number": 1,
+            "name": "Beam (2.5\" lens)",
+            "kind": "jet",
+            "diameter": 0.2,
+            "cutting": { "feed": 1200 }
+        }
+    ]
+}

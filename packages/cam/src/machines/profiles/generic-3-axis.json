@@ -1,0 +1,103 @@
+{
+    "id": "generic-3-axis",
+    "name": "Generic 3-axis mill (Fanuc)",
+    "vendor": "Generic",
+    "kind": "mill",
+    "linearAxes": [
+        { "name": "X", "min": 0, "max": 800 },
+        { "name": "Y", "min": 0, "max": 500 },
+        { "name": "Z", "min": -500, "max": 0 }
+    ],
+    "spindle": { "minRpm": 100, "maxRpm": 12000, "powerKw": 11 },
+    "maxFeed": 10000,
+    "rapidFeed": 24000,
+    "post": { "id": "fanuc" },
+    "tools": [
+        {
+            "id": "t1",
+            "number": 1,
+            "name": "10 mm flat endmill",
+            "kind": "flatEndmill",
+            "diameter": 10,
+            "fluteLength": 22,
+            "overallLength": 75,
+            "stickout": 35,
+            "flutes": 3,
+            "cutting": {
+                "spindleRpm": 8000,
+                "feed": 1200,
+                "plungeFeed": 300,
+                "stepdown": 3,
+                "stepover": 4,
+                "coolant": "flood"
+            }
+        },
+        {
+            "id": "t2",
+            "number": 2,
+            "name": "6 mm flat endmill",
+            "kind": "flatEndmill",
+            "diameter": 6,
+            "fluteLength": 16,
+            "overallLength": 60,
+            "stickout": 25,
+            "flutes": 3,
+            "cutting": {
+                "spindleRpm": 10000,
+                "feed": 900,
+                "plungeFeed": 250,
+                "stepdown": 2,
+                "stepover": 2.4,
+                "coolant": "flood"
+            }
+        },
+        {
+            "id": "t3",
+            "number": 3,
+            "name": "6 mm ball endmill",
+            "kind": "ballEndmill",
+            "diameter": 6,
+            "fluteLength": 12,
+            "overallLength": 60,
+            "stickout": 25,
+            "flutes": 2,
+            "cutting": {
+                "spindleRpm": 12000,
+                "feed": 1500,
+                "plungeFeed": 300,
+                "stepdown": 0.5,
+                "stepover": 0.4,
+                "coolant": "flood"
+            }
+        },
+        {
+            "id": "t4",
+            "number": 4,
+            "name": "8 mm drill",
+            "kind": "drill",
+            "diameter": 8,
+            "tipAngle": 118,
+            "fluteLength": 50,
+            "overallLength": 100,
+            "cutting": { "spindleRpm": 2400, "feed": 240, "coolant": "flood" }
+        },
+        {
+            "id": "t5",
+            "number": 5,
+            "name": "10 mm spot drill 90°",
+            "kind": "spotDrill",
+            "diameter": 10,
+            "tipAngle": 90,
+            "cutting": { "spindleRpm": 3000, "feed": 300, "coolant": "flood" }
+        },
+        {
+            "id": "t6",
+            "number": 6,
+            "name": "12 mm chamfer mill 90°",
+            "kind": "chamfer",
+            "diameter": 12,
+            "tipAngle": 90,
+            "cutting": { "spindleRpm": 6000, "feed": 800, "coolant": "flood" }
+        }
+    ]
+}

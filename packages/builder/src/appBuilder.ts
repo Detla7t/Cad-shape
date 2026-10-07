@@ -20,6 +20,7 @@ import {
 } from "@chili3d/core";
 import { DefaultDataExchange } from "./defaultDataExchange";
 import {
+    CamRibbonProfiles,
     DefaultRibbon,
     mergeRibbonProfiles,
     ParametricRibbonProfiles,
@@ -118,6 +119,25 @@ export class AppBuilder {
                 ...ParametricRibbonProfiles,
                 ...SheetMetalRibbonProfiles,
             );
+        });
+        return this;
+    }
+
+    /**
+     * The CAM module: CAM Studio elements (setups, tools, operations, toolpath preview and
+     * posts), the machine library, the post-processors and the operation types. Builds on
+     * the parametric module (sketches and sheet metal flat patterns feed 2D operations), so
+     * it comes after `useParametric`.
+     */
+    useCam(): this {
+        this._inits.push(async () => {
+            Logger.info("initializing cam");
+
+            // registers the CAM Studio element and commands, the machine library and the posts;
+            // plugins reach the registries (operations, posts, machines) through the global
+            const cam = await import("@chili3d/cam");
+            (globalThis as any).Chili3dCam = cam;
+            this._ribbonExtras.push(...CamRibbonProfiles);
         });
         return this;
     }

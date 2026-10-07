@@ -1,0 +1,93 @@
+{
+    "id": "haas-vf2",
+    "name": "Haas VF-2",
+    "vendor": "Haas",
+    "kind": "mill",
+    "linearAxes": [
+        { "name": "X", "min": -762, "max": 0 },
+        { "name": "Y", "min": -406, "max": 0 },
+        { "name": "Z", "min": -508, "max": 0 }
+    ],
+    "spindle": { "minRpm": 1, "maxRpm": 8100, "powerKw": 22.4 },
+    "maxFeed": 16500,
+    "rapidFeed": 25400,
+    "post": { "id": "haas" },
+    "tools": [
+        {
+            "id": "t1",
+            "number": 1,
+            "name": "1/2\" flat endmill",
+            "kind": "flatEndmill",
+            "diameter": 12.7,
+            "fluteLength": 25,
+            "overallLength": 76,
+            "stickout": 40,
+            "flutes": 3,
+            "holder": { "diameter": 40, "length": 60 },
+            "cutting": {
+                "spindleRpm": 6000,
+                "feed": 1500,
+                "plungeFeed": 400,
+                "stepdown": 4,
+                "stepover": 5,
+                "coolant": "flood"
+            }
+        },
+        {
+            "id": "t2",
+            "number": 2,
+            "name": "1/4\" flat endmill",
+            "kind": "flatEndmill",
+            "diameter": 6.35,
+            "fluteLength": 19,
+            "overallLength": 63,
+            "stickout": 28,
+            "flutes": 3,
+            "cutting": {
+                "spindleRpm": 8100,
+                "feed": 1000,
+                "plungeFeed": 250,
+                "stepdown": 2,
+                "stepover": 2.5,
+                "coolant": "flood"
+            }
+        },
+        {
+            "id": "t3",
+            "number": 3,
+            "name": "1/4\" ball endmill",
+            "kind": "ballEndmill",
+            "diameter": 6.35,
+            "fluteLength": 12,
+            "overallLength": 63,
+            "stickout": 28,
+            "flutes": 2,
+            "cutting": {
+                "spindleRpm": 8100,
+                "feed": 1600,
+                "plungeFeed": 300,
+                "stepdown": 0.5,
+                "stepover": 0.4,
+                "coolant": "flood"
+            }
+        },
+        {
+            "id": "t4",
+            "number": 4,
+            "name": "Ø6.8 drill (M8 tap drill)",
+            "kind": "drill",
+            "diameter": 6.8,
+            "tipAngle": 135,
+            "cutting": { "spindleRpm": 2800, "feed": 280, "coolant": "throughTool" }
+        },
+        {
+            "id": "t5",
+            "number": 5,
+            "name": "M8×1.25 tap",
+            "kind": "tap",
+            "diameter": 8,
+            "pitch": 1.25,
+            "cutting": { "spindleRpm": 600, "feed": 750, "coolant": "flood" }
+        }
+    ]
+}

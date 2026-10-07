@@ -24,6 +24,9 @@ export interface SetupData {
     readonly tools?: readonly ToolData[];
     /** Program number / name the post writes. */
     readonly programName?: string;
+    /** The post-processor chosen for this setup (default: the machine's `post.id`), and its options. */
+    readonly postId?: string;
+    readonly postOptions?: Readonly<Record<string, unknown>>;
 }
 
 export type StockData =

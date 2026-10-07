@@ -209,6 +209,23 @@ export const SheetMetalRibbonProfiles: RibbonProfileExtra[] = [
 ];
 
 /**
+ * The CAM tab, applied by `AppBuilder.useCam`: CAM Studios (setups, tools, operations,
+ * posts) and regenerating every toolpath of the document.
+ */
+export const CamRibbonProfiles: RibbonProfileExtra[] = [
+    {
+        tabName: "ribbon.tab.cam",
+        before: "ribbon.tab.manager",
+        groups: [
+            {
+                groupName: "ribbon.group.cam",
+                items: ["cam.newStudio", "cam.openStudio", "cam.generateAll"],
+            },
+        ],
+    },
+];
+
+/**
  * Returns a new profile list with `extras` merged into a copy of `base`: extra
  * items are prepended to the matching group (contributions land first), unknown
  * groups are appended, and new tabs are inserted before their `before` tab or

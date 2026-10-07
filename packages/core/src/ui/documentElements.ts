@@ -38,6 +38,8 @@ export interface IElementView extends IDisposable {
     readonly element: HTMLElement;
     /** Called each time its tab becomes the active one. */
     activated?(): void;
+    /** Called when another tab takes over from it (the view stays mounted, hidden). */
+    deactivated?(): void;
 }
 
 /** Builds the view of one element; called once per node, the first time its tab opens. */
@@ -56,6 +58,12 @@ export interface ElementKind {
     readonly newCommand?: CommandKeys;
     /** A detached copy for the tab's Duplicate; `node.clone()` when absent. */
     readonly duplicate?: (node: INode) => INode;
+    /**
+     * The view is a side panel beside the Part Studio's viewport rather than a full-size
+     * page — for elements that work on the model in view (a CAM Studio previewing its
+     * toolpaths, picking geometry). The Part Studio's own sidebar is hidden meanwhile.
+     */
+    readonly besideViewport?: boolean;
 }
 
 /** One element of a document, as the tab strip lists it. */

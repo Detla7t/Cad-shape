@@ -5,6 +5,7 @@
     "main": "src/index.ts",
     "devDependencies": {
         "@chili3d/app": "*",
+        "@chili3d/cam": "*",
         "@chili3d/i18n": "*",
         "@chili3d/onshape-std": "*",
         "@chili3d/parametric": "*",
