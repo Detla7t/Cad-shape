@@ -24,6 +24,7 @@ import {
     Serializer,
     ShapeTypes,
     Transaction,
+    VariableStudioNode,
     XYZ,
 } from "@chili3d/core";
 import { createMockApplication, createMockVisualWithDocument, TestDocument } from "@chili3d/core/test-utils";
@@ -500,6 +501,71 @@ describe("expression and history flows", () => {
         expect(measuredLine(sketch.data)).toBeCloseTo(20);
         expectClean(body);
         expect(extent(body)).toEqual([0, 0, 0, 40, 40, 20]);
+    });
+
+    test("a Variable Studio's variable reaches a sketch dimension and a body feature, below the table", async () => {
+        const doc = newDoc();
+        const studio = new VariableStudioNode({
+            document: doc,
+            name: "Variable Studio 1",
+            items: [{ id: "s1", name: "w", expression: "40", type: "length" }],
+        });
+        Transaction.execute(doc, "add studio", () => doc.modelManager.addNode(studio));
+
+        const dimensioned: SketchData = {
+            entities: [{ id: 1, type: "line", params: [0, 0, 40, 0] }],
+            constraints: [
+                {
+                    id: 2,
+                    kind: ConstraintKind.P2PDistance,
+                    refs: [
+                        { entityId: 1, pointIndex: 0 },
+                        { entityId: 1, pointIndex: 1 },
+                    ],
+                    datum: "w",
+                },
+            ],
+        };
+        const sketch = new SketchNode({ document: doc, plane: Plane.XY, data: dimensioned });
+        doc.modelManager.addNode(sketch);
+        const boxSketch = new SketchNode({ document: doc, plane: Plane.XY, data: rect(0, 0, 40, 40) });
+        doc.modelManager.addNode(boxSketch);
+        const profiles =
+            boxSketch.mesh.faces?.range.filter((x) => x.shape.shapeType === ShapeTypes.face) ?? [];
+        const body = new ParametricBodyNode({
+            document: doc,
+            features: [
+                {
+                    id: "e1",
+                    type: "extrude",
+                    sketchId: boxSketch.id,
+                    // Onshape's spelling of the same reference.
+                    depth: "#w / 2",
+                    profiles: [captureProfileRef(profiles[0].shape as unknown as IFace)],
+                },
+            ],
+        });
+        doc.modelManager.addNode(body);
+        expect(measuredLine(sketch.data)).toBeCloseTo(40);
+        expect(extent(body)).toEqual([0, 0, 0, 40, 40, 20]);
+
+        // Editing the studio re-derives both, exactly like a table edit.
+        Transaction.execute(doc, "edit studio", () =>
+            studio.setItems([{ id: "s1", name: "w", expression: "30", type: "length" }]),
+        );
+        expect(measuredLine(sketch.data)).toBeCloseTo(30);
+        expectClean(body);
+        expect(extent(body)).toEqual([0, 0, 0, 40, 40, 15]);
+
+        // The parameter table sits above every studio: its `w` wins.
+        setWidth(doc, "24");
+        expect(measuredLine(sketch.data)).toBeCloseTo(24);
+        expect(extent(body)).toEqual([0, 0, 0, 40, 40, 12]);
+
+        // Undoing the table edit hands `w` back to the studio.
+        await doc.history.undo();
+        expect(measuredLine(sketch.data)).toBeCloseTo(30);
+        expect(extent(body)).toEqual([0, 0, 0, 40, 40, 15]);
     });
 
     test("undo and redo of an edit restore the fused pair exactly", () => {

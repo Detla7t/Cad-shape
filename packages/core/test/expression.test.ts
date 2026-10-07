@@ -109,6 +109,30 @@ describe("names that collide with Object.prototype", () => {
     });
 });
 
+describe("Onshape's #name variable references", () => {
+    test("#w reads the variable w, unit included", () => {
+        const value = evaluate("#w * 2 + 1", { w: length(5) });
+        expect(value.value).toBe(11);
+        expect(value.unit).toEqual(LENGTH_UNITS);
+    });
+
+    test("mixes with plain references", () => {
+        expect(evaluate("#w + w", { w: length(5) }).value).toBe(10);
+    });
+
+    test.each([
+        { source: "#nope", error: "Unknown variable: nope" },
+        // A variable reference names variables only — never a constant or a function.
+        { source: "#pi", error: "Unknown variable: pi" },
+        { source: "#sin(30)", error: "Unknown variable: sin" },
+        { source: "#", error: "Expected a variable name after #" },
+        { source: "# w", error: "Expected a variable name after #" },
+        { source: "2 * #", error: "Expected a variable name after #" },
+    ])("`$source` → $error", ({ source, error }) => {
+        expect(expectError(source, { w: length(5) })).toBe(error);
+    });
+});
+
 describe("unit propagation", () => {
     const scope = { w: length(50), h: length(25), a: angle(45) };
 

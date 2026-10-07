@@ -12,7 +12,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { type IEdge, Plane, Serializer, ShapeTypes, Transaction } from "@chili3d/core";
+import { type IEdge, Plane, Serializer, ShapeTypes, Transaction, VariableStudioNode } from "@chili3d/core";
 import { createMockApplication, createMockVisualWithDocument, TestDocument } from "@chili3d/core/test-utils";
 import { initWasm, ShapeFactory } from "@chili3d/wasm";
 import { captureEdgeRef } from "../../src/features/edgeRef";
@@ -204,6 +204,87 @@ export const cube = defineFeature(function(context is Context, id is Id, definit
         });
     }, { "size" : 20 * millimeter });
 `;
+
+/** A cube whose size is the document variable `edge`, read with `getVariable`. */
+const VARIABLE_CUBE_SOURCE = `FeatureScript 2384;
+import(path : "onshape/std/geometry.fs", version : "2384.0");
+annotation { "Feature Type Name" : "Variable Cube" }
+export const variableCube = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+        annotation { "Name" : "Height" }
+        isLength(definition.height, NONNEGATIVE_LENGTH_BOUNDS);
+    }
+    {
+        const edge = getVariable(context, "edge");
+        fCuboid(context, id + "cube", {
+            "corner1" : vector(0 * millimeter, 0 * millimeter, 0 * millimeter),
+            "corner2" : vector(edge, edge, definition.height)
+        });
+    }, { "height" : 10 * millimeter });
+`;
+
+describe("Variable Studios", () => {
+    function addVariableStudio(doc: TestDocument, expression: string): VariableStudioNode {
+        const studio = new VariableStudioNode({
+            document: doc,
+            name: "Variable Studio 1",
+            items: [{ id: "s1", name: "edge", type: "length", expression }],
+        });
+        Transaction.execute(doc, "add variable studio", () => doc.modelManager.addNode(studio));
+        return studio;
+    }
+
+    test("FeatureScript reads a studio variable through getVariable, and follows its edits", async () => {
+        const doc = newDoc();
+        const variables = addVariableStudio(doc, "20");
+        const studio = addStudio(doc, VARIABLE_CUBE_SOURCE);
+        const body = addBody(doc, [customFeature(doc, studio, "variableCube")]);
+        expect(body.featureItems()[0].error).toBeUndefined();
+        expect(volume(body)).toBeCloseTo(20 * 20 * 10, 3);
+
+        Transaction.execute(doc, "edit", () =>
+            variables.setItems([{ id: "s1", name: "edge", type: "length", expression: "30" }]),
+        );
+        expect(volume(body)).toBeCloseTo(30 * 30 * 10, 3);
+
+        // The parameter table shadows the studio's `edge`.
+        Transaction.execute(doc, "table", () =>
+            doc.variables.setItems([{ id: "t1", name: "edge", type: "length", expression: "10" }]),
+        );
+        expect(volume(body)).toBeCloseTo(10 * 10 * 10, 3);
+
+        await doc.history.undo();
+        expect(volume(body)).toBeCloseTo(30 * 30 * 10, 3);
+    });
+
+    test("a feature parameter resolves a studio variable written as #name", () => {
+        const doc = newDoc();
+        addVariableStudio(doc, "20");
+        const studio = addStudio(doc, VARIABLE_CUBE_SOURCE);
+        const body = addBody(doc, [customFeature(doc, studio, "variableCube")]);
+        Transaction.execute(doc, "edit", () =>
+            body.setFeatureParameter(body.features[0].id, "height", "#edge / 4"),
+        );
+        expect(body.featureItems()[0].error).toBeUndefined();
+        expect(volume(body)).toBeCloseTo(20 * 20 * 5, 3);
+    });
+
+    test("deleting the studio leaves the feature reporting the missing variable", async () => {
+        const doc = newDoc();
+        const variables = addVariableStudio(doc, "20");
+        const studio = addStudio(doc, VARIABLE_CUBE_SOURCE);
+        const body = addBody(doc, [customFeature(doc, studio, "variableCube")]);
+        expect(volume(body)).toBeCloseTo(20 * 20 * 10, 3);
+
+        Transaction.execute(doc, "delete", () => variables.parent?.remove(variables));
+        expect(body.featureItems()[0].error).toMatch(/edge/);
+
+        await doc.history.undo();
+        expect(body.featureItems()[0].error).toBeUndefined();
+        expect(volume(body)).toBeCloseTo(20 * 20 * 10, 3);
+    });
+});
 
 describe("custom features on a host body", () => {
     test("an enum parameter renders as options and switches the geometry", () => {

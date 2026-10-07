@@ -3,9 +3,9 @@
 
 import {
     type EvaluatedVariables,
-    evaluateVariables,
     type IDocument,
     Id,
+    type IVariableSource,
     Transaction,
     type VariableData,
     type VariableType,
@@ -25,6 +25,11 @@ type VariableField = "name" | "expression" | "description";
  * own errors (`evaluate`), and a body reading a broken parameter fails the way a body reading a
  * deleted sketch does: the last good shape stays on screen. Refusing the keystroke instead
  * would make a new variable's name impossible to type — `w` is undefined until it is not.
+ *
+ * It edits one `IVariableSource` — the document's parameter table by default, or a Variable
+ * Studio — while values and errors always come from the document's whole layered scope
+ * (`document.variables.evaluate()`): a studio row may use the studios before it, and a table
+ * row may use any studio.
  */
 export class VariablesDataContent {
     private _writing = false;
@@ -32,6 +37,7 @@ export class VariablesDataContent {
     constructor(
         readonly document: IDocument,
         private readonly onApplied: () => void,
+        readonly source: IVariableSource = document.variables,
     ) {}
 
     /**
@@ -45,12 +51,15 @@ export class VariablesDataContent {
     }
 
     get items(): readonly VariableData[] {
-        return this.document.variables.items;
+        return this.source.items;
     }
 
-    /** What the table evaluates to — the value column and the per-row errors. */
+    /**
+     * What the rows evaluate to — the value column, the per-row errors and the shadowing
+     * warnings — in the document scope, keyed by row id.
+     */
     evaluate(): EvaluatedVariables {
-        return evaluateVariables(this.items);
+        return this.document.variables.evaluate();
     }
 
     /**
@@ -91,7 +100,7 @@ export class VariablesDataContent {
         this._writing = true;
         try {
             Transaction.execute(this.document, "edit variables", () => {
-                this.document.variables.setItems(items);
+                this.source.setItems(items);
             });
         } finally {
             this._writing = false;

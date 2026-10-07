@@ -12,6 +12,7 @@ import {
 } from "@chili3d/core";
 import { div } from "@chili3d/element";
 import style from "./editor.module.css";
+import { ElementWorkspace } from "./elements";
 import { FloatPanel } from "./floatPanel";
 import { ProjectView } from "./project";
 import { PropertyView } from "./property";
@@ -22,10 +23,17 @@ import { CommandContext } from "./ribbon/commandContext";
 import { Statusbar } from "./statusbar";
 import { LayoutViewport } from "./viewport";
 
+/**
+ * The document editor: ribbon on top, status bar at the bottom, and between them the
+ * active document's ELEMENT — the Part Studio (model tree, properties, viewport) or a
+ * dedicated full-size view of another element (a Feature Studio, a Variable Studio) — picked
+ * with the element tabs just above the status bar (see `ElementWorkspace`).
+ */
 export class Editor extends HTMLElement {
     private readonly _viewportContainer: HTMLDivElement;
     private readonly _commandContextContainer = div({});
     private _contentEl: HTMLDivElement | null = null;
+    private _workspace: ElementWorkspace | undefined;
     private commandContext?: CommandContext;
     private chatDock?: HTMLElement;
     private chatPanel?: ChatPanel;
@@ -60,12 +68,18 @@ export class Editor extends HTMLElement {
                 onpointerdown: (e: PointerEvent) => this._startSidebarResize(e),
             }),
         );
-        this._contentEl = div({ className: style.content }, this._sidebarEl, this._viewportContainer);
+        // The Part Studio's view is the modeling layout as it always was; other elements'
+        // views mount beside it in `elementViews`, and the workspace shows one of the two.
+        const partStudio = div({ className: style.partStudio }, this._sidebarEl, this._viewportContainer);
+        const elementViews = div({ className: style.elementViews });
+        this._workspace = new ElementWorkspace(this.app, partStudio, elementViews);
+        this._contentEl = div({ className: style.content }, partStudio, elementViews);
         this.append(
             div(
                 { className: style.root },
                 new RibbonUI(this.app, this.ribbonContent),
                 this._contentEl,
+                this._workspace.strip,
                 new Statusbar(style.statusbar),
             ),
         );
@@ -220,6 +234,7 @@ export class Editor extends HTMLElement {
         PubSub.default.sub("openCommandContext", this.openContext);
         PubSub.default.sub("closeCommandContext", this.closeContext);
         PubSub.default.sub("toggleChatPanel", this.toggleChat);
+        this._workspace?.connect();
     }
 
     disconnectedCallback(): void {
@@ -228,6 +243,7 @@ export class Editor extends HTMLElement {
         PubSub.default.remove("openCommandContext", this.openContext);
         PubSub.default.remove("closeCommandContext", this.closeContext);
         PubSub.default.remove("toggleChatPanel", this.toggleChat);
+        this._workspace?.disconnect();
         this.chatDock?.remove();
         this.chatDock = undefined;
         this.closeFloatingChat();
@@ -237,6 +253,8 @@ export class Editor extends HTMLElement {
         if (this.commandContext) {
             this.closeContext();
         }
+        // A command works in the viewport: bring the Part Studio forward if another element is open.
+        this._workspace?.showPartStudio();
         this.commandContext = new CommandContext(command);
         this._commandContextContainer.append(this.commandContext);
         this._viewportContainer.append(this._commandContextContainer);
@@ -255,6 +273,7 @@ export class Editor extends HTMLElement {
         callback: (material: Material) => void,
     ) => {
         const context = new MaterialDataContent(document, callback, editingMaterial);
+        this._workspace?.showPartStudio();
         this._viewportContainer.append(new MaterialEditor(context));
     };
 

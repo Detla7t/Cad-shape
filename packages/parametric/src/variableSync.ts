@@ -37,12 +37,15 @@ const seenRevisions = new WeakMap<IDocument, number>();
  *
  * The revision gate keeps a run to one dispatch: a consumer re-entering the table
  * (a rebuild that writes back) cannot start a second pass.
+ *
+ * `"scope"`, not the table's own `"variablesJson"`: the scope also changes when a Variable
+ * Studio is edited, added or removed, and a consumer reads the scope, not the table.
  */
 export function ensureVariableSync(document: IDocument): void {
     if (synced.has(document)) return;
     synced.add(document);
     document.variables.onPropertyChanged((property) => {
-        if (property !== "variablesJson") return;
+        if (property !== "scope") return;
         const revision = document.variables.revision;
         if (seenRevisions.get(document) === revision) return;
         seenRevisions.set(document, revision);

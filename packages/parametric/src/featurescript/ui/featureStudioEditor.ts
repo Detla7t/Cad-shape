@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { I18n, type IDocument, PubSub, Transaction } from "@chili3d/core";
+import { I18n, type IDocument, openElement, PubSub, showPartStudio, Transaction } from "@chili3d/core";
 import { ParametricBodyNode } from "../../parametricBodyNode";
 import type { FeatureStudioNode } from "../featureStudioNode";
 import { customFeatures, insertCustomFeature } from "../insertFeature";
@@ -9,41 +9,20 @@ import { type CompiledStudio, compileStudioSource, findStudio } from "../studioC
 import style from "./featureStudioEditor.module.css";
 
 /**
- * The Feature Studio editor: a floating panel with the studio's FeatureScript source, a
- * live compile check (errors point at the line), the `println` output of the studio's
- * latest runs, and the custom features it exports.
+ * The Feature Studio editor: the studio's FeatureScript source, a live compile check
+ * (errors point at the line), the `println` output of the studio's latest runs, and the
+ * custom features it exports. It is the default view of a studio's element tab (see
+ * `featureStudioElement.ts`), shown full-size in place of the Part Studio.
  *
  * Edits are drafts until applied (Apply, Ctrl/Cmd+S or Ctrl/Cmd+Enter): applying writes
  * the studio's `source` as one undo step, which rebuilds every body using its features.
- * A floating panel rather than a dialog for the same reason as the parameters panel —
- * the point is watching the model follow.
+ * The draft lives in the view, and the view stays mounted while other tabs are active,
+ * so switching to the Part Studio and back keeps unapplied edits.
  */
 
-const open = new Set<string>();
-
+/** Switches to the studio's element tab (a floating panel when no tab strip is up). */
 export function showFeatureStudioEditor(studio: FeatureStudioNode): void {
-    if (open.has(studio.id)) return;
-    open.add(studio.id);
-    const editor = new FeatureStudioEditor(studio);
-    const width = 760;
-    const height = 560;
-    PubSub.default.pub("showFloatPanel", {
-        title: "featurescript.studio",
-        content: editor.root,
-        // Over the viewport, clear of the ribbon and the model tree, so the ribbon's insert
-        // and sheet metal commands stay reachable while the studio is open.
-        x: Math.max(20, Math.min(380, window.innerWidth - width - 20)),
-        y: Math.max(20, Math.min(150, window.innerHeight - height - 20)),
-        width,
-        height,
-        minWidth: 420,
-        minHeight: 300,
-        document: studio.document,
-        onClose: () => {
-            open.delete(studio.id);
-            editor.dispose();
-        },
-    });
+    openElement(studio.document, studio);
 }
 
 function element<K extends keyof HTMLElementTagNameMap>(
@@ -297,6 +276,8 @@ export function showInsertFeatureDialog(document: IDocument, studio?: FeatureStu
                 if (entry === undefined) return;
                 const result = insertCustomFeature(document, entry, body);
                 if (!result.isOk) PubSub.default.pub("showToast", "error.default:{0}", result.error);
+                // Inserted from a studio's tab: show the body taking the new feature.
+                else showPartStudio(document);
             },
         },
         { content: "common.cancel", onclick: () => {} },

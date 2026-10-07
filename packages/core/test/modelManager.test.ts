@@ -6,7 +6,7 @@ import {
     Id,
     type INode,
     InternalClassName,
-    type ModelManager,
+    ModelManager,
     type NodeRecord,
     type OnNodeChanged,
 } from "../src";
@@ -59,7 +59,9 @@ describe("ModelManager", () => {
         });
 
         test("should initialize with empty node changed observers", () => {
-            expect(modelManager["_nodeChangedObservers"].size).toBe(0);
+            // A fresh manager, not the document's: the document's variable table observes
+            // its tree (Variable Studios are layers of the variable scope).
+            expect(new ModelManager(doc)["_nodeChangedObservers"].size).toBe(0);
         });
     });
 

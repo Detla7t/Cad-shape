@@ -248,7 +248,23 @@ class Parser {
         if (ch === "(") return this.parseParenthesized();
         if (/\d|\./.test(ch)) return this.parseNumber();
         if (/[A-Za-z_]/.test(ch)) return this.parseIdentifier();
+        if (ch === "#") return this.parseVariableReference();
         return Result.err(`Unexpected character: ${ch}`);
+    }
+
+    /**
+     * Onshape's spelling of a variable reference, `#w`. It names a variable and nothing
+     * else — `#pi` and `#sin(…)` are errors, not the constant or the function — so an
+     * expression pasted from Onshape means exactly what it meant there.
+     */
+    private parseVariableReference(): Result<EvaluatedValue> {
+        this.pos++;
+        const match = /^[A-Za-z_]\w*/.exec(this.source.slice(this.pos));
+        if (match === null) return Result.err("Expected a variable name after #");
+        const name = match[0];
+        this.pos += name.length;
+        const scoped = this.scope.get(name);
+        return scoped === undefined ? Result.err(`Unknown variable: ${name}`) : Result.ok(scoped);
     }
 
     private parseParenthesized(): Result<EvaluatedValue> {

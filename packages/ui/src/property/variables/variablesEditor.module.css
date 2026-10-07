@@ -166,6 +166,11 @@ select.field {
     }
 }
 
+/* A row that resolves but shadows a variable of a lower layer: still a value, plus a note. */
+.warningRow {
+    box-shadow: inset 3px 0 0 var(--warning-color);
+}
+
 .actions {
     display: flex;
     align-items: center;
