@@ -57,6 +57,16 @@ function ensureOccShape(shapes: IShape | IShape[]): TopoDS_Shape[] {
     throw new Error("The OCC kernel only supports OCC geometries.");
 }
 
+/**
+ * OCCT raises on a zero revolve angle (a module abort in the Release build) and silently
+ * wraps one past a full turn (400° builds a 40° sector), so both are refused here.
+ */
+function invalidRevolveAngle(degrees: number): string | undefined {
+    if (Math.abs(degrees) < Precision.Angle) return "The angle is too small.";
+    if (Math.abs(degrees) > 360 + Precision.Angle) return "The angle must not exceed 360°.";
+    return undefined;
+}
+
 function convertShapeResult<P extends unknown[] = unknown[]>(
     factory: (...params: P) => ShapeResult,
     params: P,
@@ -503,6 +513,12 @@ export class ShapeFactory implements IShapeFactory {
         ) as Result<ISolid>;
     }
     cylinder(dir: XYZ, center: XYZ, radius: number, dz: number): Result<ISolid> {
+        // OCCT builds an invalid solid for a negative height (its volume/bbox queries then
+        // abort the module): build the same cylinder the other way round instead.
+        if (dz < 0) return this.cylinder(dir.reverse(), center, radius, -dz);
+        if (radius < Precision.Distance || dz < Precision.Distance) {
+            return Result.err("The cylinder is degenerate.");
+        }
         return convertShapeResult(
             wasm.ShapeFactory.cylinder,
             [dir, center, radius, dz],
@@ -510,6 +526,11 @@ export class ShapeFactory implements IShapeFactory {
         ) as Result<ISolid>;
     }
     cone(dir: XYZ, center: XYZ, radius: number, radiusUp: number, dz: number): Result<ISolid> {
+        // OCCT raises on a negative height, which aborts the Release module.
+        if (dz < 0) return this.cone(dir.reverse(), center, radius, radiusUp, -dz);
+        if (dz < Precision.Distance || Math.max(radius, radiusUp) < Precision.Distance) {
+            return Result.err("The cone is degenerate.");
+        }
         return convertShapeResult(
             wasm.ShapeFactory.cone,
             [dir, center, radius, radiusUp, dz],
@@ -537,7 +558,7 @@ export class ShapeFactory implements IShapeFactory {
         ) as Result<IEdge>;
     }
     pyramid(plane: Plane, dx: number, dy: number, dz: number): Result<ISolid> {
-        return convertShapeResult(
+        const raw = convertShapeResult(
             wasm.ShapeFactory.pyramid,
             [
                 {
@@ -550,7 +571,16 @@ export class ShapeFactory implements IShapeFactory {
                 dz,
             ],
             "Pyramid Error",
-        ) as Result<ISolid>;
+        );
+        if (!raw.isOk) return raw as Result<ISolid>;
+        // The kernel shells five separately built faces without sewing them: no shared
+        // edges and arbitrary face orientation (invalid solid, wrong volume). Sew, then
+        // let the solid fix orient the shell outwards.
+        const sewn = raw.value.shellSewing(Precision.Distance);
+        const solid = sewn.fixSolid(Precision.Distance);
+        raw.value.dispose();
+        sewn.dispose();
+        return Result.ok(solid as ISolid);
     }
     wire(edges: IEdge[]): Result<IWire> {
         return convertShapeResult(
@@ -615,6 +645,8 @@ export class ShapeFactory implements IShapeFactory {
         );
     }
     revolve(profile: IShape, axis: Line, angle: number): Result<IShape> {
+        const invalid = invalidRevolveAngle(angle);
+        if (invalid !== undefined) return Result.err(invalid);
         return convertShapeResult(
             wasm.ShapeFactory.revolve,
             [
@@ -630,6 +662,8 @@ export class ShapeFactory implements IShapeFactory {
     }
 
     revolveTracked(profile: IShape, axis: Line, angle: number): Result<TrackedShape> {
+        const invalid = invalidRevolveAngle(angle);
+        if (invalid !== undefined) return Result.err(invalid);
         return convertTrackedShapeResult(
             wasm.ShapeFactory.revolveTracked,
             [

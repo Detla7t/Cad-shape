@@ -1,9 +1,10 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import type { IEdge, IFace, XYZLike } from "@chili3d/core";
+import type { IEdge, IFace, XYZ, XYZLike } from "@chili3d/core";
 import { profileEdgeEntityIds, profileEntityIds } from "./profileEntities";
 import { captureRegionFingerprint } from "./profileRef";
+import { MATCH_TOLERANCE } from "./refGeometry";
 
 /**
  * Content-derived seed keys for profile regions and their boundary edges.
@@ -78,4 +79,67 @@ export function profileEdgeSeeds(face: IFace, baseSeed: string, edges: IEdge[]):
         const entity = entities?.[index];
         return entity === undefined ? `${baseSeed}:e${index}` : `${baseSeed}:ent${entity}`;
     });
+}
+
+/**
+ * Seeds the sweep edges the kernel's edge history leaves unmapped — the end-cap copies of
+ * the profile's edges, and the edges its vertices sweep (a prism's lateral lines, a
+ * revolve's circles and arcs) — from the profile edges they derive from.
+ *
+ * Left positional (`${featureId}:${index}`), they realign onto a look-alike whenever the
+ * kernel re-enumerates the solid — sub-tolerance noise in a re-solved sketch is enough — and
+ * `edgeMatchesRefInvariant` cannot catch it: a rectangle's opposite cap edges are parallel,
+ * a revolve's circles coaxial. An edge feature would silently move to the wrong edge.
+ *
+ * - **Cap copy:** its mid point is a profile edge's mid point carried by `capOf` (the
+ *   sweep's motion) → `${edgeSeed}:cap`.
+ * - **Vertex sweep:** one end on a profile vertex → the sorted seeds of the profile edges
+ *   meeting there, `:sweep`. Two vertices bounded by the same edge pair (a two-edge loop)
+ *   are told apart by an occurrence suffix in vertex-coordinate order, the
+ *   `profileSeeds` recipe.
+ * - Anything else keeps the positional id it already has.
+ */
+export function seedSweptEdges(
+    edgeIds: string[],
+    outputEdges: readonly IEdge[],
+    edgeMap: readonly number[],
+    profileEdges: readonly IEdge[],
+    edgeSeeds: readonly string[],
+    capOf: (point: XYZ) => XYZ,
+): void {
+    const near = (a: XYZ, b: XYZ) => a.distanceTo(b) < MATCH_TOLERANCE;
+    const capMids = profileEdges.map((edge) => capOf(midPoint(edge)));
+    const ends = profileEdges.map((edge) => [edge.startPoint(), edge.endPoint()]);
+    const swept = new Map<string, { index: number; vertex: XYZ }[]>();
+    for (const [index, edge] of outputEdges.entries()) {
+        if (edgeMap[index] >= 0) continue;
+        const mid = midPoint(edge);
+        const copy = capMids.findIndex((point) => near(point, mid));
+        if (copy >= 0) {
+            edgeIds[index] = `${edgeSeeds[copy]}:cap`;
+            continue;
+        }
+        const vertex = [edge.startPoint(), edge.endPoint()].find((point) =>
+            ends.some((pair) => pair.some((end) => near(end, point))),
+        );
+        if (vertex === undefined) continue;
+        const meeting = [
+            ...new Set(edgeSeeds.filter((_, k) => ends[k].some((end) => near(end, vertex)))),
+        ].sort();
+        const key = `${meeting.join("&")}:sweep`;
+        const group = swept.get(key) ?? [];
+        group.push({ index, vertex });
+        swept.set(key, group);
+    }
+    for (const [key, group] of swept) {
+        group
+            .sort((a, b) => a.vertex.x - b.vertex.x || a.vertex.y - b.vertex.y || a.vertex.z - b.vertex.z)
+            .forEach(({ index }, occurrence) => {
+                edgeIds[index] = occurrence === 0 ? key : `${key}~${occurrence}`;
+            });
+    }
+}
+
+function midPoint(edge: IEdge): XYZ {
+    return edge.pointAt((edge.firstParameter() + edge.lastParameter()) / 2);
 }

@@ -30,7 +30,7 @@ import { extrudeFromSourceFaces } from "./pressPull";
 import { type ResolvedProfile, resolveProfiles } from "./profileBuilder";
 import { profileEdgeEntityIds, registerProfileEdgeEntities } from "./profileEntities";
 import { captureProfileRef } from "./profileRef";
-import { profileEdgeSeeds } from "./profileSeeds";
+import { profileEdgeSeeds, seedSweptEdges } from "./profileSeeds";
 import { anyPairTouches, combineShapes, extrudePlain, translateFace } from "./sweepGeometry";
 
 export function findSketch(document: IDocument, id: string): SketchNode | undefined {
@@ -255,7 +255,7 @@ function sweepProfiles(
  * merged ids back per prism. Returns undefined when the fuse does not apply or
  * fails — the caller then combines the prisms into a compound.
  */
-function fuseSweptPrisms(
+export function fuseSweptPrisms(
     featureId: string,
     shapes: IShape[],
     faceIds: string[][],
@@ -443,13 +443,14 @@ function sweepProfileTracked(
         // The completed face map keeps the top-face seeding below unambiguous: a
         // kernel-missed bottom face would otherwise look like a second history-less
         // candidate.
-        const { edgeMap, faceMap } = completeTrackedHistory([face], result.value, {
+        const { edgeMap, faceMap, outputEdges } = completeTrackedHistory([face], result.value, {
             inputEdges: faceEdges,
             inputFaces: [face],
         });
         const faceIds = trackedFaceIds(featureId, [seed], edgeSeeds, faceMap, result.value.faceEdgeMap);
         seedTopFace(faceIds, seed, faceMap, result.value.faceEdgeMap, result.value.capFaces ?? []);
         const edgeIds = trackedIds(featureId, edgeSeeds, edgeMap);
+        seedSweptEdges(edgeIds, outputEdges, edgeMap, faceEdges, edgeSeeds, (point) => point.add(vec));
         return Result.ok({ shape: result.value.shape, faceIds, edgeIds });
     } finally {
         owned.forEach((x) => x.dispose());

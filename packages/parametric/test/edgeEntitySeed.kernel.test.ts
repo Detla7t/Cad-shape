@@ -94,15 +94,33 @@ function edgeGeometryBySeedId(body: ParametricBodyNode): Map<string, number[][][
     return result;
 }
 
+/** The profile edges' own seeds (`…:ent<id>`), without their `:cap` copies and `:sweep` edges. */
+function profileSeeds(ids: readonly string[]): string[] {
+    return ids.filter((id) => /:ent\d+$/.test(id));
+}
+
+/**
+ * Every edge of a box extruded from the square is seeded from its generating entities: the
+ * four profile edges, their copies on the top cap (`:cap`) and the four lateral edges their
+ * corners sweep (`:sweep`, named after the two entities meeting there).
+ */
+function expectSquarePrismSeeds(ids: readonly string[]): void {
+    const profile = profileSeeds(ids);
+    expect(profile).toHaveLength(4);
+    for (const id of profile) expect(id).toMatch(/^sketch:.+:e1\.2\.3\.4:ent[1-4]$/);
+    expect(new Set(profile.map((id) => id.split(":ent")[1])).size).toBe(4);
+    expect(ids.filter((id) => id.endsWith(":cap")).sort()).toEqual(profile.map((id) => `${id}:cap`).sort());
+    const swept = ids.filter((id) => id.endsWith(":sweep"));
+    expect(swept).toHaveLength(4);
+    for (const id of swept) expect(id).toMatch(/^sketch:.+:ent[1-4]&sketch:.+:ent[1-4]:sweep$/);
+    expect(ids).toHaveLength(12);
+}
+
 describe("sketch entity edge seeds (real kernel)", () => {
     test("swept edge seeds come from the generating sketch entity", () => {
         const { body } = setup(square(10));
-        const ids = [...edgeGeometryBySeedId(body).keys()];
-        // The four bottom edges keep their profile-edge seeds (top and vertical
-        // edges are feature-scoped); each seed names its entity, not a wire position.
-        expect(ids).toHaveLength(4);
-        for (const id of ids) expect(id).toMatch(/^sketch:.+:e1\.2\.3\.4:ent[1-4]$/);
-        expect(new Set(ids.map((id) => id.split(":ent")[1])).size).toBe(4);
+        // Each seed names its entity, not a wire position.
+        expectSquarePrismSeeds([...edgeGeometryBySeedId(body).keys()]);
     });
 
     test("reordering the sketch entities keeps every seed on its edge", () => {
@@ -132,10 +150,7 @@ describe("sketch entity edge seeds (real kernel)", () => {
         doc.modelManager.addNode(body);
         expect(body.shape.isOk).toBe(true);
 
-        const ids = [...edgeGeometryBySeedId(body).keys()];
-        expect(ids).toHaveLength(4);
-        for (const id of ids) expect(id).toMatch(/^sketch:.+:e1\.2\.3\.4:ent[1-4]$/);
-        expect(new Set(ids.map((id) => id.split(":ent")[1])).size).toBe(4);
+        expectSquarePrismSeeds([...edgeGeometryBySeedId(body).keys()]);
     });
 
     test("a T-junction sketch attributes split pieces to their source entity", () => {
@@ -143,7 +158,11 @@ describe("sketch entity edge seeds (real kernel)", () => {
         const before = edgeGeometryBySeedId(body);
         // The outer boundary's pieces are attributed to their source entities; the
         // divider's own pieces are interior to the fused bottom face and vanish.
-        expect([...before.keys()].map((id) => id.split(":ent")[1]).sort()).toEqual(["1", "2", "3", "4"]);
+        expect(
+            profileSeeds([...before.keys()])
+                .map((id) => id.split(":ent")[1])
+                .sort(),
+        ).toEqual(["1", "2", "3", "4"]);
         // Entity 1's two pieces fused back into one edge carrying the entity's seed.
         const ent1 = [...before.keys()].find((id) => id.endsWith(":ent1"));
         if (!ent1) throw new Error("ent1 seed missing");

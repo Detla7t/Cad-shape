@@ -8,7 +8,8 @@ import {
     type IFace,
     type IShape,
     Line,
-    type Matrix4,
+    MathUtils,
+    Matrix4,
     Result,
     resolveUnitSpec,
     ShapeNode,
@@ -19,7 +20,7 @@ import type { SketchNode } from "../sketch/sketchNode";
 import { isBodyTimelineNode, isBodyTrackingNode } from "./bodyTracking";
 import { matchEdgeIndexes, matchEdgesAnchored } from "./edgeMatcher";
 import { captureEdgeRef, type EdgeRef } from "./edgeRef";
-import { findSketch } from "./extrude";
+import { findSketch, fuseSweptPrisms } from "./extrude";
 import {
     completeTrackedHistory,
     type FeatureContext,
@@ -32,8 +33,9 @@ import {
 } from "./feature";
 import { type ResolvedProfile, resolveProfiles } from "./profileBuilder";
 import { captureProfileRef } from "./profileRef";
-import { profileEdgeSeeds } from "./profileSeeds";
+import { profileEdgeSeeds, seedSweptEdges } from "./profileSeeds";
 import { MATCH_TOLERANCE } from "./refGeometry";
+import { fuseProfiles } from "./sweepGeometry";
 import { combineIds } from "./trackedId";
 
 const revolveHandler: FeatureHandler<RevolveFeatureData> = {
@@ -89,7 +91,8 @@ const revolveHandler: FeatureHandler<RevolveFeatureData> = {
                 if (!shape.isOk) return Result.err(shape.error);
                 shapes.push(shape.value);
             }
-            return shapes.length === 1 ? Result.ok(shapes[0]) : shapeFactory.combine(shapes);
+            // Touching revolved profiles merge into one solid, as extrude's prisms do.
+            return fuseProfiles(shapes);
         }
         return revolveTracked(feature, sketch, axis, angle.value, profiles.value, tracking);
     },
@@ -217,17 +220,24 @@ function revolveTracked(
     tracking: ShapeTracking,
 ): Result<IShape> {
     const shapes: IShape[] = [];
-    const outputFaceIds: string[] = [];
-    const outputEdgeIds: string[] = [];
+    const faceIds: string[][] = [];
+    const edgeIds: string[][] = [];
     for (const profile of profiles) {
         const revolved = revolveProfileTracked(feature, sketch, axis, angle, profile);
         if (!revolved.isOk) return Result.err(revolved.error);
         shapes.push(revolved.value.shape);
-        outputFaceIds.push(...revolved.value.faceIds);
-        outputEdgeIds.push(...revolved.value.edgeIds);
+        faceIds.push(revolved.value.faceIds);
+        edgeIds.push(revolved.value.edgeIds);
     }
-    tracking.outputFaceIds = outputFaceIds;
-    tracking.outputEdgeIds = outputEdgeIds;
+    // Touching revolved profiles merge into one solid, as extrude's prisms do.
+    const fused = fuseSweptPrisms(feature.id, shapes, faceIds, edgeIds);
+    if (fused?.isOk) {
+        tracking.outputFaceIds = fused.value.faceIds;
+        tracking.outputEdgeIds = fused.value.edgeIds;
+        return Result.ok(fused.value.shape);
+    }
+    tracking.outputFaceIds = faceIds.flat();
+    tracking.outputEdgeIds = edgeIds.flat();
     return shapes.length === 1 ? Result.ok(shapes[0]) : shapeFactory.combine(shapes);
 }
 
@@ -252,10 +262,14 @@ function revolveProfileTracked(
     const edgeSeeds = profileEdgeSeeds(profile.face, seed, faceEdges);
     // Revolve edge history is sparse; the completed face map feeds both
     // trackedFaceIds and the history-less seeding below.
-    const { edgeMap, faceMap, outputFaces } = completeTrackedHistory([profile.face], result.value, {
-        inputEdges: faceEdges,
-        inputFaces: [profile.face],
-    });
+    const { edgeMap, faceMap, outputFaces, outputEdges } = completeTrackedHistory(
+        [profile.face],
+        result.value,
+        {
+            inputEdges: faceEdges,
+            inputFaces: [profile.face],
+        },
+    );
     // Side faces generated from profile edges take the edge's seed (see extrude).
     const faceIds = trackedFaceIds(feature.id, [seed], edgeSeeds, faceMap, result.value.faceEdgeMap);
     seedHistoryLessFaces(
@@ -268,11 +282,10 @@ function revolveProfileTracked(
         seed,
         result.value.capFaces,
     );
-    return Result.ok({
-        shape: result.value.shape,
-        faceIds,
-        edgeIds: trackedIds(feature.id, edgeSeeds, edgeMap),
-    });
+    const edgeIds = trackedIds(feature.id, edgeSeeds, edgeMap);
+    const rotation = Matrix4.fromAxisRad(axis.point, axis.direction, MathUtils.degToRad(angle));
+    seedSweptEdges(edgeIds, outputEdges, edgeMap, faceEdges, edgeSeeds, (point) => rotation.ofPoint(point));
+    return Result.ok({ shape: result.value.shape, faceIds, edgeIds });
 }
 
 /**

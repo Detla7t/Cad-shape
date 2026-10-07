@@ -65,7 +65,7 @@ const booleanHandler: FeatureHandler<BooleanFeatureData> = {
             }
             switch (feature.operation) {
                 case "common":
-                    return shapeFactory.booleanCommon([context.input], toolShapes);
+                    return commonOfAll(context.input, toolShapes);
                 case "cut":
                     return shapeFactory.booleanCut([context.input], toolShapes);
                 default:
@@ -118,6 +118,22 @@ export function trackedBoolean(operation: BooleanOperation): TrackedMethod | und
     return TRACKED[operation](shapeFactory);
 }
 
+/**
+ * Intersect keeps what the input shares with EVERY tool (Onshape/SolidWorks semantics). One
+ * kernel common over a tool list intersects with the tools' union instead, so several tools
+ * are applied one after another.
+ */
+function commonOfAll(input: IShape, toolShapes: IShape[]): Result<IShape> {
+    let shape = input;
+    for (const tool of toolShapes) {
+        const next = shapeFactory.booleanCommon([shape], [tool]);
+        if (shape !== input) shape.dispose();
+        if (!next.isOk) return next;
+        shape = next.value;
+    }
+    return Result.ok(shape);
+}
+
 function evaluateTracked(
     feature: BooleanFeatureData,
     context: FeatureContext,
@@ -130,28 +146,47 @@ function evaluateTracked(
     if (input === undefined || tracking === undefined) {
         return Result.err("boolean requires a preceding feature");
     }
-    const result = tracked([input], toolShapes);
-    if (!result.isOk) return Result.err(result.error);
-    const { edgeMap, faceMap } = completeTrackedHistory([input, ...toolShapes], result.value);
-    tracking.outputFaceIds = mapBooleanIds(
-        feature.id,
-        input,
-        tracking.inputFaceIds,
-        tools,
-        faceMap,
-        ShapeTypes.face,
-        result.value.faceAncestors,
-    );
-    tracking.outputEdgeIds = mapBooleanIds(
-        feature.id,
-        input,
-        tracking.inputEdgeIds,
-        tools,
-        edgeMap,
-        ShapeTypes.edge,
-        result.value.edgeAncestors,
-    );
-    return Result.ok(result.value.shape);
+    // Intersect runs one tool per step (see `commonOfAll`); fuse and cut take them all at once.
+    const steps = feature.operation === "common" ? tools.map((_, k) => [k]) : [tools.map((_, k) => k)];
+    let shape = input;
+    let faceIds = tracking.inputFaceIds;
+    let edgeIds = tracking.inputEdgeIds;
+    for (const [step, picked] of steps.entries()) {
+        const stepTools = picked.map((k) => tools[k]);
+        const stepShapes = picked.map((k) => toolShapes[k]);
+        const result = tracked([shape], stepShapes);
+        if (!result.isOk) {
+            if (shape !== input) shape.dispose();
+            return Result.err(result.error);
+        }
+        const { edgeMap, faceMap } = completeTrackedHistory([shape, ...stepShapes], result.value);
+        // Later steps scope their new sub-shapes apart from the earlier steps' ones.
+        const scope = step === 0 ? feature.id : `${feature.id}~${step}`;
+        faceIds = mapBooleanIds(
+            scope,
+            shape,
+            faceIds,
+            stepTools,
+            faceMap,
+            ShapeTypes.face,
+            result.value.faceAncestors,
+        );
+        edgeIds = mapBooleanIds(
+            scope,
+            shape,
+            edgeIds,
+            stepTools,
+            edgeMap,
+            ShapeTypes.edge,
+            result.value.edgeAncestors,
+        );
+        // An intermediate step's shape is ours; the chain input is not.
+        if (shape !== input) shape.dispose();
+        shape = result.value.shape;
+    }
+    tracking.outputFaceIds = [...faceIds];
+    tracking.outputEdgeIds = [...edgeIds];
+    return Result.ok(shape);
 }
 
 registerFeature("boolean", booleanHandler);

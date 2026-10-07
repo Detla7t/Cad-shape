@@ -136,14 +136,14 @@ describe("golden id stability (real kernel)", () => {
 
         expect(idSnapshot(body)).toEqual({
             edges: {
-                "e1:0": [
+                "sketch:sk1:e1.2.3.4:ent2&sketch:sk1:e1.2.3.4:ent3:sweep": [
                     [
                         [20, 20, 0],
                         [20, 20, 0.5],
                         [20, 20, 20],
                     ],
                 ],
-                "e1:1": [
+                "sketch:sk1:e1.2.3.4:ent3&sketch:sk1:e1.2.3.4:ent4:sweep": [
                     [
                         [-20, 20, 0],
                         [-20, 20, 0.5],
@@ -157,14 +157,14 @@ describe("golden id stability (real kernel)", () => {
                         [20, 20, 0],
                     ],
                 ],
-                "e1:3": [
+                "sketch:sk1:e1.2.3.4:ent3:cap": [
                     [
                         [-20, 20, 20],
                         [19.5, 20, 20],
                         [20, 20, 20],
                     ],
                 ],
-                "e1:4": [
+                "sketch:sk1:e1.2.3.4:ent1&sketch:sk1:e1.2.3.4:ent4:sweep": [
                     [
                         [-20, -20, 0],
                         [-20, -20, 0.5],
@@ -178,14 +178,14 @@ describe("golden id stability (real kernel)", () => {
                         [-20, 20, 0],
                     ],
                 ],
-                "e1:6": [
+                "sketch:sk1:e1.2.3.4:ent4:cap": [
                     [
                         [-20, -20, 20],
                         [-20, 19.5, 20],
                         [-20, 20, 20],
                     ],
                 ],
-                "e1:7": [
+                "sketch:sk1:e1.2.3.4:ent1&sketch:sk1:e1.2.3.4:ent2:sweep": [
                     [
                         [20, -20, 0],
                         [20, -20, 0.5],
@@ -199,7 +199,7 @@ describe("golden id stability (real kernel)", () => {
                         [20, -20, 0],
                     ],
                 ],
-                "e1:9": [
+                "sketch:sk1:e1.2.3.4:ent1:cap": [
                     [
                         [-20, -20, 20],
                         [-19.5, -20, 20],
@@ -213,7 +213,7 @@ describe("golden id stability (real kernel)", () => {
                         [20, 20, 0],
                     ],
                 ],
-                "e1:11": [
+                "sketch:sk1:e1.2.3.4:ent2:cap": [
                     [
                         [20, -20, 20],
                         [20, -19.5, 20],
@@ -240,21 +240,21 @@ describe("golden id stability (real kernel)", () => {
 
         expect(idSnapshot(body)).toEqual({
             edges: {
-                "e1:0": [
+                "sketch:sk1:e1.2.3.4:ent2&sketch:sk1:e1.2.3.4:ent3:sweep": [
                     [
                         [20, 20, -20],
                         [20, 20, 19.5],
                         [20, 20, 20],
                     ],
                 ],
-                "e1:3": [
+                "sketch:sk1:e1.2.3.4:ent3:cap": [
                     [
                         [-20, 20, 20],
                         [19.5, 20, 20],
                         [20, 20, 20],
                     ],
                 ],
-                "e1:1": [
+                "sketch:sk1:e1.2.3.4:ent3&sketch:sk1:e1.2.3.4:ent4:sweep": [
                     [
                         [-20, 20, -20],
                         [-20, 20, -19.5],
@@ -268,56 +268,56 @@ describe("golden id stability (real kernel)", () => {
                         [20, 20, -20],
                     ],
                 ],
-                "e1:neg:4": [
+                "sketch:sk1:e1.2.3.4:neg:ent1&sketch:sk1:e1.2.3.4:neg:ent4:sweep": [
                     [
                         [-20, -20, -20],
                         [-20, 19.5, -20],
                         [-20, 20, -20],
                     ],
                 ],
-                "e1:neg:6": [
+                "sketch:sk1:e1.2.3.4:neg:ent4:cap": [
                     [
                         [-20, -20, -20],
                         [-19.5, -20, -20],
                         [20, -20, -20],
                     ],
                 ],
-                "e1:neg:7": [
+                "sketch:sk1:e1.2.3.4:neg:ent1&sketch:sk1:e1.2.3.4:neg:ent2:sweep": [
                     [
                         [20, -20, -20],
                         [20, -19.5, -20],
                         [20, 20, -20],
                     ],
                 ],
-                "e1:9": [
+                "sketch:sk1:e1.2.3.4:ent1:cap": [
                     [
                         [-20, -20, 20],
                         [-19.5, -20, 20],
                         [20, -20, 20],
                     ],
                 ],
-                "e1:7": [
+                "sketch:sk1:e1.2.3.4:ent1&sketch:sk1:e1.2.3.4:ent2:sweep": [
                     [
                         [20, -20, -20],
                         [20, -20, 19.5],
                         [20, -20, 20],
                     ],
                 ],
-                "e1:4": [
+                "sketch:sk1:e1.2.3.4:ent1&sketch:sk1:e1.2.3.4:ent4:sweep": [
                     [
                         [-20, -20, -20],
                         [-20, -20, -19.5],
                         [-20, -20, 20],
                     ],
                 ],
-                "e1:6": [
+                "sketch:sk1:e1.2.3.4:ent4:cap": [
                     [
                         [-20, -20, 20],
                         [-20, 19.5, 20],
                         [-20, 20, 20],
                     ],
                 ],
-                "e1:11": [
+                "sketch:sk1:e1.2.3.4:ent2:cap": [
                     [
                         [20, -20, 20],
                         [20, -19.5, 20],
@@ -401,7 +401,7 @@ describe("golden id stability (real kernel)", () => {
 
         expect(idSnapshot(body)).toEqual({
             edges: {
-                "e1:7": [
+                "sketch:sk1:e1.2.3.4:ent1&sketch:sk1:e1.2.3.4:ent2:sweep": [
                     [
                         [20, -20, 0.5],
                         [20, -20, 2],
@@ -415,7 +415,7 @@ describe("golden id stability (real kernel)", () => {
                         [20, -17.041149, 3.755165],
                     ],
                 ],
-                "e1:11": [
+                "sketch:sk1:e1.2.3.4:ent2:cap": [
                     [
                         [20, -20, 20],
                         [20, -19.5, 20],
@@ -429,7 +429,7 @@ describe("golden id stability (real kernel)", () => {
                         [20, 20, 0],
                     ],
                 ],
-                "e1:0": [
+                "sketch:sk1:e1.2.3.4:ent2&sketch:sk1:e1.2.3.4:ent3:sweep": [
                     [
                         [20, 20, 0],
                         [20, 20, 0.5],
@@ -464,7 +464,7 @@ describe("golden id stability (real kernel)", () => {
                         [-10, -20, 8],
                     ],
                 ],
-                "e1:9": [
+                "sketch:sk1:e1.2.3.4:ent1:cap": [
                     [
                         [-20, -20, 20],
                         [-19.5, -20, 20],
@@ -478,7 +478,7 @@ describe("golden id stability (real kernel)", () => {
                         [-10, -20, 0],
                     ],
                 ],
-                "e1:4": [
+                "sketch:sk1:e1.2.3.4:ent1&sketch:sk1:e1.2.3.4:ent4:sweep": [
                     [
                         [-20, -20, 0],
                         [-20, -20, 0.5],
@@ -499,14 +499,14 @@ describe("golden id stability (real kernel)", () => {
                         [20, -18, 0],
                     ],
                 ],
-                "e1:3": [
+                "sketch:sk1:e1.2.3.4:ent3:cap": [
                     [
                         [-20, 20, 20],
                         [19.5, 20, 20],
                         [20, 20, 20],
                     ],
                 ],
-                "e1:6": [
+                "sketch:sk1:e1.2.3.4:ent4:cap": [
                     [
                         [-20, -20, 20],
                         [-20, 19.5, 20],
@@ -534,63 +534,63 @@ describe("golden id stability (real kernel)", () => {
                         [-20, 20, 0],
                     ],
                 ],
-                "e2:7": [
+                "sketch:sk2:e1.2.3.4:ent1&sketch:sk2:e1.2.3.4:ent2:sweep": [
                     [
                         [10, -30, 0],
                         [10, -20.5, 0],
                         [10, -20, 0],
                     ],
                 ],
-                "e2:9": [
+                "sketch:sk2:e1.2.3.4:ent1:cap": [
                     [
                         [-10, -30, 0],
                         [-9.5, -30, 0],
                         [10, -30, 0],
                     ],
                 ],
-                "e2:4": [
+                "sketch:sk2:e1.2.3.4:ent1&sketch:sk2:e1.2.3.4:ent4:sweep": [
                     [
                         [-10, -30, 0],
                         [-10, -20.5, 0],
                         [-10, -20, 0],
                     ],
                 ],
-                "e1:1": [
+                "sketch:sk1:e1.2.3.4:ent3&sketch:sk1:e1.2.3.4:ent4:sweep": [
                     [
                         [-20, 20, 0],
                         [-20, 20, 0.5],
                         [-20, 20, 20],
                     ],
                 ],
-                "e2:0": [
+                "sketch:sk2:e1.2.3.4:ent2&sketch:sk2:e1.2.3.4:ent3:sweep": [
                     [
                         [10, -30, 8],
                         [10, -20.5, 8],
                         [10, -20, 8],
                     ],
                 ],
-                "e2:11": [
+                "sketch:sk2:e1.2.3.4:ent2:cap": [
                     [
                         [10, -30, 0],
                         [10, -30, 0.5],
                         [10, -30, 8],
                     ],
                 ],
-                "e2:1": [
+                "sketch:sk2:e1.2.3.4:ent3&sketch:sk2:e1.2.3.4:ent4:sweep": [
                     [
                         [-10, -30, 8],
                         [-10, -20.5, 8],
                         [-10, -20, 8],
                     ],
                 ],
-                "e2:3": [
+                "sketch:sk2:e1.2.3.4:ent3:cap": [
                     [
                         [-10, -30, 8],
                         [9.5, -30, 8],
                         [10, -30, 8],
                     ],
                 ],
-                "e2:6": [
+                "sketch:sk2:e1.2.3.4:ent4:cap": [
                     [
                         [-10, -30, 0],
                         [-10, -30, 7.5],
@@ -636,14 +636,14 @@ describe("golden id stability (real kernel)", () => {
 
         expect(idSnapshot(body)).toEqual({
             edges: {
-                "r1:0": [
+                "sketch:sk1:e1.2.3.4:ent2&sketch:sk1:e1.2.3.4:ent3:sweep": [
                     [
                         [-10, 15, 0],
                         [8.369483, 15.967209, 0],
                         [15, 10, 0],
                     ],
                 ],
-                "r1:1": [
+                "sketch:sk1:e1.2.3.4:ent3&sketch:sk1:e1.2.3.4:ent4:sweep": [
                     [
                         [-10, 5, 0],
                         [-0.406343, 11.172953, 0],
@@ -657,14 +657,14 @@ describe("golden id stability (real kernel)", () => {
                         [15, 10, 0],
                     ],
                 ],
-                "r1:3": [
+                "sketch:sk1:e1.2.3.4:ent3:cap": [
                     [
                         [-10, 5, 0],
                         [-10, 14.5, 0],
                         [-10, 15, 0],
                     ],
                 ],
-                "r1:4": [
+                "sketch:sk1:e1.2.3.4:ent1&sketch:sk1:e1.2.3.4:ent4:sweep": [
                     [
                         [0, 5, 0],
                         [4.387913, 2.397128, 0],
@@ -678,14 +678,14 @@ describe("golden id stability (real kernel)", () => {
                         [5, 10, 0],
                     ],
                 ],
-                "r1:6": [
+                "sketch:sk1:e1.2.3.4:ent4:cap": [
                     [
                         [-10, 5, 0],
                         [-9.5, 5, 0],
                         [0, 5, 0],
                     ],
                 ],
-                "r1:7": [
+                "sketch:sk1:e1.2.3.4:ent1&sketch:sk1:e1.2.3.4:ent2:sweep": [
                     [
                         [0, 15, 0],
                         [13.163738, 7.191383, 0],
@@ -699,7 +699,7 @@ describe("golden id stability (real kernel)", () => {
                         [15, 0, 0],
                     ],
                 ],
-                "r1:9": [
+                "sketch:sk1:e1.2.3.4:ent1:cap": [
                     [
                         [0, 5, 0],
                         [0, 5.5, 0],
@@ -713,7 +713,7 @@ describe("golden id stability (real kernel)", () => {
                         [15, 10, 0],
                     ],
                 ],
-                "r1:11": [
+                "sketch:sk1:e1.2.3.4:ent2:cap": [
                     [
                         [-10, 15, 0],
                         [-0.5, 15, 0],
