@@ -6,7 +6,8 @@ import type { IDisposable } from "../foundation/disposable";
 import { Result } from "../foundation/result";
 import type { INode } from "../model/node";
 import type { EvaluatedValue } from "./expression";
-import { ANGLE_UNITS, LENGTH_UNITS, UNITLESS } from "./unitSpec";
+import { UNITLESS } from "./unitSpec";
+import { unitSuffix } from "./unitSuffix";
 
 /**
  * DATA TABLES — named grids of typed cells a document's nodes expose (a Data Source's sheets
@@ -300,51 +301,6 @@ export function sliceDataTable(table: DataTable, range: CellRange): DataTable {
 
 // ------------------------------------------------------------------ Cell values
 
-/** Unit suffixes a data value may carry, as the factor to the app's unit (mm, degrees). */
-const LENGTH_FACTORS: Record<string, number> = {
-    mm: 1,
-    millimeter: 1,
-    millimeters: 1,
-    millimetre: 1,
-    millimetres: 1,
-    cm: 10,
-    centimeter: 10,
-    centimeters: 10,
-    centimetre: 10,
-    centimetres: 10,
-    m: 1000,
-    meter: 1000,
-    meters: 1000,
-    metre: 1000,
-    metres: 1000,
-    km: 1e6,
-    um: 0.001,
-    µm: 0.001,
-    micron: 0.001,
-    microns: 0.001,
-    in: 25.4,
-    inch: 25.4,
-    inches: 25.4,
-    '"': 25.4,
-    ft: 304.8,
-    foot: 304.8,
-    feet: 304.8,
-    "'": 304.8,
-    yd: 914.4,
-    yard: 914.4,
-    yards: 914.4,
-};
-
-const ANGLE_FACTORS: Record<string, number> = {
-    deg: 1,
-    degree: 1,
-    degrees: 1,
-    "°": 1,
-    rad: 180 / Math.PI,
-    radian: 180 / Math.PI,
-    radians: 180 / Math.PI,
-};
-
 const QUANTITY_PATTERN = /^([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)\s*(\S*)$/;
 
 /**
@@ -360,10 +316,8 @@ export function parseDataQuantity(text: string): EvaluatedValue | undefined {
     const unit = match[2];
     if (unit === "") return { value, unit: UNITLESS };
     if (unit === "%") return { value: value / 100, unit: UNITLESS };
-    const key = unit === "µm" || unit === "°" ? unit : unit.toLowerCase();
-    if (Object.hasOwn(LENGTH_FACTORS, key)) return { value: value * LENGTH_FACTORS[key], unit: LENGTH_UNITS };
-    if (Object.hasOwn(ANGLE_FACTORS, key)) return { value: value * ANGLE_FACTORS[key], unit: ANGLE_UNITS };
-    return undefined;
+    const suffix = unitSuffix(unit);
+    return suffix === undefined ? undefined : { value: value * suffix.factor, unit: suffix.unit };
 }
 
 /** A cell as a number with its unit: booleans are 1 / 0, text must read as a quantity. */

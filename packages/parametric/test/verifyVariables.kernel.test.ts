@@ -6,7 +6,7 @@
  *
  * - the table (`core/src/parameters/variableTable.ts`) is ordered, typed (length / angle /
  *   unitless) and unit-checked; feature parameters and sketch dimensions reference its rows
- *   by bare name (`w * 2`) or Onshape's `#w` — unit literals (`10 mm`) are not accepted —
+ *   by bare name (`w * 2`) or Onshape's `#w`, and literals may carry units (`10 mm`, `5 * mm`) —
  *   and a broken row still claims its name;
  * - one table edit re-solves the sketches and rebuilds the bodies that read it
  *   (`variableSync.ts`), and undo / redo of that edit rebuild them back;
@@ -167,12 +167,12 @@ describe("the document variable table", () => {
         expect(scope.has("w")).toBe(false);
     });
 
-    // Onshape expressions carry units (`10 mm + 1 in`); here a literal is a bare number in
-    // the slot's display unit.
-    test("literals carry no units — `10 mm` is not an expression (gap)", () => {
-        const result = evaluateExpression("10 mm", new Map());
-        expect(result.isOk).toBe(false);
-        expect(result.error).toBe("Unexpected character: m");
+    // Onshape expressions carry units (`10 mm + 1 in`); a bare literal still takes the slot's unit.
+    test("literals may carry units — `10 mm + 1 in` is a length in mm", () => {
+        const result = evaluateExpression("10 mm + 1 in", new Map());
+        expect(result.isOk).toBe(true);
+        expect(result.value.value).toBeCloseTo(35.4, 12);
+        expect(result.value.unit).toEqual({ length: 1, angle: 0 });
     });
 });
 

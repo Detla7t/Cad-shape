@@ -6,6 +6,7 @@ export * from "./configuredValue";
 export * from "./dataTable";
 export * from "./expression";
 export * from "./unitSpec";
+export * from "./unitSuffix";
 export * from "./variableData";
 export * from "./variableStudioNode";
 export * from "./variableTable";

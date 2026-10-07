@@ -204,6 +204,56 @@ describe("unit propagation", () => {
     });
 });
 
+describe("literals with units", () => {
+    test.each([
+        ["40 mm", 40, LENGTH_UNITS],
+        ["40mm", 40, LENGTH_UNITS],
+        ["2.5 cm", 25, LENGTH_UNITS],
+        ["0.1 m", 100, LENGTH_UNITS],
+        ["1 in", 25.4, LENGTH_UNITS],
+        ["2 inch", 50.8, LENGTH_UNITS],
+        ["1 ft", 304.8, LENGTH_UNITS],
+        ["5 µm", 0.005, LENGTH_UNITS],
+        ["90 deg", 90, ANGLE_UNITS],
+        ["30°", 30, ANGLE_UNITS],
+        ["1 rad", 180 / Math.PI, ANGLE_UNITS],
+        ["1e1 MM", 10, LENGTH_UNITS],
+    ])("%s", (source, value, unit) => {
+        const result = evaluate(source);
+        expect(result.value).toBeCloseTo(value, 9);
+        expect(result.unit).toEqual(unit);
+    });
+
+    test("mix with variables, Onshape style", () => {
+        const w = { w: length(40) };
+        expect(evaluate("#w + 5 mm", w)).toEqual(length(45));
+        expect(evaluate("10 mm + 1 in")).toEqual(length(35.4));
+        expect(evaluate("w / 2 + 1 cm", w)).toEqual(length(30));
+        expect(evaluate("-3 mm * 2")).toEqual(length(-6));
+        expect(evaluate("sin(30 deg)").value).toBeCloseTo(0.5, 12);
+    });
+
+    test("a bare unit name is that unit's quantity, unless a variable takes the name", () => {
+        expect(evaluate("5 * mm")).toEqual(length(5));
+        expect(evaluate("#w + 2 * inch", { w: length(10) })).toEqual(length(60.8));
+        expect(evaluate("45 * deg")).toEqual(angle(45));
+        expect(evaluate("2 * m", { m: length(3) })).toEqual(length(6));
+        // A written suffix is always the unit: juxtaposition means nothing else.
+        expect(evaluate("2 m", { m: length(3) })).toEqual(length(2000));
+        expect(expectError("2 * M")).toBe("Unknown identifier: M");
+    });
+
+    test("a unit must fit what it is combined with", () => {
+        expect(expectError("10 mm + 5 deg")).toBe("Dimension mismatch: cannot combine length with angle");
+        expect(evaluate("10 mm * 2 mm").unit).toEqual({ length: 2, angle: 0 });
+    });
+
+    test("a word that is not a unit is still rejected", () => {
+        expect(expectError("10 mx")).toBe("Unexpected character: m");
+        expect(expectError("2 e")).toBe("Unexpected character: e");
+    });
+});
+
 describe("resolveUnitSpec", () => {
     const scope = { w: length(2), a: angle(45) } as Record<string, EvaluatedValue>;
     const scoped: Scope = new Map(Object.entries(scope));

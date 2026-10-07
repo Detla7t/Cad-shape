@@ -15,6 +15,7 @@ import {
     unitSpecLabel,
     unitSpecRoot,
 } from "./unitSpec";
+import { type UnitSuffix, unitSuffix } from "./unitSuffix";
 
 /** Parameter values: a literal number or an expression string like `width * 2 + 10`. */
 export type ParameterValue = number | string;
@@ -206,9 +207,12 @@ export function registeredExpressionFunctions(): readonly string[] {
  *
  * Every value carries a `UnitSpec`, and each operation propagates it: `+ - %` require
  * both sides to agree (a unitless side adopts the other's unit), `* /` add and
- * subtract the exponents, `sin`/`cos`/`tan` take an angle and yield a ratio. Literals
- * are unitless and so are adoptable, which is what lets `depth = 50` and `w + 1` both
- * work while `w + angle` is rejected.
+ * subtract the exponents, `sin`/`cos`/`tan` take an angle and yield a ratio. Bare
+ * literals are unitless and so are adoptable, which is what lets `depth = 50` and `w + 1`
+ * both work while `w + angle` is rejected. A literal written with a unit (`40 mm`, `2.5in`,
+ * `90 deg`, `30°`, `1 rad`) carries it, converted to the app's units (mm, degrees), and a
+ * bare unit name is that unit's quantity when no variable takes the name — Onshape's
+ * `#w + 5 * mm` and `#w + 5 mm` both read.
  */
 export function evaluateExpression(source: string, scope: Scope): Result<EvaluatedValue> {
     const parser = new Parser(source, scope);
@@ -398,7 +402,25 @@ class Parser {
         const match = /^\d*\.?\d+([eE][+-]?\d+)?/.exec(this.source.slice(this.pos));
         if (match === null) return Result.err(`Unexpected character: ${this.source[this.pos]}`);
         this.pos += match[0].length;
-        return Result.ok({ value: Number(match[0]), unit: UNITLESS });
+        const value = Number(match[0]);
+        const suffix = this.parseUnitSuffix();
+        if (suffix === undefined) return Result.ok({ value, unit: UNITLESS });
+        return Result.ok({ value: value * suffix.factor, unit: suffix.unit });
+    }
+
+    /**
+     * The unit written right after a literal (`40 mm`, `40mm`, `30°`), consumed only when it
+     * names one — juxtaposition means nothing else, so `40 m` is 40 metres even beside a
+     * variable `m`. Anything else is left for the caller to reject as before.
+     */
+    private parseUnitSuffix(): UnitSuffix | undefined {
+        const match = /^\s*([A-Za-z_µ]\w*|°)/.exec(this.source.slice(this.pos));
+        if (match === null) return undefined;
+        const after = this.source.slice(this.pos + match[0].length).trimStart();
+        if (after.startsWith("(")) return undefined;
+        const suffix = unitSuffix(match[1]);
+        if (suffix !== undefined) this.pos += match[0].length;
+        return suffix;
     }
 
     private parseIdentifier(): Result<EvaluatedValue> {
@@ -411,6 +433,8 @@ class Parser {
         const scoped = this.scope.get(name);
         if (scoped !== undefined) return Result.ok(scoped);
         if (Object.hasOwn(CONSTANTS, name)) return Result.ok({ value: CONSTANTS[name], unit: UNITLESS });
+        const unit = unitSuffix(name, true);
+        if (unit !== undefined) return Result.ok({ value: unit.factor, unit: unit.unit });
         return Result.err(`Unknown identifier: ${name}`);
     }
 
