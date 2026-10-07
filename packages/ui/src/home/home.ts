@@ -10,6 +10,7 @@ import {
     ObservableCollection,
     PubSub,
     type RecentDocumentDTO,
+    StorageHistoryPersistence,
 } from "@chili3d/core";
 import { a, button, collection, div, img, label, span, svg } from "@chili3d/element";
 import style from "./home.module.css";
@@ -352,6 +353,7 @@ export class Home extends HTMLElement {
                     await Promise.all([
                         this.app.storage.delete(Constants.DBName, Constants.DocumentTable, item.id),
                         this.app.storage.delete(Constants.DBName, Constants.RecentTable, item.id),
+                        new StorageHistoryPersistence(this.app.storage).remove(item.id),
                     ]);
                     documents.remove(item);
                 }

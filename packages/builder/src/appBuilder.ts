@@ -15,6 +15,8 @@ import {
     type IWindow,
     type Locale,
     Logger,
+    registerProjectEntryProvider,
+    VERSION_HISTORY_ENTRY_PROVIDER,
 } from "@chili3d/core";
 import { DefaultDataExchange } from "./defaultDataExchange";
 import {
@@ -73,6 +75,7 @@ export class AppBuilder {
             await this._storage.createDBIfNeeded(Constants.DBName, [
                 Constants.DocumentTable,
                 Constants.RecentTable,
+                Constants.HistoryTable,
             ]);
         });
         return this;
@@ -145,6 +148,8 @@ export class AppBuilder {
     }
 
     async build(): Promise<IApplication> {
+        // A document's version history travels inside its .chili3d file, under history/.
+        registerProjectEntryProvider(VERSION_HISTORY_ENTRY_PROVIDER);
         for (const init of this._inits) {
             await init();
         }

@@ -22,9 +22,11 @@ import {
     zipProjectFiles,
 } from "@chili3d/app";
 import {
+    DocumentVersionControl,
     type IApplication,
     type IDocument,
     Material,
+    MemoryHistoryPersistence,
     Plane,
     PROJECT_FORMAT_VERSION,
     type ProjectEntryProvider,
@@ -32,7 +34,9 @@ import {
     registerProjectEntryProvider,
     type Serialized,
     sha256Hex,
+    Transaction,
     unregisterProjectEntryProvider,
+    VERSION_HISTORY_ENTRY_PROVIDER,
 } from "@chili3d/core";
 import { createMockApplication } from "@chili3d/core/test-utils";
 import {
@@ -411,6 +415,33 @@ describe("project extension folders", () => {
         expect(opened.isOk).toBe(true);
         expect(reads).toHaveLength(1);
         expect(Object.keys(reads[0]).sort()).toEqual(["objects.pack", "refs.json"]);
+    });
+
+    test("the document's version history travels in history/ and is back after opening the file", async () => {
+        registerProjectEntryProvider(VERSION_HISTORY_ENTRY_PROVIDER);
+        const doc = sampleDocument(newApp());
+        const control = DocumentVersionControl.create(doc, { persistence: new MemoryHistoryPersistence() });
+        Transaction.execute(doc, "deeper", () => {
+            doc.variables.setItems([{ id: "v1", name: "h", type: "length", expression: "20" }]);
+        });
+        control.flush();
+        expect(control.createVersion("Released", "for the shop").isOk).toBe(true);
+        const commits = control.log().map((entry) => entry.id);
+
+        const bytes = (await writeProjectFile(doc, { now: NOW })).value;
+        const files = await entriesOf(bytes);
+        expect([...files.keys()].filter((name) => name.startsWith("history/")).sort()).toEqual([
+            "history/objects.json",
+            "history/refs.json",
+        ]);
+
+        const opened = await openProjectFile(newApp(), bytes);
+        expect(opened.isOk).toBe(true);
+        const reopened = DocumentVersionControl.of(opened.value);
+        expect(reopened?.versions().map((version) => [version.name, version.description])).toEqual([
+            ["Released", "for the shop"],
+        ]);
+        expect(reopened?.log().map((entry) => entry.id)).toEqual(commits);
     });
 
     test("without the provider, history/ entries (known or not) survive open and save untouched", async () => {

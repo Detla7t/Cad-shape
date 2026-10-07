@@ -40,6 +40,7 @@ export interface PubSubEventMap {
     showToast: (message: I18nKeys, ...args: any[]) => void;
     statusBarTip: (tip: I18nKeys) => void;
     toggleChatPanel: () => void;
+    toggleVersionsPanel: () => void;
     viewClosed: (view: IView) => void;
     viewCursor: (cursor: CursorType) => void;
     visibleChanged: (model: INode) => void;

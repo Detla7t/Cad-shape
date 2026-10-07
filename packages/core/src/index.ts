@@ -30,4 +30,5 @@ export * from "./snap";
 export * from "./snapType";
 export * from "./step";
 export * from "./ui";
+export * from "./versioning";
 export * from "./visual";

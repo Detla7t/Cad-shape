@@ -4,6 +4,7 @@
 import {
     type Act,
     Constants,
+    DocumentVersionControl,
     History,
     I18n,
     type IApplication,
@@ -21,6 +22,7 @@ import {
     PubSub,
     type Serialized,
     Serializer,
+    StorageHistoryPersistence,
     VariableTable,
 } from "@chili3d/core";
 import { Picker } from "./picker";
@@ -82,6 +84,7 @@ export class Document extends Observable implements IDocument {
     override disposeInternal(): void {
         super.disposeInternal();
 
+        DocumentVersionControl.of(this)?.dispose();
         this.modelManager.dispose();
         this.visual.dispose();
         this.history.dispose();
@@ -94,6 +97,8 @@ export class Document extends Observable implements IDocument {
     async save() {
         const data = this.serialize();
         await this.application.storage.put(Constants.DBName, Constants.DocumentTable, this.id, data);
+        // The version history is saved with the document — never ahead of it.
+        await DocumentVersionControl.of(this)?.persist();
         const image = this.application.activeView?.toImage();
         await this.application.storage.put(Constants.DBName, Constants.RecentTable, this.id, {
             id: this.id,
@@ -155,6 +160,21 @@ export class Document extends Observable implements IDocument {
 
         await document.modelManager.deserialize(data["models"]);
         document.history.disabled = false;
+        await Document.startVersioning(document);
         return document;
+    }
+
+    /**
+     * Puts a document under version control: its saved history is loaded (a document without
+     * one starts with an initial commit) and every later change is captured as a microversion.
+     */
+    static async startVersioning(document: IDocument): Promise<void> {
+        try {
+            await DocumentVersionControl.attach(document, {
+                persistence: new StorageHistoryPersistence(document.application.storage),
+            });
+        } catch (error) {
+            Logger.warn(`version control could not start for ${document.name}`, error);
+        }
     }
 }

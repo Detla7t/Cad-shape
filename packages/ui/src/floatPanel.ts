@@ -22,7 +22,7 @@ export class FloatPanel extends HTMLElement {
     private initialWidth = 0;
     private initialHeight = 0;
 
-    constructor(options: FloatPanelOptions) {
+    constructor(private readonly options: FloatPanelOptions) {
         super();
         this.className = style.root;
         this.style.left = `${options.x ?? 20}px`;
@@ -46,6 +46,16 @@ export class FloatPanel extends HTMLElement {
         this.addEventListener("keydown", this.handleKeyEvent);
     }
 
+    /** Closes the panel the way its close button does (running `onClose`). */
+    close(): void {
+        try {
+            this.options.onClose?.();
+        } finally {
+            this.remove();
+            this.dispose();
+        }
+    }
+
     private createHeader(options: FloatPanelOptions): HTMLElement {
         return div(
             { className: style.header },
@@ -54,14 +64,7 @@ export class FloatPanel extends HTMLElement {
             div(
                 {
                     className: style.closeButton,
-                    onclick: () => {
-                        try {
-                            options.onClose?.();
-                        } finally {
-                            this.remove();
-                            this.dispose();
-                        }
-                    },
+                    onclick: () => this.close(),
                 },
                 svg({
                     icon: "icon-times",

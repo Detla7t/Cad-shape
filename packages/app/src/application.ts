@@ -3,6 +3,7 @@
 
 import {
     type CommandKeys,
+    DocumentVersionControl,
     I18n,
     type IApplication,
     type ICommand,
@@ -23,6 +24,7 @@ import {
     Plane,
     PubSub,
     type Serialized,
+    StorageHistoryPersistence,
     setCurrentApplication,
     VisualConfig,
     type VisualItemConfig,
@@ -213,6 +215,7 @@ export class Application extends Observable implements IApplication {
         const lightGray = new Material({ document, name: "LightGray", color: 0xdedede });
         const deepGray = new Material({ document, name: "DeepGray", color: 0x898989 });
         document.modelManager.materials.push(lightGray, deepGray);
+        DocumentVersionControl.create(document, { persistence: new StorageHistoryPersistence(this.storage) });
         await this.createActiveView(document);
         return document;
     }

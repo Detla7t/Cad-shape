@@ -5,4 +5,6 @@ export class Constants {
     static readonly DBName = "chili3d-db";
     static readonly DocumentTable = "documents";
     static readonly RecentTable = "recents";
+    /** Version history per document: a manifest under the document id plus object packs. */
+    static readonly HistoryTable = "history";
 }

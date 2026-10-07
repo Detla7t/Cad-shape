@@ -100,7 +100,7 @@ export const DefaultRibbon: RibbonTabProfile[] = [
             },
             {
                 groupName: "ribbon.group.other",
-                items: ["wechat.group", "ai.toggleChat"],
+                items: ["wechat.group", "ai.toggleChat", "doc.history"],
             },
         ],
     },
