@@ -4,6 +4,7 @@
 import { installEvaluation } from "./context/evaluation";
 import { installOperations } from "./context/operations";
 import { installQueries } from "./context/queries";
+import { installQueryTypes } from "./context/queryTypes";
 import { installSketch } from "./context/sketch";
 import { Interpreter, type ModuleResolver } from "./lang/interpreter";
 import { installCore } from "./std/core";
@@ -31,6 +32,7 @@ export function createNativeInterpreter(
     installGeometry(std);
     installFeatureSupport(std);
     installQueries(std);
+    installQueryTypes(std);
     installSketch(std);
     installOperations(std);
     installEvaluation(std);

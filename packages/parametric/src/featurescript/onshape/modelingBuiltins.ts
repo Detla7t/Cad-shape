@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import { FsContext } from "../context/fsContext";
+import { lastModifyingOperationIdOf, lastOperationIdOf } from "../context/queryTypes";
 import { FsRuntimeError } from "../lang/errors";
 import {
     FsArray,
@@ -152,9 +153,21 @@ export function installModelingBuiltins(define: BuiltinRegistry, bridge: StdBrid
         "evSurfaceDefinition",
         "evOwnerSketchPlane",
         "evEdgeTangentLines",
+        "evEdgeConvexity",
+        "evFilletRadius",
     ]) {
         forward(name);
     }
+
+    // Operation history: what `startTracking` and `lastModifyingOperationId` read.
+    define("lastOperationId", (args) => lastOperationIdOf(FsContext.of(args[0])));
+    define("lastModifyingOperationId", (args) => {
+        const definition = args[1];
+        if (!(definition instanceof FsMap)) fail("lastModifyingOperationId needs { entity }");
+        return lastModifyingOperationIdOf(FsContext.of(args[0]), bridge.toLocal(definition.field("entity")));
+    });
+    // Transient ids are strings already.
+    define("transientIdToString", (args) => String(args[0]));
     forward("evLength", "evLength", renameField("edges", "entities"));
     forward("evArea", "evArea", renameField("faces", "entities"));
     forward("evVolume", "evVolume", renameField("bodies", "entities"));
