@@ -29,7 +29,7 @@ import { stockToolFor } from "./tools";
  * stock) in slices that yield to the event loop, and hands back a `StockSimulation` — the
  * stock after any move (playback seeks), its mesh coloured by the deviation from the parts,
  * what each move removed and the warnings (rapids into the stock, shank and holder
- * collisions, gouges, toolpaths it cannot simulate), grouped into runs of consecutive moves
+ * collisions, gouges, toolpaths it cannot simulate), grouped into runs of nearby moves
  * and traced back to their toolpath and toolpath move. Everything is in the toolpaths' frame
  * (a setup's WCS), millimetres.
  */
@@ -67,7 +67,7 @@ export interface SimulationOptions extends Omit<FlattenOptions, "skip" | "stockT
 
 export type SimulationWarningKind = StockWarningKind;
 
-/** A run of consecutive moves of one toolpath raising the same warning. */
+/** A run of moves of one toolpath raising the same warning, no more than `RUN_GAP` apart. */
 export interface SimulationWarning {
     readonly kind: SimulationWarningKind;
     readonly toolpathIndex: number;
@@ -96,6 +96,9 @@ export interface SimulatedMove {
     readonly rapid: boolean;
     readonly tool: ToolData;
 }
+
+/** Warnings of one kind this few moves apart (a pass and its links) join one run. */
+export const RUN_GAP = 25;
 
 const NICE = [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10];
 
@@ -330,7 +333,7 @@ function cylinderHeights(
     return heights;
 }
 
-/** The kernel's per-move warnings as runs of consecutive moves of one toolpath. */
+/** The kernel's per-move warnings as runs of nearby moves of one toolpath (see `RUN_GAP`). */
 function groupWarnings(
     sim: StockSimulator,
     moves: SimulationMoves,
@@ -345,7 +348,7 @@ function groupWarnings(
         if (
             run !== undefined &&
             run.toolpathIndex === toolpathIndex &&
-            warning.moveIndex <= run.lastMove + 1
+            warning.moveIndex - run.lastMove <= RUN_GAP
         ) {
             const worse = warning.depth > run.depth;
             runs[previous] = {

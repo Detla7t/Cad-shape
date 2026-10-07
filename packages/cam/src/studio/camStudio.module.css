@@ -482,3 +482,121 @@
     margin-right: 4px;
     vertical-align: middle;
 }
+
+/* ------------------------------------------------------------ stock simulation */
+
+.simulation {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 0 1 auto;
+    min-height: 0;
+    max-height: 45%;
+    overflow: auto;
+    padding: 6px 10px 8px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.simulation[hidden] {
+    display: none;
+}
+
+.simHeader {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+}
+
+.simOutdated {
+    padding: 4px 6px;
+    border-radius: 4px;
+    line-height: 1.4;
+    color: var(--warning-color, #ef6c00);
+    background-color: color-mix(in srgb, var(--warning-color, #ef6c00) 10%, transparent);
+}
+
+.simLegend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    color: var(--foreground-muted-color);
+    font-size: 11px;
+}
+
+.simLegendItem {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.simSwatch {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+}
+
+.simPlayback {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.simReadout {
+    min-height: 14px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 11px;
+    color: var(--foreground-secondary-color);
+}
+
+.simWarnings {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    margin-top: 4px;
+}
+
+.simWarning {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 22px;
+    padding: 0 4px;
+    border-radius: 4px;
+    cursor: pointer;
+
+    &:hover {
+        background-color: var(--hover-background-color);
+    }
+}
+
+.simWarning[data-selected] {
+    background-color: var(--active-background-color);
+}
+
+.simWarningKind {
+    flex: 0 0 auto;
+    font-weight: 600;
+}
+
+.simDot {
+    flex: 0 0 auto;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--warning-color, #ef6c00);
+}
+
+.simDot[data-kind="gouge"],
+.simDot[data-kind="holderCollision"],
+.simDot[data-kind="shankCollision"] {
+    background-color: var(--error-color, #c62828);
+}
+
+.simDot[data-kind="unsupported"] {
+    background-color: var(--foreground-muted-color);
+}
