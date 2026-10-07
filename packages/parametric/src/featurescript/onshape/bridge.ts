@@ -77,8 +77,13 @@ export class StdBridge {
         const point = (field: string) => lengthVector(q.field(field));
         switch (type) {
             case "NOTHING":
-            case "EVERYTHING":
                 return query(type, kind);
+            case "EVERYTHING": {
+                // std's qBodyType folds its body types into an EVERYTHING query (qAllSolidBodies()).
+                const everything = query("EVERYTHING", kind);
+                if (!q.has("bodyType")) return everything;
+                return query("BODY_TYPE", { query: everything, bodyType: q.field("bodyType") });
+            }
             case "CREATED_BY":
                 return query("CREATED_BY", { featureId: q.field("featureId"), ...kind });
             case "TRANSIENT":
@@ -95,7 +100,9 @@ export class StdBridge {
             case "OWNER_PART":
                 return query("OWNER_BODY", { query: sub("query") });
             case "OWNED_BY_PART": {
-                const owned = query("OWNED_BY_BODY", { body: sub("part"), ...kind });
+                // Only bodies own entities: std's evArea / evLength pass their faces / edges here too.
+                const bodies = query("ENTITY_FILTER", { query: sub("part"), entityType: "BODY" });
+                const owned = query("OWNED_BY_BODY", { body: bodies, ...kind });
                 if (!q.has("subquery")) return owned;
                 return query("INTERSECTION", { subqueries: fsArray([sub("subquery"), owned]) });
             }
@@ -206,10 +213,14 @@ export class StdBridge {
                 });
             case "SKETCH_ENTITY":
                 return query("SKETCH_ENTITY", {
-                    featureId: q.field("operationId"),
+                    // In Onshape a sketch's edges come from its `sketchId + "wireOp"` operation.
+                    featureId: stripSuffix(q.field("operationId"), "wireOp"),
                     sketchEntityId: q.field("sketchEntityId"),
                     ...kind,
                 });
+            // Wire edges here never derive from other edges (there is no opExtractWires).
+            case "LAMINAR_DEPENDENCY":
+                return query("NOTHING");
             case "SWEPT_FACE":
             case "SWEPT_EDGE":
                 return query("NON_CAP_ENTITY", { featureId: q.field("operationId"), ...kind });

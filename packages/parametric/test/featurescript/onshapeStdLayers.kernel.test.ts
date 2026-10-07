@@ -86,7 +86,6 @@ const NOT_YET_IMPLEMENTED: Record<number, readonly string[]> = {
         "getFeatureName",
         "getLastActiveId",
         "getParameterToleranceInfo",
-        "getTolerantParameterIds",
         "lastModifyingOperationId",
         "lastOperationId",
         "setFeaturePatternInstanceData",

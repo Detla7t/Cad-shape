@@ -139,6 +139,9 @@ export function installFeatureBuiltins(define: BuiltinRegistry, bridge: StdBridg
         fail(`Query variable "${name}" not found`);
     });
 
+    // There is no tolerance UI: no parameter is tolerant.
+    define("getTolerantParameterIds", () => new FsMap());
+
     // Error highlighting and parameter bookkeeping have no UI here.
     for (const name of [
         "setErrorEntities",

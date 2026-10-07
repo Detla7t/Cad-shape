@@ -96,7 +96,10 @@ export const roundedPlate = defineFeature(function(context is Context, id is Id,
                 "entities" : qSketchRegion(id + "sketch1"),
                 "endBound" : BoundingType.BLIND,
                 "depth" : definition.thickness,
-                "operationType" : NewBodyOperationType.ADD
+                // Merge with the part, once there is one (std's ADD needs a part to merge with).
+                "operationType" : isQueryEmpty(context, qAllModifiableSolidBodies())
+                        ? NewBodyOperationType.NEW
+                        : NewBodyOperationType.ADD
         });
 
         if (definition.rounded)

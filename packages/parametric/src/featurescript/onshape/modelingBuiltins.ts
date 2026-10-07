@@ -2,8 +2,10 @@
 // See LICENSE file in the project root for full license information.
 
 import { FsContext } from "../context/fsContext";
+import { FsRuntimeError } from "../lang/errors";
 import {
     FsArray,
+    FsEnumValue,
     FsMap,
     FsOpaque,
     FsQuantity,
@@ -16,8 +18,10 @@ import {
     type NativeFunction,
 } from "../lang/values";
 import { createNativeInterpreter } from "../nativeStd";
+import { idString } from "../std/feature";
 import { makePlane, makePlaneData, readPlane, type Vec3, vec } from "../std/geometry";
 import type { StdBridge } from "./bridge";
+import { featureState } from "./featureBuiltins";
 import type { BuiltinRegistry } from "./registry";
 
 /**
@@ -40,7 +44,15 @@ export function installModelingBuiltins(define: BuiltinRegistry, bridge: StdBrid
         const fn = kernel(localName);
         define(name, (args, site) => {
             const local = args.map((value) => bridge.toLocal(value));
-            return bridge.toStd(fn.impl(adapt === undefined ? local : adapt(local), { ...site, isType }));
+            try {
+                return bridge.toStd(fn.impl(adapt === undefined ? local : adapt(local), { ...site, isType }));
+            } catch (error) {
+                // As in Onshape, a failed operation leaves an ERROR status on its id: std's
+                // `try(op(...))` + processSubfeatureStatus read it back.
+                if (name.startsWith("op") && error instanceof FsRuntimeError)
+                    reportOperationError(args, error);
+                throw error;
+            }
         });
     };
     /** Renames one field of the definition map (argument 1) — `{ "faces" : q }` → `{ "entities" : q }`. */
@@ -64,7 +76,6 @@ export function installModelingBuiltins(define: BuiltinRegistry, bridge: StdBrid
         "opExtrude",
         "opRevolve",
         "opSweep",
-        "opLoft",
         "opThicken",
         "opFillet",
         "opChamfer",
@@ -81,6 +92,8 @@ export function installModelingBuiltins(define: BuiltinRegistry, bridge: StdBrid
     }
 
     forward("opSphere", "fSphere");
+    // std's loft passes its ExtendedToolBodyType; the kernel reads SOLID / SURFACE by name.
+    forward("opLoft", "opLoft", enumByName("bodyType"));
 
     // The frame a planar face coplanar with `plane` gets: world X projected into the plane,
     // world Y when the normal runs along X — the x axes of the default Top, Front and Right planes.
@@ -146,6 +159,26 @@ export function installModelingBuiltins(define: BuiltinRegistry, bridge: StdBrid
     forward("evArea", "evArea", renameField("faces", "entities"));
     forward("evVolume", "evVolume", renameField("bodies", "entities"));
     forward("evBox", "evBox3d");
+}
+
+/** An enum field of an operation's definition (argument 2) by member name: `ExtendedToolBodyType.SOLID` → "SOLID". */
+function enumByName(field: string) {
+    return (args: FsValue[]): FsValue[] => {
+        const definition = args[2];
+        const value = definition instanceof FsMap ? definition.field(field) : undefined;
+        if (!(definition instanceof FsMap) || !(value instanceof FsEnumValue)) return args;
+        const copy = new FsMap(definition.pairs(), definition.tag);
+        copy.set(field, value.name);
+        return [args[0], args[1], copy, ...args.slice(3)];
+    };
+}
+
+function reportOperationError(args: FsValue[], error: FsRuntimeError): void {
+    if (!(args[0] instanceof FsOpaque) || !(args[1] instanceof FsArray)) return;
+    featureState(FsContext.of(args[0])).status.set(
+        idString(args[1]),
+        fsMap({ statusType: "ERROR", statusEnum: "CUSTOM_ERROR", statusMsg: error.message }),
+    );
 }
 
 /** Sketch built-ins take raw numbers as meters (`skRectangle` passes stripped values). */

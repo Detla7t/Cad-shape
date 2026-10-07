@@ -90,7 +90,9 @@ function optionalLengthMm(value: FsValue, what: string, fallback = 0): number {
 }
 
 function angleDeg(value: FsValue, what: string): number {
-    return (expectQuantity(value, ANGLE, what) * 180) / Math.PI;
+    // Onshape's operations take a bare number as radians (std's fCone: `"angleForward" : 2 * PI`).
+    const radians = typeof value === "number" ? value : expectQuantity(value, ANGLE, what);
+    return (radians * 180) / Math.PI;
 }
 
 /** An affine (meters) as a kernel `Matrix4` (mm, column-major). */
@@ -458,10 +460,8 @@ function installPrimitives(std: StdBuilder): void {
     });
     std.fn("opHelix", (args) => {
         const [ctx, id, definition] = definitionOf(args, "opHelix");
-        const axis = readLine(definition.field("axis"), "axis");
+        const { axis, turns, pitch } = helixDefinition(definition);
         const start = readPoint(definition.field("startPoint"), "startPoint");
-        const turns = expectNumber(definition.field("turns") ?? 1, "turns");
-        const pitch = lengthMm(definition.field("pitch") ?? definition.field("height"), "pitch");
         const radial = vec.sub(
             start,
             vec.add(
@@ -485,6 +485,35 @@ function installPrimitives(std: StdBuilder): void {
         ctx.addBody(wire, id);
         return undefined;
     });
+}
+
+/**
+ * A helix's axis, turn count and pitch (mm), in Onshape's form — `direction`, `axisStart`,
+ * `interval` (in turns) and `helicalPitch` — or the short `axis` / `turns` / `pitch` one.
+ */
+function helixDefinition(definition: FsMap): { axis: LineData; turns: number; pitch: number } {
+    if (!definition.has("axisStart")) {
+        return {
+            axis: readLine(definition.field("axis"), "axis"),
+            turns: expectNumber(definition.field("turns") ?? 1, "turns"),
+            pitch: lengthMm(definition.field("pitch") ?? definition.field("height"), "pitch"),
+        };
+    }
+    const [from, to] = expectArray(definition.field("interval"), "interval").items.map((turn) =>
+        expectNumber(turn, "interval"),
+    );
+    if (from !== 0 || definition.field("clockwise") === true)
+        fail("opHelix supports counter-clockwise helices starting at turn 0 only");
+    if (optionalLengthMm(definition.field("spiralPitch"), "spiralPitch") !== 0)
+        fail("opHelix does not support a spiral pitch");
+    return {
+        axis: {
+            origin: readPoint(definition.field("axisStart"), "axisStart"),
+            direction: readDirection(definition.field("direction"), "direction"),
+        },
+        turns: to - from,
+        pitch: lengthMm(definition.field("helicalPitch"), "helicalPitch"),
+    };
 }
 
 /** As std's `fSphere`: the center is optional (the origin), a vertex query, or a point. */
@@ -517,20 +546,17 @@ function installSweeps(std: StdBuilder): void {
             id,
             resolveQuery(ctx, definition.field("entities")),
             axis,
-            -startDeg,
             spanDeg + startDeg,
+            -startDeg,
         );
         return undefined;
     });
     std.fn("opSweep", (args) => {
         const [ctx, id, definition] = definitionOf(args, "opSweep");
         const profiles = resolveQuery(ctx, definition.field("profiles"));
-        const faces = facesOf(profiles).map((entry) => entry.face as IShape);
-        const sections =
-            faces.length > 0
-                ? faces
-                : edgeRefsOf(profiles).map((ref) => ref.body.edges()[ref.index] as IShape);
-        if (sections.length === 0) fail("opSweep needs profile faces or edges");
+        // The pipe shell sweeps wires (a face or a bare edge aborts it): a face's outer loop, or the edges.
+        const faces = facesOf(profiles).map((entry) => ctx.track(entry.face.outerWire()) as IShape);
+        const sections = faces.length > 0 ? faces : [wireOf(ctx, edgeRefsOf(profiles), "opSweep profile")];
         const path = wireOf(ctx, edgeRefsOf(resolveQuery(ctx, definition.field("path"))), "opSweep path");
         ctx.addBody(
             kernel(
@@ -592,7 +618,10 @@ function opExtrudeExtent(ctx: FsContext, definition: FsMap): ExtrudeExtent {
         definition.field("startDepth") === undefined && startBound === "BLIND"
             ? 0
             : boundDistance(ctx, startBound, definition.field("startDepth"), "startDepth");
-    return { end, start };
+    // `isStartBoundOpposite : false` measures the start along the extrude direction (std's symmetric
+    // extrude passes `startDepth : -depth / 2`); by default it runs backwards from the profile.
+    const along = definition.field("isStartBoundOpposite") === false && startBound === "BLIND";
+    return { end, start: along ? -start : start };
 }
 
 function boundDistance(ctx: FsContext, bound: string, depth: FsValue, what: string): number {
@@ -821,6 +850,12 @@ function booleanOp(ctx: FsContext, opId: string, definition: FsMap): void {
             if (!keepTools) for (const tool of tools) ctx.removeBody(tool);
             return;
         }
+        case "SUBTRACT_COMPLEMENT":
+            // Removes from every target what lies outside the tools (std's NewBodyOperationType.INTERSECT).
+            if (targets.length === 0) fail("A subtract-complement needs targets");
+            for (const target of targets) booleanInto(ctx, opId, target, tools, "INTERSECTION", true);
+            if (!keepTools) for (const tool of tools) ctx.removeBody(tool);
+            return;
         default:
             fail(`BooleanOperationType.${operation} is not supported`);
     }
@@ -846,7 +881,11 @@ function installBodyOps(std: StdBuilder): void {
                 ? transforms.map((_, i) => `${i}`)
                 : expectArray(namesValue, "instanceNames").items.map((n) => toDisplayString(n));
         if (names.length !== transforms.length) fail("opPattern needs one instance name per transform");
-        const bodies = ownerBodies(resolveQuery(ctx, definition.field("entities"))).map((ref) => ref.body);
+        const refs = resolveQuery(ctx, definition.field("entities"));
+        // A face pattern rebuilds the faces on their own part; copying the whole part instead is wrong.
+        if (refs.some((ref) => ref.kind === "FACE"))
+            fail("opPattern of faces (a face pattern) is not supported");
+        const bodies = ownerBodies(refs).map((ref) => ref.body);
         patternBodies(ctx, id, bodies, transforms, names);
         return undefined;
     });
