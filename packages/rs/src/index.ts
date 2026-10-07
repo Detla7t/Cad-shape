@@ -9,3 +9,4 @@
 
 export * from "./polygon";
 export * from "./runtime";
+export * from "./stockSim";

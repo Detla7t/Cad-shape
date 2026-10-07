@@ -17,5 +17,6 @@ export * from "./ops2d";
 export * from "./ops3d";
 export * from "./ops5x";
 export * from "./posts";
+export * from "./sim";
 export * from "./studio";
 export * from "./versioning";

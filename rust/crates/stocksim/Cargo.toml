@@ -1,0 +1,12 @@
+# Part of the Chili3d Project, under the AGPL-3.0 License.
+# See LICENSE file in the project root for full license information.
+
+[package]
+name = "stocksim"
+description = "Stock material-removal simulation: a 3-axis Z-map cut by swept APT-style tool profiles, with rapid, collision and gouge checks."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
