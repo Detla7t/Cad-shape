@@ -7,4 +7,6 @@ export class Constants {
     static readonly RecentTable = "recents";
     /** Version history per document: a manifest under the document id plus object packs. */
     static readonly HistoryTable = "history";
+    /** Geometry of linked parts (other documents' parts at a version), by source, commit and node. */
+    static readonly LinkCacheTable = "linkCache";
 }

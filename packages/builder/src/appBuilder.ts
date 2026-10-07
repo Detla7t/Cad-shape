@@ -20,6 +20,7 @@ import {
 } from "@chili3d/core";
 import { DefaultDataExchange } from "./defaultDataExchange";
 import {
+    AssemblyRibbonProfiles,
     DefaultRibbon,
     mergeRibbonProfiles,
     ParametricRibbonProfiles,
@@ -30,6 +31,8 @@ import {
 export class AppBuilder {
     protected readonly _inits: (() => Promise<void>)[] = [];
     protected readonly _ribbonExtras: RibbonProfileExtra[] = [];
+    /** Run once the application exists (modules that need it — storage, documents — start here). */
+    protected readonly _onBuilt: ((app: IApplication) => void | Promise<void>)[] = [];
     protected _storage?: IStorage;
     protected _visualFactory?: IVisualFactory;
     protected _shapeProvider?: IShapeProvider;
@@ -76,6 +79,7 @@ export class AppBuilder {
                 Constants.DocumentTable,
                 Constants.RecentTable,
                 Constants.HistoryTable,
+                Constants.LinkCacheTable,
             ]);
         });
         return this;
@@ -122,6 +126,26 @@ export class AppBuilder {
         return this;
     }
 
+    /**
+     * Assemblies and cross-document links (`@chili3d/assembly`): the Assembly element, linked
+     * parts, the link service following saved source documents, and the `.chili3d` `links/`
+     * folder that carries linked geometry.
+     */
+    useAssembly(): this {
+        this._inits.push(async () => {
+            Logger.info("initializing assembly");
+
+            const assembly = await import("@chili3d/assembly");
+            // Scriptable like the core API (plugins, the console): insert, mate, solve, link.
+            (globalThis as Record<string, unknown>)["Chili3dAssembly"] = assembly;
+            this._ribbonExtras.push(...AssemblyRibbonProfiles);
+            this._onBuilt.push((app) => {
+                assembly.installAssembly(app);
+            });
+        });
+        return this;
+    }
+
     useThree(): this {
         this._inits.push(async () => {
             Logger.info("initializing three");
@@ -156,6 +180,9 @@ export class AppBuilder {
         this.ensureNecessary();
 
         const app = this.createApp();
+        for (const onBuilt of this._onBuilt) {
+            await onBuilt(app);
+        }
         await this._window?.init(app);
         await this.loadDefaultPlugins(app);
 

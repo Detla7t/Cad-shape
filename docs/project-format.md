@@ -14,6 +14,7 @@ featurestudios/<name>.fs   one plain-text FeatureScript file per Feature Studio
 thumbnail.png              image of the view when saved (optional)
 geometry/<node>.brep       BREP caches of shape nodes (optional, off by default, NOT authoritative)
 history/                   reserved for the version-control system (owned by its provider)
+links/                     cached geometry of linked parts (`@chili3d/assembly`, see below)
 <prefix>/...               folders of other registered entry providers
 ```
 
@@ -102,6 +103,28 @@ interface ProjectEntryProvider {
   for that document. A throwing `write` fails the save with a message. A provider registered
   after the file was opened gets `read` with the loaded entries just before its first `write`.
 - `history/` is recognized even if the manifest does not list it.
+
+## Linked parts (`links/`)
+
+A document that links parts of other documents (a linked part in its Part Studio, linked
+instances in an assembly) stores the geometry those links currently show, so the file opens
+— with its linked parts — where none of the sources exist. The links themselves stay in
+`document.json` (source document id, node id, version spec, resolved commit); `links/` is
+only their cache, written by the `link-cache` provider (exclusive):
+
+```
+links/index.json     { "format": "chili3d-links", "version": 1, "entries": [ {
+                         "key": "<doc>@<commit>#<node>", "documentId", "documentName",
+                         "commit", "nodeId", "nodeName", "kind": "part" | "assembly",
+                         "versionLabel", "parts": [ { "name", "path": "1-1.brep",
+                         "transform": [16 numbers], "faceIds"?, "edgeIds"?, "bomKey",
+                         "sourceLabel" } ] } ] }
+links/<n>-<m>.brep   one BREP per solid of each entry
+```
+
+On open the entries go into the link cache (memory and IndexedDB); a link whose source is
+reachable then resolves as usual, one whose source is missing shows the cached geometry and a
+broken-link state.
 
 ## Why a zip with a manifest
 

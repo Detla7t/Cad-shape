@@ -209,6 +209,45 @@ export const SheetMetalRibbonProfiles: RibbonProfileExtra[] = [
 ];
 
 /**
+ * Ribbon contributions of the assembly module, applied by `AppBuilder.useAssembly`: an
+ * Assembly tab (elements, instances, mates, BOM) with the cross-document link commands, and
+ * the link commands next to the other Part Studio insertions.
+ */
+export const AssemblyRibbonProfiles: RibbonProfileExtra[] = [
+    {
+        tabName: "ribbon.tab.assembly",
+        before: "ribbon.tab.manager",
+        groups: [
+            {
+                groupName: "ribbon.group.assembly",
+                items: [
+                    "assembly.new",
+                    "assembly.insert",
+                    ["assembly.solve", "assembly.bom", "assembly.export"],
+                ],
+            },
+            {
+                groupName: "ribbon.group.links",
+                items: [
+                    "link.insertPart",
+                    "link.manage",
+                    ["link.update", "link.changeVersion", "link.importSource"],
+                ],
+            },
+        ],
+    },
+    {
+        tabName: "ribbon.tab.file",
+        groups: [
+            {
+                groupName: "ribbon.group.links",
+                items: ["link.importSource"],
+            },
+        ],
+    },
+];
+
+/**
  * Returns a new profile list with `extras` merged into a copy of `base`: extra
  * items are prepended to the matching group (contributions land first), unknown
  * groups are appended, and new tabs are inserted before their `before` tab or

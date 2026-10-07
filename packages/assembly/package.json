@@ -1,0 +1,11 @@
+{
+    "name": "@chili3d/assembly",
+    "version": "0.7.1",
+    "description": "Assemblies and cross-document links: instances of parts and sub-assemblies (of this document or linked from other documents at a version), mate connectors, mates and their solver, BOM and placed-instance export",
+    "main": "src/index.ts",
+    "type": "module",
+    "devDependencies": {
+        "@chili3d/core": "*",
+        "@chili3d/element": "*"
+    }
+}
