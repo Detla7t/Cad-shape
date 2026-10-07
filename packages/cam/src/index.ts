@@ -8,3 +8,4 @@ export * from "./model/post";
 export * from "./model/setup";
 export * from "./model/tool";
 export * from "./model/toolpath";
+export * from "./ops5x";
