@@ -5,7 +5,17 @@ import type { IDocument } from "../document";
 import type { NodeRecord } from "../foundation/history";
 import { HistoryObservable } from "../foundation/observer";
 import { type INode, NodeUtils } from "../model/node";
-import { EMPTY_SCOPE, type EvaluatedValue, isConstantName, resolveUnitSpec, type Scope } from "./expression";
+import { dataTablesKey, isDataTableNode } from "./dataTable";
+import {
+    EMPTY_SCOPE,
+    type EvaluatedValue,
+    isConstantName,
+    resolveUnitSpec,
+    type Scope,
+    type ScopeContext,
+    scopeContext,
+    withScopeContext,
+} from "./expression";
 import { isVariableType, unitSpecOfType } from "./unitSpec";
 import { type IVariableSource, parseVariableItems, type VariableData } from "./variableData";
 import { isVariableStudioNode, type VariableStudioNode } from "./variableStudioNode";
@@ -40,9 +50,11 @@ interface Accumulator {
     readonly origins: Map<string, string>;
 }
 
-function accumulator(base: Scope): Accumulator {
+function accumulator(base: Scope, context = scopeContext(base)): Accumulator {
     return {
-        scope: new Map(base),
+        // The scope being built carries the base's context (or the one given): a row's
+        // `data(...)` call finds the document's tables through it.
+        scope: withScopeContext(new Map(base), context),
         errors: new Map(),
         warnings: new Map(),
         values: new Map(),
@@ -78,8 +90,9 @@ export function evaluateVariables(
 export function evaluateVariableLayers(
     layers: readonly VariableLayer[],
     base: Scope = EMPTY_SCOPE,
+    context?: ScopeContext,
 ): EvaluatedVariables {
-    const result = accumulator(base);
+    const result = accumulator(base, context ?? scopeContext(base));
     for (const layer of layers) evaluateLayer(layer.items, layer.name, result);
     return result;
 }
@@ -144,6 +157,10 @@ function evaluateVariable(
  * A name repeated within one layer is an error on the later row; shadowing across layers
  * is allowed and reported as a warning on the shadowing row. (Configurations, when they
  * come, slot in as a layer below the studios.)
+ *
+ * The scope also carries the document (`scopeContext`), so registered expression functions —
+ * `data("Prices", "B3")` — read its data tables, and a `token` fingerprinting those tables:
+ * a data source that changes re-scopes the document like a studio edit does.
  *
  * Everything that resolves an expression reads `evaluate().scope`, so a studio reaches
  * feature parameters, sketch dimensions and FeatureScript's `getVariable` with no change
@@ -225,7 +242,15 @@ export class VariableTable extends HistoryObservable implements IVariableTable {
                 items: studio.items,
             }));
             layers.push({ name: TABLE_LAYER, items: this.items });
-            this._evaluated = { revision: this._revision, result: evaluateVariableLayers(layers) };
+            const tables = dataTablesKey(this.document);
+            const context: ScopeContext = {
+                document: this.document,
+                ...(tables === "" ? {} : { token: tables }),
+            };
+            this._evaluated = {
+                revision: this._revision,
+                result: evaluateVariableLayers(layers, EMPTY_SCOPE, context),
+            };
         }
         return this._evaluated.result;
     }
@@ -248,17 +273,23 @@ export class VariableTable extends HistoryObservable implements IVariableTable {
         return this.document.modelManager.findNodes(isVariableStudioNode).filter(isVariableStudioNode);
     }
 
-    /** What the studio layers hold: which studios, in which order, with which variables. */
+    /**
+     * What the layers outside the table hold: which studios, in which order, with which
+     * variables — and which data tables, at which revisions (`dataTablesKey`).
+     */
     private layersKey(): string {
-        return this.studios()
+        const studios = this.studios()
             .map((studio) => `${studio.id}\u0000${studio.variablesJson}`)
             .join("\u0001");
+        const tables = dataTablesKey(this.document);
+        return tables === "" ? studios : `${studios}\u0003${tables}`;
     }
 
     private readonly handleNodesChanged = (records: NodeRecord[]) => {
         // A folder may carry studios in or out with it (and a loaded document arrives as
         // one record for its root), so any list node is worth a look.
-        const touched = (node: INode) => isVariableStudioNode(node) || NodeUtils.isLinkedListNode(node);
+        const touched = (node: INode) =>
+            isVariableStudioNode(node) || NodeUtils.isLinkedListNode(node) || isDataTableNode(node);
         if (records.some((record) => touched(record.node))) this.notifyScopeChanged();
     };
 

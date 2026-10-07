@@ -4,6 +4,7 @@
 import {
     ANGLE_UNITS,
     type FeatureParameter,
+    findDataTable,
     type IDocument,
     type IFace,
     type IShape,
@@ -363,6 +364,7 @@ function evaluateFeatureScript(feature: FeatureScriptFeatureData, context: Featu
             input: context.input,
             instanceId: instanceIdOf(feature),
             variables: documentVariables(context.scope),
+            dataTables: (reference) => findDataTable(context.document, reference),
             definition: (fsContext) =>
                 buildDefinition(
                     feature,

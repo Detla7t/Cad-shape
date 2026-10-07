@@ -2,7 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import type { IShape } from "@chili3d/core";
-import { type FsBody, FsContext } from "./context/fsContext";
+import { type FsBody, FsContext, type FsDataTableSource } from "./context/fsContext";
 import { FsError, FsRuntimeError } from "./lang/errors";
 import type {
     FeatureExport,
@@ -136,6 +136,8 @@ export interface FeatureRun {
     /** The root Id of this feature instance (the feature's id in the body). */
     readonly instanceId: string;
     readonly variables?: ReadonlyMap<string, FsValue>;
+    /** The document's data tables, for `getDataTable`. */
+    readonly dataTables?: FsDataTableSource;
 }
 
 export interface FeatureRunResult {
@@ -156,6 +158,7 @@ export function runFeature(run: FeatureRun): FeatureRunResult {
     try {
         if (run.input !== undefined) context.addHostBody(run.input);
         for (const [name, value] of run.variables ?? []) context.variables.set(name, value);
+        context.dataTables = run.dataTables;
         const definition = run.interpreter.adaptHostValue(run.definition(context));
         const callable =
             run.feature.module.exports.get(run.feature.name) ??

@@ -20,6 +20,7 @@ import {
 } from "@chili3d/core";
 import { DefaultDataExchange } from "./defaultDataExchange";
 import {
+    DataRibbonProfiles,
     DefaultRibbon,
     mergeRibbonProfiles,
     ParametricRibbonProfiles,
@@ -118,6 +119,23 @@ export class AppBuilder {
                 ...ParametricRibbonProfiles,
                 ...SheetMetalRibbonProfiles,
             );
+        });
+        return this;
+    }
+
+    /**
+     * Data Sources (`@chili3d/data`): CSV / Excel / ODS / JSON files, SQLite databases, web APIs,
+     * databases over HTTP and online sheets as document tables, the `data()` / `lookup()` /
+     * `count()` / `sum()` expression functions, and FeatureScript's `getDataTable`. Remote
+     * sources set to refresh on open or on an interval are kept fresh while their document is shown.
+     */
+    useData(): this {
+        this._inits.push(async () => {
+            Logger.info("initializing data sources");
+
+            const data = await import("@chili3d/data");
+            data.startDataRefresh();
+            this._ribbonExtras.push(...DataRibbonProfiles);
         });
         return this;
     }

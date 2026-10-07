@@ -18,6 +18,7 @@ import {
     type UserFunction,
 } from "../lang/values";
 import { mergeMaps } from "./core";
+import { getDataTable } from "./dataTables";
 import { arg, type StdBuilder } from "./registry";
 
 /** Joins an Id's components; `qCreatedBy` matches this string or any `/`-extension of it. */
@@ -92,6 +93,9 @@ export function installFeatureSupport(std: StdBuilder): void {
         }
         return context.variables.get(name);
     });
+    std.fn("getDataTable", (args) =>
+        getDataTable(arg(args, 0, "getDataTable"), arg(args, 1, "getDataTable")),
+    );
     std.fn("setVariable", (args) => {
         const context = FsContext.of(arg(args, 0, "setVariable"));
         context.variables.set(

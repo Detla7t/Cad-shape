@@ -11,6 +11,8 @@ open/save of a live document).
 manifest.json              what is inside (always first)
 document.json              the serialized document (Document.serialize()), pretty-printed
 featurestudios/<name>.fs   one plain-text FeatureScript file per Feature Studio
+data/<name>.snapshot.json  a Data Source's cached tables (JSON, one table row per line)
+data/<name>.<ext>          a Data Source's attached file (.csv, .xlsx, .sqlite, …), its real bytes
 thumbnail.png              image of the view when saved (optional)
 geometry/<node>.brep       BREP caches of shape nodes (optional, off by default, NOT authoritative)
 history/                   reserved for the version-control system (owned by its provider)
@@ -61,12 +63,21 @@ endings included). File names are the element name made file-safe and unique
 case-insensitively (`Bracket.fs`, `bracket (2).fs`). The reader re-inlines **any**
 `{ "$file": … }` node property, so new element kinds need no reader change.
 
+A class may externalize several properties (one registration each; `projectSourceElementSpecs`).
+A Data Source keeps its cached tables (`snapshotJson`) and its attachment as files under
+`data/`: `extensionOf(node)` names the attachment after its file type, `skipEmpty` keeps an empty
+property inline, and `encoding: "base64"` marks a property holding binary content as base64 —
+the archive stores the raw bytes and the reference says so, `{ "$file": "data/Shop.sqlite",
+"$encoding": "base64" }`, so the reader base64-encodes them back. Secret values (API keys) are
+never in these files: a Data Source serializes them only when it opted in to storing them.
+
 ## Reading rules
 
 - Refused (error, nothing loads): not a zip; no `manifest.json`; manifest not JSON or not an
   object; `format` ≠ `chili3d-project`; `formatVersion` not a positive integer or newer than the
   reader's; `elements`/`files`/`extensions` present but not lists; no or invalid
-  `document.json`; a `$file` reference to a missing or non-UTF-8 entry.
+  `document.json`; a `$file` reference to a missing entry, or to a non-UTF-8 one without
+  `"$encoding": "base64"`.
 - Warnings only: a listed file whose size/sha-256 differs (a hand-edited `.fs` is legitimate),
   a listed optional file that is missing.
 - Unknown entries and unknown manifest fields are ignored (forward compatibility).

@@ -4,6 +4,7 @@
 import { HOST_ID } from "../context/fsContext";
 import type { Interpreter } from "../lang/interpreter";
 import { fsMap, native, toDisplayString } from "../lang/values";
+import { getDataTable } from "../std/dataTables";
 import { makeId } from "../std/feature";
 import { installAttributeBuiltins } from "./attributeBuiltins";
 import { StdBridge } from "./bridge";
@@ -49,7 +50,8 @@ export function installOnshapeBuiltins(interpreter: Interpreter, version: number
 /**
  * Chili3d's additions to Onshape's std, visible to every studio without an import. A
  * custom feature here runs inside a body, on the body's geometry so far: `qHostBody()`
- * names that input (what the feature's picks resolve against).
+ * names that input (what the feature's picks resolve against). `getDataTable(context, name)`
+ * reads a document data table (see `std/dataTables.ts`), its quantities as std `ValueWithUnits`.
  */
 function installExtensions(interpreter: Interpreter, bridge: StdBridge): void {
     interpreter.std.define(
@@ -64,5 +66,9 @@ function installExtensions(interpreter: Interpreter, bridge: StdBridge): void {
                 "Query",
             ),
         ),
+    );
+    interpreter.std.define(
+        "getDataTable",
+        native("getDataTable", (args) => bridge.toStd(getDataTable(args[0], args[1]))),
     );
 }

@@ -20,6 +20,7 @@ import {
     Result,
     type Scope,
     ShapeNode,
+    scopeContext,
     serializable,
     serialize,
     Transaction,
@@ -938,13 +939,17 @@ export class ParametricBodyNode
 
     /**
      * Cache keys include the scope snapshot so a variable change invalidates dependents,
-     * and the handler's `cacheToken` for state outside the feature JSON (a FeatureScript
-     * studio's source).
+     * the scope's data-table token (a refreshed table changes what `data(...)` and
+     * FeatureScript's `getDataTable` read without changing any scope entry), and the
+     * handler's `cacheToken` for state outside the feature JSON (a FeatureScript studio's
+     * source).
      */
     private cacheKey(feature: FeatureData, scope: Scope): string {
         const token = featureHandler(feature.type)?.cacheToken?.(feature, this.document);
         const base = scope.size === 0 ? JSON.stringify(feature) : JSON.stringify([feature, [...scope]]);
-        return token === undefined ? base : `${base}\u0000${token}`;
+        const data = scopeContext(scope)?.token;
+        const keyed = data === undefined ? base : `${base}\u0000data:${data}`;
+        return token === undefined ? keyed : `${keyed}\u0000${token}`;
     }
 
     /** The cached entry for `index`, when the feature data, the input and the refs all still match. */

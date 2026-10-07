@@ -208,6 +208,20 @@ export const SheetMetalRibbonProfiles: RibbonProfileExtra[] = [
     },
 ];
 
+/** `useData()`: Data Sources beside Variable Studios on the parametric tab. */
+export const DataRibbonProfiles: RibbonProfileExtra[] = [
+    {
+        tabName: "ribbon.tab.parametric",
+        before: "ribbon.tab.manager",
+        groups: [
+            {
+                groupName: "ribbon.group.data",
+                items: ["data.newSource", "data.refreshAll"],
+            },
+        ],
+    },
+];
+
 /**
  * Returns a new profile list with `extras` merged into a copy of `base`: extra
  * items are prepended to the matching group (contributions land first), unknown

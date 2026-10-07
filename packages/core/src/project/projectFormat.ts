@@ -26,6 +26,11 @@ export const PROJECT_HISTORY_FOLDER = "history/";
 
 /** The key that replaces an externalized property in `document.json`: `{ "$file": "<path>" }`. */
 export const PROJECT_FILE_REF_KEY = "$file";
+/**
+ * Beside `$file` for a binary file: `{ "$file": "<path>", "$encoding": "base64" }` — the property
+ * holds the file's bytes as base64, the archive holds the bytes themselves.
+ */
+export const PROJECT_FILE_ENCODING_KEY = "$encoding";
 
 /** One element (tab) of the document. */
 export interface ProjectElement {
@@ -82,9 +87,11 @@ export interface ProjectManifest {
 }
 
 /**
- * A node class whose (large, textual) property is stored as its own file instead of
- * inline in `document.json` — a Feature Studio's FeatureScript source becomes
- * `featurestudios/<name>.fs`. Registered by the module that owns the class.
+ * A node class whose (large) property is stored as its own file instead of inline in
+ * `document.json` — a Feature Studio's FeatureScript source becomes
+ * `featurestudios/<name>.fs`, a Data Source's attached spreadsheet `data/<name>.xlsx`.
+ * Registered by the module that owns the class; a class may externalize several properties
+ * (one spec each, distinct extensions when they share a folder).
  */
 export interface ProjectSourceElementSpec {
     /** The serialized class name (`__cla$$__`). */
@@ -97,14 +104,28 @@ export interface ProjectSourceElementSpec {
     readonly folder: string;
     /** File extension including the dot, e.g. ".fs". */
     readonly extension: string;
+    /**
+     * The extension for one serialized node — e.g. taken from an attached file's name — or
+     * undefined to use `extension`.
+     */
+    readonly extensionOf?: (node: Readonly<Record<string, unknown>>) => string | undefined;
+    /**
+     * `"utf8"` (default): the property is text, stored as UTF-8. `"base64"`: the property is
+     * binary content as base64, stored as the raw bytes (and base64-encoded again on read).
+     */
+    readonly encoding?: "utf8" | "base64";
+    /** Keep an empty property inline (no file) — for optional content such as an attachment. */
+    readonly skipEmpty?: boolean;
 }
 
-const sourceElements = new Map<string, ProjectSourceElementSpec>();
+const sourceElements = new Map<string, ProjectSourceElementSpec[]>();
 const elementKinds = new Map<string, string>();
 
+/** Registers one externalized property; a second spec for the same class and field replaces it. */
 export function registerProjectSourceElement(spec: ProjectSourceElementSpec): void {
     if (!spec.folder.endsWith("/")) throw new Error(`Project folder must end in "/": ${spec.folder}`);
-    sourceElements.set(spec.className, spec);
+    const specs = (sourceElements.get(spec.className) ?? []).filter((x) => x.field !== spec.field);
+    sourceElements.set(spec.className, [...specs, spec]);
     elementKinds.set(spec.className, spec.kind);
 }
 
@@ -113,8 +134,14 @@ export function registerProjectElementKind(className: string, kind: string): voi
     elementKinds.set(className, kind);
 }
 
+/** The first externalized property of a class — the file its manifest element points at. */
 export function projectSourceElementSpec(className: string): ProjectSourceElementSpec | undefined {
-    return sourceElements.get(className);
+    return sourceElements.get(className)?.[0];
+}
+
+/** Every externalized property of a class, in registration order. */
+export function projectSourceElementSpecs(className: string): readonly ProjectSourceElementSpec[] {
+    return sourceElements.get(className) ?? [];
 }
 
 /** The manifest kind of a node class: registered, else derived ("VariableStudioNode" → "variableStudio"). */

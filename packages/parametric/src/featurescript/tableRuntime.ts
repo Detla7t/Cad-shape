@@ -2,7 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import type { IShape } from "@chili3d/core";
-import { FsContext } from "./context/fsContext";
+import { FsContext, type FsDataTableSource } from "./context/fsContext";
 import { FsThrow } from "./lang/errors";
 import type { Interpreter, TableExport } from "./lang/interpreter";
 import {
@@ -88,6 +88,8 @@ export interface TableRun {
     /** The table's `definition`, in native values (`adaptHostValue` converts for Onshape's std). */
     readonly definition: FsMap;
     readonly variables?: ReadonlyMap<string, FsValue>;
+    /** The document's data tables, for `getDataTable`. */
+    readonly dataTables?: FsDataTableSource;
     readonly format?: TableFormatOptions;
 }
 
@@ -96,6 +98,7 @@ export function runTable(run: TableRun): TableRunResult {
     try {
         for (const body of run.bodies) context.addHostBody(body.shape).name = body.name;
         for (const [name, value] of run.variables ?? []) context.variables.set(name, value);
+        context.dataTables = run.dataTables;
         run.interpreter.resetBudget();
         const definition = run.interpreter.adaptHostValue(run.definition);
         const callable =
