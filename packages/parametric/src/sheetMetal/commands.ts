@@ -59,9 +59,12 @@ function append(
     body: ParametricBodyNode,
     feature: SheetMetalFeatureData,
     name: string,
+    consumed: readonly INode[] = [],
 ): void {
     Transaction.execute(document, name, () => {
         body.setFeaturesEmitShapeChanged([...body.features, feature]);
+        // Sketches the feature consumed hide, as extrude and revolve hide theirs.
+        for (const node of consumed) if (node instanceof SketchNode) node.visible = false;
         document.visual.update();
     });
     document.selection.setSelectedNodes([body], false);
@@ -183,6 +186,7 @@ export class SheetMetalBendCommand extends MultistepCommand {
                 direction: this.direction === "sheetMetal.down" ? "down" : "up",
             },
             "excute sheetMetal.bend",
+            this.stepDatas[1].shapes.map((data) => data.owner.node),
         );
     }
 }
@@ -505,6 +509,7 @@ export class BeadCommand extends SheetBodyCommand {
                       }),
             },
             "excute sheetMetal.bead",
+            line === undefined ? [] : [line.owner.node],
         );
     }
 }

@@ -25,11 +25,17 @@ export function showFeatureStudioEditor(studio: FeatureStudioNode): void {
     if (open.has(studio.id)) return;
     open.add(studio.id);
     const editor = new FeatureStudioEditor(studio);
+    const width = 760;
+    const height = 560;
     PubSub.default.pub("showFloatPanel", {
         title: "featurescript.studio",
         content: editor.root,
-        width: 760,
-        height: 560,
+        // Over the viewport, clear of the ribbon and the model tree, so the ribbon's insert
+        // and sheet metal commands stay reachable while the studio is open.
+        x: Math.max(20, Math.min(380, window.innerWidth - width - 20)),
+        y: Math.max(20, Math.min(150, window.innerHeight - height - 20)),
+        width,
+        height,
         minWidth: 420,
         minHeight: 300,
         document: studio.document,
