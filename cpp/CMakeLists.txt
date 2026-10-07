@@ -66,7 +66,7 @@ if (${EMSCRIPTEN})
     target_compile_options (occt PUBLIC
         $<$<CONFIG:Release>:-Oz>
         $<$<CONFIG:Release>:-flto>
-        $<IF:$<CONFIG:Release>,-sDISABLE_EXCEPTION_CATCHING=1,-sDISABLE_EXCEPTION_CATCHING=0>
+        -fwasm-exceptions
         -DOCCT_NO_PLUGINS
     )
 
@@ -75,13 +75,13 @@ if (${EMSCRIPTEN})
     target_compile_options (${TARGET} PUBLIC
         $<$<CONFIG:Release>:-Oz>
         $<$<CONFIG:Release>:-flto>
-        $<IF:$<CONFIG:Release>,-sDISABLE_EXCEPTION_CATCHING=1,-sDISABLE_EXCEPTION_CATCHING=0>
+        -fwasm-exceptions
     )
     target_link_libraries(${TARGET} PUBLIC occt)
     target_link_options (${TARGET} PUBLIC
         $<IF:$<CONFIG:Release>,-Oz,-O0>
         $<IF:$<CONFIG:Release>,-flto,-fno-lto>
-        $<IF:$<CONFIG:Release>,-sDISABLE_EXCEPTION_CATCHING=1,-sDISABLE_EXCEPTION_CATCHING=0>
+        -fwasm-exceptions
         -sMODULARIZE=1
         -sEXPORT_ES6=1
         -sSTACK_SIZE=16MB
