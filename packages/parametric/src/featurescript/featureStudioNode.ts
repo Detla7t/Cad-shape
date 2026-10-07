@@ -7,6 +7,7 @@ import {
     type INodeIcon,
     type INodeSceneless,
     Node,
+    registerProjectSourceElement,
     serializable,
     serialize,
 } from "@chili3d/core";
@@ -55,6 +56,17 @@ export class FeatureStudioNode extends Node implements INodeIcon, INodeSceneless
 export function isFeatureStudioNode(node: unknown): node is FeatureStudioNode {
     return node instanceof FeatureStudioNode;
 }
+
+export const FEATURE_STUDIO_EXTENSION = ".fs";
+
+// In a `.chili3d` project the source is its own file, `featurestudios/<name>.fs`.
+registerProjectSourceElement({
+    className: FeatureStudioNode.name,
+    kind: "featureStudio",
+    field: "source",
+    folder: "featurestudios/",
+    extension: FEATURE_STUDIO_EXTENSION,
+});
 
 /** The starting point of a new studio: a parameterized feature that shows the main moving parts. */
 export const DEFAULT_STUDIO_SOURCE = `FeatureScript 3083;

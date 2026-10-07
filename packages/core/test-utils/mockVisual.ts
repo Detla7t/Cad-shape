@@ -85,6 +85,7 @@ export function createMockVisualWithDocument(
             exportToStl: async () => ({ ok: false }),
             exportToPly: async () => ({ ok: false }),
             exportToObj: async () => ({ ok: false }),
+            exportToGltf: async () => ({ ok: false }),
             ...overrides.meshExporter,
         } as IMeshExporter,
         update: () => {},

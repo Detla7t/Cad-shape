@@ -12,7 +12,7 @@ import {
     Result,
     type VisualNode,
 } from "@chili3d/core";
-import { createMockDocument, MockShape, TestNode } from "@chili3d/core/test-utils";
+import { createMockDocument, MockShape, TestDocument, TestNode } from "@chili3d/core/test-utils";
 import { rs } from "@rstest/core";
 import { DefaultDataExchange } from "../src/defaultDataExchange";
 
@@ -32,6 +32,7 @@ describe("DefaultDataExchange", () => {
             expect(formats).toContain(".igs");
             expect(formats).toContain(".brep");
             expect(formats).toContain(".stl");
+            expect(formats).toContain(".fs");
         });
 
         test("should return an array of strings", () => {
@@ -54,6 +55,9 @@ describe("DefaultDataExchange", () => {
             expect(formats).toContain(".ply");
             expect(formats).toContain(".ply binary");
             expect(formats).toContain(".obj");
+            expect(formats).toContain(".glb");
+            expect(formats).toContain(".gltf");
+            expect(formats).toContain(".3mf");
         });
 
         test("should return an array of strings", () => {
@@ -185,6 +189,22 @@ describe("DefaultDataExchange", () => {
             doc.visual.update = updateSpy;
             return { converter, node, doc, addNodeSpy, updateSpy };
         }
+
+        test("should import a .fs file as a new Feature Studio named after the file", async () => {
+            const { FeatureStudioNode } = await import("@chili3d/parametric");
+            const doc = new TestDocument();
+            const source = "FeatureScript 3083;\nexport const x = 1;\n";
+
+            await exchange.import(doc, [new File([source], "Duct Seams.fs")]);
+
+            const studios = doc.modelManager.findNodes((node) => node instanceof FeatureStudioNode);
+            expect(
+                studios.map((studio) => [
+                    studio.name,
+                    (studio as InstanceType<typeof FeatureStudioNode>).source,
+                ]),
+            ).toEqual([["Duct Seams", source]]);
+        });
 
         test("should route .brep through convertFromBrep with the file text", async () => {
             const { converter, doc, addNodeSpy, updateSpy } = setup();
@@ -344,6 +364,41 @@ describe("DefaultDataExchange", () => {
             expect(exportToObj).toHaveBeenCalledTimes(1);
             expect(exportToObj).toHaveBeenCalledWith([node]);
             expect(exportToPly).not.toHaveBeenCalled();
+        });
+
+        test.each([
+            { type: ".glb", binary: true },
+            { type: ".gltf", binary: false },
+        ])("should route $type to meshExporter.exportToGltf with binary=$binary", async ({
+            type,
+            binary,
+        }) => {
+            const doc = createMockDocument();
+            const exportToGltf = rs.fn(
+                async (_nodes: VisualNode[], _binary: boolean) => Result.ok("gltf-data") as Result<BlobPart>,
+            );
+            Object.assign(doc.visual, { meshExporter: { exportToGltf } as unknown as IMeshExporter });
+            const { node } = createShapeNode(doc, "gltf-node");
+
+            const result = await exchange.export(type, [node]);
+
+            expect(result).toEqual(["gltf-data"]);
+            expect(exportToGltf).toHaveBeenCalledWith([node], binary);
+        });
+
+        test("should write .3mf from each node's kernel mesh, named after the node", async () => {
+            const doc = createMockDocument();
+            const { node, transformedMul } = createShapeNode(doc, "Duct part");
+
+            const result = await exchange.export(".3mf", [node]);
+
+            expect(result).toHaveLength(1);
+            expect(transformedMul).toHaveBeenCalledTimes(1);
+            const { default: JSZip } = await import("jszip");
+            const zip = await JSZip.loadAsync(result![0] as Uint8Array);
+            const model = await zip.file("3D/3dmodel.model")!.async("string");
+            expect(model).toContain(`name="Duct part"`);
+            expect(model).toContain(`<triangle v1="0" v2="1" v3="2"/>`);
         });
 
         test.each([

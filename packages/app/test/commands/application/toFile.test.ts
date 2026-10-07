@@ -1,9 +1,9 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { DOCUMENT_FILE_EXTENSION, PubSub } from "@chili3d/core";
+import { DOCUMENT_FILE_EXTENSION, PROJECT_FILE_EXTENSION, PubSub } from "@chili3d/core";
 import { createMockApplication, createMockDocument } from "@chili3d/core/test-utils";
-import { describe, expect, rs, test } from "@rstest/core";
+import { describe, expect, test } from "@rstest/core";
 import { SaveDocumentToFile } from "../../../src/commands/application/toFile";
 
 describe("SaveDocumentToFile", () => {
@@ -194,15 +194,20 @@ describe("SaveDocumentToFile callback", () => {
         const doc = createMockDocument({ name: "test-document" });
         doc.serialize = () => {
             state.serializeCalled = true;
-            return { id: "123", name: "test-document" } as any;
+            return {
+                __cla$$__: "Document",
+                version: __DOCUMENT_VERSION__,
+                id: "123",
+                name: "test-document",
+                models: { components: [], nodes: [], materials: [] },
+                variables: [],
+                acts: [],
+                userData: {},
+            } as any;
         };
 
         const app = createMockApplication();
         app.activeView = { document: doc } as any;
-
-        // The command callback waits on a setTimeout(100) before serializing;
-        // fake timers let tests advance that delay deterministically.
-        rs.useFakeTimers();
 
         // Stub URL.createObjectURL / revokeObjectURL used by download()
         const originalCreateObjectURL = URL.createObjectURL;
@@ -212,7 +217,6 @@ describe("SaveDocumentToFile callback", () => {
 
         const restore = () => {
             PubSub.default.pub = originalPub;
-            rs.useRealTimers();
             URL.createObjectURL = originalCreateObjectURL;
             URL.revokeObjectURL = originalRevokeObjectURL;
         };
@@ -220,12 +224,13 @@ describe("SaveDocumentToFile callback", () => {
         return { state, app, restore };
     }
 
-    /** Run the showPermanent callback to completion, advancing the internal timer delay. */
+    /**
+     * Run the showPermanent callback to completion. Real timers: the zip writer schedules
+     * its own work, which fake timers would never run.
+     */
     async function runCallback(state: { callback: (() => Promise<void>) | undefined }) {
         if (!state.callback) return;
-        const callbackPromise = state.callback();
-        await rs.advanceTimersByTimeAsync(100);
-        await callbackPromise;
+        await state.callback();
     }
 
     test("should serialize the document inside the callback", async () => {
@@ -261,7 +266,7 @@ describe("SaveDocumentToFile callback", () => {
         }
     });
 
-    test("should create a download link with document name and extension", async () => {
+    test("should download the document as a .chili3d project", async () => {
         const { state, app, restore } = setupCallbackTest();
 
         // Track what the download creates
@@ -288,8 +293,7 @@ describe("SaveDocumentToFile callback", () => {
 
             await runCallback(state);
 
-            expect(anchorDownload).toContain("test-document");
-            expect(anchorDownload).toContain(DOCUMENT_FILE_EXTENSION);
+            expect(anchorDownload).toBe(`test-document${PROJECT_FILE_EXTENSION}`);
         } finally {
             document.createElement = originalCreateElement;
             restore();

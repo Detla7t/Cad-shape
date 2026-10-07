@@ -66,7 +66,7 @@ export function buildFileTools(): Tool[] {
         {
             name: "export_nodes",
             description:
-                "Export nodes to a CAD file and download it in the browser. format is one of the app's export formats ('.step', '.iges', '.brep' for B-rep geometry; '.stl', '.stl binary', '.ply', '.ply binary', '.obj' for meshes). Nodes merge into a single file. Omit ids to export all top-level nodes.",
+                "Export nodes to a CAD file and download it in the browser. format is one of the app's export formats ('.step', '.iges', '.brep' for B-rep geometry; '.stl', '.stl binary', '.ply', '.ply binary', '.obj', '.3mf' for meshes; '.glb', '.gltf' for colored glTF scenes with node names). Nodes merge into a single file. Omit ids to export all top-level nodes.",
             parameters: {
                 type: "object",
                 properties: {

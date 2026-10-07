@@ -3,7 +3,6 @@
 
 import {
     type CommandKeys,
-    DOCUMENT_FILE_EXTENSION,
     I18n,
     type IApplication,
     type ICommand,
@@ -30,6 +29,7 @@ import {
 } from "@chili3d/core";
 import { Document } from "./document";
 import { PluginManager } from "./pluginManager";
+import { isDocumentFileName, openDocumentFile } from "./project/projectFile";
 import { importFiles } from "./utils";
 
 export interface ApplicationOptions {
@@ -160,8 +160,12 @@ export class Application extends Observable implements IApplication {
             "showPermanent",
             async () => {
                 for (const file of opens) {
-                    const json: Serialized = JSON.parse(await file.text());
-                    await this.loadDocument(json);
+                    // A `.chili3d` project or a legacy `.cd` document.
+                    const document = await openDocumentFile(this, file);
+                    if (!document.isOk) {
+                        PubSub.default.pub("showToast", "error.default:{0}", document.error);
+                        continue;
+                    }
                     this.activeView?.cameraController.fitContent();
                 }
             },
@@ -176,7 +180,7 @@ export class Application extends Observable implements IApplication {
         const plugins: File[] = [];
         for (const element of files) {
             const fileName = element.name.toLowerCase();
-            if (fileName.endsWith(DOCUMENT_FILE_EXTENSION)) {
+            if (isDocumentFileName(fileName)) {
                 opens.push(element);
             } else if (fileName.endsWith(PLUGIN_FILE_EXTENSION)) {
                 plugins.push(element);
@@ -221,7 +225,9 @@ export class Application extends Observable implements IApplication {
 
     async loadFileFromUrl(url: string): Promise<void> {
         return Promise.try(async () => {
-            const filename = url.substring(url.lastIndexOf("/") + 1);
+            // The extension picks the loader, so drop any query (`model.chili3d?raw=1`).
+            const path = url.split(/[?#]/)[0];
+            const filename = path.substring(path.lastIndexOf("/") + 1);
             if (!filename || !filename.includes(".")) {
                 throw new Error(`No file name in url: ${url}`);
             }

@@ -37,8 +37,17 @@ describe("DefaultRibbon", () => {
         expect(DefaultRibbon[0].tabName).toBe("ribbon.tab.model");
     });
 
-    test("second tab should be manager tab", () => {
-        expect(DefaultRibbon[1].tabName).toBe("ribbon.tab.manager");
+    test("second tab should be the file tab, the last one the manager tab", () => {
+        expect(DefaultRibbon[1].tabName).toBe("ribbon.tab.file");
+        expect(DefaultRibbon.at(-1)!.tabName).toBe("ribbon.tab.manager");
+    });
+
+    test("file tab gathers the document file commands and the 3D import/export", () => {
+        const fileTab = DefaultRibbon.find((t) => t.tabName === "ribbon.tab.file")!;
+        expect(fileTab.groups.map((g) => [g.groupName, flattenItems(g.items)])).toEqual([
+            ["ribbon.group.document", ["doc.new", "doc.open", "doc.saveToFile", "doc.save"]],
+            ["ribbon.group.importExport", ["file.import", "file.export"]],
+        ]);
     });
 
     test("should not contain any sketch commands without useParametric", () => {
@@ -185,6 +194,25 @@ describe("ParametricRibbonProfiles", () => {
     });
 });
 
+describe("parametric file commands", () => {
+    test("join the file tab: 2D export and Feature Studio files", () => {
+        const merged = mergeRibbonProfiles(DefaultRibbon, ParametricRibbonProfiles);
+        const fileTabs = merged.filter((t) => t.tabName === "ribbon.tab.file");
+        expect(fileTabs).toHaveLength(1);
+        expect(fileTabs[0].groups.map((g) => [g.groupName, flattenItems(g.items)])).toEqual([
+            ["ribbon.group.document", ["doc.new", "doc.open", "doc.saveToFile", "doc.save"]],
+            ["ribbon.group.importExport", ["file.import", "file.export"]],
+            ["ribbon.group.export2d", ["sheetMetal.exportFlat", "sketch.export"]],
+            ["ribbon.group.featureScript", ["featurescript.exportStudio", "featurescript.importStudio"]],
+        ]);
+    });
+
+    test("the sketch tab exports the sketch being edited", () => {
+        const sketchTab = SketchRibbonProfiles.find((t) => t.tabName === "ribbon.tab.sketch")!;
+        expect(flattenItems(sketchTab.groups.flatMap((g) => g.items))).toContain("sketch.export");
+    });
+});
+
 describe("SheetMetalRibbonProfiles", () => {
     test("adds the sheet metal tab before the manager tab", () => {
         const merged = mergeRibbonProfiles(DefaultRibbon, SheetMetalRibbonProfiles);
@@ -200,6 +228,7 @@ describe("SheetMetalRibbonProfiles", () => {
             "sheetMetal.base",
             "sheetMetal.bend",
             "sheetMetal.flatten",
+            "sheetMetal.exportFlat",
             "sheetMetal.pittsburgh",
             "sheetMetal.easyEdge",
             "sheetMetal.hem",
@@ -218,6 +247,7 @@ describe("mergeRibbonProfiles", () => {
 
         expect(tabNames).toEqual([
             "ribbon.tab.model",
+            "ribbon.tab.file",
             "ribbon.tab.parametric",
             "ribbon.tab.manager",
             "ribbon.tab.sketch",
