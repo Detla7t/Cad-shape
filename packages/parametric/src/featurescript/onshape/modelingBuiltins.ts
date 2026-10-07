@@ -87,6 +87,27 @@ export function installModelingBuiltins(define: BuiltinRegistry, bridge: StdBrid
         "opPoint",
         "opPlane",
         "opHelix",
+        "opSplitPart",
+        "opSplitFace",
+        "opSplitEdges",
+        "opDeleteFace",
+        "opExtractSurface",
+        "opEnclose",
+        "opFlipOrientation",
+        "opOffsetFace",
+        "opMoveFace",
+        "opReplaceFace",
+        "opModifyFillet",
+        "opPolyline",
+        "opExtractWires",
+        "opIntersectFaces",
+        "opCreateBSplineCurve",
+        "opCreateCompositePart",
+        "opModifyCompositePart",
+        "opNameEntity",
+        "opMateConnector",
+        "opHole",
+        "opMergeContexts",
     ]) {
         forward(name);
     }
@@ -144,6 +165,8 @@ export function installModelingBuiltins(define: BuiltinRegistry, bridge: StdBrid
         "evEdgeTangentLines",
         "evEdgeConvexity",
         "evFilletRadius",
+        "evMateConnector",
+        "evMateConnectorCoordSystem",
     ]) {
         forward(name);
     }

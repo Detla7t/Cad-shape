@@ -370,36 +370,10 @@ export class StdLayerProbe {
      * interpreter's own feature list never sees them.
      */
     featuresOf(module: ModuleInstance): FeatureExport[] {
-        const features: FeatureExport[] = [];
-        for (const item of module.program.body) {
-            if (!item.exported || (item.kind !== "Const" && item.kind !== "FunctionTop")) continue;
-            const annotations = item.annotations ?? [];
-            if (annotations.length === 0) continue;
-            let annotation: FsMap;
-            let value: FsValue;
-            try {
-                annotation = this.interpreter.evaluateAnnotations(annotations, module.env);
-                value = this.interpreter.evaluate(parseExpression(item.name), module.env);
-            } catch {
-                continue;
-            }
-            const displayName = annotation.field("Feature Type Name");
-            if (typeof displayName !== "string" || !isCallable(value) || value.kind !== "user") continue;
-            let definition: FeatureDefinition | undefined;
-            if (item.kind === "FunctionTop") {
-                if (value.params.length === 3) definition = { fn: value };
-            } else {
-                const scope = value.closure as { vars: Map<string, { value: FsValue }> };
-                const fn = scope.vars.get("feature")?.value;
-                const defaults = scope.vars.get("defaults")?.value;
-                if (isCallable(fn) && fn.kind === "user" && fn.params.length === 3)
-                    definition = defaults instanceof FsMap ? { fn, defaults } : { fn };
-            }
-            if (definition === undefined) continue;
-            features.push({ name: item.name, displayName, annotation, definition, module });
-            this.featureValues.set(`${module.path}#${item.name}`, value);
-        }
-        return features;
+        return stdFeatures(this.interpreter, module).map(({ feature, wrapper }) => {
+            this.featureValues.set(`${module.path}#${feature.name}`, wrapper);
+            return feature;
+        });
     }
 
     private probeFeature(module: string, feature: FeatureExport, instance: ModuleInstance): void {
@@ -552,6 +526,50 @@ export class StdLayerProbe {
     ): void {
         this.results.push({ module, layer, kind, name, outcome, detail, faults });
     }
+}
+
+/**
+ * The features a loaded std module exports, each with the value Part Studio code calls:
+ * annotated (`"Feature Type Name"`) constants made by `defineFeature` (their closure holds
+ * the feature function and defaults) and annotated plain functions of `(context, id,
+ * definition)`.
+ */
+export function stdFeatures(
+    interpreter: Interpreter,
+    module: ModuleInstance,
+): { feature: FeatureExport; wrapper: FsValue }[] {
+    const features: { feature: FeatureExport; wrapper: FsValue }[] = [];
+    for (const item of module.program.body) {
+        if (!item.exported || (item.kind !== "Const" && item.kind !== "FunctionTop")) continue;
+        const annotations = item.annotations ?? [];
+        if (annotations.length === 0) continue;
+        let annotation: FsMap;
+        let value: FsValue;
+        try {
+            annotation = interpreter.evaluateAnnotations(annotations, module.env);
+            value = interpreter.evaluate(parseExpression(item.name), module.env);
+        } catch {
+            continue;
+        }
+        const displayName = annotation.field("Feature Type Name");
+        if (typeof displayName !== "string" || !isCallable(value) || value.kind !== "user") continue;
+        let definition: FeatureDefinition | undefined;
+        if (item.kind === "FunctionTop") {
+            if (value.params.length === 3) definition = { fn: value };
+        } else {
+            const scope = value.closure as { vars: Map<string, { value: FsValue }> };
+            const fn = scope.vars.get("feature")?.value;
+            const defaults = scope.vars.get("defaults")?.value;
+            if (isCallable(fn) && fn.kind === "user" && fn.params.length === 3)
+                definition = defaults instanceof FsMap ? { fn, defaults } : { fn };
+        }
+        if (definition === undefined) continue;
+        features.push({
+            feature: { name: item.name, displayName, annotation, definition, module },
+            wrapper: value,
+        });
+    }
+    return features;
 }
 
 function message(error: unknown): string {

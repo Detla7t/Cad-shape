@@ -1057,6 +1057,13 @@ export class Interpreter {
                     statement.second === undefined ? [fsMap({ key, value }), undefined] : [key, value],
                 );
             }
+        } else if (iterable instanceof FsEnumType) {
+            // An enum iterates like a map from member names to members (std's hole walks `HoleFaceType`).
+            for (const [key, value] of iterable.values) {
+                pairs.push(
+                    statement.second === undefined ? [fsMap({ key, value }), undefined] : [key, value],
+                );
+            }
         } else {
             throw new FsRuntimeError(
                 `Cannot iterate over a ${describeValue(iterable)}`,

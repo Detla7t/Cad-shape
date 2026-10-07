@@ -128,7 +128,7 @@ export function resolveQuery(ctx: FsContext, value: FsValue): EntityRef[] {
         }
         case "BODY_TYPE": {
             const wanted = enumList(value.field("bodyType"), "BodyType");
-            return resolveQuery(ctx, value.field("query")).filter((ref) => wanted.has(ref.body.kind));
+            return resolveQuery(ctx, value.field("query")).filter((ref) => wanted.has(ref.body.bodyType));
         }
         case "GEOMETRY": {
             const wanted = enumList(value.field("geometryType"), "GeometryType");
@@ -682,13 +682,7 @@ export function installQueries(std: StdBuilder): void {
             ...kindField(args[1]),
         }),
     );
-    std.fn("qLoopEdges", (args) =>
-        query("ADJACENT", {
-            query: args[0],
-            adjacencyType: enumValue(std, "AdjacencyType", "EDGE"),
-            entityType: entityTypeValue(std, "EDGE"),
-        }),
-    );
+    std.fn("qLoopEdges", (args) => query("LOOP_EDGES", { query: args[0] }));
     std.fn("qLargest", (args) => query("LARGEST", { query: args[0] }));
     std.fn("qSmallest", (args) => query("SMALLEST", { query: args[0] }));
     std.fn("qClosestTo", (args) => query("CLOSEST_TO", { query: args[0], point: args[1] }));

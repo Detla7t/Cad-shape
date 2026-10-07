@@ -39,7 +39,27 @@ export const HOST_ID = "_input";
 
 export type EntityKind = "BODY" | "FACE" | "EDGE" | "VERTEX";
 export type BodyKind = "SOLID" | "SHEET" | "WIRE" | "POINT";
+/** Std's `BodyType`: the geometric kinds plus the bodies that carry no geometry of their own. */
+export type BodyType = BodyKind | "MATE_CONNECTOR" | "COMPOSITE";
 export type CapKind = "START" | "END";
+
+/** A mate connector's coordinate system (meters) and what it belongs to. */
+export interface MateConnectorData {
+    readonly origin: Vec3;
+    readonly xAxis: Vec3;
+    readonly zAxis: Vec3;
+    /** Body serial of the owner part, if any. */
+    readonly owner?: number;
+    /** Body serial of what the connector follows through transforms. */
+    readonly attachedTo?: number;
+}
+
+/** A composite part: a grouping of other bodies (by body serial). */
+export interface CompositeData {
+    /** A closed composite consumes its constituents (`qConsumed`). */
+    readonly closed: boolean;
+    members: number[];
+}
 
 export interface EntityAttribute {
     /** Stable per-run serial — what a transient query names. Inherited through history. */
@@ -82,6 +102,8 @@ export class FsBody {
             sketch?: boolean;
             plane?: PlaneData;
             defaultGeometry?: boolean;
+            mateConnector?: MateConnectorData;
+            composite?: CompositeData;
         },
     ) {
         this._shape = shape;
@@ -147,7 +169,20 @@ export class FsBody {
 
     /** True for bodies that end up in the feature's output (not sketches, planes or points). */
     get isModelGeometry(): boolean {
-        return !this.flags.construction && !this.flags.sketch && this.kind !== "POINT";
+        return (
+            !this.flags.construction &&
+            !this.flags.sketch &&
+            this.kind !== "POINT" &&
+            this.flags.mateConnector === undefined &&
+            this.flags.composite === undefined
+        );
+    }
+
+    /** Std's `BodyType`: a mate connector or composite part, else the geometric kind. */
+    get bodyType(): BodyType {
+        if (this.flags.mateConnector !== undefined) return "MATE_CONNECTOR";
+        if (this.flags.composite !== undefined) return "COMPOSITE";
+        return this.kind;
     }
 }
 

@@ -67,12 +67,12 @@ import {
 
 // ------------------------------------------------------------------ Shared helpers
 
-function kernel<T>(result: Result<T>, what: string): T {
+export function kernel<T>(result: Result<T>, what: string): T {
     if (!result.isOk) fail(`${what} failed: ${result.error}`);
     return result.value;
 }
 
-function definitionOf(args: FsValue[], fn: string): [FsContext, string, FsMap] {
+export function definitionOf(args: FsValue[], fn: string): [FsContext, string, FsMap] {
     const ctx = FsContext.of(arg(args, 0, fn));
     const id = idString(arg(args, 1, fn));
     const definition = args[2] === undefined ? new FsMap() : expectMap(args[2], `${fn} definition`);
@@ -82,15 +82,15 @@ function definitionOf(args: FsValue[], fn: string): [FsContext, string, FsMap] {
 const mm = (v: Vec3): XYZ => new XYZ(v[0] * MM_PER_METER, v[1] * MM_PER_METER, v[2] * MM_PER_METER);
 const xyz = (v: Vec3): XYZ => new XYZ(v[0], v[1], v[2]);
 
-function lengthMm(value: FsValue, what: string): number {
+export function lengthMm(value: FsValue, what: string): number {
     return expectQuantity(value, LENGTH, what) * MM_PER_METER;
 }
 
-function optionalLengthMm(value: FsValue, what: string, fallback = 0): number {
+export function optionalLengthMm(value: FsValue, what: string, fallback = 0): number {
     return value === undefined ? fallback : lengthMm(value, what);
 }
 
-function angleDeg(value: FsValue, what: string): number {
+export function angleDeg(value: FsValue, what: string): number {
     // Onshape's operations take a bare number as radians (std's fCone: `"angleForward" : 2 * PI`).
     const radians = typeof value === "number" ? value : expectQuantity(value, ANGLE, what);
     return (radians * 180) / Math.PI;
@@ -121,7 +121,7 @@ export function kernelMatrix(a: AffineData): Matrix4 {
 }
 
 /** Faces named by a query: FACE refs, or every face of SHEET bodies. */
-function facesOf(refs: readonly EntityRef[]): { body: FsBody; face: IFace }[] {
+export function facesOf(refs: readonly EntityRef[]): { body: FsBody; face: IFace }[] {
     const result: { body: FsBody; face: IFace }[] = [];
     for (const ref of refs) {
         if (ref.kind === "FACE") result.push({ body: ref.body, face: ref.body.faces()[ref.index] });
@@ -133,7 +133,7 @@ function facesOf(refs: readonly EntityRef[]): { body: FsBody; face: IFace }[] {
 }
 
 /** Edge refs named by a query: EDGE refs, a face's edges, a wire body's edges. */
-function edgeRefsOf(refs: readonly EntityRef[]): EntityRef[] {
+export function edgeRefsOf(refs: readonly EntityRef[]): EntityRef[] {
     const seen = new Set<string>();
     const result: EntityRef[] = [];
     for (const ref of refs) {
@@ -148,7 +148,7 @@ function edgeRefsOf(refs: readonly EntityRef[]): EntityRef[] {
     return result;
 }
 
-function groupByBody(refs: readonly EntityRef[]): Map<FsBody, number[]> {
+export function groupByBody(refs: readonly EntityRef[]): Map<FsBody, number[]> {
     const groups = new Map<FsBody, number[]>();
     for (const ref of refs) {
         const list = groups.get(ref.body) ?? [];
@@ -172,7 +172,7 @@ function profileNormal(body: FsBody, face: IFace): Vec3 {
 }
 
 /** A very long distance covering every body in the context — THROUGH_ALL's stand-in. */
-function throughAllDepthMm(ctx: FsContext): number {
+export function throughAllDepthMm(ctx: FsContext): number {
     let extent = 0;
     for (const body of ctx.bodies) {
         if (body.flags.defaultGeometry) continue;
@@ -194,7 +194,7 @@ function throughAllDepthMm(ctx: FsContext): number {
     return Math.max(1000, extent * 4 + 100);
 }
 
-function removeIfEmpty(ctx: FsContext, body: FsBody): void {
+export function removeIfEmpty(ctx: FsContext, body: FsBody): void {
     if (body.faces().length === 0 && body.edges().length === 0) ctx.removeBody(body);
 }
 
@@ -324,7 +324,7 @@ function plainBoolean(
 }
 
 /** Combines `tools` into `target` in place (attributes inherited through the boolean history). */
-function booleanInto(
+export function booleanInto(
     ctx: FsContext,
     opId: string,
     target: FsBody,
@@ -884,9 +884,15 @@ function installBodyOps(std: StdBuilder): void {
     std.fn("opTransform", (args) => {
         const [ctx, id, definition] = definitionOf(args, "opTransform");
         const affine = readTransform(definition.field("transform"), "transform");
-        for (const ref of ownerBodies(resolveQuery(ctx, definition.field("bodies")))) {
-            transformBody(ctx, id, ref.body, affine);
+        const bodies = ownerBodies(resolveQuery(ctx, definition.field("bodies"))).map((ref) => ref.body);
+        // Mate connectors attached to a moved body follow it.
+        const moved = new Set(bodies.map((body) => body.bodyAttr.serial));
+        for (const body of ctx.bodies) {
+            const attachedTo = body.flags.mateConnector?.attachedTo;
+            if (attachedTo !== undefined && moved.has(attachedTo) && !bodies.includes(body))
+                bodies.push(body);
         }
+        for (const body of bodies) transformBody(ctx, id, body, affine);
         return undefined;
     });
     std.fn("opPattern", (args) => {
@@ -942,7 +948,7 @@ function installBodyOps(std: StdBuilder): void {
     });
 }
 
-function transformBody(ctx: FsContext, opId: string, body: FsBody, affine: AffineData): void {
+export function transformBody(ctx: FsContext, opId: string, body: FsBody, affine: AffineData): void {
     const attrs = { faces: body.faceAttrs, edges: body.edgeAttrs, vertices: body.vertexAttrs };
     const shape = ctx.track(body.shape.transformedMul(kernelMatrix(affine)));
     body.setShape(shape);
@@ -951,14 +957,35 @@ function transformBody(ctx: FsContext, opId: string, body: FsBody, affine: Affin
     body.edgeAttrs = attrs.edges;
     body.vertexAttrs = attrs.vertices;
     recordMoved(ctx, opId, body);
-    if (body.flags.plane !== undefined) {
-        const plane = body.flags.plane;
-        (body.flags as { plane?: typeof plane }).plane = {
-            origin: applyAffine(affine, plane.origin),
-            normal: vec.normalize(applyLinear(affine.m, plane.normal)),
-            x: vec.normalize(applyLinear(affine.m, plane.x)),
-        };
-    }
+    Object.assign(body.flags, transformedFlags(body.flags, affine));
+}
+
+/** A body's construction plane and mate connector frame moved with it. */
+function transformedFlags(flags: FsBody["flags"], affine: AffineData): FsBody["flags"] {
+    const direction = (v: Vec3) => vec.normalize(applyLinear(affine.m, v));
+    const { plane, mateConnector } = flags;
+    return {
+        ...flags,
+        ...(plane === undefined
+            ? {}
+            : {
+                  plane: {
+                      origin: applyAffine(affine, plane.origin),
+                      normal: direction(plane.normal),
+                      x: direction(plane.x),
+                  },
+              }),
+        ...(mateConnector === undefined
+            ? {}
+            : {
+                  mateConnector: {
+                      ...mateConnector,
+                      origin: applyAffine(affine, mateConnector.origin),
+                      xAxis: direction(mateConnector.xAxis),
+                      zAxis: direction(mateConnector.zAxis),
+                  },
+              }),
+    };
 }
 
 function patternBodies(
@@ -972,7 +999,10 @@ function patternBodies(
         const createdBy = `${opId}/${names[i]}`;
         for (const body of bodies) {
             const shape = body.shape.transformedMul(kernelMatrix(affine));
-            const copy = ctx.addBody(shape, createdBy, { ...body.flags, defaultGeometry: false });
+            const copy = ctx.addBody(shape, createdBy, {
+                ...transformedFlags(body.flags, affine),
+                defaultGeometry: false,
+            });
             // Copies keep caps and sketch entity tags, never the host-index link: two
             // entities must not claim the same stable id.
             copy.faceAttrs = body.faceAttrs.map((attr) => ({ ...ctx.freshAttr(createdBy), cap: attr.cap }));
@@ -997,7 +1027,7 @@ function mirrorPlaneOf(ctx: FsContext, value: FsValue) {
 }
 
 /** A Line from either a Line value or a query naming a linear edge (or a cylindrical face's axis). */
-function axisOf(ctx: FsContext, value: FsValue): LineData {
+export function axisOf(ctx: FsContext, value: FsValue): LineData {
     if (value instanceof FsMap && value.tag === "Line") return readLine(value, "axis");
     const refs = resolveQuery(ctx, value);
     const edge = refs.find((ref) => ref.kind === "EDGE");
@@ -1030,7 +1060,7 @@ function axisOf(ctx: FsContext, value: FsValue): LineData {
 }
 
 /** The direction of a Vector, a straight edge, or a planar face's normal. */
-function directionOf(ctx: FsContext, value: FsValue): Vec3 {
+export function directionOf(ctx: FsContext, value: FsValue): Vec3 {
     if (value instanceof FsArray) return readDirection(value, "direction");
     const refs = resolveQuery(ctx, value);
     const face = refs.find((ref) => ref.kind === "FACE");
