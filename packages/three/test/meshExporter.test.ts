@@ -125,4 +125,86 @@ describe("ThreeMeshExporter", () => {
         expect(result.isOk).toBe(false);
         expect(result.error).toBe("can not export to ply");
     });
+
+    describe("exportToGltf", () => {
+        /** Two model nodes: a red triangle placed at x = 10 and a blue one, each its own visual. */
+        function gltfContext() {
+            const nodes: VisualNode[] = [];
+            const visualMap = new Map<VisualNode, Mesh>();
+            for (const [name, color, x] of [
+                ["Duct", 0xff0000, 10],
+                ["Flange", 0x0000ff, 0],
+            ] as const) {
+                const node = { id: name, name } as unknown as VisualNode;
+                const geometry = new BufferGeometry();
+                geometry.setAttribute(
+                    "position",
+                    new BufferAttribute(new Float32Array([0, 0, 0, 2, 0, 0, 0, 2, 0]), 3),
+                );
+                const mesh = new Mesh(geometry, new MeshBasicMaterial({ color }));
+                meshesToDispose.push(mesh);
+                const parent = new Group();
+                parent.position.x = x;
+                parent.add(mesh);
+                visualMap.set(node, parent as any);
+                nodes.push(node);
+            }
+            return { nodes, exporter: new ThreeMeshExporter(createThreeMockVisualContext(visualMap)) };
+        }
+
+        test("writes a GLB: header, JSON chunk with named nodes, colors and placements, binary chunk", async () => {
+            const { nodes, exporter } = gltfContext();
+            const result = await exporter.exportToGltf(nodes, true);
+            expect(result.isOk).toBe(true);
+            const buffer = result.value as ArrayBuffer;
+            expect(buffer).toBeInstanceOf(ArrayBuffer);
+
+            const view = new DataView(buffer);
+            expect(view.getUint32(0, true)).toBe(0x46546c67); // "glTF"
+            expect(view.getUint32(4, true)).toBe(2);
+            expect(view.getUint32(8, true)).toBe(buffer.byteLength);
+            const jsonLength = view.getUint32(12, true);
+            expect(view.getUint32(16, true)).toBe(0x4e4f534a); // "JSON"
+            const json = JSON.parse(new TextDecoder().decode(new Uint8Array(buffer, 20, jsonLength)));
+            expect(view.getUint32(20 + jsonLength + 4, true)).toBe(0x004e4942); // "BIN"
+
+            expect(json.asset.version).toBe("2.0");
+            const names = json.nodes.map((node: { name: string }) => node.name);
+            expect(names).toEqual(["Chili3D", "Duct", "Flange"]);
+            // The root turns Z-up millimetres into glTF's Y-up metres.
+            const root = json.nodes[0];
+            expect(root.children).toEqual([1, 2]);
+            expect(root.matrix[0]).toBeCloseTo(0.001, 9);
+            expect(root.matrix[6]).toBeCloseTo(-0.001, 9);
+            expect(json.nodes[1].matrix[12]).toBe(10);
+            expect(json.nodes[2].matrix).toBeUndefined();
+            const colors = json.nodes
+                .slice(1)
+                .map(
+                    (node: { mesh: number }) => json.materials[json.meshes[node.mesh].primitives[0].material],
+                )
+                .map(
+                    (material: { pbrMetallicRoughness: { baseColorFactor: number[] } }) =>
+                        material.pbrMetallicRoughness.baseColorFactor,
+                );
+            expect(colors).toEqual([
+                [1, 0, 0, 1],
+                [0, 0, 1, 1],
+            ]);
+            expect(json.accessors[json.meshes[0].primitives[0].attributes.POSITION].count).toBe(3);
+        });
+
+        test("writes .gltf JSON with the buffers embedded", async () => {
+            const { nodes, exporter } = gltfContext();
+            const result = await exporter.exportToGltf(nodes, false);
+            expect(result.isOk).toBe(true);
+            const json = JSON.parse(result.value as string);
+            expect(json.nodes.map((node: { name: string }) => node.name)).toEqual([
+                "Chili3D",
+                "Duct",
+                "Flange",
+            ]);
+            expect(json.buffers[0].uri).toMatch(/^data:application\/octet-stream;base64,/);
+        });
+    });
 });

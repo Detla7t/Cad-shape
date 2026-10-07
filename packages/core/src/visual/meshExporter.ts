@@ -8,4 +8,6 @@ export interface IMeshExporter {
     exportToStl(node: VisualNode[], asciiMode: boolean): Result<BlobPart>;
     exportToPly(node: VisualNode[], asciiMode: boolean): Result<BlobPart>;
     exportToObj(node: VisualNode[]): Result<BlobPart>;
+    /** glTF 2.0: binary `.glb` or JSON `.gltf` (buffers embedded), one named node per model node. */
+    exportToGltf(node: VisualNode[], binary: boolean): Promise<Result<BlobPart>>;
 }

@@ -3,6 +3,7 @@
 
 import {
     EditableShapeNode,
+    GeometryNode,
     I18n,
     type IDataExchange,
     type IDocument,
@@ -13,14 +14,27 @@ import {
     ShapeNode,
     type VisualNode,
 } from "@chili3d/core";
+import { type ThreeMfMesh, write3mf } from "./threeMf";
 
 export class DefaultDataExchange implements IDataExchange {
     importFormats(): string[] {
-        return [".step", ".stp", ".iges", ".igs", ".brep", ".stl"];
+        return [".step", ".stp", ".iges", ".igs", ".brep", ".stl", ".fs"];
     }
 
     exportFormats(): string[] {
-        return [".step", ".iges", ".brep", ".stl", ".stl binary", ".ply", ".ply binary", ".obj"];
+        return [
+            ".step",
+            ".iges",
+            ".brep",
+            ".stl",
+            ".stl binary",
+            ".ply",
+            ".ply binary",
+            ".obj",
+            ".glb",
+            ".gltf",
+            ".3mf",
+        ];
     }
 
     async import(document: IDocument, files: FileList | File[]): Promise<void> {
@@ -33,6 +47,12 @@ export class DefaultDataExchange implements IDataExchange {
         let importResult: Result<INode> | undefined;
 
         const fileName = file.name.toLocaleLowerCase();
+        if (this.extensionIs(fileName, ".fs")) {
+            // FeatureScript: the file becomes a new Feature Studio of the document.
+            const { importFeatureStudio } = await import("@chili3d/parametric");
+            importFeatureStudio(document, file.name, await file.text());
+            return;
+        }
         if (this.extensionIs(fileName, ".brep")) {
             importResult = await this.importBrep(document, file);
         } else if (this.extensionIs(fileName, ".stl")) {
@@ -96,6 +116,10 @@ export class DefaultDataExchange implements IDataExchange {
             shapeResult = document.visual.meshExporter.exportToPly(nodes, false);
         } else if (type === ".obj") {
             shapeResult = document.visual.meshExporter.exportToObj(nodes);
+        } else if (type === ".glb" || type === ".gltf") {
+            shapeResult = await document.visual.meshExporter.exportToGltf(nodes, type === ".glb");
+        } else if (type === ".3mf") {
+            shapeResult = await this.export3mf(document, nodes);
         } else {
             const shapes = this.getExportShapes(nodes);
             if (!shapes.length) return undefined;
@@ -121,6 +145,40 @@ export class DefaultDataExchange implements IDataExchange {
 
         !shapes.length && PubSub.default.pub("showToast", "error.export.noNodeCanBeExported");
         return shapes;
+    }
+
+    /** 3MF from the kernel's meshes (headless, like STL): one object per node, named and colored. */
+    private async export3mf(document: IDocument, nodes: VisualNode[]): Promise<Result<BlobPart>> {
+        const meshes: ThreeMfMesh[] = [];
+        for (const node of nodes) {
+            if (!(node instanceof ShapeNode) || !node.shape.isOk) continue;
+            const shape = node.shape.value.transformedMul(node.worldTransform());
+            try {
+                const faces = shape.mesh.faces;
+                if (faces === undefined || faces.index.length === 0) continue;
+                meshes.push({
+                    name: node.name,
+                    color: this.nodeColor(document, node),
+                    positions: faces.position,
+                    indices: faces.index,
+                });
+            } finally {
+                shape.dispose();
+            }
+        }
+        if (meshes.length === 0) return Result.err(I18n.translate("error.export.noNodeCanBeExported"));
+        return Result.ok((await write3mf(meshes)) as BlobPart);
+    }
+
+    private nodeColor(document: IDocument, node: VisualNode): number | undefined {
+        if (!(node instanceof GeometryNode)) return undefined;
+        const id = Array.isArray(node.materialId) ? node.materialId[0] : node.materialId;
+        const color = document.modelManager.materials.find((material) => material.id === id)?.color;
+        if (typeof color === "number") return color;
+        if (typeof color === "string" && /^#?[0-9a-f]{6}$/i.test(color)) {
+            return Number.parseInt(color.replace("#", ""), 16);
+        }
+        return undefined;
     }
 
     private exportStl(doc: IDocument, shapes: IShape[], binary: boolean): Result<BlobPart> {

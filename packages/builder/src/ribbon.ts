@@ -105,6 +105,21 @@ export const DefaultRibbon: RibbonTabProfile[] = [
         ],
     },
     {
+        // Project files and every export in one place; modules add theirs (2D drawings,
+        // Feature Studios) through their ribbon profiles.
+        tabName: "ribbon.tab.file",
+        groups: [
+            {
+                groupName: "ribbon.group.document",
+                items: ["doc.new", "doc.open", "doc.saveToFile", "doc.save"],
+            },
+            {
+                groupName: "ribbon.group.importExport",
+                items: ["file.import", "file.export"],
+            },
+        ],
+    },
+    {
         tabName: "ribbon.tab.manager",
         groups: [
             {
@@ -148,6 +163,19 @@ export const ParametricRibbonProfiles: RibbonProfileExtra[] = [
             },
         ],
     },
+    {
+        tabName: "ribbon.tab.file",
+        groups: [
+            {
+                groupName: "ribbon.group.export2d",
+                items: ["sheetMetal.exportFlat", "sketch.export"],
+            },
+            {
+                groupName: "ribbon.group.featureScript",
+                items: ["featurescript.exportStudio", "featurescript.importStudio"],
+            },
+        ],
+    },
 ];
 
 /**
@@ -162,7 +190,7 @@ export const SheetMetalRibbonProfiles: RibbonProfileExtra[] = [
         groups: [
             {
                 groupName: "ribbon.group.sheetMetal",
-                items: ["sheetMetal.base", "sheetMetal.bend", "sheetMetal.flatten"],
+                items: ["sheetMetal.base", "sheetMetal.bend", "sheetMetal.flatten", "sheetMetal.exportFlat"],
             },
             {
                 groupName: "ribbon.group.seams",

@@ -435,6 +435,13 @@ describe("Application", () => {
             expect(result.opens).toHaveLength(1);
         });
 
+        test("should group .chili3d projects as opens, case-insensitively", () => {
+            const project = new File([""], "duct.chili3d");
+            const result = callGroupFiles([project, new File([""], "OTHER.CHILI3D")]);
+            expect(result.opens).toEqual([project, expect.any(File)]);
+            expect(result.imports).toHaveLength(0);
+        });
+
         test("should group .chiliplugin files as plugins", () => {
             const pluginFile = new File([""], "my.plugin.chiliplugin");
             const result = callGroupFiles([pluginFile]);

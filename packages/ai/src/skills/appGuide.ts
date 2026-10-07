@@ -133,10 +133,12 @@ The workflow to teach:
     `## Documents and files
 - The app opens on a start screen: {doc.new}, {doc.open}, the recent documents and the settings (see below).
 - {doc.save} stores the document in the browser (IndexedDB); it then appears in the start screen's recents.
-- {doc.saveToFile} downloads the document as a .cd file, which {doc.open} reads back.
+- {doc.saveToFile} downloads the document as a .chili3d project (a zip: manifest.json, document.json, every Feature Studio as a readable .fs file, a thumbnail); {doc.open} reads it back, and still opens legacy .cd files.
 - There is NO autosave — nothing is stored until the user saves. Closing with a document open asks for confirmation first.
-- Import: .step, .stp, .iges, .igs, .brep, .stl. Export: .step, .iges, .brep, .stl, .stl binary, .ply, .ply binary, .obj — the export dialog chooses the format and can pack several objects into a .zip.
-- Dropping files onto the window: a .cd opens, plugin files load, anything else is imported.`,
+- Import: .step, .stp, .iges, .igs, .brep, .stl, and .fs (becomes a new Feature Studio). Export: .step, .iges, .brep, .stl, .stl binary, .ply, .ply binary, .obj, .glb, .gltf, .3mf — the export dialog chooses the format and can pack several objects into a .zip.
+- 2D export, in millimetres, as DXF (R12) or SVG: {sheetMetal.exportFlat} writes a sheet metal body's flat pattern (outline and holes, bend lines on BEND_UP / BEND_DOWN labelled with angle and radius, crimp/bead marks on FORMING); {sketch.export} writes a sketch in its plane's coordinates. {featurescript.exportStudio} / {featurescript.importStudio} move Feature Studios as .fs files.
+- The File tab gathers all of this: open/save, import/export, 2D export and Feature Studio files.
+- Dropping files onto the window: a .chili3d or .cd opens, plugin files load, anything else is imported.`,
 
     `## Settings, units and the AI assistant
 - The only settings screen is the start screen (Home button in the title bar): Language, Theme (system by default) and 3D Navigation. They persist in the browser.

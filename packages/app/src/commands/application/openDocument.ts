@@ -3,14 +3,17 @@
 
 import {
     command,
+    DOCUMENT_FILE_EXTENSION,
     I18n,
     type IApplication,
     type ICommand,
+    PROJECT_FILE_EXTENSION,
     PubSub,
-    readFileAsync,
-    type Serialized,
+    readFilesAsync,
 } from "@chili3d/core";
+import { openDocumentFile } from "../../project/projectFile";
 
+/** Opens a `.chili3d` project, or a legacy `.cd` document file. */
 @command({
     key: "doc.open",
     icon: "icon-open",
@@ -21,12 +24,17 @@ export class OpenDocument implements ICommand {
         PubSub.default.pub(
             "showPermanent",
             async () => {
-                const files = await readFileAsync(".cd", false);
-                if (files.isOk) {
-                    const json: Serialized = JSON.parse(files.value[0].data);
-                    const document = await app.loadDocument(json);
-                    document?.application.activeView?.cameraController.fitContent();
+                const files = await readFilesAsync(
+                    `${PROJECT_FILE_EXTENSION},${DOCUMENT_FILE_EXTENSION}`,
+                    false,
+                );
+                if (!files.isOk || files.value.length === 0) return;
+                const document = await openDocumentFile(app, files.value[0]);
+                if (!document.isOk) {
+                    PubSub.default.pub("showToast", "error.default:{0}", document.error);
+                    return;
                 }
+                document.value.application.activeView?.cameraController.fitContent();
             },
             "toast.excuting{0}",
             I18n.translate("command.doc.open"),

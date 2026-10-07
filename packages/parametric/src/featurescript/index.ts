@@ -23,4 +23,5 @@ export {
 export { type OnshapeStdBundle, onshapeStdFromBundle } from "./onshape/stdBundle";
 export * from "./runtime";
 export * from "./studioCompiler";
+export * from "./studioFiles";
 export * from "./tableRuntime";

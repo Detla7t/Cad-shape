@@ -3,6 +3,7 @@
 
 export * from "./build";
 export * from "./features";
+export * from "./flatPattern";
 export * from "./model";
 export * from "./treatments";
 import "./commands";

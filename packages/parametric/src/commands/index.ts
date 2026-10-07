@@ -3,6 +3,7 @@
 
 import "./booleanCommand";
 import "./edgeCornerCommand";
+import "./exportCommands";
 import "./extrudeCommand";
 import "./featureScriptCommands";
 import "./reselectCommand";

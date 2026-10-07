@@ -19,6 +19,7 @@ export * from "./modelManager";
 export * from "./navigation";
 export * from "./parameters";
 export * from "./plugin";
+export * from "./project";
 export * from "./property";
 export * from "./selection";
 export * from "./selectionFilter";
