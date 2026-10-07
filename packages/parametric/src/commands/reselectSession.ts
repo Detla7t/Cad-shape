@@ -65,7 +65,7 @@ export interface ReselectHost extends INode, IBodyTrackingNode {
  * handling, the pick call, the preview subscription and the teardown — is shared (see
  * `runReselectSession`).
  */
-interface ReselectPickSpec<TRef> {
+export interface ReselectPickSpec<TRef> {
     prompt: I18nKeys;
     shapeType: ShapeType;
     /** The pick is restricted to this node. */
@@ -102,7 +102,7 @@ interface ReselectPickSpec<TRef> {
  * `capture` deliberately runs before `teardown`: the edge session has to read its refs
  * while the rolled-back cache still describes the shape the user picked from.
  */
-async function runReselectSession<TRef>(
+export async function runReselectSession<TRef>(
     host: ReselectHost,
     controller: AsyncController,
     spec: ReselectPickSpec<TRef>,

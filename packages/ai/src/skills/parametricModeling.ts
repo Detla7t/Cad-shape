@@ -6,7 +6,7 @@ import type { Skill } from "./types";
 export const parametricModeling: Skill = {
     name: "parametric-modeling",
     description:
-        "How to build a PARAMETRIC body with run_parametric: the op catalog (sketch/extrude/revolve/fillet/chamfer/boolean/editFeature/features), sketch entity encodings, constraints, and how to pick edge indexes — load it before any run_parametric call",
+        "How to build a PARAMETRIC body with run_parametric: the op catalog (sketch/extrude/revolve/fillet/chamfer/boolean/editFeature/features/studio/featurescript), sketch entity encodings, constraints, FeatureScript custom features, and how to pick edge indexes — load it before any run_parametric call",
     content: `Parametric modeling. run_parametric builds a feature TREE the user can re-edit; run_program builds throwaway geometry.
 
 Which one: if the user should be able to change a dimension afterwards, roll the timeline back, or see the feature list — run_parametric. If it is a one-off shape, a measurement, or a geometry query — run_program. A parametric body is a long-lived asset: never feed it to run_program's edit-style ops (booleanCut/booleanFuse/fillet/pushPull/...), which DELETE their inputs and would destroy the feature history. To combine bodies, use run_parametric's own boolean op.
@@ -36,6 +36,27 @@ left half-built.
 - { op: "editFeature", body, featureId, action, ... }
   action: "setParameter" (key, value) | "rename" (value) | "suppress" (value) | "moveTo" (index) | "remove"
 - { op: "features", body }   // reads the feature list: ids, names, parameters, errors
+- { op: "studio", id, name, source }   // FeatureScript source in a Feature Studio (Onshape dialect)
+  Creates the studio, or replaces the source of the studio already called "name". The result lists
+  the custom features it exports with their parameters (key, kind, default, enum options).
+- { op: "featurescript", id, studio, feature, parameters?, body?, name? }
+  Adds the exported custom feature "feature" of "studio" as a feature row: without "body" it starts a
+  new body, with "body" it runs against that body's current shape. "parameters" are definition
+  fields: lengths in mm, angles in degrees (numbers or expressions), booleans, enum member names.
+
+FeatureScript. A custom feature is an exported defineFeature constant; its precondition declares the
+parameters (isLength/isAngle/isInteger/isReal with bounds, "is boolean", "is SomeEnum", "is Query"),
+and the body calls std operations on the context. Lengths carry units (10 * mm, 1 * inch); queries
+select entities (qCreatedBy(id + "extrude1", EntityType.FACE), qSketchRegion(id + "sketch1"),
+qHostBody(EntityType.EDGE) for the body the feature runs on). Supported: sketches (newSketch,
+newSketchOnPlane, skLineSegment, skCircle, skArc, skRectangle, skPolyline, skRegularPolygon, skSlot,
+skSolve), extrude/revolve (and opExtrude/opRevolve with BLIND or THROUGH_ALL), fillet/chamfer,
+opBoolean/booleanBodies, opShell, opSweep, opLoft, opThicken, opTransform, opPattern,
+linearPattern/circularPattern/mirror, fCuboid/fCylinder/fCone/fSphere, ev* measurements, and the
+math/vector/plane/transform std. End a feature by deleting its helper sketches (opDeleteBodies).
+Example:
+ { op: "studio", id: "st", name: "Bosses", source: "FeatureScript 2384;\nannotation { "Feature Type Name" : "Boss" }\nexport const boss = defineFeature(function(context is Context, id is Id, definition is map)\n precondition { annotation { "Name" : "Diameter" } isLength(definition.d, NONNEGATIVE_LENGTH_BOUNDS); }\n { fCylinder(context, id + "c", { "bottomCenter" : vector(0, 0, 0) * mm, "topCenter" : vector(0, 0, 10) * mm, "radius" : definition.d / 2 }); },\n { "d" : 8 * mm });" }
+ { op: "featurescript", id: "b1", studio: "st", feature: "boss", parameters: { d: 12 } }
 
 Variables. Every feature parameter (extrude depth/startOffset, revolve angle, fillet radius,
 chamfer distance) takes either a number or an EXPRESSION STRING, so "width * 2" follows the

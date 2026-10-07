@@ -4,6 +4,7 @@
 import "./booleanCommand";
 import "./edgeCornerCommand";
 import "./extrudeCommand";
+import "./featureScriptCommands";
 import "./reselectCommand";
 import "./revolveCommand";
 import "./variableCommand";

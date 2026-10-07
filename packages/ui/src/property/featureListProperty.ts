@@ -16,7 +16,7 @@ import {
     Transaction,
     type UnitSpec,
 } from "@chili3d/core";
-import { div, input, span, svg } from "@chili3d/element";
+import { button, div, input, option, select, span, svg } from "@chili3d/element";
 import { showDialog } from "../dialog";
 import commonStyle from "./common.module.css";
 import style from "./featureListProperty.module.css";
@@ -166,19 +166,64 @@ export class FeatureListProperty extends HTMLElement {
     private parameterRow(item: FeatureItem, param: FeatureParameter) {
         return div(
             { className: style.param },
-            span({ className: commonStyle.propertyName, textContent: new Localize(param.display) }),
-            typeof param.value === "boolean"
-                ? input({
-                      type: "checkbox",
-                      checked: param.value,
-                      onclick: (e) =>
-                          this.applyChecked(item, param.key, (e.target as HTMLInputElement).checked),
-                  })
-                : this.textParamInput(item, param.key, param.value, param.unit),
+            // A script-defined parameter names itself; built-in ones translate their key.
+            span({
+                className: commonStyle.propertyName,
+                textContent: param.label ?? new Localize(param.display),
+            }),
+            this.parameterEditor(item, param),
         );
     }
 
-    private textParamInput(item: FeatureItem, key: string, value: number | string, unit?: UnitSpec) {
+    private parameterEditor(item: FeatureItem, param: FeatureParameter) {
+        if (typeof param.value === "boolean") {
+            return input({
+                type: "checkbox",
+                checked: param.value,
+                onclick: (e) => this.applyChecked(item, param.key, (e.target as HTMLInputElement).checked),
+            });
+        }
+        if (param.pick !== undefined) return this.pickParam(item, param);
+        if (param.options !== undefined) return this.optionParam(item, param);
+        return this.textParamInput(item, param);
+    }
+
+    /** A closed set of choices (e.g. a FeatureScript enum): a dropdown, applied on change. */
+    private optionParam(item: FeatureItem, param: FeatureParameter) {
+        return select(
+            {
+                className: `${inputStyle.box} ${style.select}`,
+                onchange: (e) => this.applyValue(item, param.key, (e.target as HTMLSelectElement).value),
+            },
+            ...(param.options ?? []).map((choice) =>
+                option({
+                    value: choice.value,
+                    textContent: choice.label,
+                    selected: choice.value === param.value,
+                }),
+            ),
+        );
+    }
+
+    /** A pick of the body's own entities: the summary, and a button that re-picks. */
+    private pickParam(item: FeatureItem, param: FeatureParameter) {
+        return div(
+            { className: style.pick },
+            span({ className: style.pickSummary, textContent: String(param.value) }),
+            button({
+                className: style.pickButton,
+                textContent: new Localize("featurescript.pick"),
+                onclick: (e: MouseEvent) => {
+                    e.stopPropagation();
+                    this.node.reselectShapes?.(item.id, param.key);
+                },
+            }),
+        );
+    }
+
+    private textParamInput(item: FeatureItem, param: FeatureParameter) {
+        const { key, unit } = param;
+        const value = param.value as number | string;
         const expected = unitSpecLabelKey(unit);
         return input({
             className: inputStyle.box,
@@ -384,9 +429,12 @@ export class FeatureListProperty extends HTMLElement {
     }
 
     private applyParameter(box: HTMLInputElement, item: FeatureItem, key: string) {
-        const current = item.parameters.find((x) => x.key === key)?.value;
-        const text = box.value.trim();
-        if (text === "") {
+        const parameter = item.parameters.find((x) => x.key === key);
+        const current = parameter?.value;
+        // Free text is taken as typed (an empty string included); everything else is a
+        // number or an expression and cannot be empty.
+        const text = parameter?.text === true ? box.value : box.value.trim();
+        if (text === "" && parameter?.text !== true) {
             PubSub.default.pub("showToast", "error.default:{0}", "invalid input");
             box.value = String(current ?? "");
             return;
@@ -395,7 +443,11 @@ export class FeatureListProperty extends HTMLElement {
         // A non-numeric value is kept as an expression string; a failure to resolve
         // it surfaces as a feature error on the row.
         const asNumber = Number(text);
-        const value = Number.isFinite(asNumber) ? asNumber : text;
+        const value = parameter?.text !== true && Number.isFinite(asNumber) ? asNumber : text;
+        this.applyValue(item, key, value);
+    }
+
+    private applyValue(item: FeatureItem, key: string, value: number | string) {
         Transaction.execute(this.document, "edit feature", () => {
             this.node.setFeatureParameter(item.id, key, value);
             this.document.visual.update();

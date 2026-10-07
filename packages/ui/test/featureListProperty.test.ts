@@ -29,6 +29,10 @@ rs.mock("../src/property/featureListProperty.module.css", () => ({
     warningText: "fl-warning-text",
     param: "fl-param",
     reference: "fl-reference",
+    select: "fl-select",
+    pick: "fl-pick",
+    pickSummary: "fl-pick-summary",
+    pickButton: "fl-pick-button",
     menu: "fl-menu",
     menuItem: "fl-menu-item",
     menuIcon: "fl-menu-icon",
@@ -67,6 +71,7 @@ function featureNode(parameters: FeatureItem["parameters"], item?: Partial<Featu
         renameFeature: rs.fn(),
         removeFeature: rs.fn(),
         activateReference: rs.fn((_featureId: string, _key: string) => {}),
+        reselectShapes: rs.fn((_featureId: string, _key?: string) => {}),
     } as unknown as INode & IFeatureListNode;
 }
 
@@ -129,6 +134,87 @@ describe("FeatureListProperty", () => {
         const box = mustQuery<HTMLInputElement>(prop, "input.ip-box");
         expect(box.value).toBe("12.3457");
         expect(prop.querySelector("input[type='checkbox']")).toBeNull();
+    });
+
+    test("a script-defined parameter shows its own label instead of the translated key", () => {
+        const doc = createMockDocument();
+        const node = featureNode([
+            { key: "width", display: "featurescript.parameter", label: "Plate width", value: 80 },
+        ]);
+        const prop = new FeatureListProperty(doc, node);
+        expandFirstRow(prop);
+
+        const row = mustQuery<HTMLElement>(prop, ".fl-param");
+        expect(row.textContent).toContain("Plate width");
+    });
+
+    test("a parameter with options renders a dropdown that applies the chosen value", () => {
+        const doc = createMockDocument();
+        const node = featureNode([
+            {
+                key: "shape",
+                display: "featurescript.parameter",
+                label: "Shape",
+                value: "ROUND",
+                options: [
+                    { value: "ROUND", label: "Round" },
+                    { value: "SQUARE", label: "Square" },
+                ],
+            },
+        ]);
+        const prop = new FeatureListProperty(doc, node);
+        expandFirstRow(prop);
+
+        const dropdown = mustQuery<HTMLSelectElement>(prop, "select.fl-select");
+        const options = Array.from(dropdown.querySelectorAll("option"));
+        expect(options.map((x) => [x.value, x.textContent])).toEqual([
+            ["ROUND", "Round"],
+            ["SQUARE", "Square"],
+        ]);
+        expect(options.map((x) => (x as unknown as { _selected: boolean })._selected)).toEqual([true, false]);
+        expect(prop.querySelector("input.ip-box")).toBeNull();
+
+        const onchange = (dropdown as unknown as { _onchange: (e: { target: { value: string } }) => void })
+            ._onchange;
+        onchange({ target: { value: "SQUARE" } });
+        expect(node.setFeatureParameter).toHaveBeenCalledWith("b1", "shape", "SQUARE");
+    });
+
+    test("a pick parameter shows its summary and re-picks through the node", () => {
+        const doc = createMockDocument();
+        const node = featureNode([
+            {
+                key: "edges",
+                display: "featurescript.parameter",
+                label: "Edges",
+                value: "2 edges",
+                pick: { kinds: ["edge"] },
+            },
+        ]);
+        const prop = new FeatureListProperty(doc, node);
+        expandFirstRow(prop);
+
+        expect(mustQuery(prop, ".fl-pick-summary").textContent).toBe("2 edges");
+        const button = mustQuery<HTMLElement>(prop, ".fl-pick-button");
+        (button as unknown as { _onclick: (e: MouseEvent) => void })._onclick({
+            stopPropagation: () => {},
+        } as MouseEvent);
+        expect(node.reselectShapes).toHaveBeenCalledWith("b1", "edges");
+    });
+
+    test("a text parameter keeps numeric-looking input as text", () => {
+        const doc = createMockDocument();
+        const node = featureNode([
+            { key: "label", display: "featurescript.parameter", label: "Label", value: "A", text: true },
+        ]);
+        const prop = new FeatureListProperty(doc, node);
+        expandFirstRow(prop);
+
+        const box = mustQuery<HTMLInputElement>(prop, "input.ip-box");
+        box.value = "42";
+        const onkeydown = (box as unknown as { _onkeydown: (e: Partial<KeyboardEvent>) => void })._onkeydown;
+        onkeydown({ key: "Enter", target: box, stopPropagation: () => {} });
+        expect(node.setFeatureParameter).toHaveBeenCalledWith("b1", "label", "42");
     });
 
     test("toggling the checkbox applies the boolean parameter", () => {

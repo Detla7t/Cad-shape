@@ -24,6 +24,7 @@ import {
     serialize,
     Transaction,
 } from "@chili3d/core";
+import { FeatureScriptPickSession } from "./commands/featureScriptPickSession";
 import { ReselectFeatureCommand } from "./commands/reselectCommand";
 import { EdgeReselectSession, ProfileReselectSession } from "./commands/reselectSession";
 import { evaluateFeature, type FeatureData, featureHandler, type ShapeTracking } from "./features";
@@ -40,7 +41,7 @@ import {
 } from "./features/bodyTracking";
 import type { EdgeRef } from "./features/edgeRef";
 import { findSketch } from "./features/extrude";
-import type { BooleanFeatureData, ExtrudeFeatureData } from "./features/feature";
+import type { BooleanFeatureData, ExtrudeFeatureData, FeatureScriptFeatureData } from "./features/feature";
 import type { ProfileRef } from "./features/profileRef";
 import { syncNodeWatches } from "./nodeWatch";
 import { danglingProfileRefs, SketchNode } from "./sketch/sketchNode";
@@ -291,7 +292,7 @@ export class ParametricBodyNode
                 warning: this._featureWarnings.get(feature.id),
                 reselectable: handler?.reselectable === true,
                 references: this.featureReferences(feature),
-                parameters: handler?.parameters(feature) ?? [],
+                parameters: handler?.parameters(feature, this.document) ?? [],
             };
         });
     }
@@ -331,7 +332,7 @@ export class ParametricBodyNode
     setFeatureParameter(featureId: string, key: string, value: number | string | boolean): void {
         const features = this.features.map((feature) => {
             if (feature.id !== featureId) return feature;
-            return featureHandler(feature.type)?.setParameter(feature, key, value) ?? feature;
+            return featureHandler(feature.type)?.setParameter(feature, key, value, this.document) ?? feature;
         });
         this.setFeaturesEmitShapeChanged(features);
     }
@@ -383,8 +384,8 @@ export class ParametricBodyNode
      * service's normal lifecycle — its cleanup (restoring the rollback preview and
      * re-enabling the history) always completes before the new command runs.
      */
-    async reselectShapes(featureId: string): Promise<void> {
-        await ReselectFeatureCommand.start(this, featureId);
+    async reselectShapes(featureId: string, key?: string): Promise<void> {
+        await ReselectFeatureCommand.start(this, featureId, key);
     }
 
     /**
@@ -396,10 +397,15 @@ export class ParametricBodyNode
      * stored refs were captured from that pre-feature geometry). The body node is
      * re-selected afterwards so the feature panel stays open.
      */
-    async reselectSession(featureId: string, controller: AsyncController): Promise<void> {
+    async reselectSession(featureId: string, controller: AsyncController, key?: string): Promise<void> {
         const featureIndex = this.features.findIndex((x) => x.id === featureId);
         const feature = this.features[featureIndex];
         if (feature?.type === "extrude") return this.reselectProfiles(feature, controller);
+        if (feature?.type === "featurescript") {
+            if (key !== undefined)
+                await this.reselectFeatureScriptPick(feature, featureIndex, key, controller);
+            return;
+        }
         if (feature?.type !== "fillet" && feature?.type !== "chamfer") return;
 
         const edges = await new EdgeReselectSession(this).pick(feature, featureIndex, controller);
@@ -431,6 +437,41 @@ export class ParametricBodyNode
                 x.id === feature.id ? { ...x, profiles: profiles.length > 0 ? profiles : undefined } : x,
             );
             this.setFeaturesEmitShapeChanged(features);
+            this.document.visual.update();
+        });
+    }
+
+    /**
+     * Re-picks one `Query` parameter of a FeatureScript feature (see
+     * `FeatureScriptPickSession`). The entity kinds come from the parameter's
+     * `"Filter"`, as the panel reports them in `FeatureParameter.pick`.
+     */
+    private async reselectFeatureScriptPick(
+        feature: FeatureScriptFeatureData,
+        featureIndex: number,
+        key: string,
+        controller: AsyncController,
+    ): Promise<void> {
+        const parameter = featureHandler(feature.type)
+            ?.parameters(feature, this.document)
+            .find((x) => x.key === key);
+        if (parameter?.pick === undefined) return;
+        const current = feature.definition[key];
+        const value = await new FeatureScriptPickSession(this).pick(
+            typeof current === "object" ? current : undefined,
+            featureIndex,
+            parameter.pick.kinds,
+            controller,
+        );
+        if (value === undefined) return;
+        Transaction.execute(this.document, "pick entities", () => {
+            const features = this.features.map((x) =>
+                x.id === feature.id && x.type === "featurescript"
+                    ? { ...x, definition: { ...x.definition, [key]: value } }
+                    : x,
+            );
+            this.setFeaturesEmitShapeChanged(features);
+            this.document.selection.clearSelection();
             this.document.visual.update();
         });
     }
@@ -826,6 +867,7 @@ export class ParametricBodyNode
         const cached = this.validCacheEntry(key, input, nextCache.length);
         if (cached !== undefined) {
             nextCache.push(cached);
+            if (cached.warning !== undefined) this._featureWarnings.set(feature.id, cached.warning);
             return Result.ok({ shape: cached.shape, faceIds: cached.faceIds, edgeIds: cached.edgeIds });
         }
         return this.evaluateAndCache(feature, key, scope, input, faceIds, edgeIds, nextCache);
@@ -864,6 +906,7 @@ export class ParametricBodyNode
             resolvedProfiles: tracking.resolvedProfiles,
             resolvedEdges: tracking.resolvedEdges,
         };
+        if (tracking.warning !== undefined) this._featureWarnings.set(feature.id, tracking.warning);
         nextCache.push({
             json: key,
             input,
@@ -871,13 +914,20 @@ export class ParametricBodyNode
             shape: output.shape,
             faceIds: output.faceIds,
             edgeIds: output.edgeIds,
+            warning: tracking.warning,
         });
         return Result.ok(output);
     }
 
-    /** Cache keys include the scope snapshot so a variable change invalidates dependents. */
+    /**
+     * Cache keys include the scope snapshot so a variable change invalidates dependents,
+     * and the handler's `cacheToken` for state outside the feature JSON (a FeatureScript
+     * studio's source).
+     */
     private cacheKey(feature: FeatureData, scope: Scope): string {
-        return scope.size === 0 ? JSON.stringify(feature) : JSON.stringify([feature, [...scope]]);
+        const token = featureHandler(feature.type)?.cacheToken?.(feature, this.document);
+        const base = scope.size === 0 ? JSON.stringify(feature) : JSON.stringify([feature, [...scope]]);
+        return token === undefined ? base : `${base}\u0000${token}`;
     }
 
     /** The cached entry for `index`, when the feature data, the input and the refs all still match. */
@@ -984,7 +1034,8 @@ export class ParametricBodyNode
     // keeps the last good shape silently — the feature panel shows the error — instead
     // of toasting per change.
     private readonly handleWatchedNodeChanged = (property: string) => {
-        if (property !== "shape" && property !== "transform") return;
+        // `source` is a Feature Studio's code: the custom features it defines re-run.
+        if (property !== "shape" && property !== "transform" && property !== "source") return;
         this.rebuildFromUpstream();
     };
 

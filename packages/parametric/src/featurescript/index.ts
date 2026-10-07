@@ -1,0 +1,12 @@
+// Part of the Chili3d Project, under the AGPL-3.0 License.
+// See LICENSE file in the project root for full license information.
+
+export * from "./context/fsContext";
+export * from "./featureScriptFeature";
+export * from "./featureSpec";
+export * from "./featureStudioNode";
+export * from "./lang/errors";
+export { type FeatureExport, Interpreter, type ModuleInstance, type ModuleSource } from "./lang/interpreter";
+export { parseExpression, parseProgram } from "./lang/parser";
+export * from "./runtime";
+export * from "./studioCompiler";

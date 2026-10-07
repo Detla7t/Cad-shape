@@ -119,6 +119,45 @@
     margin-top: 6px;
 }
 
+/* A FeatureScript enum (or any closed choice) renders as a dropdown in the input slot. */
+.select {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+/* An entity pick: what is picked, and the button that re-picks it. */
+.pick {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+.pickSummary {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pickButton {
+    flex-shrink: 0;
+    padding: 2px 8px;
+    font-size: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background-color: transparent;
+    color: inherit;
+    cursor: pointer;
+
+    &:hover {
+        background-color: var(--panel-hover-background-color);
+    }
+}
+
 /* A referenced node's name is a link into that node: click selects, double-click edits. */
 .reference {
     flex: 1 1 auto;

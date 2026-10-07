@@ -10,12 +10,31 @@ export interface FeatureParameter {
     readonly key: string;
     readonly display: I18nKeys;
     /**
+     * A literal label shown instead of translating `display` — for parameters a user
+     * script defines (FeatureScript custom features name their own parameters).
+     */
+    readonly label?: string;
+    /**
      * Literal number or an expression string (e.g. `width * 2`) resolved at rebuild;
      * booleans render as a checkbox (e.g. a boolean feature's consume-tools toggle).
      */
     readonly value: number | string | boolean;
     /** The unit the slot expects — the panel hints it, the rebuild enforces it. */
     readonly unit?: UnitSpec;
+    /** A closed set of choices (`value` is one of them) — rendered as a dropdown. */
+    readonly options?: readonly FeatureParameterOption[];
+    /** Set for free text: the panel passes what was typed through unchanged, never as a number. */
+    readonly text?: boolean;
+    /**
+     * Set for a pick of the body's own entities: the panel shows `value` (a summary such
+     * as "2 edges") with a button that starts `reselectShapes(featureId, key)`.
+     */
+    readonly pick?: { readonly kinds: readonly ("edge" | "face" | "vertex")[] };
+}
+
+export interface FeatureParameterOption {
+    readonly value: string;
+    readonly label: string;
 }
 
 /**
@@ -70,8 +89,11 @@ export interface IFeatureListNode {
     /** Assigns a custom display name; an empty name clears it. */
     renameFeature?(featureId: string, name: string): void;
     removeFeature(featureId: string): void;
-    /** Re-picks the shapes a feature references (e.g. the edges of a fillet). */
-    reselectShapes?(featureId: string): void;
+    /**
+     * Re-picks the shapes a feature references (e.g. the edges of a fillet). `key` names
+     * the parameter for features with several picks (a `FeatureParameter.pick` row).
+     */
+    reselectShapes?(featureId: string, key?: string): void;
     /**
      * Opens the node one of the feature's references points at (e.g. entering the
      * sketch an extrude consumes). `key` is the reference's own key, as reported in

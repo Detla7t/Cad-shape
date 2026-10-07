@@ -27,6 +27,9 @@ import type {
     FeatureData,
     RevolveFeatureData,
 } from "../features/feature";
+import { FeatureStudioNode } from "../featurescript/featureStudioNode";
+import { newFeatureScriptFeature } from "../featurescript/insertFeature";
+import { compileDocumentStudio, findStudio } from "../featurescript/studioCompiler";
 import { ParametricBodyNode } from "../parametricBodyNode";
 import { captureFaceRef, type PlaneFaceRef, sketchPlaneOfFace } from "../sketch/planeRef";
 import {
@@ -58,7 +61,9 @@ export type ParametricOp =
     | FilletChamferOp
     | BooleanOp
     | EditFeatureOp
-    | FeaturesOp;
+    | FeaturesOp
+    | StudioOp
+    | FeatureScriptOp;
 
 export interface SketchOp {
     op: "sketch";
@@ -135,6 +140,34 @@ export interface FeaturesOp {
     op: "features";
     id?: string;
     body: string;
+}
+
+/**
+ * Creates a Feature Studio holding FeatureScript `source` — or replaces the source of the
+ * studio already named `name`. Fails (rolling the program back) when the source does not
+ * compile; the result reports the custom features it exports.
+ */
+export interface StudioOp {
+    op: "studio";
+    id: string;
+    name: string;
+    source: string;
+}
+
+/**
+ * Adds a custom feature from a studio: `feature` is the exported constant's name,
+ * `parameters` its definition fields in app units (mm, degrees; numbers or expressions),
+ * booleans, enum member names or strings. Omit `body` to start a new body.
+ */
+export interface FeatureScriptOp {
+    op: "featurescript";
+    id: string;
+    name?: string;
+    /** The studio op id, or an existing studio's node id or name. */
+    studio: string;
+    feature: string;
+    parameters?: Record<string, ParameterValue | boolean>;
+    body?: string;
 }
 
 /**
@@ -236,6 +269,12 @@ function runOp(state: State, op: ParametricOp): void {
             break;
         case "features":
             runFeaturesOp(state, op);
+            break;
+        case "studio":
+            runStudioOp(state, op);
+            break;
+        case "featurescript":
+            runFeatureScriptOp(state, op);
             break;
         default:
             throw new Error(`unknown op "${(op as { op: string }).op}"`);
@@ -530,6 +569,59 @@ function runEditFeatureOp(state: State, op: EditFeatureOp): void {
             throw new Error(`unknown editFeature action "${(op as { action: string }).action}"`);
     }
     checkBody(state, body, before);
+}
+
+function runStudioOp(state: State, op: StudioOp): void {
+    if (typeof op.name !== "string" || op.name.trim() === "") throw new Error('"studio" requires a "name"');
+    if (typeof op.source !== "string") throw new Error('"studio" requires "source" (FeatureScript code)');
+    let studio = findStudio(state.document, op.name);
+    if (studio === undefined) {
+        studio = new FeatureStudioNode({ document: state.document, name: op.name, source: op.source });
+        state.document.modelManager.addNode(studio);
+        state.out.created.push({ id: op.id, nodeId: studio.id, name: studio.name });
+    } else {
+        studio.source = op.source;
+    }
+    const compiled = compileDocumentStudio(state.document, studio.id);
+    if (compiled?.error !== undefined)
+        throw new Error(`the FeatureScript does not compile: ${compiled.error}`);
+    state.refs.set(op.id, studio.id);
+    state.out.results[op.id] = {
+        features: (compiled?.features ?? []).map((feature) => ({
+            feature: feature.name,
+            display: feature.displayName,
+            parameters: compiled?.spec(feature.name)?.parameters.map((parameter) => ({
+                key: parameter.key,
+                kind: parameter.kind,
+                label: parameter.label,
+                default: parameter.defaultValue,
+                ...(parameter.options !== undefined
+                    ? { options: parameter.options.map((o) => o.value) }
+                    : {}),
+            })),
+        })),
+    };
+}
+
+function runFeatureScriptOp(state: State, op: FeatureScriptOp): void {
+    const key = String(op.studio ?? "");
+    const studio = findStudio(state.document, state.refs.get(key) ?? key);
+    if (studio === undefined) throw new Error(`unknown studio "${key}" — create it with a "studio" op first`);
+    const feature = newFeatureScriptFeature(
+        state.document,
+        studio,
+        String(op.feature ?? ""),
+        op.parameters ?? {},
+    );
+    if (!feature.isOk) throw new Error(feature.error);
+    const data = op.name === undefined ? feature.value : { ...feature.value, name: op.name };
+    if (op.body === undefined) {
+        createBody(state, op.id, op.name ?? feature.value.name, [data]);
+        return;
+    }
+    const body = resolveBody(state, op.body);
+    appendFeature(state, body, data);
+    state.refs.set(op.id, body.id);
 }
 
 function runFeaturesOp(state: State, op: FeaturesOp): void {

@@ -35,7 +35,8 @@ export type FeatureData =
     | RevolveFeatureData
     | FilletFeatureData
     | ChamferFeatureData
-    | BooleanFeatureData;
+    | BooleanFeatureData
+    | FeatureScriptFeatureData;
 
 export interface ExtrudeFeatureData extends FeatureBase {
     readonly type: "extrude";
@@ -120,6 +121,42 @@ export interface BooleanFeatureData extends FeatureBase {
 }
 
 /**
+ * A FeatureScript query parameter: the host body's entities the user picked, stored the
+ * way the built-in features store theirs — edge fingerprints with tracked ids
+ * (`EdgeRef`), face fingerprints with tracked ids, vertex positions.
+ */
+export interface FeatureScriptQueryValue {
+    readonly edges?: EdgeRef[];
+    readonly faces?: FeatureScriptFaceRef[];
+    readonly vertices?: { readonly point: XYZLike }[];
+}
+
+export interface FeatureScriptFaceRef {
+    readonly faceId?: string;
+    readonly center: XYZLike;
+    readonly area: number;
+    /** Outward normal, for planar faces only. */
+    readonly normal?: XYZLike;
+}
+
+export type FeatureScriptParameterValue = ParameterValue | boolean | FeatureScriptQueryValue;
+
+/**
+ * A custom feature defined in FeatureScript: an exported `defineFeature` constant of a
+ * Feature Studio, run against the body's chain shape. Parameter values are stored by
+ * definition field, in app units (mm, degrees) — numeric ones may be expressions over
+ * the document's variables like any other feature parameter.
+ */
+export interface FeatureScriptFeatureData extends FeatureBase {
+    readonly type: "featurescript";
+    /** Node id of the `FeatureStudioNode` holding the source. */
+    readonly studioId: string;
+    /** The exported feature constant's name. */
+    readonly featureName: string;
+    readonly definition: Record<string, FeatureScriptParameterValue>;
+}
+
+/**
  * What a feature may ask of the body replaying it: its identity (to recognise a
  * self-reference, e.g. an extrude sourced on the host's own face) and its world
  * transform (boolean tools are mapped into the body's local space). Deliberately
@@ -165,6 +202,8 @@ export interface ShapeTracking {
      * them back into the feature, same re-anchoring contract as `resolvedProfiles`.
      */
     resolvedEdges?: EdgeRef[];
+    /** A non-fatal message for the feature row (e.g. a FeatureScript `reportFeatureWarning`). */
+    warning?: string;
 }
 
 /**
@@ -281,8 +320,15 @@ export interface FeatureHandler<F extends FeatureData = any> {
      * a door to. Dangles are dropped, not rendered.
      */
     references?(feature: F): FeatureNodeRef[];
-    parameters(feature: F): FeatureParameter[];
-    setParameter(feature: F, key: string, value: ParameterValue | boolean): F;
+    /** `document` lets a feature whose parameters live elsewhere (a FeatureScript studio) read them. */
+    parameters(feature: F, document?: IDocument): FeatureParameter[];
+    setParameter(feature: F, key: string, value: ParameterValue | boolean, document?: IDocument): F;
+    /**
+     * Extra cache-key material for state the feature JSON does not carry (a studio's
+     * source): a change in the token re-evaluates the feature even when its JSON, its
+     * input and its watched shapes are all unchanged.
+     */
+    cacheToken?(feature: F, document: IDocument): string;
     /**
      * Writes the refs the last evaluation actually matched back into the feature
      * (re-anchoring — see `ShapeTracking.resolvedProfiles`/`resolvedEdges`). Each

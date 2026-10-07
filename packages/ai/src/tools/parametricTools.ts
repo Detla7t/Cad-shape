@@ -24,7 +24,18 @@ const OPS_SCHEMA = {
     properties: {
         op: {
             type: "string",
-            enum: ["sketch", "extrude", "revolve", "fillet", "chamfer", "boolean", "editFeature", "features"],
+            enum: [
+                "sketch",
+                "extrude",
+                "revolve",
+                "fillet",
+                "chamfer",
+                "boolean",
+                "editFeature",
+                "features",
+                "studio",
+                "featurescript",
+            ],
             description: "Which operation to run",
         },
         id: {
@@ -127,6 +138,21 @@ const OPS_SCHEMA = {
         key: { type: "string", description: 'setParameter: the parameter name, e.g. "depth"' },
         value: { description: "setParameter: the new value; suppress: true/false; rename: the new name" },
         index: { type: "number", description: "moveTo: the feature's absolute index in the list" },
+        source: {
+            type: "string",
+            description:
+                "studio: FeatureScript source (Onshape dialect). Custom features are exported `defineFeature` constants whose precondition declares their parameters.",
+        },
+        studio: {
+            type: "string",
+            description: "featurescript: the studio op id, or an existing studio's name or node id",
+        },
+        feature: { type: "string", description: "featurescript: the exported feature constant's name" },
+        parameters: {
+            type: "object",
+            description:
+                "featurescript: definition fields by name — lengths in mm and angles in degrees (numbers or expressions), booleans, enum member names, strings",
+        },
     },
     required: ["op"],
 };
@@ -144,7 +170,7 @@ export function buildParametricTools(): Tool[] {
         {
             name: "run_parametric",
             description:
-                "Build a parametric body — a sketch plus an ordered feature list the user can re-edit later. Same calling shape as run_program: { ops: [...] }, ops run in order, later ops reference earlier ids, and one call is one undo step. The difference: run_program produces throwaway geometry, run_parametric produces a feature tree the user can change a dimension in afterwards, so use it whenever the model should stay editable and run_program for one-off shapes. Ops: sketch, extrude, revolve, fillet, chamfer, boolean, editFeature, features — load_skill parametric-modeling for the full catalog. Nothing is ever deleted: a boolean's tool nodes become hidden children of the body.",
+                "Build a parametric body — a sketch plus an ordered feature list the user can re-edit later. Same calling shape as run_program: { ops: [...] }, ops run in order, later ops reference earlier ids, and one call is one undo step. The difference: run_program produces throwaway geometry, run_parametric produces a feature tree the user can change a dimension in afterwards, so use it whenever the model should stay editable and run_program for one-off shapes. Ops: sketch, extrude, revolve, fillet, chamfer, boolean, editFeature, features, studio (FeatureScript source), featurescript (add a custom feature from a studio) — load_skill parametric-modeling for the full catalog. Nothing is ever deleted: a boolean's tool nodes become hidden children of the body.",
             parameters: RUN_PARAMETRIC_PARAMETERS,
             handler: runParametric,
         },

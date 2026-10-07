@@ -1,0 +1,483 @@
+// Part of the Chili3d Project, under the AGPL-3.0 License.
+// See LICENSE file in the project root for full license information.
+
+import {
+    type IEdge,
+    type IFace,
+    type IShape,
+    type IVertex,
+    Plane,
+    ShapeTypes,
+    type TrackedShape,
+    XYZ,
+} from "@chili3d/core";
+import { completeEdgeHistory, completeFaceHistory } from "../../features/historyCompletion";
+import { FsOpaque, type FsValue, fail } from "../lang/values";
+import { makePlaneData, type PlaneData, type Vec3 } from "../std/geometry";
+
+/**
+ * The FeatureScript modeling `Context`: the bodies a feature run has built so far.
+ *
+ * Every body carries one attribute per sub-shape (faces, edges, vertices — aligned with
+ * `findSubShapes` order). Attributes are what queries resolve against and are what
+ * makes them survive later operations: an operation that rebuilds a body copies each
+ * output entity's attribute from the input entity the kernel history (completed by
+ * geometric identity) says it derives from, so `qCreatedBy(id + "extrude1", FACE)`
+ * still finds the extrude's faces after a fillet, and a transient query handed out by
+ * `evaluateQuery` follows its entity through modifications.
+ *
+ * Lengths here are kernel millimetres; the FeatureScript side converts at the boundary
+ * (`MM_PER_METER`).
+ */
+
+export const MM_PER_METER = 1000;
+
+/** `createdBy` of the host body's input — what `qHostBody()` names. */
+export const HOST_ID = "_input";
+
+export type EntityKind = "BODY" | "FACE" | "EDGE" | "VERTEX";
+export type BodyKind = "SOLID" | "SHEET" | "WIRE" | "POINT";
+export type CapKind = "START" | "END";
+
+export interface EntityAttribute {
+    /** Stable per-run serial — what a transient query names. Inherited through history. */
+    readonly serial: number;
+    /** `/`-joined Id of the operation that created the entity. */
+    readonly createdBy: string;
+    readonly cap?: CapKind;
+    /** Index of the host body's input sub-shape this entity derives from (stable-id tracking). */
+    readonly hostIndex?: number;
+    /** The sketch entity id an edge (or a sketch point vertex) was drawn as. */
+    readonly sketchEntity?: string;
+    /** Nesting depth of a sketch region (0 = not inside another region). */
+    readonly regionDepth?: number;
+}
+
+/** One `findSubShapes` kind of a body, enumerated once per shape revision. */
+interface SubShapeCache {
+    faces?: IFace[];
+    edges?: IEdge[];
+    vertices?: IVertex[];
+}
+
+export class FsBody {
+    private _shape: IShape;
+    private cache: SubShapeCache = {};
+    faceAttrs: EntityAttribute[] = [];
+    edgeAttrs: EntityAttribute[] = [];
+    vertexAttrs: EntityAttribute[] = [];
+    /** Display name set through `setProperty(... PropertyType.NAME ...)`. */
+    name?: string;
+
+    constructor(
+        readonly context: FsContext,
+        readonly key: number,
+        shape: IShape,
+        readonly bodyAttr: EntityAttribute,
+        public kind: BodyKind,
+        readonly flags: {
+            construction?: boolean;
+            sketch?: boolean;
+            plane?: PlaneData;
+            defaultGeometry?: boolean;
+        },
+    ) {
+        this._shape = shape;
+    }
+
+    get shape(): IShape {
+        return this._shape;
+    }
+
+    /** Replaces the geometry; callers set the new attributes right after. */
+    setShape(shape: IShape): void {
+        this._shape = shape;
+        this.cache = {};
+        this.kind = bodyKindOf(shape);
+    }
+
+    faces(): IFace[] {
+        this.cache.faces ??= this.context.track(this._shape.findSubShapes(ShapeTypes.face)) as IFace[];
+        return this.cache.faces;
+    }
+
+    edges(): IEdge[] {
+        this.cache.edges ??= this.context.track(this._shape.findSubShapes(ShapeTypes.edge)) as IEdge[];
+        return this.cache.edges;
+    }
+
+    vertices(): IVertex[] {
+        this.cache.vertices ??= this.context.track(this._shape.findSubShapes(ShapeTypes.vertex)) as IVertex[];
+        return this.cache.vertices;
+    }
+
+    attrs(kind: Exclude<EntityKind, "BODY">): EntityAttribute[] {
+        return kind === "FACE" ? this.faceAttrs : kind === "EDGE" ? this.edgeAttrs : this.vertexAttrs;
+    }
+
+    subShapes(kind: Exclude<EntityKind, "BODY">): IShape[] {
+        return kind === "FACE" ? this.faces() : kind === "EDGE" ? this.edges() : this.vertices();
+    }
+
+    /** True for bodies that end up in the feature's output (not sketches, planes or points). */
+    get isModelGeometry(): boolean {
+        return !this.flags.construction && !this.flags.sketch && this.kind !== "POINT";
+    }
+}
+
+export function bodyKindOf(shape: IShape): BodyKind {
+    switch (shape.shapeType) {
+        case ShapeTypes.solid:
+        case ShapeTypes.compoundSolid:
+            return "SOLID";
+        case ShapeTypes.shell:
+        case ShapeTypes.face:
+            return "SHEET";
+        case ShapeTypes.wire:
+        case ShapeTypes.edge:
+            return "WIRE";
+        case ShapeTypes.vertex:
+            return "POINT";
+        default: {
+            // A compound takes the highest-dimension kind it contains.
+            if (shape.findSubShapes(ShapeTypes.solid).length > 0) return "SOLID";
+            if (shape.findSubShapes(ShapeTypes.face).length > 0) return "SHEET";
+            if (shape.findSubShapes(ShapeTypes.edge).length > 0) return "WIRE";
+            return "POINT";
+        }
+    }
+}
+
+/** An entity a query resolved to. `index` is -1 for a body. */
+export interface EntityRef {
+    readonly body: FsBody;
+    readonly kind: EntityKind;
+    readonly index: number;
+}
+
+export function entityKey(ref: EntityRef): string {
+    return `${ref.body.key}:${ref.kind}:${ref.index}`;
+}
+
+export function entityAttr(ref: EntityRef): EntityAttribute {
+    return ref.kind === "BODY" ? ref.body.bodyAttr : ref.body.attrs(ref.kind)[ref.index];
+}
+
+export function entityShape(ref: EntityRef): IShape {
+    return ref.kind === "BODY" ? ref.body.shape : ref.body.subShapes(ref.kind)[ref.index];
+}
+
+/** The inputs of a history-tracked rebuild: each body's sub-shapes, in kernel order. */
+export interface HistorySource {
+    readonly faces: readonly IFace[];
+    readonly edges: readonly IEdge[];
+    readonly vertices: readonly IVertex[];
+    readonly faceAttrs: readonly EntityAttribute[];
+    readonly edgeAttrs: readonly EntityAttribute[];
+    readonly vertexAttrs: readonly EntityAttribute[];
+}
+
+export function historySource(body: FsBody): HistorySource {
+    return {
+        faces: body.faces(),
+        edges: body.edges(),
+        vertices: body.vertices(),
+        faceAttrs: body.faceAttrs,
+        edgeAttrs: body.edgeAttrs,
+        vertexAttrs: body.vertexAttrs,
+    };
+}
+
+/** What a run reports besides geometry. */
+export interface FsRunNotes {
+    readonly warnings: string[];
+    readonly infos: string[];
+}
+
+export class FsContext {
+    readonly bodies: FsBody[] = [];
+    readonly variables = new Map<string, FsValue>();
+    readonly notes: FsRunNotes = { warnings: [], infos: [] };
+    /** Sketches opened by `newSketch` and not yet solved, by Id string. */
+    readonly openSketches = new Map<string, unknown>();
+    /** Every shape wrapper created during the run; disposed by `dispose` except what is kept. */
+    private readonly arena = new Set<IShape>();
+    /** Shapes owned by someone else (the host input); never disposed here. */
+    private readonly foreign = new Set<IShape>();
+    private nextSerial = 1;
+    private nextKey = 1;
+    readonly value: FsOpaque;
+
+    constructor() {
+        this.value = new FsOpaque("Context", this);
+        this.addDefaultGeometry();
+    }
+
+    static of(value: FsValue): FsContext {
+        if (value instanceof FsOpaque && value.payload instanceof FsContext) return value.payload;
+        fail(`Expected a Context, got ${value instanceof FsOpaque ? value.typeName : typeof value}`);
+    }
+
+    // ------------------------------------------------------------------ Shape lifetime
+
+    /** Registers kernel shapes created during the run for disposal; returns them for chaining. */
+    track<T extends IShape | IShape[]>(shapes: T): T {
+        for (const shape of Array.isArray(shapes) ? shapes : [shapes]) {
+            if (!this.foreign.has(shape)) this.arena.add(shape);
+        }
+        return shapes;
+    }
+
+    /** Disposes every shape of the run except `keep` (and foreign shapes). */
+    dispose(keep: readonly IShape[] = []): void {
+        const kept = new Set(keep);
+        for (const shape of this.arena) {
+            if (!kept.has(shape)) shape.dispose();
+        }
+        this.arena.clear();
+    }
+
+    // ------------------------------------------------------------------ Bodies
+
+    newSerial(): number {
+        return this.nextSerial++;
+    }
+
+    freshAttr(
+        createdBy: string,
+        extra?: Partial<Omit<EntityAttribute, "serial" | "createdBy">>,
+    ): EntityAttribute {
+        return { serial: this.newSerial(), createdBy, ...extra };
+    }
+
+    /** Adds a body whose every entity is brand new, created by `createdBy`. */
+    addBody(
+        shape: IShape,
+        createdBy: string,
+        flags: FsBody["flags"] = {},
+        options: { faceExtra?: (index: number) => Partial<EntityAttribute> } = {},
+    ): FsBody {
+        this.track(shape);
+        const body = new FsBody(
+            this,
+            this.nextKey++,
+            shape,
+            this.freshAttr(createdBy),
+            bodyKindOf(shape),
+            flags,
+        );
+        body.faceAttrs = body.faces().map((_, i) => this.freshAttr(createdBy, options.faceExtra?.(i)));
+        body.edgeAttrs = body.edges().map(() => this.freshAttr(createdBy));
+        body.vertexAttrs = body.vertices().map(() => this.freshAttr(createdBy));
+        this.bodies.push(body);
+        return body;
+    }
+
+    /**
+     * Adds the host body's input shape: every entity remembers its input index so the
+     * feature can hand stable ids back to the parametric body afterwards.
+     */
+    addHostBody(shape: IShape): FsBody {
+        this.foreign.add(shape);
+        const body = new FsBody(this, this.nextKey++, shape, this.freshAttr(HOST_ID), bodyKindOf(shape), {});
+        body.faceAttrs = body.faces().map((_, i) => this.freshAttr(HOST_ID, { hostIndex: i }));
+        body.edgeAttrs = body.edges().map((_, i) => this.freshAttr(HOST_ID, { hostIndex: i }));
+        body.vertexAttrs = body.vertices().map(() => this.freshAttr(HOST_ID));
+        this.bodies.push(body);
+        return body;
+    }
+
+    removeBody(body: FsBody): void {
+        const index = this.bodies.indexOf(body);
+        if (index >= 0) this.bodies.splice(index, 1);
+    }
+
+    /**
+     * Rebuilds `body` with `result`, inheriting attributes along the kernel history.
+     * `sources` lists the history inputs in kernel order (the body itself first, then any
+     * tools); entities without an ancestor are created by `createdBy`.
+     */
+    rebuildBody(
+        body: FsBody,
+        result: IShape | TrackedShape,
+        sources: readonly HistorySource[],
+        createdBy: string,
+        extra?: { capFaces?: ReadonlySet<number>; startFaces?: ReadonlySet<number> },
+    ): void {
+        const tracked = isTracked(result) ? result : undefined;
+        const shape = tracked?.shape ?? (result as IShape);
+        this.track(shape);
+        body.setShape(shape);
+        const attrs = this.inheritAttributes(body, sources, createdBy, tracked, extra);
+        body.faceAttrs = attrs.faces;
+        body.edgeAttrs = attrs.edges;
+        body.vertexAttrs = attrs.vertices;
+    }
+
+    /** Adds a body built by a history-tracked operation (the same inheritance as `rebuildBody`). */
+    addDerivedBody(
+        result: IShape | TrackedShape,
+        sources: readonly HistorySource[],
+        createdBy: string,
+        flags: FsBody["flags"] = {},
+        extra?: { capFaces?: ReadonlySet<number>; startFaces?: ReadonlySet<number> },
+    ): FsBody {
+        const tracked = isTracked(result) ? result : undefined;
+        const shape = tracked?.shape ?? (result as IShape);
+        this.track(shape);
+        const body = new FsBody(
+            this,
+            this.nextKey++,
+            shape,
+            this.freshAttr(createdBy),
+            bodyKindOf(shape),
+            flags,
+        );
+        const attrs = this.inheritAttributes(body, sources, createdBy, tracked, extra);
+        body.faceAttrs = attrs.faces;
+        body.edgeAttrs = attrs.edges;
+        body.vertexAttrs = attrs.vertices;
+        this.bodies.push(body);
+        return body;
+    }
+
+    private inheritAttributes(
+        body: FsBody,
+        sources: readonly HistorySource[],
+        createdBy: string,
+        tracked: TrackedShape | undefined,
+        extra?: { capFaces?: ReadonlySet<number>; startFaces?: ReadonlySet<number> },
+    ): { faces: EntityAttribute[]; edges: EntityAttribute[]; vertices: EntityAttribute[] } {
+        const inputFaces = sources.flatMap((source) => source.faces);
+        const inputEdges = sources.flatMap((source) => source.edges);
+        const faceAttrs = sources.flatMap((source) => source.faceAttrs);
+        const edgeAttrs = sources.flatMap((source) => source.edgeAttrs);
+        const outputFaces = body.faces();
+        const outputEdges = body.edges();
+        const faceMap = completeFaceHistory(
+            inputFaces,
+            outputFaces,
+            alignedMap(tracked?.faceMap, outputFaces.length, inputFaces.length),
+        );
+        const edgeMap = completeEdgeHistory(
+            inputEdges,
+            outputEdges,
+            alignedMap(tracked?.edgeMap, outputEdges.length, inputEdges.length),
+        );
+        const faces = this.uniqueSerials(
+            faceMap.map((input, i) => {
+                if (extra?.capFaces?.has(i)) return this.freshAttr(createdBy, { cap: "END" });
+                if (extra?.startFaces?.has(i)) return this.freshAttr(createdBy, { cap: "START" });
+                return input >= 0 ? faceAttrs[input] : this.freshAttr(createdBy);
+            }),
+        );
+        const edges = this.uniqueSerials(
+            edgeMap.map((input) => (input >= 0 ? edgeAttrs[input] : this.freshAttr(createdBy))),
+        );
+        const vertices = this.inheritVertices(body.vertices(), sources, createdBy);
+        return { faces, edges, vertices };
+    }
+
+    /**
+     * A split entity's pieces all derive from one input: the first keeps its serial (and so
+     * the transient queries naming it), the rest get fresh ones — a transient id must name
+     * exactly one entity.
+     */
+    private uniqueSerials(attrs: EntityAttribute[]): EntityAttribute[] {
+        const used = new Set<number>();
+        return attrs.map((attr) => {
+            if (!used.has(attr.serial)) {
+                used.add(attr.serial);
+                return attr;
+            }
+            return { ...attr, serial: this.newSerial() };
+        });
+    }
+
+    /** Vertices have no kernel history: a vertex at an input vertex's exact position inherits it. */
+    private inheritVertices(
+        vertices: readonly IVertex[],
+        sources: readonly HistorySource[],
+        createdBy: string,
+    ): EntityAttribute[] {
+        const inputs: { point: XYZ; attr: EntityAttribute }[] = [];
+        for (const source of sources) {
+            source.vertices.forEach((vertex, i) => {
+                const point = safePoint(vertex);
+                if (point !== undefined) inputs.push({ point, attr: source.vertexAttrs[i] });
+            });
+        }
+        const claimed = new Set<number>();
+        return vertices.map((vertex) => {
+            const point = safePoint(vertex);
+            if (point !== undefined) {
+                const index = inputs.findIndex(
+                    (input, i) => !claimed.has(i) && input.point.distanceTo(point) < 1e-7,
+                );
+                if (index >= 0) {
+                    claimed.add(index);
+                    return inputs[index].attr;
+                }
+            }
+            return this.freshAttr(createdBy);
+        });
+    }
+
+    // ------------------------------------------------------------------ Default geometry
+
+    /** Onshape's default planes and origin: Top (XY), Front (XZ, normal -Y), Right (YZ). */
+    private addDefaultGeometry(): void {
+        const planes: [string, Vec3, Vec3][] = [
+            ["Top", [0, 0, 1], [1, 0, 0]],
+            ["Front", [0, -1, 0], [1, 0, 0]],
+            ["Right", [1, 0, 0], [0, 1, 0]],
+        ];
+        for (const [name, normal, x] of planes) {
+            const plane = makePlaneData([0, 0, 0], normal, x);
+            const face = shapeFactory.rect(toKernelPlane(plane, -50, -50), 100, 100);
+            if (!face.isOk) continue;
+            this.addBody(face.value, name, { construction: true, plane, defaultGeometry: true });
+        }
+        const origin = shapeFactory.point({ x: 0, y: 0, z: 0 });
+        if (origin.isOk) this.addBody(origin.value, "Origin", { construction: true, defaultGeometry: true });
+    }
+}
+
+function isTracked(value: IShape | TrackedShape): value is TrackedShape {
+    return (value as TrackedShape).faceMap !== undefined && (value as TrackedShape).shape !== undefined;
+}
+
+/** A kernel map padded/clipped to the output count, with out-of-range inputs dropped. */
+function alignedMap(map: readonly number[] | undefined, outputs: number, inputs: number): number[] {
+    return Array.from({ length: outputs }, (_, i) => {
+        const index = map?.[i] ?? -1;
+        return index >= 0 && index < inputs ? index : -1;
+    });
+}
+
+function safePoint(vertex: IVertex): XYZ | undefined {
+    try {
+        return vertex.point();
+    } catch {
+        return undefined;
+    }
+}
+
+/** A plane (meters) as a kernel `Plane` (mm), with its origin moved by (u, v) mm in-plane. */
+export function toKernelPlane(plane: PlaneData, u = 0, v = 0): Plane {
+    const y: Vec3 = [
+        plane.normal[1] * plane.x[2] - plane.normal[2] * plane.x[1],
+        plane.normal[2] * plane.x[0] - plane.normal[0] * plane.x[2],
+        plane.normal[0] * plane.x[1] - plane.normal[1] * plane.x[0],
+    ];
+    const origin = new XYZ(
+        plane.origin[0] * MM_PER_METER + plane.x[0] * u + y[0] * v,
+        plane.origin[1] * MM_PER_METER + plane.x[1] * u + y[1] * v,
+        plane.origin[2] * MM_PER_METER + plane.x[2] * u + y[2] * v,
+    );
+    return new Plane({
+        origin,
+        normal: new XYZ(plane.normal[0], plane.normal[1], plane.normal[2]),
+        xvec: new XYZ(plane.x[0], plane.x[1], plane.x[2]),
+    });
+}

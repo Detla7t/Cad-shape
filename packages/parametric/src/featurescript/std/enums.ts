@@ -1,0 +1,83 @@
+// Part of the Chili3d Project, under the AGPL-3.0 License.
+// See LICENSE file in the project root for full license information.
+
+import type { StdBuilder } from "./registry";
+
+/**
+ * The std enums FeatureScript code names. Values match Onshape's spelling so ported
+ * code reads unchanged; members the kernel cannot honour are still declared and
+ * rejected with a clear message where used.
+ */
+export const STD_ENUMS: Record<string, readonly string[]> = {
+    EntityType: ["VERTEX", "EDGE", "FACE", "BODY"],
+    BodyType: ["SOLID", "SHEET", "WIRE", "POINT", "MATE_CONNECTOR", "COMPOSITE"],
+    BoundingType: [
+        "BLIND",
+        "SYMMETRIC",
+        "THROUGH_ALL",
+        "UP_TO_NEXT",
+        "UP_TO_SURFACE",
+        "UP_TO_BODY",
+        "UP_TO_VERTEX",
+    ],
+    NewBodyOperationType: ["NEW", "ADD", "REMOVE", "INTERSECT"],
+    BooleanOperationType: ["UNION", "SUBTRACTION", "INTERSECTION", "SUBTRACT_COMPLEMENT"],
+    GeometryType: [
+        "LINE",
+        "CIRCLE",
+        "ARC",
+        "OTHER_CURVE",
+        "PLANE",
+        "CYLINDER",
+        "CONE",
+        "SPHERE",
+        "TORUS",
+        "OTHER_SURFACE",
+        "MESH",
+    ],
+    CapType: ["START", "END", "EITHER"],
+    ChamferType: ["EQUAL_OFFSETS", "TWO_OFFSETS", "OFFSET_ANGLE"],
+    AdjacencyType: ["VERTEX", "EDGE"],
+    ConstructionObject: ["YES", "NO"],
+    SketchObject: ["YES", "NO"],
+    RevolveType: ["FULL", "ONE_DIRECTION", "SYMMETRIC", "TWO_DIRECTIONS"],
+    PropertyType: ["NAME", "APPEARANCE", "MATERIAL", "DESCRIPTION", "PART_NUMBER"],
+    ToolBodyType: ["SOLID", "SURFACE"],
+    ExtendedToolBodyType: ["SOLID", "SURFACE", "THIN"],
+    PatternType: ["PART", "FEATURE", "FACE"],
+    MirrorType: ["PART", "FEATURE", "FACE"],
+    FilletCrossSection: ["CIRCULAR", "CONIC", "CURVATURE"],
+    ShellType: ["INWARD", "OUTWARD"],
+    SMBendType: ["BEND", "ROLL", "HEM"],
+    SMJointType: ["EDGE", "BEND", "RIP"],
+    SMReliefStyle: ["SIZED", "OBROUND", "RECTANGLE", "TEAR"],
+    SMFlangeAlignment: ["INNER", "OUTER", "MIDDLE"],
+    SeamType: ["PITTSBURGH", "BUTTON_PUNCH_SNAP_LOCK", "STANDING"],
+    CrimpType: ["MALE", "FEMALE"],
+    DimensionDirection: ["MINIMUM", "ALIGNED", "HORIZONTAL", "VERTICAL"],
+    ConstraintType: [
+        "NONE",
+        "COINCIDENT",
+        "PARALLEL",
+        "VERTICAL",
+        "HORIZONTAL",
+        "PERPENDICULAR",
+        "CONCENTRIC",
+        "MIRROR",
+        "MIDPOINT",
+        "TANGENT",
+        "EQUAL",
+        "LENGTH",
+        "DISTANCE",
+        "ANGLE",
+        "RADIUS",
+        "DIAMETER",
+        "FIX",
+        "PROJECTED",
+        "OFFSET",
+    ],
+};
+
+export function installEnums(std: StdBuilder): void {
+    for (const [name, members] of Object.entries(STD_ENUMS)) std.enumType(name, members);
+}

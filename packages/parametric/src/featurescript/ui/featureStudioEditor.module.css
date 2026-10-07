@@ -1,0 +1,170 @@
+/* Part of the Chili3d Project, under the AGPL-3.0 License.
+   See LICENSE file in the project root for full license information. */
+
+.root {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    box-sizing: border-box;
+    padding: 6px;
+}
+
+.toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.name {
+    flex: 0 1 220px;
+    min-width: 80px;
+    padding: 3px 6px;
+    font-size: 13px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background-color: transparent;
+    color: inherit;
+}
+
+.status {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 12px;
+    opacity: 0.8;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    &.error {
+        color: var(--error-color);
+        opacity: 1;
+    }
+
+    &.ok {
+        color: var(--success-color, var(--primary-color));
+    }
+}
+
+.button {
+    flex-shrink: 0;
+    padding: 3px 10px;
+    font-size: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background-color: transparent;
+    color: inherit;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+        background-color: var(--panel-hover-background-color);
+    }
+
+    &:disabled {
+        opacity: 0.4;
+        cursor: default;
+    }
+
+    &.primary {
+        border-color: var(--primary-color);
+        color: var(--primary-color);
+    }
+}
+
+.editor {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    overflow: hidden;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    font-size: 12.5px;
+    line-height: 18px;
+}
+
+.gutter {
+    flex-shrink: 0;
+    margin: 0;
+    padding: 6px 6px 6px 8px;
+    min-width: 28px;
+    text-align: right;
+    opacity: 0.55;
+    overflow: hidden;
+    user-select: none;
+    border-right: 1px solid var(--border-color);
+    white-space: pre;
+}
+
+.errorLine {
+    color: var(--error-color);
+    opacity: 1;
+    font-weight: 700;
+}
+
+.code {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+    padding: 6px 8px;
+    border: none;
+    outline: none;
+    resize: none;
+    background-color: transparent;
+    color: inherit;
+    font: inherit;
+    line-height: inherit;
+    white-space: pre;
+    overflow: auto;
+    tab-size: 4;
+}
+
+.output {
+    flex: 0 0 auto;
+    max-height: 30%;
+    min-height: 40px;
+    overflow: auto;
+    padding: 4px 6px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    font-size: 12px;
+    white-space: pre-wrap;
+}
+
+.outputTitle {
+    font-size: 11px;
+    text-transform: uppercase;
+    opacity: 0.6;
+    margin-bottom: 2px;
+}
+
+.feature {
+    color: var(--primary-color);
+}
+
+.dialog {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 320px;
+}
+
+.dialogRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    & > span {
+        flex: 0 0 72px;
+        font-size: 13px;
+    }
+
+    & > select {
+        flex: 1 1 auto;
+        min-width: 0;
+        padding: 3px 4px;
+    }
+}

@@ -172,6 +172,9 @@ describe("ParametricRibbonProfiles", () => {
             "feature.fuse",
             "feature.cut",
             "feature.common",
+            "featurescript.insert",
+            "featurescript.newStudio",
+            "featurescript.editStudio",
             "feature.variable",
         ]);
     });

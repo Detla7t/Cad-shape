@@ -25,6 +25,8 @@ export class ReselectFeatureCommand extends CancelableCommand {
     constructor(
         private readonly body?: ParametricBodyNode,
         private readonly featureId?: string,
+        /** The parameter to re-pick, for features with several picks (FeatureScript queries). */
+        private readonly key?: string,
     ) {
         super();
     }
@@ -35,7 +37,7 @@ export class ReselectFeatureCommand extends CancelableCommand {
         // context panel can resolve this command's icon and title.
         if (this.body === undefined || this.featureId === undefined) return;
         this.controller = new AsyncController();
-        await this.body.reselectSession(this.featureId, this.controller);
+        await this.body.reselectSession(this.featureId, this.controller, this.key);
     }
 
     /**
@@ -46,14 +48,14 @@ export class ReselectFeatureCommand extends CancelableCommand {
      * CommandService in the meantime (which cancelled this one and awaited its
      * cleanup) owns the slot.
      */
-    static async start(body: ParametricBodyNode, featureId: string): Promise<void> {
+    static async start(body: ParametricBodyNode, featureId: string, key?: string): Promise<void> {
         const app = body.document.application;
         const running = app.executingCommand;
         if (running !== undefined) {
             if (!isCancelableCommand(running)) return;
             await running.cancel();
         }
-        await ReselectFeatureCommand.run(app, new ReselectFeatureCommand(body, featureId));
+        await ReselectFeatureCommand.run(app, new ReselectFeatureCommand(body, featureId, key));
     }
 
     private static async run(app: IApplication, command: ReselectFeatureCommand): Promise<void> {

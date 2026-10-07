@@ -41,6 +41,8 @@ export interface FeatureCacheEntry {
      */
     readonly faceIds?: string[];
     readonly edgeIds?: string[];
+    /** The non-fatal message the evaluation reported, replayed onto the row on a cache hit. */
+    readonly warning?: string;
 }
 
 /** Which of the two tracked id arrays a query addresses. */
