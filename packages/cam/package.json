@@ -6,5 +6,8 @@
     "type": "module",
     "devDependencies": {
         "@chili3d/core": "*"
+    },
+    "dependencies": {
+        "clipper2-js": "^1.2.4"
     }
 }
