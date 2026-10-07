@@ -135,6 +135,23 @@ export interface FeatureExport {
     readonly module: ModuleInstance;
 }
 
+/**
+ * One custom table a module exports through `defineTable` — Onshape's
+ * `annotation { "Table Type Name" : ... } export const t = defineTable(function(context, definition) ...)`.
+ * `definition.fn` is the table function; its precondition declares the parameters as a
+ * feature's does, with the definition at parameter index 1.
+ */
+export interface TableExport {
+    /** The exported constant's name — the table's stable key. */
+    readonly name: string;
+    /** "Table Type Name" from the annotation, falling back to `name`. */
+    readonly displayName: string;
+    readonly description?: string;
+    readonly annotation: FsMap;
+    readonly definition: FeatureDefinition;
+    readonly module: ModuleInstance;
+}
+
 export class ModuleInstance {
     readonly exports = new Map<string, FsValue>();
     /** Names an `export import` passes on; exported with their final (merged) value. */
@@ -143,6 +160,7 @@ export class ModuleInstance {
     readonly imported = new Set<string>();
     readonly namespaces = new Map<string, ModuleInstance>();
     readonly features: FeatureExport[] = [];
+    readonly tables: TableExport[] = [];
 
     constructor(
         readonly path: string,
@@ -152,6 +170,10 @@ export class ModuleInstance {
 
     feature(name: string): FeatureExport | undefined {
         return this.features.find((feature) => feature.name === name);
+    }
+
+    table(name: string): TableExport | undefined {
+        return this.tables.find((table) => table.name === name);
     }
 }
 
@@ -171,6 +193,20 @@ function stdFeatureDefinition(wrapper: UserFunction, annotation: FsMap): Feature
     const fn = scope.vars.get("feature")?.value;
     const defaults = scope.vars.get("defaults")?.value;
     if (!isCallable(fn) || fn.kind !== "user" || fn.params.length !== 3) return undefined;
+    return defaults instanceof FsMap ? { fn, defaults } : { fn };
+}
+
+/**
+ * Std's `defineTable(table)` returns `function(context, definition) { return table(context, definition); }`;
+ * an export of one annotated with `"Table Type Name"` is a table whose precondition is the
+ * wrapped function's.
+ */
+function stdTableDefinition(wrapper: UserFunction, annotation: FsMap): FeatureDefinition | undefined {
+    if (annotation.field("Table Type Name") === undefined || wrapper.params.length !== 2) return undefined;
+    const scope = wrapper.closure as Environment;
+    const fn = scope.vars.get("table")?.value;
+    const defaults = scope.vars.get("defaults")?.value;
+    if (!isCallable(fn) || fn.kind !== "user" || fn.params.length !== 2) return undefined;
     return defaults instanceof FsMap ? { fn, defaults } : { fn };
 }
 
@@ -447,8 +483,12 @@ export class Interpreter {
             const env = lazy.module.env;
             const value = this.evaluateValue(item.value, env);
             if (item.type !== undefined) this.checkType(value, item.type, env, `Constant "${item.name}"`);
-            if (isCallable(value) && value.kind === "native" && value.feature !== undefined) {
-                // Name the feature after its constant so stack traces read naturally.
+            if (
+                isCallable(value) &&
+                value.kind === "native" &&
+                (value.feature !== undefined || value.table !== undefined)
+            ) {
+                // Name the feature (or table) after its constant so stack traces read naturally.
                 (value as { name: string }).name = item.name;
             }
             lazy.value = value;
@@ -498,9 +538,13 @@ export class Interpreter {
         for (const [name, nested] of imported.namespaces) {
             if (!module.namespaces.has(name)) module.namespaces.set(name, nested);
         }
-        if (reexport) module.features.push(...imported.features);
+        if (reexport) {
+            module.features.push(...imported.features);
+            module.tables.push(...imported.tables);
+        }
     }
 
+    /** Records an exported constant that is a custom feature or a custom table. */
     private collectFeature(
         module: ModuleInstance,
         name: string,
@@ -509,19 +553,33 @@ export class Interpreter {
         env: Environment,
     ): void {
         if (!isCallable(value) || value.kind === "overloads") return;
-        if (value.kind === "native" && value.feature === undefined) return;
+        if (value.kind === "native" && value.feature === undefined && value.table === undefined) return;
         if (annotations.length === 0 && value.kind === "user") return;
         const annotation = this.evaluateAnnotations(annotations, env);
-        const definition = value.kind === "native" ? value.feature : stdFeatureDefinition(value, annotation);
-        if (definition === undefined) return;
-        const displayName = annotation.field("Feature Type Name");
-        const description = annotation.field("Feature Type Description");
-        module.features.push({
+        const text = (key: string) => {
+            const field = annotation.field(key);
+            return typeof field === "string" ? field : undefined;
+        };
+        const feature = value.kind === "native" ? value.feature : stdFeatureDefinition(value, annotation);
+        if (feature !== undefined) {
+            module.features.push({
+                name,
+                displayName: text("Feature Type Name") ?? name,
+                description: text("Feature Type Description"),
+                annotation,
+                definition: feature,
+                module,
+            });
+            return;
+        }
+        const table = value.kind === "native" ? value.table : stdTableDefinition(value, annotation);
+        if (table === undefined) return;
+        module.tables.push({
             name,
-            displayName: typeof displayName === "string" ? displayName : name,
-            description: typeof description === "string" ? description : undefined,
+            displayName: text("Table Type Name") ?? name,
+            description: text("Table Type Description"),
             annotation,
-            definition,
+            definition: table,
             module,
         });
     }
@@ -800,6 +858,8 @@ export class Interpreter {
         if (builtin !== undefined && type.namespace === undefined && !this.declaresType(type.name, env)) {
             if (!builtin(value))
                 throw new FsRuntimeError(`Cannot convert ${describeValue(value)} to ${type.name}`, pos);
+            // An enum value is its name tagged with the enum type: `as string` strips the tag.
+            if (type.name === "string" && value instanceof FsEnumValue) return value.name;
             // `as map` / `as array` drops a custom tag.
             if (isContainer(value) && value.tag !== undefined) {
                 const copy = cloneContainer(value);

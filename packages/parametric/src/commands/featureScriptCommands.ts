@@ -5,6 +5,7 @@ import { command, type IApplication, type ICommand, PubSub, Transaction } from "
 import { FeatureStudioNode } from "../featurescript/featureStudioNode";
 import { documentStudios } from "../featurescript/studioCompiler";
 import { showFeatureStudioEditor, showInsertFeatureDialog } from "../featurescript/ui/featureStudioEditor";
+import { showTablesPanel } from "../featurescript/ui/tablesPanel";
 
 /** A studio name not used yet in the document: "Feature Studio 1", "Feature Studio 2", ... */
 function nextStudioName(studios: readonly FeatureStudioNode[]): string {
@@ -45,6 +46,16 @@ export class EditFeatureStudioCommand implements ICommand {
             return;
         }
         showFeatureStudioEditor(studio as FeatureStudioNode);
+    }
+}
+
+/** Opens the custom tables panel: the tables the document's studios export, computed over its parts. */
+@command({ key: "featurescript.tables", icon: "icon-all" })
+export class ShowCustomTablesCommand implements ICommand {
+    async execute(application: IApplication): Promise<void> {
+        const document = application.activeView?.document;
+        if (document === undefined) return;
+        showTablesPanel(document);
     }
 }
 

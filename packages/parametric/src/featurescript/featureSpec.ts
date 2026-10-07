@@ -2,7 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import type { Block, Expression, MapLiteral, Statement } from "./lang/ast";
-import { Environment, type FeatureExport, type Interpreter } from "./lang/interpreter";
+import { Environment, type FeatureExport, type Interpreter, type TableExport } from "./lang/interpreter";
 import {
     ANGLE,
     FsArray,
@@ -78,7 +78,8 @@ export interface FsParameterSpec {
 export interface FeatureSpec {
     /** The interpreter and export the spec was read from — visibility conditions evaluate there. */
     readonly interpreter: Interpreter;
-    readonly feature: FeatureExport;
+    /** The custom feature — or custom table, whose precondition declares parameters the same way. */
+    readonly feature: FeatureExport | TableExport;
     readonly name: string;
     readonly displayName: string;
     readonly description?: string;
@@ -90,9 +91,18 @@ export interface FeatureSpec {
 const MM_PER_M = 1000;
 const DEG_PER_RAD = 180 / Math.PI;
 
-export function analyzeFeature(interpreter: Interpreter, feature: FeatureExport): FeatureSpec {
+/**
+ * The parameter spec of a custom feature's precondition. `definitionIndex` is where the
+ * function takes its `definition`: 2 for a feature `(context, id, definition)`, 1 for a
+ * table `(context, definition)` (see `analyzeTable`).
+ */
+export function analyzeFeature(
+    interpreter: Interpreter,
+    feature: FeatureExport | TableExport,
+    definitionIndex = 2,
+): FeatureSpec {
     const fn = feature.definition.fn;
-    const definitionName = fn.params[2]?.name ?? "definition";
+    const definitionName = fn.params[definitionIndex]?.name ?? "definition";
     const env = feature.module.env;
     const parameters: FsParameterSpec[] = [];
     const seen = new Set<string>();
@@ -113,6 +123,11 @@ export function analyzeFeature(interpreter: Interpreter, feature: FeatureExport)
         parameters,
         definitionName,
     };
+}
+
+/** A custom table's parameters — read from its precondition exactly like a feature's. */
+export function analyzeTable(interpreter: Interpreter, table: TableExport): FeatureSpec {
+    return analyzeFeature(interpreter, table, 1);
 }
 
 class PreconditionAnalyzer {

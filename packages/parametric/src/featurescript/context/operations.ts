@@ -876,6 +876,9 @@ function installBodyOps(std: StdBuilder): void {
     std.fn("getProperty", (args) => {
         const ctx = FsContext.of(arg(args, 0, "getProperty"));
         const definition = expectMap(arg(args, 1, "getProperty"), "getProperty definition");
+        // Only names are kept on bodies; any other property reads as unset.
+        const property = enumName(definition.field("propertyType"), "PropertyType", "propertyType");
+        if (property !== "NAME") return undefined;
         const body = ownerBodies(resolveQuery(ctx, definition.field("entity")))[0]?.body;
         return body?.name;
     });

@@ -2,9 +2,15 @@
 // See LICENSE file in the project root for full license information.
 
 import type { IDocument } from "@chili3d/core";
-import { analyzeFeature, type FeatureSpec } from "./featureSpec";
+import { analyzeFeature, analyzeTable, type FeatureSpec } from "./featureSpec";
 import { FeatureStudioNode } from "./featureStudioNode";
-import type { FeatureExport, Interpreter, ModuleInstance, ModuleSource } from "./lang/interpreter";
+import type {
+    FeatureExport,
+    Interpreter,
+    ModuleInstance,
+    ModuleSource,
+    TableExport,
+} from "./lang/interpreter";
 import { createInterpreter, describeError } from "./runtime";
 
 /**
@@ -32,6 +38,10 @@ export interface CompiledStudio {
     readonly log: string[];
     spec(featureName: string): FeatureSpec | undefined;
     feature(featureName: string): FeatureExport | undefined;
+    /** Custom tables the studio exports (`defineTable`), with their parameter specs. */
+    readonly tables: readonly TableExport[];
+    table(tableName: string): TableExport | undefined;
+    tableSpec(tableName: string): FeatureSpec | undefined;
 }
 
 const MAX_CACHE = 48;
@@ -151,30 +161,53 @@ function compileUncached(
         failure = describeError(error);
     }
     const features = module?.features ?? [];
+    const tables = module?.tables ?? [];
+    const tableSpecs = new Map<string, FeatureSpec | undefined>();
+    /** Analyzes once per name; a precondition the analyzer cannot read yields no spec. */
+    const cachedSpec = <T>(
+        cache: Map<string, FeatureSpec | undefined>,
+        name: string,
+        exported: T | undefined,
+        analyze: (exported: T) => FeatureSpec,
+    ) => {
+        if (!cache.has(name)) {
+            let spec: FeatureSpec | undefined;
+            try {
+                spec = exported === undefined ? undefined : analyze(exported);
+            } catch {
+                spec = undefined;
+            }
+            cache.set(name, spec);
+        }
+        return cache.get(name);
+    };
     return {
         studioId,
         interpreter,
         module,
         features,
+        tables,
         error: failure?.error,
         line: failure?.line,
         column: failure?.column,
         dependencies: [...dependencies],
         log,
         feature: (featureName) => features.find((feature) => feature.name === featureName),
-        spec(featureName) {
-            if (!specs.has(featureName)) {
-                const feature = features.find((candidate) => candidate.name === featureName);
-                let spec: FeatureSpec | undefined;
-                try {
-                    spec = feature === undefined ? undefined : analyzeFeature(interpreter, feature);
-                } catch {
-                    spec = undefined;
-                }
-                specs.set(featureName, spec);
-            }
-            return specs.get(featureName);
-        },
+        spec: (featureName) =>
+            cachedSpec(
+                specs,
+                featureName,
+                features.find((candidate) => candidate.name === featureName),
+                (feature) => analyzeFeature(interpreter, feature),
+            ),
+        table: (tableName) => tables.find((table) => table.name === tableName),
+        tableSpec: (tableName) =>
+            cachedSpec(
+                tableSpecs,
+                tableName,
+                tables.find((candidate) => candidate.name === tableName),
+                (table) => analyzeTable(interpreter, table),
+            ),
     };
 }
 

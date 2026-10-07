@@ -10,6 +10,7 @@ import type {
     ModuleInstance,
     ModuleResolver,
     ModuleSource,
+    TableExport,
 } from "./lang/interpreter";
 import type { FsMap, FsValue } from "./lang/values";
 import { createNativeInterpreter } from "./nativeStd";
@@ -78,6 +79,7 @@ export function createInterpreter(setup: InterpreterSetup = {}): Interpreter {
 export interface CompileResult {
     readonly module?: ModuleInstance;
     readonly features: readonly FeatureExport[];
+    readonly tables: readonly TableExport[];
     readonly error?: string;
     /** 1-based line of the error, when known — for editor gutters. */
     readonly line?: number;
@@ -89,9 +91,9 @@ export function compileStudio(source: ModuleSource, setup: InterpreterSetup = {}
     const interpreter = createInterpreter(setup);
     try {
         const module = interpreter.load(source);
-        return { module, features: module.features };
+        return { module, features: module.features, tables: module.tables };
     } catch (error) {
-        return { features: [], ...describeError(error) };
+        return { features: [], tables: [], ...describeError(error) };
     }
 }
 

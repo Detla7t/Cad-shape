@@ -31,7 +31,7 @@ const NOT_YET_IMPLEMENTED: Record<number, readonly string[]> = {
     3: ["clusterPoints", "containsSketch", "valuesSortedById"],
     8: ["approximateSpline", "evaluateSpline"],
     9: ["transientIdToString", "unpackQuery"],
-    10: ["getProperty", "setProperty", "sheetMetalApplyInFlat"],
+    10: ["sheetMetalApplyInFlat"],
     12: [
         "opBodyDraft",
         "opBooleanedPattern",
