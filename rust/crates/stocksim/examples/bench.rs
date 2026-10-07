@@ -3,12 +3,12 @@
 
 //! Timing of a full-size simulation: a 200 × 200 mm stock at 0.25 mm cells (640 000 columns),
 //! 10 000 moves — Z-level roughing with a Ø10 end mill in 5 mm segments at three depths, then
-//! parallel finishing of a wavy surface with a Ø6 ball — and the stock's mesh.
-//! `cargo run --release --example bench -p stocksim`
+//! parallel finishing of a wavy surface with a Ø6 ball, both in holders checked for collisions
+//! — and the stock's mesh. `cargo run --release --example bench -p stocksim`
 
 use std::time::Instant;
 
-use stocksim::{MaterialModel, MeshOptions, Move, Profile, Simulator, Tool, ZMap};
+use stocksim::{Holder, MaterialModel, MeshOptions, Move, Profile, Simulator, Tool, ZMap};
 
 /// The program as (from, to, tool, rapid) moves: exactly 10 000 of them.
 pub fn program() -> Vec<([f64; 3], [f64; 3], usize, bool)> {
@@ -76,8 +76,25 @@ fn main() {
     let started = Instant::now();
     let model = ZMap::new_box([0.0, 0.0, -30.0], [200.0, 200.0, 0.0], 0.25).unwrap();
     let mut sim = Simulator::new(model);
-    sim.add_tool(Tool::new(Profile::flat(5.0).unwrap()).with_flutes(25.0).unwrap());
-    sim.add_tool(Tool::new(Profile::ball(3.0).unwrap()).with_flutes(15.0).unwrap());
+    let holder = |radius, offset| Holder {
+        radius,
+        offset,
+        length: 50.0,
+    };
+    sim.add_tool(
+        Tool::new(Profile::flat(5.0).unwrap())
+            .with_flutes(25.0)
+            .unwrap()
+            .with_holder(holder(20.0, 35.0))
+            .unwrap(),
+    );
+    sim.add_tool(
+        Tool::new(Profile::ball(3.0).unwrap())
+            .with_flutes(15.0)
+            .unwrap()
+            .with_holder(holder(16.0, 30.0))
+            .unwrap(),
+    );
     let program = program();
     for &(from, to, tool, rapid) in &program {
         sim.push_move(Move {

@@ -376,6 +376,7 @@ impl ZMap {
             (dx / xy, dy / xy, xy, (to[2] - az0) / xy, az0)
         };
         let reach = tool.reach();
+        let radius = tool.radius();
         let profile = tool.profile();
         let r2 = tool.radius() * tool.radius();
         let flat_tool = profile.kind() == ProfileKind::Flat;
@@ -402,17 +403,33 @@ impl ZMap {
             let Some((i0, i1)) = grid.columns(xa, xb) else {
                 continue;
             };
+            // The columns the cutter itself sweeps (the reach is wider with a shank or holder).
+            let cut = if reach > radius {
+                capsule_span(ax, ay, ux, uy, len, radius, py).and_then(|(a, b)| grid.columns(a, b))
+            } else {
+                Some((i0, i1))
+            };
             let tj = j / TILE;
             let ry = py - ay;
             let mut i = i0;
             while i <= i1 {
                 let ti = i / TILE;
                 let end = ((ti + 1) * TILE - 1).min(i1);
-                if (self.tile_max(ti, tj) as f64) <= z_min {
+                let top = self.tile_max(ti, tj) as f64;
+                if top <= z_min {
                     i = end + 1;
                     continue;
                 }
-                for k in i..=end {
+                // Below the shank and the holder all over the tile: only the cutter's columns matter.
+                let (first, last) = if top <= z_min + non_cutting {
+                    match cut {
+                        Some((c0, c1)) => (i.max(c0), end.min(c1)),
+                        None => (1, 0),
+                    }
+                } else {
+                    (i, end)
+                };
+                for k in first..=last {
                     let index = j * grid.nx + k;
                     let h = self.heights[index] as f64;
                     if h <= z_min {
