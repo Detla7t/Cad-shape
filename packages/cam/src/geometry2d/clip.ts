@@ -156,6 +156,12 @@ function rawOffset(points: readonly Point2[], delta: number, options: OffsetOpti
                 return add(from, scale(dir, s));
             };
             out.push(along(a, perpRight(nk)), along(b, perpRight(nj)));
+        } else if (Math.abs(turn) <= step) {
+            // A turn within one arc step (a vertex of a curve's chords): the chord between the
+            // two edge ends is all the round join would add, so the edges meet at their mitre —
+            // within the tolerance of the arc (outside it, never closer than delta). Keeping both
+            // ends instead doubled a curve's vertex count with every successive offset.
+            out.push(add(p, scale(add(nk, nj), delta / (1 + Math.cos(turn)))));
         } else {
             const steps = Math.max(1, Math.ceil(Math.abs(turn) / step));
             const start = scale(nk, delta);
