@@ -231,3 +231,47 @@ export function holesFromCircles(
     }
     return out;
 }
+
+/**
+ * Holes at picked rims (circular edges, sketch circles) drilled to the hole's bottom: a circle
+ * on a hole of the parts (same axis and diameter, its plane within the hole) is that hole —
+ * its real floor, through or blind; any other circle is drilled from its plane down to
+ * `bottom` (the stock bottom), through the stock. A rim carries no depth of its own: the
+ * stock's height measured from the rim drilled past the stock bottom whenever the rim was
+ * below the stock top, and left a through hole short of its breakthrough.
+ */
+export function holesFromRims(
+    circles: readonly { center: Point2; radius: number; z: number }[],
+    parts: readonly IShape[],
+    bottom: number,
+    tolerance = 1e-3,
+): Hole[] {
+    const detected = detectHoles(parts, tolerance);
+    const out: Hole[] = [];
+    for (const circle of circles) {
+        const match = detected.find(
+            (hole) =>
+                Math.hypot(hole.center[0] - circle.center[0], hole.center[1] - circle.center[1]) <
+                    tolerance &&
+                Math.abs(hole.diameter / 2 - circle.radius) < tolerance &&
+                circle.z >= hole.bottom - tolerance &&
+                circle.z <= hole.top + tolerance,
+        );
+        const hole: Hole = match ?? {
+            center: circle.center,
+            diameter: 2 * circle.radius,
+            top: circle.z,
+            bottom: Math.min(bottom, circle.z),
+            through: true,
+        };
+        // A hole's two rims are both circles: keep it once, from the upper one.
+        const twin = out.findIndex(
+            (h) =>
+                Math.hypot(h.center[0] - hole.center[0], h.center[1] - hole.center[1]) < tolerance &&
+                Math.abs(h.diameter - hole.diameter) < tolerance,
+        );
+        if (twin < 0) out.push(hole);
+        else if (hole.top > out[twin].top) out[twin] = hole;
+    }
+    return out;
+}
