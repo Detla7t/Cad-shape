@@ -1,0 +1,26 @@
+/* Part of the Chili3d Project, under the AGPL-3.0 License.
+   See LICENSE file in the project root for full license information. */
+
+.dialog {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 320px;
+}
+
+.dialogRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    & > span {
+        flex: 0 0 72px;
+        font-size: 13px;
+    }
+
+    & > select {
+        flex: 1 1 auto;
+        min-width: 0;
+        padding: 3px 4px;
+    }
+}

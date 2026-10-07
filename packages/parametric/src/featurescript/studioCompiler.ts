@@ -26,6 +26,8 @@ export interface CompiledStudio {
     readonly error?: string;
     readonly line?: number;
     readonly column?: number;
+    /** The module `line`/`column` are in: the studio's name, an imported studio's, or a std path. */
+    readonly file?: string;
     /** Node ids of the other studios this one imported (transitively). */
     readonly dependencies: readonly string[];
     /** Output of `print`/`println`, from loading and from feature runs (most recent last, bounded). */
@@ -159,6 +161,7 @@ function compileUncached(
         error: failure?.error,
         line: failure?.line,
         column: failure?.column,
+        file: failure?.file,
         dependencies: [...dependencies],
         log,
         feature: (featureName) => features.find((feature) => feature.name === featureName),
