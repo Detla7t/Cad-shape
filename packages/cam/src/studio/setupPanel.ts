@@ -29,7 +29,7 @@ import {
     vectorField,
 } from "./dom";
 import { pickBodies, pickPlanarFace, pickVertex } from "./picking";
-import { commitMachines, defaultStock, documentBodies } from "./studioEdits";
+import { commitMachines, defaultStock, documentBodies, rebaseOperations } from "./studioEdits";
 import type { StudioHost } from "./studioHost";
 
 /** The setup editor: name, machine, parts, work coordinates, stock, program name. */
@@ -77,6 +77,7 @@ export function renderSetupPanel(host: StudioHost, setup: SetupData): HTMLElemen
                 update("change machine", {
                     machineId,
                     ...(kindChanged ? { stock: defaultStock(next) } : {}),
+                    ...(next !== undefined ? { operations: rebaseOperations(setup, machine, next) } : {}),
                 });
             }),
         ),

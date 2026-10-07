@@ -4,7 +4,7 @@
 import { Id, type INode, ShapeNode, Transaction } from "@chili3d/core";
 import { SketchNode } from "@chili3d/parametric";
 import type { CamStudioNode } from "../camStudioNode";
-import { setupTools } from "../context/tools";
+import { operationTool, setupTools } from "../context/tools";
 import { WORLD_WCS } from "../context/wcs";
 import type { MachineProfileData } from "../model/machine";
 import { type CamOperationHandler, camOperation } from "../model/operation";
@@ -123,6 +123,40 @@ export function newOperation(
         ...(tool === undefined ? {} : { toolId: tool.id }),
         params: handler.defaults(machine, tool),
     };
+}
+
+const sameValue = (a: unknown, b: unknown) => a === b || JSON.stringify(a) === JSON.stringify(b);
+
+/**
+ * The setup's operations moved to machine `to` (from `from`): a tool the new library lacks
+ * is replaced by the handler's first guess, and every parameter still at the value the
+ * handler derived from the old machine and tool (kerf, pierce settings, heights, feeds and
+ * speeds) takes the new machine's — values the user set are kept. Without this an operation
+ * moved from a plasma table to a waterjet kept the torch's kerf and feed.
+ */
+export function rebaseOperations(
+    setup: SetupData,
+    from: MachineProfileData | undefined,
+    to: MachineProfileData,
+): CamOperationData[] {
+    const tools = setupTools(setup, to);
+    return setup.operations.map((operation) => {
+        const handler = camOperation(operation.type);
+        // An operation the new machine cannot run is left alone (it reports so when generated).
+        if (handler === undefined || !handler.machineKinds.includes(to.kind)) return operation;
+        const tool = tools.find((x) => x.id === operation.toolId) ?? suitableTool(handler, tools);
+        const before =
+            from === undefined || !handler.machineKinds.includes(from.kind)
+                ? {}
+                : handler.defaults(from, operationTool(setup, from, operation));
+        const after = handler.defaults(to, tool);
+        const params: Record<string, unknown> = { ...operation.params };
+        for (const [key, value] of Object.entries(after)) {
+            if (key in before && sameValue(params[key], before[key])) params[key] = value;
+        }
+        const { toolId: _old, ...rest } = operation;
+        return { ...rest, ...(tool === undefined ? {} : { toolId: tool.id }), params };
+    });
 }
 
 /** A first tool guess per operation category: drills for hole cycles, balls for 3D finishing. */
