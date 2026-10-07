@@ -1,0 +1,216 @@
+999
+Chili3D test fixture: plate with a rounded corner, a hole, an arc, a bolt block and a label
+  0
+SECTION
+  2
+HEADER
+  9
+$ACADVER
+  1
+AC1015
+  9
+$INSUNITS
+ 70
+4
+  0
+ENDSEC
+  0
+SECTION
+  2
+TABLES
+  0
+TABLE
+  2
+LAYER
+ 70
+4
+  0
+LAYER
+  2
+0
+ 70
+0
+ 62
+7
+  6
+CONTINUOUS
+  0
+LAYER
+  2
+OUTLINE
+ 70
+0
+ 62
+1
+  6
+CONTINUOUS
+  0
+LAYER
+  2
+HOLES
+ 70
+0
+ 62
+5
+  6
+DASHED
+  0
+LAYER
+  2
+NOTES
+ 70
+0
+ 62
+3
+  6
+CONTINUOUS
+  0
+ENDTAB
+  0
+ENDSEC
+  0
+SECTION
+  2
+BLOCKS
+  0
+BLOCK
+  8
+0
+  2
+BOLT
+ 70
+0
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  0
+CIRCLE
+  8
+0
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+ 40
+2.0
+  0
+LINE
+  8
+0
+ 10
+-3.0
+ 20
+0.0
+ 30
+0.0
+ 11
+3.0
+ 21
+0.0
+ 31
+0.0
+  0
+ENDBLK
+  8
+0
+  0
+ENDSEC
+  0
+SECTION
+  2
+ENTITIES
+  0
+LWPOLYLINE
+  8
+OUTLINE
+ 90
+5
+ 70
+1
+ 10
+0.0
+ 20
+0.0
+ 10
+90.0
+ 20
+0.0
+ 42
+0.41421356237309503
+ 10
+100.0
+ 20
+10.0
+ 10
+100.0
+ 20
+50.0
+ 10
+0.0
+ 20
+50.0
+  0
+CIRCLE
+  8
+HOLES
+ 10
+25.0
+ 20
+25.0
+ 30
+0.0
+ 40
+5.0
+  0
+ARC
+  8
+OUTLINE
+ 10
+50.0
+ 20
+70.0
+ 30
+0.0
+ 40
+10.0
+ 50
+0.0
+ 51
+180.0
+  0
+INSERT
+  8
+HOLES
+  2
+BOLT
+ 10
+75.0
+ 20
+25.0
+ 30
+0.0
+ 50
+90.0
+  0
+TEXT
+  8
+NOTES
+ 10
+10.0
+ 20
+60.0
+ 30
+0.0
+ 40
+5.0
+  1
+Plate %%c5
+  0
+ENDSEC
+  0
+EOF

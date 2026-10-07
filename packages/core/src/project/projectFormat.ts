@@ -27,10 +27,13 @@ export const PROJECT_HISTORY_FOLDER = "history/";
 /** The key that replaces an externalized property in `document.json`: `{ "$file": "<path>" }`. */
 export const PROJECT_FILE_REF_KEY = "$file";
 /**
- * Beside `$file` for a binary file: `{ "$file": "<path>", "$encoding": "base64" }` — the property
- * holds the file's bytes as base64, the archive holds the bytes themselves.
+ * Next to `$file`, how the file maps back onto the property: absent for UTF-8 text,
+ * `"base64"` when the property holds the file's bytes as base64 (binary files).
  */
 export const PROJECT_FILE_ENCODING_KEY = "$encoding";
+
+/** How an externalized property is stored: as the file's UTF-8 text, or its bytes in base64. */
+export type ProjectSourceEncoding = "text" | "base64";
 
 /** One element (tab) of the document. */
 export interface ProjectElement {
@@ -105,15 +108,25 @@ export interface ProjectSourceElementSpec {
     /** File extension including the dot, e.g. ".fs". */
     readonly extension: string;
     /**
+     * How the property maps onto the file (default "text": the property is the file's
+     * UTF-8 text). "base64": the property holds base64 and the file holds the decoded
+     * bytes, so a binary attachment is not inlined in `document.json`. A function picks
+     * per serialized node.
+     */
+    readonly encoding?:
+        | ProjectSourceEncoding
+        | ((node: Readonly<Record<string, unknown>>) => ProjectSourceEncoding);
+    /**
+     * The file name for a serialized node, its own extension included (e.g. the attached
+     * file's original name); default: the node's name + `extensionOf(node)` or `extension`.
+     * Still made file-safe and unique within the folder.
+     */
+    readonly fileName?: (node: Readonly<Record<string, unknown>>) => string | undefined;
+    /**
      * The extension for one serialized node — e.g. taken from an attached file's name — or
-     * undefined to use `extension`.
+     * undefined to use `extension`. Ignored when `fileName` names the file.
      */
     readonly extensionOf?: (node: Readonly<Record<string, unknown>>) => string | undefined;
-    /**
-     * `"utf8"` (default): the property is text, stored as UTF-8. `"base64"`: the property is
-     * binary content as base64, stored as the raw bytes (and base64-encoded again on read).
-     */
-    readonly encoding?: "utf8" | "base64";
     /** Keep an empty property inline (no file) — for optional content such as an attachment. */
     readonly skipEmpty?: boolean;
 }
@@ -142,6 +155,11 @@ export function projectSourceElementSpec(className: string): ProjectSourceElemen
 /** Every externalized property of a class, in registration order. */
 export function projectSourceElementSpecs(className: string): readonly ProjectSourceElementSpec[] {
     return sourceElements.get(className) ?? [];
+}
+
+/** The folders registered source elements write to ("featurestudios/", ...). */
+export function projectSourceFolders(): string[] {
+    return [...new Set([...sourceElements.values()].flat().map((spec) => spec.folder))];
 }
 
 /** The manifest kind of a node class: registered, else derived ("VariableStudioNode" → "variableStudio"). */

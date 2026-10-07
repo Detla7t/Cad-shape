@@ -184,6 +184,23 @@ export class AppBuilder {
         return this;
     }
 
+    /**
+     * Drawings and office files: DXF/DWG import (a sketch plus a drawing element), the
+     * multiview drawing export, OBJ/glTF/3MF meshes, and document elements (Markdown,
+     * Word, OpenDocument, spreadsheets, PDF, images, text) with their viewers. Heavy
+     * libraries (LibreDWG, ExcelJS, pdf.js, mammoth, docx, CodeMirror) load on first use.
+     */
+    useDocuments(): this {
+        this._inits.push(async () => {
+            Logger.info("initializing documents");
+
+            const documents = await import("@chili3d/documents");
+            documents.registerDocumentsModule();
+            this._ribbonExtras.push(...documents.DocumentsRibbonProfiles);
+        });
+        return this;
+    }
+
     useThree(): this {
         this._inits.push(async () => {
             Logger.info("initializing three");

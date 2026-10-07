@@ -1,0 +1,27 @@
+{
+    "name": "@chili3d/documents",
+    "version": "0.7.1",
+    "description": "Drawing and office file formats: DXF/DWG import, 2D drawing export, and document elements (Markdown, DOCX, ODT, spreadsheets, PDF, images, text) with viewers and editors",
+    "main": "src/index.ts",
+    "type": "module",
+    "devDependencies": {
+        "@chili3d/core": "*",
+        "@chili3d/element": "*",
+        "@chili3d/parametric": "*"
+    },
+    "dependencies": {
+        "@codemirror/commands": "^6.11.1",
+        "@codemirror/search": "^6.7.2",
+        "@codemirror/state": "^6.7.6",
+        "@codemirror/view": "^6.43.14",
+        "@mlightcad/libredwg-web": "^0.7.15",
+        "@node-projects/acad-ts": "^3.2.0",
+        "docx": "^9.9.0",
+        "exceljs": "^4.4.0",
+        "jszip": "^3.10.1",
+        "mammoth": "^1.13.0",
+        "marked": "^18.1.0",
+        "pdfjs-dist": "^6.4.299",
+        "three": "0.184.0"
+    }
+}

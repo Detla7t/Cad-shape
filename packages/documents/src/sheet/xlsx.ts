@@ -1,0 +1,118 @@
+// Part of the Chili3d Project, under the AGPL-3.0 License.
+// See LICENSE file in the project root for full license information.
+
+import type * as ExcelJS from "exceljs";
+import { addressOf, type CellData, type SheetData, type WorkbookData } from "./model";
+
+/**
+ * Excel workbooks (.xlsx) through ExcelJS (MIT), loaded on first use: values, formulas
+ * with their cached results, number formats, column widths, merges and sheets. Dates
+ * become Excel serial numbers (their date format is kept), rich text its plain text,
+ * hyperlinks their text.
+ */
+
+type ExcelModule = typeof ExcelJS;
+
+async function excel(): Promise<ExcelModule> {
+    const module = (await import("exceljs")) as ExcelModule & { default?: ExcelModule };
+    return module.default ?? module;
+}
+
+/** Days since 1899-12-30, the Excel (1900 system) serial number of a date. */
+function serial(date: Date): number {
+    return (date.getTime() - Date.UTC(1899, 11, 30)) / 86_400_000;
+}
+
+/** Column width: Excel characters ↔ pixels (7 px per character of the default font, 5 px padding). */
+const charsToPx = (chars: number) => Math.round(chars * 7 + 5);
+const pxToChars = (px: number) => Math.max(0, (px - 5) / 7);
+
+type Result = NonNullable<ExcelJS.CellFormulaValue["result"]>;
+
+function resultOf(result: Result | undefined): Pick<CellData, "v" | "e"> {
+    if (result === undefined || result === null) return {};
+    if (result instanceof Date) return { v: serial(result) };
+    if (typeof result === "object") return "error" in result ? { v: result.error, e: true } : {};
+    return { v: result };
+}
+
+function cellOf(cell: ExcelJS.Cell): CellData | undefined {
+    const value = cell.value;
+    const z =
+        typeof cell.numFmt === "string" && cell.numFmt !== "" && cell.numFmt !== "General"
+            ? cell.numFmt
+            : undefined;
+    const format = z === undefined ? {} : { z };
+    if (value === null || value === undefined) return z === undefined ? undefined : { z };
+    if (typeof value === "number" || typeof value === "string" || typeof value === "boolean") {
+        return { v: value, ...format };
+    }
+    if (value instanceof Date) return { v: serial(value), z: z ?? "yyyy-mm-dd" };
+    if ("formula" in value || "sharedFormula" in value) {
+        const formula = cell.formula ?? ("formula" in value ? value.formula : undefined);
+        if (formula === undefined || formula === "") return { ...resultOf(value.result), ...format };
+        return { f: formula, ...resultOf(value.result), ...format };
+    }
+    if ("error" in value) return { v: value.error, e: true, ...format };
+    if ("richText" in value) return { v: value.richText.map((run) => run.text).join(""), ...format };
+    if ("text" in value) return { v: String(value.text), ...format };
+    return undefined;
+}
+
+export async function readXlsx(bytes: Uint8Array): Promise<WorkbookData> {
+    const { Workbook } = await excel();
+    const book = new Workbook();
+    await book.xlsx.load(bytes.slice().buffer as unknown as Parameters<typeof book.xlsx.load>[0]);
+    const sheets: SheetData[] = book.worksheets.map((worksheet) => {
+        const cells: Record<string, CellData> = {};
+        worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+            row.eachCell({ includeEmpty: false }, (cell, colNumber) => {
+                // A merged range's other cells repeat the master's value: keep it once.
+                if (cell.isMerged && cell.master.address !== cell.address) return;
+                const data = cellOf(cell);
+                if (data !== undefined) cells[addressOf(rowNumber - 1, colNumber - 1)] = data;
+            });
+        });
+        const cols = (worksheet.columns ?? []).map((column) =>
+            typeof column.width === "number" ? charsToPx(column.width) : null,
+        );
+        const merges = ((worksheet.model as { merges?: string[] }).merges ?? []).filter((range) =>
+            range.includes(":"),
+        );
+        return {
+            name: worksheet.name,
+            cells,
+            ...(cols.some((width) => width !== null) ? { cols } : {}),
+            ...(merges.length > 0 ? { merges } : {}),
+        };
+    });
+    return { sheets: sheets.length > 0 ? sheets : [{ name: "Sheet1", cells: {} }] };
+}
+
+/** The workbook as .xlsx bytes; formula cells carry their cached result (`v`). */
+export async function writeXlsx(workbook: WorkbookData): Promise<Uint8Array> {
+    const { Workbook } = await excel();
+    const book = new Workbook();
+    book.creator = "Chili3D";
+    for (const sheet of workbook.sheets) {
+        const worksheet = book.addWorksheet(sheet.name.slice(0, 31) || "Sheet");
+        for (const [address, cell] of Object.entries(sheet.cells)) {
+            const target = worksheet.getCell(address);
+            const error = { error: String(cell.v) } as ExcelJS.CellErrorValue;
+            if (cell.f !== undefined) {
+                target.value = {
+                    formula: cell.f,
+                    ...(cell.v === undefined ? {} : { result: cell.e ? error : cell.v }),
+                };
+            } else if (cell.v !== undefined) {
+                target.value = cell.e ? error : cell.v;
+            }
+            if (cell.z !== undefined) target.numFmt = cell.z;
+        }
+        (sheet.cols ?? []).forEach((width, index) => {
+            if (width !== null) worksheet.getColumn(index + 1).width = pxToChars(width);
+        });
+        for (const range of sheet.merges ?? []) worksheet.mergeCells(range);
+    }
+    return new Uint8Array(await book.xlsx.writeBuffer());
+}

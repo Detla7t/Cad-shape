@@ -13,6 +13,7 @@ document.json              the serialized document (Document.serialize()), prett
 featurestudios/<name>.fs   one plain-text FeatureScript file per Feature Studio
 data/<name>.snapshot.json  a Data Source's cached tables (JSON, one table row per line)
 data/<name>.<ext>          a Data Source's attached file (.csv, .xlsx, .sqlite, …), its real bytes
+files/<file name>          one file per document element (Markdown, DOCX, XLSX, PDF, DXF, ...), raw bytes
 thumbnail.png              image of the view when saved (optional)
 geometry/<node>.brep       BREP caches of shape nodes (optional, off by default, NOT authoritative)
 history/                   reserved for the version-control system (owned by its provider)
@@ -36,6 +37,7 @@ Paths use `/`, are relative, never contain `..`. Text files are UTF-8.
   "elements": [                                  // the document's tabs
     { "id": "<root node id>", "kind": "partStudio", "name": "Duct job" },
     { "id": "…", "kind": "featureStudio", "name": "Seams", "path": "featurestudios/Seams.fs" },
+    { "id": "…", "kind": "document", "name": "Cut list", "path": "files/Cut list.xlsx" },
     { "id": "…", "kind": "variableStudio", "name": "Variables" }  // any other sceneless node
   ],
   "files": [                                     // every entry except the manifest
@@ -54,31 +56,53 @@ Paths use `/`, are relative, never contain `..`. Text files are UTF-8.
 
 `role` is one of `document`, `source`, `thumbnail`, `cache`, `extension`.
 
-## Text-sourced elements
+## Source elements (text and binary files)
 
 A node class may register a string property to live in its own file
-(`registerProjectSourceElement({ className, kind, field, folder, extension })`). Feature
-Studios do: in `document.json` their `source` becomes `{ "$file": "featurestudios/Seams.fs" }`
+(`registerProjectSourceElement({ className, kind, field, folder, extension, encoding?, fileName? })`).
+Feature Studios do: in `document.json` their `source` becomes `{ "$file": "featurestudios/Seams.fs" }`
 and the `.fs` file is the single source of truth, re-inlined on load (byte for byte, line
 endings included). File names are the element name made file-safe and unique
 case-insensitively (`Bracket.fs`, `bracket (2).fs`). The reader re-inlines **any**
 `{ "$file": … }` node property, so new element kinds need no reader change.
 
-A class may externalize several properties (one registration each; `projectSourceElementSpecs`).
-A Data Source keeps its cached tables (`snapshotJson`) and its attachment as files under
-`data/`: `extensionOf(node)` names the attachment after its file type, `skipEmpty` keeps an empty
-property inline, and `encoding: "base64"` marks a property holding binary content as base64 —
-the archive stores the raw bytes and the reference says so, `{ "$file": "data/Shop.sqlite",
-"$encoding": "base64" }`, so the reader base64-encodes them back. Secret values (API keys) are
-never in these files: a Data Source serializes them only when it opted in to storing them.
+Options of a registration:
+
+- `encoding` (`"text"` by default, or a function of the serialized node): with `"base64"`
+  the property holds the file's bytes as base64 and the archive holds the decoded bytes, so
+  binary files are not inlined; the reference then reads
+  `{ "$file": "files/Photo.png", "$encoding": "base64" }`. A value that is not valid base64
+  is left inline rather than lost.
+- `fileName(node)`: the file's own name, extension included (e.g. the imported file's
+  original name); still made file-safe and unique within the folder. Default: element name +
+  `extensionOf(node)` (an extension per node, e.g. from an attachment's file type) or
+  `extension`.
+- `skipEmpty`: an empty property stays inline (no file) — for optional content.
+- A class may externalize several properties (one registration each;
+  `projectSourceElementSpecs`); the manifest element points at the first.
+- Registered source folders are reserved: an entry provider cannot claim them.
+
+A Data Source (`@chili3d/data`) keeps its cached tables (`snapshotJson`) and its attachment
+as files under `data/` (`data/Shop.sqlite` with `"$encoding": "base64"`). Secret values (API
+keys) are never in these files: a Data Source serializes them only when it opted in to
+storing them.
+
+Document elements (`@chili3d/documents`, kind `document`) use this for `files/`: a
+`DocumentFileNode` keeps the file in its `content` property (UTF-8 text for text formats
+such as Markdown/CSV/DXF, base64 for binary ones such as DOCX/XLSX/PDF/DWG/images), so the
+project holds the original file, unchanged, named after the element with the file's
+extension (`files/Cut list.xlsx`, `files/Plate.dwg`). Keeping the bytes in a serialized
+property, rather than in a separate store, is what makes undo/redo, version history,
+copy/paste and the IndexedDB document store (which saves `Document.serialize()`) carry the
+file without any extra machinery.
 
 ## Reading rules
 
 - Refused (error, nothing loads): not a zip; no `manifest.json`; manifest not JSON or not an
   object; `format` ≠ `chili3d-project`; `formatVersion` not a positive integer or newer than the
   reader's; `elements`/`files`/`extensions` present but not lists; no or invalid
-  `document.json`; a `$file` reference to a missing entry, or to a non-UTF-8 one without
-  `"$encoding": "base64"`.
+  `document.json`; a `$file` reference to a missing entry, to a non-UTF-8 entry (text
+  references), or with an unknown `$encoding`.
 - Warnings only: a listed file whose size/sha-256 differs (a hand-edited `.fs` is legitimate),
   a listed optional file that is missing.
 - Unknown entries and unknown manifest fields are ignored (forward compatibility).

@@ -8,6 +8,7 @@
         "@chili3d/cam": "*",
         "@chili3d/data": "*",
         "@chili3d/assembly": "*",
+        "@chili3d/documents": "*",
         "@chili3d/i18n": "*",
         "@chili3d/onshape-std": "*",
         "@chili3d/parametric": "*",

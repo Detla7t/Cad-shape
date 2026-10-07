@@ -4,12 +4,15 @@
 import {
     EditableShapeNode,
     type IDocument,
+    type IFileImporter,
     type IMeshExporter,
+    type ImportFile,
     type INode,
     type IShape,
     type Matrix4,
     PubSub,
     Result,
+    registerFileImporter,
     type VisualNode,
 } from "@chili3d/core";
 import { createMockDocument, MockShape, TestDocument, TestNode } from "@chili3d/core/test-utils";
@@ -66,34 +69,6 @@ describe("DefaultDataExchange", () => {
             for (const f of formats) {
                 expect(typeof f).toBe("string");
             }
-        });
-    });
-
-    describe("extensionIs (private)", () => {
-        // NOTE: extensionIs does NOT lowercase internally — the caller
-        // (handleSingleFileImport) lowercases the fileName before passing it in.
-        test("should match exact extension (already lowercased by caller)", () => {
-            expect((exchange as any).extensionIs("model.step", ".step")).toBe(true);
-        });
-
-        test("should return false for non-matching extension", () => {
-            expect((exchange as any).extensionIs("model.stl", ".step")).toBe(false);
-        });
-
-        test("should match against multiple extensions", () => {
-            expect((exchange as any).extensionIs("model.stp", ".step", ".stp")).toBe(true);
-        });
-
-        test("should return false when none match", () => {
-            expect((exchange as any).extensionIs("model.obj", ".step", ".iges")).toBe(false);
-        });
-
-        test("should match .stl extension", () => {
-            expect((exchange as any).extensionIs("model.stl", ".stl")).toBe(true);
-        });
-
-        test("should match .brep extension", () => {
-            expect((exchange as any).extensionIs("model.brep", ".brep")).toBe(true);
         });
     });
 
@@ -262,6 +237,64 @@ describe("DefaultDataExchange", () => {
             expect(converter.convertFromIGES).not.toHaveBeenCalled();
             expect(converter.convertFromSTEP).not.toHaveBeenCalled();
             expect(addNodeSpy).not.toHaveBeenCalled();
+        });
+
+        test("should route by content: a STEP file with another extension still goes to the STEP reader", async () => {
+            const { converter, doc } = setup();
+
+            await exchange.import(doc, [new File(["ISO-10303-21;\nHEADER;\n"], "model.txt")]);
+
+            expect(converter.convertFromSTEP).toHaveBeenCalledTimes(1);
+            expect(converter.convertFromIGES).not.toHaveBeenCalled();
+        });
+
+        test("should explain proprietary formats instead of reporting them unsupported", async () => {
+            const alertSpy = rs.fn((_message: string) => {});
+            rs.stubGlobal("alert", alertSpy);
+            const { converter, doc, addNodeSpy } = setup();
+
+            await exchange.import(doc, [
+                new File(["**ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz****\n"], "bracket.x_t"),
+                new File([new Uint8Array([1, 2, 3])], "housing.sldprt"),
+            ]);
+
+            // The test locale echoes keys with their arguments filled in.
+            expect(alertSpy.mock.calls.map(([message]) => message)).toEqual([
+                "error.import.parasolidbracket.x_t",
+                "error.import.proprietaryhousing.sldprtSolidWorksDassault Systèmes",
+            ]);
+            expect(converter.convertFromSTEP).not.toHaveBeenCalled();
+            expect(addNodeSpy).not.toHaveBeenCalled();
+        });
+
+        test("should hand a file to the first registered importer that accepts it, with its detected format", async () => {
+            const { converter, doc } = setup();
+            const seen: ImportFile[] = [];
+            const importer: IFileImporter = {
+                id: "test.dxf",
+                extensions: [".dxf"],
+                accepts: (file) => file.format.id === "dxf",
+                import: async (_document, file) => {
+                    seen.push(file);
+                    return Result.ok([]);
+                },
+            };
+            const registration = registerFileImporter(importer);
+            try {
+                expect(exchange.importFormats()).toContain(".dxf");
+                expect(exchange.importFormats()).toContain(".x_t");
+                await exchange.import(doc, [
+                    new File(["  0\nSECTION\n  2\nENTITIES\n  0\nENDSEC\n  0\nEOF\n"], "plan.bin"),
+                ]);
+            } finally {
+                registration.dispose();
+            }
+            expect(seen.map((file) => [file.name, file.format.id, file.format.by])).toEqual([
+                ["plan.bin", "dxf", "content"],
+            ]);
+            expect(seen[0].bytes).toBeInstanceOf(Uint8Array);
+            expect(converter.convertFromSTEP).not.toHaveBeenCalled();
+            expect(exchange.importFormats()).not.toContain(".dxf");
         });
 
         test("should import every file in the list", async () => {

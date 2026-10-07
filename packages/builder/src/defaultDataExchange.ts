@@ -2,13 +2,19 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    type DetectedFileFormat,
+    detectFileFormat,
     EditableShapeNode,
+    FILE_FORMATS,
+    fileImporters,
     GeometryNode,
     I18n,
     type IDataExchange,
     type IDocument,
+    type ImportFile,
     type INode,
     type IShape,
+    Logger,
     PubSub,
     Result,
     ShapeNode,
@@ -16,9 +22,27 @@ import {
 } from "@chili3d/core";
 import { type ThreeMfMesh, write3mf } from "./threeMf";
 
+/** Formats the kernel imports itself (any registered importer may add more). */
+const BUILT_IN_IMPORTS = [".step", ".stp", ".iges", ".igs", ".brep", ".stl", ".fs"];
+
+/**
+ * Import and export of the Part Studio. Every imported file is identified by
+ * `detectFileFormat` — content first (magic bytes, container entries, text signatures),
+ * then the extension — and handed to the first registered `IFileImporter` that accepts
+ * it (DXF/DWG, meshes, documents, …), else to the kernel's STEP/IGES/BREP/STL readers.
+ * Proprietary CAD formats get an explanation instead of "unsupported".
+ */
 export class DefaultDataExchange implements IDataExchange {
     importFormats(): string[] {
-        return [".step", ".stp", ".iges", ".igs", ".brep", ".stl", ".fs"];
+        const extensions = new Set(BUILT_IN_IMPORTS);
+        for (const importer of fileImporters())
+            for (const extension of importer.extensions) extensions.add(extension);
+        // Offered so that picking one explains why it cannot be read.
+        for (const format of FILE_FORMATS) {
+            if (format.category === "proprietary")
+                for (const extension of format.extensions) extensions.add(extension);
+        }
+        return [...extensions];
     }
 
     exportFormats(): string[] {
@@ -47,27 +71,51 @@ export class DefaultDataExchange implements IDataExchange {
         let importResult: Result<INode> | undefined;
 
         const fileName = file.name.toLocaleLowerCase();
-        if (this.extensionIs(fileName, ".fs")) {
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        const format = detectFileFormat(file.name, bytes);
+        if (format.mismatch) {
+            Logger.info(
+                `${file.name} is ${format.name} (recognized by its content), not what its extension says`,
+            );
+        }
+        if (format.id === "featurescript") {
             // FeatureScript: the file becomes a new Feature Studio of the document.
             const { importFeatureStudio } = await import("@chili3d/parametric");
-            importFeatureStudio(document, file.name, await file.text());
+            importFeatureStudio(document, file.name, new TextDecoder().decode(bytes));
             return;
         }
-        if (this.extensionIs(fileName, ".brep")) {
-            importResult = await this.importBrep(document, file);
-        } else if (this.extensionIs(fileName, ".stl")) {
-            importResult = await this.importStl(document, file);
-        } else if (this.extensionIs(fileName, ".step", ".stp")) {
-            importResult = await this.importStep(document, file);
-        } else if (this.extensionIs(fileName, ".iges", ".igs")) {
-            importResult = await this.importIges(document, file);
+        const importFile: ImportFile = { name: file.name, bytes, format };
+        const importer = fileImporters().find((candidate) => candidate.accepts(importFile));
+        if (importer !== undefined) {
+            const imported = await importer.import(document, importFile);
+            if (!imported.isOk) {
+                PubSub.default.pub("showToast", "error.import.failed{0}{1}", file.name, imported.error);
+                return;
+            }
+            document.visual.update();
+            return;
+        }
+        if (format.id === "brep") {
+            importResult = this.importBrep(document, file.name, bytes);
+        } else if (format.id === "stl") {
+            importResult = shapeConverter.convertFromSTL(document, bytes);
+        } else if (format.id === "step") {
+            importResult = shapeConverter.convertFromSTEP(document, bytes);
+        } else if (format.id === "iges") {
+            importResult = shapeConverter.convertFromIGES(document, bytes);
+        } else if (format.category === "proprietary") {
+            alert(this.proprietaryMessage(file.name, format));
+            return;
         }
 
         this.handleImportResult(document, fileName, importResult);
     }
 
-    private extensionIs(fileName: string, ...extensions: string[]): boolean {
-        return extensions.some((ext) => fileName.endsWith(ext));
+    /** Why a closed CAD format cannot be read, and what to do instead. */
+    private proprietaryMessage(fileName: string, format: DetectedFileFormat): string {
+        const key =
+            format.id === "parasolid" ? "error.import.parasolid{0}" : "error.import.proprietary{0}{1}{2}";
+        return I18n.translate(key, fileName, format.name, format.vendor ?? "");
     }
 
     private handleImportResult(document: IDocument, name: string, nodeResult: Result<INode> | undefined) {
@@ -82,27 +130,12 @@ export class DefaultDataExchange implements IDataExchange {
         document.visual.update();
     }
 
-    async importBrep(document: IDocument, file: File) {
-        const shape = shapeConverter.convertFromBrep(await file.text());
+    importBrep(document: IDocument, name: string, bytes: Uint8Array): Result<INode> {
+        const shape = shapeConverter.convertFromBrep(new TextDecoder().decode(bytes));
         if (!shape.isOk) {
             return Result.err(shape.error);
         }
-        return Result.ok(new EditableShapeNode({ document, name: file.name, shape: shape.value }));
-    }
-
-    private async importStl(document: IDocument, file: File) {
-        const content = new Uint8Array(await file.arrayBuffer());
-        return shapeConverter.convertFromSTL(document, content);
-    }
-
-    private async importIges(document: IDocument, file: File) {
-        const content = new Uint8Array(await file.arrayBuffer());
-        return shapeConverter.convertFromIGES(document, content);
-    }
-
-    private async importStep(document: IDocument, file: File) {
-        const content = new Uint8Array(await file.arrayBuffer());
-        return shapeConverter.convertFromSTEP(document, content);
+        return Result.ok(new EditableShapeNode({ document, name, shape: shape.value }));
     }
 
     async export(type: string, nodes: VisualNode[]): Promise<BlobPart[] | undefined> {
