@@ -1,7 +1,35 @@
 /* tslint:disable */
 /* eslint-disable */
 export const memory: WebAssembly.Memory;
+export const __wbg_stocksim_free: (a: number, b: number) => void;
+export const __wbg_stocksimmesh_free: (a: number, b: number) => void;
+export const stocksim_add_moves: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number];
+export const stocksim_add_tool: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: number, s: number, t: number) => [number, number, number];
+export const stocksim_comparison: (a: number) => [number, number];
+export const stocksim_cursor: (a: number) => number;
+export const stocksim_deviations: (a: number) => [number, number];
+export const stocksim_grid: (a: number) => [number, number];
+export const stocksim_heights: (a: number) => [number, number];
+export const stocksim_mesh: (a: number, b: number) => number;
+export const stocksim_move_count: (a: number) => number;
+export const stocksim_new: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number, number];
+export const stocksim_removed: (a: number) => [number, number];
+export const stocksim_run: (a: number, b: number) => number;
+export const stocksim_seek: (a: number, b: number) => void;
+export const stocksim_set_part: (a: number, b: number, c: number, d: number, e: number) => [number, number];
+export const stocksim_set_stock_heights: (a: number, b: number, c: number) => [number, number];
+export const stocksim_set_stock_triangles: (a: number, b: number, c: number, d: number, e: number) => [number, number];
+export const stocksim_set_tolerances: (a: number, b: number, c: number) => [number, number];
+export const stocksim_volume: (a: number) => number;
+export const stocksim_warnings: (a: number) => [number, number];
+export const stocksimmesh_deviation: (a: number) => [number, number];
+export const stocksimmesh_indices: (a: number) => [number, number];
+export const stocksimmesh_normals: (a: number) => [number, number];
+export const stocksimmesh_positions: (a: number) => [number, number];
 export const version: () => [number, number];
 export const __wbindgen_externrefs: WebAssembly.Table;
+export const __wbindgen_malloc: (a: number, b: number) => number;
+export const __externref_table_dealloc: (a: number) => void;
+export const __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
 export const __wbindgen_free: (a: number, b: number, c: number) => void;
 export const __wbindgen_start: () => void;

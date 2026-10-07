@@ -18,6 +18,7 @@ checksum = "4e7648175b45a9a48536d676f68d918270699102aa8dab5496df06904c914600"
 name = "chili-rs"
 version = "0.7.1"
 dependencies = [
+ "stocksim",
  "wasm-bindgen",
 ]
 
@@ -50,6 +51,10 @@ name = "rustversion"
 version = "1.0.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf54715a573b99ac80df0bc206da022bcd442c974952c7b9720069370852e21f"
+
+[[package]]
+name = "stocksim"
+version = "0.7.1"
 
 [[package]]
 name = "syn"
