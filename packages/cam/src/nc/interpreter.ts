@@ -26,6 +26,8 @@ import type { NcDiagnostic, NcDialectId, NcReadOptions, NcSeverity, NcToolInfo }
 type Arc = Extract<ToolpathMove, { kind: "arc" }>;
 type Plane = Arc["plane"];
 type CycleCode = 73 | 74 | 76 | 81 | 82 | 83 | 84 | 85 | 86 | 87 | 88 | 89;
+/** The motion group's mode (group 01, with the drilling cycles). */
+type MotionMode = "G0" | "G1" | "G2" | "G3" | "G5" | "G5.1" | "G33" | "G38" | "cycle" | undefined;
 
 const MM_PER_INCH = 25.4;
 const LENGTH_EPSILON = 1e-9;
@@ -59,6 +61,32 @@ const FANUC_ARGUMENTS: Record<string, number> = {
     Y: 25,
     Z: 26,
 };
+
+/** G codes the reader acts on (×10: G43.4 → 434). */
+const KNOWN_G = new Set([
+    0, 10, 20, 30, 40, 50, 51, 52, 90, 100, 170, 180, 190, 200, 210, 280, 281, 300, 301, 330, 331, 382, 383,
+    384, 385, 400, 410, 420, 430, 431, 434, 435, 440, 490, 520, 530, 531, 536, 540, 541, 550, 560, 570, 580,
+    590, 591, 592, 593, 610, 611, 640, 680, 682, 690, 700, 710, 730, 740, 760, 800, 810, 820, 830, 840, 850,
+    860, 870, 880, 890, 900, 901, 910, 911, 920, 921, 922, 923, 930, 940, 950, 960, 970, 980, 990, 1540, 2340,
+    2540, 2550, 650, 1870, 1030, 7000, 7100, 6420, 6410, 6010, 6020,
+]);
+
+const AXIS_LETTERS = ["X", "Y", "Z", "A", "B", "C", "U", "V", "W"];
+const SIEMENS_AXES = ["X", "Y", "Z", "A3", "B3", "C3"];
+const ROTARY_LETTERS = ["A", "B", "C"];
+const MOTION_CODES = [
+    [0, "G0"],
+    [10, "G1"],
+    [20, "G2"],
+    [30, "G3"],
+    [50, "G5"],
+    [51, "G5.1"],
+] as const;
+const PRINTER_MOTION_CODES = MOTION_CODES.slice(0, 4);
+const CYCLE_CODES = [73, 74, 76, 81, 82, 83, 84, 85, 86, 87, 88, 89] as const;
+
+/** M codes the reader acts on in every family but printers. */
+const HANDLED_M = new Set([0, 1, 2, 3, 4, 5, 6, 30, 60, 61, 97, 98, 99]);
 
 /** Mill M codes that do nothing to the path (orientation, rigid tap, overrides, …). */
 const PASSIVE_MILL_M = new Set([10, 11, 19, 29, 48, 49, 50, 51, 52, 53, 101, 102, 103, 104]);
@@ -95,6 +123,10 @@ export interface ReaderResult {
     readonly programNumber?: string;
     readonly name?: string;
     readonly homeUsed: boolean;
+    /** Moves at a home-derived height (written with the provisional `homeZ`). */
+    readonly homeRelative: readonly { readonly path: BuiltToolpath; readonly index: number }[];
+    /** Such a move went through a rotated frame: read again with the real home height. */
+    readonly homeInFrames: boolean;
     readonly maxProgrammedZ: number;
     readonly layers: number;
     /** Spindle speeds (laser powers) the program switches on with. */
@@ -107,19 +139,30 @@ export interface BuiltToolpath {
     lines: number[];
     homeMoves: Set<number>;
     start?: Vec3;
+    /** `start` is at the (provisional) home height. */
+    startAtHome?: boolean;
     spindleRpm?: number;
     coolant?: ToolpathData["coolant"];
     label?: string;
 }
 
 /** A block's words by letter, evaluated, plus its G and M codes (×10: G43.4 → 434). */
-type Words = Map<string, { readonly word: NcWord; readonly value: number }> & { g: number[]; m: number[] };
+class WordMap extends Map<string, { readonly word: NcWord; readonly value: number }> {
+    readonly g: number[] = [];
+    readonly m: number[] = [];
+}
+type Words = WordMap;
+
+/** A block's G or M codes (×10), in order. */
+type Codes = readonly number[];
 
 /** Siemens `NAME=value` words; `mode` is AC(…) (absolute) or IC(…) (incremental). */
 type NamedValues = Map<
     string,
     { readonly value?: number; readonly text: string; readonly mode?: "ac" | "ic" }
 >;
+
+const NO_NAMED: NamedValues = new Map();
 
 interface TiltFrame {
     /** Origin of the tilted plane in the active work coordinates. */
@@ -147,6 +190,8 @@ interface CallFrame {
     readonly kind: "program" | "local" | "macro" | "oword";
     readonly label?: string;
     readonly scoped: boolean;
+    /** Open o-word blocks (if/while/…) of the caller: a return closes the callee's. */
+    readonly owordDepth: number;
 }
 
 interface OwordFrame {
@@ -207,8 +252,13 @@ function callArguments(args: string): number[] {
 
 export class NcReader {
     private readonly lines: string[];
+    /** Lexed blocks, kept once the program jumps (straight programs are read once, line by line). */
     private readonly blocks: (NcBlock | undefined)[];
-    private readonly cache: boolean;
+    private caching = false;
+    /** Moves whose Z derives from the (provisional) home height, to shift once it is known. */
+    private readonly homeRelative: { path: BuiltToolpath; index: number }[] = [];
+    /** A home-derived move went through a rotation (tilted plane): shifting Z is not enough. */
+    private homeInFrames = false;
     readonly dialect: NcDialect;
     private readonly machine?: MachineProfileData;
     private readonly kinematics?: FiveAxisKinematics;
@@ -229,7 +279,7 @@ export class NcReader {
     private plane: Plane = "XY";
     private feedMode: "minute" | "inverse" | "revolution" = "minute";
     private feed: number;
-    private motion: "G0" | "G1" | "G2" | "G3" | "G5" | "G5.1" | "G33" | "G38" | "cycle" | undefined;
+    private motion: MotionMode;
     private cycle: CycleState | undefined;
     private cycleCode: CycleCode | undefined;
     private retractToR = false;
@@ -291,8 +341,7 @@ export class NcReader {
         homeZ: number,
     ) {
         this.lines = text.split("\n");
-        this.cache = this.lines.length <= 400_000;
-        this.blocks = this.cache ? new Array(this.lines.length) : [];
+        this.blocks = [];
         this.dialect = ncDialect(dialect);
         this.machine = options.machine;
         this.homeZ = options.homeZ ?? homeZ;
@@ -337,6 +386,11 @@ export class NcReader {
             const block = this.blockAt(pc);
             this.line = block.line;
             this.execute(block);
+            // A jump (loop, subprogram): lines may run again, keep their blocks from now on.
+            if (this.pc !== pc + 1 && !this.caching && this.lines.length <= 400_000) {
+                this.caching = true;
+                this.blocks.length = this.lines.length;
+            }
         }
         if (this.calls.length > 0 && !this.ended) {
             this.report(this.line, "warning", "The program ends inside a subprogram (no M99 / endsub)");
@@ -357,6 +411,8 @@ export class NcReader {
             ...(this.programNumber === undefined ? {} : { programNumber: this.programNumber }),
             ...(this.programName === undefined ? {} : { name: this.programName }),
             homeUsed: this.homeUsed,
+            homeRelative: this.homeRelative,
+            homeInFrames: this.homeInFrames,
             maxProgrammedZ: this.maxProgrammedZ,
             layers: this.layers,
             ...(this.spindle === undefined ? {} : { spindle: this.spindle }),
@@ -364,14 +420,11 @@ export class NcReader {
     }
 
     private blockAt(pc: number): NcBlock {
-        if (this.cache) {
-            const cached = this.blocks[pc];
-            if (cached !== undefined) return cached;
-            const block = lexBlock(this.lines[pc], pc + 1);
-            this.blocks[pc] = block;
-            return block;
-        }
-        return lexBlock(this.lines[pc], pc + 1);
+        const cached = this.blocks[pc];
+        if (cached !== undefined) return cached;
+        const block = lexBlock(this.lines[pc], pc + 1);
+        if (this.caching) this.blocks[pc] = block;
+        return block;
     }
 
     private report(line: number, severity: NcSeverity, message: string): void {
@@ -618,7 +671,14 @@ export class NcReader {
             this.ended = true;
             return;
         }
-        this.calls.push({ returnPc: this.pc, startPc, repeats: Math.max(1, repeats), kind, scoped });
+        this.calls.push({
+            returnPc: this.pc,
+            startPc,
+            repeats: Math.max(1, repeats),
+            kind,
+            scoped,
+            owordDepth: this.owords.length,
+        });
         if (scoped) this.locals.push(new Map());
         this.pc = startPc;
     }
@@ -642,6 +702,7 @@ export class NcReader {
         }
         this.calls.pop();
         if (frame.scoped) this.locals.pop();
+        this.owords.length = Math.min(this.owords.length, frame.owordDepth);
         this.pc = frame.returnPc;
         if (sequence !== undefined) this.gotoSequence(sequence);
     }
@@ -689,11 +750,6 @@ export class NcReader {
             }
             case "ENDSUB":
             case "RETURN": {
-                while (this.owords.length > 0 && this.calls.at(-1)?.label === label) {
-                    const top = this.owords.at(-1)!;
-                    if (top.startPc < (this.calls.at(-1)?.startPc ?? 0)) break;
-                    this.owords.pop();
-                }
                 if (args[0] !== undefined) this.globals.set("_value", this.expression(args[0]));
                 if (this.calls.at(-1)?.kind === "oword") this.returnFromProgram();
                 return;
@@ -716,6 +772,7 @@ export class NcReader {
                     kind: "oword",
                     label,
                     scoped: true,
+                    owordDepth: this.owords.length,
                 });
                 const locals = new Map<number | string, number>();
                 values.forEach((value, index) => {
@@ -845,9 +902,7 @@ export class NcReader {
     // ------------------------------------------------------------------ Words
 
     private evaluateWords(block: NcBlock): Words {
-        const words = new Map() as Words;
-        words.g = [];
-        words.m = [];
+        const words = new WordMap();
         for (const word of block.words) {
             const value = this.value(word);
             if (word.letter === "G") {
@@ -871,8 +926,8 @@ export class NcReader {
     }
 
     private executeWords(block: NcBlock, words: Words): void {
-        const g = new Set(words.g);
-        const m = new Set(words.m);
+        const g = words.g;
+        const m = words.m;
         const has = (letter: string) => words.has(letter);
         const num = (letter: string) => words.get(letter)?.value;
         if (this.dialect.family === "printer") {
@@ -881,7 +936,7 @@ export class NcReader {
         }
 
         // Named values and keywords (Siemens).
-        const named: NamedValues = new Map();
+        const named: NamedValues = block.named.length === 0 ? NO_NAMED : new Map();
         for (const entry of block.named) {
             const fn = entry.value?.k === "fn" ? entry.value.name : undefined;
             const mode = fn === "IC" ? "ic" : fn === "AC" ? "ac" : undefined;
@@ -901,10 +956,10 @@ export class NcReader {
         }
 
         // 1. Feed rate mode, feed.
-        if (g.has(930)) this.feedMode = "inverse";
-        if (g.has(940)) this.feedMode = "minute";
-        if (g.has(950)) this.feedMode = "revolution";
-        const isDwell = g.has(40);
+        if (g.includes(930)) this.feedMode = "inverse";
+        if (g.includes(940)) this.feedMode = "minute";
+        if (g.includes(950)) this.feedMode = "revolution";
+        const isDwell = g.includes(40);
         if (has("F") && !(isDwell && this.dialect.dwell === "siemens")) {
             const f = num("F")!;
             if (this.feedMode === "inverse") this.inverseFeed = f;
@@ -920,14 +975,14 @@ export class NcReader {
         }
         // 3. Tool select, 4. tool change.
         if (has("T")) this.pendingTool = Math.round(num("T")!);
-        if (m.has(60)) {
+        if (m.includes(60)) {
             if (this.pendingTool === undefined) {
                 this.report(block.line, "warning", "M6 without a T word: the tool stays");
             } else {
                 this.toolChange(this.pendingTool, block.line);
             }
         }
-        if (m.has(610) && has("Q")) this.toolChange(Math.round(num("Q")!), block.line);
+        if (m.includes(610) && has("Q")) this.toolChange(Math.round(num("Q")!), block.line);
         // 5. Spindle / beam, 6. coolant.
         this.spindleCodes(m, block.line);
         for (const code of m) {
@@ -943,71 +998,73 @@ export class NcReader {
             return;
         }
         // 8. Plane, units, compensation, length offsets.
-        if (g.has(170)) this.plane = "XY";
-        if (g.has(180)) this.plane = "ZX";
-        if (g.has(190)) this.plane = "YZ";
-        if (g.has(200) || (this.dialect.siemensUnits && (g.has(700) || g.has(7000)))) this.setUnits(true);
-        if (g.has(210) || (this.dialect.siemensUnits && (g.has(710) || g.has(7100)))) this.setUnits(false);
-        if (!this.dialect.siemensUnits && (g.has(700) || g.has(710)))
+        if (g.includes(170)) this.plane = "XY";
+        if (g.includes(180)) this.plane = "ZX";
+        if (g.includes(190)) this.plane = "YZ";
+        if (g.includes(200) || (this.dialect.siemensUnits && (g.includes(700) || g.includes(7000))))
+            this.setUnits(true);
+        if (g.includes(210) || (this.dialect.siemensUnits && (g.includes(710) || g.includes(7100))))
+            this.setUnits(false);
+        if (!this.dialect.siemensUnits && (g.includes(700) || g.includes(710)))
             this.report(block.line, "warning", "G70/G71 are lathe cycles here (not supported)");
-        if (g.has(410) || g.has(420)) {
+        if (g.includes(410) || g.includes(420)) {
             this.report(
                 block.line,
                 "warning",
                 "Cutter compensation (G41/G42) is not applied: the backplot shows the programmed path",
             );
         }
-        if (g.has(434) || g.has(435) || g.has(2340)) this.setTcp(true);
-        if (g.has(490)) this.setTcp(false);
+        if (g.includes(434) || g.includes(435) || g.includes(2340)) this.setTcp(true);
+        if (g.includes(490)) this.setTcp(false);
         // 9. Coordinate systems.
         this.workOffsetCodes(g, words, block.line);
         // 10. Distance modes, retract mode.
-        if (g.has(900)) this.absolute = true;
-        if (g.has(910)) this.absolute = false;
-        if (g.has(901)) this.arcAbsolute = true;
-        if (g.has(911)) this.arcAbsolute = false;
-        if (g.has(980)) this.retractToR = false;
-        if (g.has(990)) this.retractToR = true;
+        if (g.includes(900)) this.absolute = true;
+        if (g.includes(910)) this.absolute = false;
+        if (g.includes(901)) this.arcAbsolute = true;
+        if (g.includes(911)) this.arcAbsolute = false;
+        if (g.includes(980)) this.retractToR = false;
+        if (g.includes(990)) this.retractToR = true;
         // Tilted planes and DWO.
-        if (g.has(682)) this.tiltedPlane(words, block.line);
-        else if (g.has(680)) this.rotation2d(words, block.line);
-        if (g.has(531) || g.has(536)) this.orientTool(block.line);
-        if (g.has(690)) this.setTilt(undefined);
-        if (g.has(2540)) this.setDwo(true);
-        if (g.has(2550)) this.setDwo(false);
+        if (g.includes(682)) this.tiltedPlane(words, block.line);
+        else if (g.includes(680)) this.rotation2d(words, block.line);
+        if (g.includes(531) || g.includes(536)) this.orientTool(block.line);
+        if (g.includes(690)) this.setTilt(undefined);
+        if (g.includes(2540)) this.setDwo(true);
+        if (g.includes(2550)) this.setDwo(false);
         // Motion modes are modal even in a block that is busy with something else.
         this.motionModes(g, block.line);
         // 11. Non-modal: offsets, reference returns, machine coordinates (their axis words are theirs).
-        if (g.has(100)) {
+        if (g.includes(100)) {
             this.g10(words, block.line);
             this.afterMotion(m, block.line);
             return;
         }
-        if (g.has(920) || g.has(520)) {
-            if (g.has(920)) this.g92Command(words);
+        if (g.includes(920) || g.includes(520)) {
+            if (g.includes(920)) this.g92Command(words);
             else this.withFrameChange(() => (this.g52 = this.axisValues(words, this.g52)));
             this.afterMotion(m, block.line);
             return;
         }
-        if (g.has(921) || g.has(922)) this.withFrameChange(() => (this.g92 = [0, 0, 0]));
-        if (g.has(280) || g.has(300)) {
+        if (g.includes(921) || g.includes(922)) this.withFrameChange(() => (this.g92 = [0, 0, 0]));
+        if (g.includes(280) || g.includes(300)) {
             this.referenceReturn(words, block.line);
             this.afterMotion(m, block.line);
             return;
         }
-        if (g.has(530) || block.keywords.includes("SUPA")) {
+        if (g.includes(530) || block.keywords.includes("SUPA")) {
             this.machineMove(words, block.line);
             this.afterMotion(m, block.line);
             return;
         }
-        if (g.has(650)) {
+        if (g.includes(650)) {
             this.macroCall(words, block.line);
             return;
         }
         // 12. Motion.
-        const axisWords = ["X", "Y", "Z", "A", "B", "C", "U", "V", "W"].some((letter) => has(letter));
-        const siemensAxes = ["X", "Y", "Z", "A3", "B3", "C3"].some((name) => named.has(name));
-        if (g.has(331)) this.rigidTap(words, block.line);
+        const axisWords = AXIS_LETTERS.some((letter) => has(letter));
+        const siemensAxes = named.size > 0 && SIEMENS_AXES.some((name) => named.has(name));
+        if (g.includes(331)) this.rigidTap(words, block.line);
         else if (axisWords || siemensAxes || (this.motion === "cycle" && has("R"))) {
             this.motionBlock(block, words, named);
         } else if ((this.motion === "G2" || this.motion === "G3") && (has("I") || has("J") || has("K"))) {
@@ -1018,75 +1075,70 @@ export class NcReader {
     }
 
     /** The motion group (G0–G3, splines, threading, probing, drilling cycles, G80). */
-    private motionModes(g: Set<number>, line: number): void {
-        if (g.has(800)) {
+    private motionModes(g: Codes, line: number): void {
+        if (g.includes(800)) {
             this.cycle = undefined;
             this.cycleCode = undefined;
-            if (this.motion === "cycle") this.motion = undefined;
+            // Fanuc keeps G0/G1 (group 01) under a cycle (group 09): after G80 it is back.
+            if (this.motion === "cycle") this.motion = this.motionBeforeCycle;
         }
-        for (const [code, motion] of [
-            [0, "G0"],
-            [10, "G1"],
-            [20, "G2"],
-            [30, "G3"],
-            [50, "G5"],
-            [51, "G5.1"],
-        ] as const) {
-            if (g.has(code)) {
+        for (const [code, motion] of MOTION_CODES) {
+            if (g.includes(code)) {
                 this.motion = motion;
                 this.cycle = undefined;
                 this.cycleCode = undefined;
             }
         }
-        if (g.has(52)) this.report(line, "error", "G5.2 NURBS are not supported");
-        if (g.has(330) || g.has(331) || g.has(760)) this.motion = "G33";
-        if ([382, 383, 384, 385].some((code) => g.has(code))) this.motion = "G38";
-        for (const code of [73, 74, 76, 81, 82, 83, 84, 85, 86, 87, 88, 89] as const) {
-            if (g.has(code * 10)) {
-                if (this.motion !== "cycle") this.cycle = undefined;
+        if (g.includes(52)) this.report(line, "error", "G5.2 NURBS are not supported");
+        if (g.includes(330) || g.includes(331) || g.includes(760)) this.motion = "G33";
+        if ([382, 383, 384, 385].some((code) => g.includes(code))) this.motion = "G38";
+        for (const code of CYCLE_CODES) {
+            if (g.includes(code * 10)) {
+                if (this.motion !== "cycle") {
+                    this.cycle = undefined;
+                    this.motionBeforeCycle = this.motion;
+                }
                 this.cycleCode = code;
                 this.motion = "cycle";
             }
         }
     }
 
+    private motionBeforeCycle: MotionMode;
+
     /** Printer firmware: moves with extrusion, extrusion modes, homing, dwell, extruder changes. */
-    private printerWords(block: NcBlock, words: Words, g: Set<number>, m: Set<number>): void {
-        if (m.has(820)) this.absoluteE = true;
-        if (m.has(830)) this.absoluteE = false;
-        if (words.has("T") && m.size === 0 && g.size === 0) {
+    private printerWords(block: NcBlock, words: Words, g: Codes, m: Codes): void {
+        if (m.includes(820)) this.absoluteE = true;
+        if (m.includes(830)) this.absoluteE = false;
+        if (words.has("T") && m.length === 0 && g.length === 0) {
             this.toolChange(Math.round(words.get("T")!.value), block.line);
         }
-        if (g.size === 0) {
+        if (g.length === 0) {
             this.afterMotion(m, block.line);
             return;
         }
-        if (words.has("F") && !g.has(40)) this.feed = words.get("F")!.value * this.scale();
-        if (g.has(40)) {
+        if (words.has("F") && !g.includes(40)) this.feed = words.get("F")!.value * this.scale();
+        if (g.includes(40)) {
             this.dwell(words, block.line);
             return;
         }
-        if (g.has(200)) this.setUnits(true);
-        if (g.has(210)) this.setUnits(false);
-        if (g.has(900)) this.absolute = true;
-        if (g.has(910)) this.absolute = false;
-        if (g.has(920)) {
+        if (g.includes(200)) this.setUnits(true);
+        if (g.includes(210)) this.setUnits(false);
+        if (g.includes(900)) this.absolute = true;
+        if (g.includes(910)) this.absolute = false;
+        if (g.includes(920)) {
             this.g92Command(words);
             return;
         }
-        if (g.has(280)) {
+        if (g.includes(280)) {
             this.referenceReturn(words, block.line);
             return;
         }
-        for (const [code, motion] of [
-            [0, "G0"],
-            [10, "G1"],
-            [20, "G2"],
-            [30, "G3"],
-        ] as const) {
-            if (g.has(code)) this.motion = motion;
+        for (const [code, motion] of PRINTER_MOTION_CODES) {
+            if (g.includes(code)) this.motion = motion;
         }
-        if ([0, 10, 20, 30].some((code) => g.has(code))) this.motionBlock(block, words, new Map());
+        if (g.includes(0) || g.includes(10) || g.includes(20) || g.includes(30))
+            this.motionBlock(block, words, NO_NAMED);
         this.afterMotion(m, block.line);
     }
 
@@ -1094,9 +1146,9 @@ export class NcReader {
     private feedPerRev = false;
 
     /** Program stops and ends, after the block's motion. */
-    private afterMotion(m: Set<number>, line: number): void {
+    private afterMotion(m: Codes, line: number): void {
         const printer = this.dialect.family === "printer";
-        if (m.has(0) || m.has(10)) {
+        if (m.includes(0) || m.includes(10)) {
             if (this.manualTool !== undefined && this.dialect.manualToolChange) {
                 this.toolChange(this.manualTool, line);
                 this.manualTool = undefined;
@@ -1104,16 +1156,16 @@ export class NcReader {
                 this.emit({ kind: "dwell", seconds: 0 });
             }
         }
-        if (m.has(600) && this.dialect.family === "mill") this.emit({ kind: "dwell", seconds: 0 });
-        if (!printer && (m.has(20) || m.has(300))) {
+        if (m.includes(600) && this.dialect.family === "mill") this.emit({ kind: "dwell", seconds: 0 });
+        if (!printer && (m.includes(20) || m.includes(300))) {
             if (this.calls.length > 0 && this.calls.at(-1)!.kind !== "oword") {
                 this.report(line, "warning", "M2/M30 inside a subprogram ends the whole program");
             }
             this.ended = true;
         }
-        if (m.has(980) && !printer) this.subprogramCall(line);
-        if (m.has(970) && !printer) this.localSubprogramCall(line);
-        if (m.has(990) && !printer) {
+        if (m.includes(980) && !printer) this.subprogramCall(line);
+        if (m.includes(970) && !printer) this.localSubprogramCall(line);
+        if (m.includes(990) && !printer) {
             const p = this.wordNumber("P");
             this.returnFromProgram(p === undefined ? undefined : Math.round(p));
         }
@@ -1176,26 +1228,19 @@ export class NcReader {
             repeats: Math.max(1, Math.round(words.get("L")?.value ?? 1)),
             kind: "macro",
             scoped: true,
+            owordDepth: this.owords.length,
         });
         this.locals.push(locals);
         this.pc = start + 1;
     }
 
     private checkG(code: number): void {
-        const known = new Set([
-            0, 10, 20, 30, 40, 50, 51, 52, 90, 100, 170, 180, 190, 200, 210, 280, 281, 300, 301, 330, 331,
-            382, 383, 384, 385, 400, 410, 420, 430, 431, 434, 435, 440, 490, 520, 530, 531, 536, 540, 541,
-            550, 560, 570, 580, 590, 591, 592, 593, 610, 611, 640, 680, 682, 690, 700, 710, 730, 740, 760,
-            800, 810, 820, 830, 840, 850, 860, 870, 880, 890, 900, 901, 910, 911, 920, 921, 922, 923, 930,
-            940, 950, 960, 970, 980, 990, 1540, 2340, 2540, 2550, 650, 1870, 1030, 7000, 7100, 6420, 6410,
-            6010, 6020,
-        ]);
         if (code >= 1100 && code <= 1290) return; // Haas G110–G129 work offsets
         if (this.dialect.family === "printer") {
             // Printers: G28/G29/G80 (mesh levelling), G10/G11 (retraction) … do not move the path.
             if (![0, 10, 20, 30, 40, 200, 210, 280, 900, 910, 920].includes(code)) return;
         }
-        if (!known.has(code)) {
+        if (!KNOWN_G.has(code)) {
             const text = code % 10 === 0 ? `G${code / 10}` : `G${(code / 10).toFixed(1)}`;
             this.report(this.line, "warning", `${text} is not supported`);
         }
@@ -1205,8 +1250,7 @@ export class NcReader {
         const family = this.dialect.family;
         if (family === "printer") return;
         const base = code / 10;
-        const handled = [0, 1, 2, 3, 4, 5, 6, 30, 60, 61, 97, 98, 99];
-        if (handled.includes(base)) return;
+        if (HANDLED_M.has(base)) return;
         if (this.dialect.coolantOn[base] !== undefined || this.dialect.coolantOff.includes(base)) return;
         if (this.dialect.beamOn?.includes(base) || this.dialect.beamOff?.includes(base)) return;
         if (this.dialect.passive?.includes(base)) return;
@@ -1287,7 +1331,7 @@ export class NcReader {
 
     private spindle: { min: number; max: number } | undefined;
 
-    private spindleCodes(m: Set<number>, line: number): void {
+    private spindleCodes(m: Codes, line: number): void {
         const beamOn = this.dialect.beamOn ?? [];
         const beamOff = this.dialect.beamOff ?? [];
         if (this.dialect.family === "printer") return;
@@ -1297,18 +1341,18 @@ export class NcReader {
                 if (beamOn.includes(code / 10)) this.cutterOn();
                 else if (beamOff.includes(code / 10)) this.cutterOff();
             }
-            if (this.dialect.id === "laser" && (m.has(30) || m.has(40))) {
+            if (this.dialect.id === "laser" && (m.includes(30) || m.includes(40))) {
                 this.spindleOn = true;
                 this.noteSpindle();
             }
             return;
         }
-        if (m.has(30) || m.has(40)) {
+        if (m.includes(30) || m.includes(40)) {
             this.spindleOn = true;
             this.noteSpindle();
             if (this.rpm <= 0) this.report(line, "info", "The spindle starts without a speed (S)");
         }
-        if (m.has(50)) this.spindleOn = false;
+        if (m.includes(50)) this.spindleOn = false;
     }
 
     private cutterOn(): void {
@@ -1454,12 +1498,12 @@ export class NcReader {
 
     // ------------------------------------------------------------------ Work offsets
 
-    private offsetKey(g: Set<number>, words: Words): string | undefined {
-        for (let index = 0; index < 6; index++) if (g.has(540 + index * 10)) return `G${54 + index}`;
-        for (const sub of [1, 2, 3]) if (g.has(590 + sub)) return `G59.${sub}`;
+    private offsetKey(g: Codes, words: Words): string | undefined {
+        for (let index = 0; index < 6; index++) if (g.includes(540 + index * 10)) return `G${54 + index}`;
+        for (const sub of [1, 2, 3]) if (g.includes(590 + sub)) return `G59.${sub}`;
         const p = words.get("P")?.value;
-        if (g.has(541)) return `G54.1 P${Math.round(p ?? 1)}`;
-        if (g.has(1540)) return `G54.1 P${Math.round(p ?? 1)}`;
+        if (g.includes(541)) return `G54.1 P${Math.round(p ?? 1)}`;
+        if (g.includes(1540)) return `G54.1 P${Math.round(p ?? 1)}`;
         for (const code of g) {
             if (code >= 1100 && code <= 1290 && code % 10 === 0) return `G54.1 P${(code - 1090) / 10}`;
         }
@@ -1484,10 +1528,11 @@ export class NcReader {
             return;
         }
         change();
+        this.updateShift();
     }
 
-    private workOffsetCodes(g: Set<number>, words: Words, line: number): void {
-        if (g.has(100)) return; // G10 L2 P… names an offset, it does not select it
+    private workOffsetCodes(g: Codes, words: Words, line: number): void {
+        if (g.includes(100)) return; // G10 L2 P… names an offset, it does not select it
         const key = this.offsetKey(g, words);
         if (key === undefined || key === this.activeOffset) return;
         if (this.base !== undefined && !this.offsets.has(key) && !this.unknownOffsetReported.has(key)) {
@@ -1617,6 +1662,7 @@ export class NcReader {
 
     /** Program coordinates (active system) → base (output) coordinates, without the base shift. */
     private toBaseRaw(program: Vec3): Vec3 {
+        if (!this.shifted && this.tilt === undefined && this.kinematics === undefined) return program;
         let point = program;
         if (this.tilt !== undefined) point = add(this.tilt.origin, mulMV(this.tilt.frame, point));
         else if (this.machineCoordinates()) {
@@ -1625,12 +1671,21 @@ export class NcReader {
         return add(point, this.shift());
     }
 
+    /** Active frame offset minus the base frame's (zero before the first motion). */
     private shift(): Vec3 {
-        if (this.base === undefined) return [0, 0, 0];
-        return sub(this.frameOffset(), this.base);
+        return this.shiftVector;
+    }
+
+    private shiftVector: Vec3 = [0, 0, 0];
+    private shifted = false;
+
+    private updateShift(): void {
+        this.shiftVector = this.base === undefined ? [0, 0, 0] : sub(this.frameOffset(), this.base);
+        this.shifted = this.shiftVector[0] !== 0 || this.shiftVector[1] !== 0 || this.shiftVector[2] !== 0;
     }
 
     private toProgram(point: Vec3): Vec3 {
+        if (!this.shifted && this.tilt === undefined && this.kinematics === undefined) return point;
         let local = sub(point, this.shift());
         if (this.tilt !== undefined) local = mulMV(transpose(this.tilt.frame), sub(local, this.tilt.origin));
         else if (this.machineCoordinates()) {
@@ -1653,6 +1708,7 @@ export class NcReader {
             lines: [],
             homeMoves: new Set(),
             ...(this.positionKnown ? { start: this.position } : {}),
+            ...(this.positionKnown && this.zState !== "programmed" ? { startAtHome: true } : {}),
         };
         if (this.spindleOn && this.rpm > 0) path.spindleRpm = this.rpm;
         if (this.coolant !== "off") path.coolant = this.coolant;
@@ -1675,19 +1731,35 @@ export class NcReader {
         const path = this.current!;
         path.moves.push(move);
         path.lines.push(this.line);
-        if (home) path.homeMoves.add(path.moves.length - 1);
-        return path.moves.length - 1;
+        const index = path.moves.length - 1;
+        if (home) path.homeMoves.add(index);
+        if (this.atHomeHeight) {
+            this.atHomeHeight = false;
+            this.homeRelative.push({ path, index });
+            if (!this.translationOnly()) this.homeInFrames = true;
+        }
+        return index;
     }
+
+    /** The next emitted move's height derives from the home height (`trackZ` said so). */
+    private atHomeHeight = false;
 
     /** Called before any motion: fixes the base frame, flushes comments, starts the wire. */
     private beginMotion(): void {
-        if (this.base === undefined) this.base = this.frameOffset();
+        if (this.base === undefined) {
+            this.base = this.frameOffset();
+            this.updateShift();
+        }
         this.flushComments();
     }
 
     private trackZ(to: Vec3, home: boolean): void {
-        if (home || this.zState !== "programmed") this.homeUsed = true;
-        else this.maxProgrammedZ = Math.max(this.maxProgrammedZ, to[2]);
+        if (home || this.zState !== "programmed") {
+            this.homeUsed = true;
+            this.atHomeHeight = true;
+        } else {
+            this.maxProgrammedZ = Math.max(this.maxProgrammedZ, to[2]);
+        }
     }
 
     private moveTo(to: Vec3, kind: "rapid" | "linear", home = false): void {
@@ -1879,7 +1951,7 @@ export class NcReader {
 
     private updateRotaries(words: Words): void {
         let changed = false;
-        for (const letter of ["A", "B", "C"]) {
+        for (const letter of ROTARY_LETTERS) {
             const word = words.get(letter);
             if (word === undefined || Number.isNaN(word.value)) continue;
             const next = this.absolute ? word.value : this.angles[letter] + word.value;

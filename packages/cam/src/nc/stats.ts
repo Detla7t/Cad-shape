@@ -4,7 +4,7 @@
 import { DEFAULT_PRINT_KINEMATICS, estimatePrintTime } from "../additive/gcode/estimate";
 import type { MachineProfileData } from "../model/machine";
 import type { ToolpathMove, Vec3 } from "../model/toolpath";
-import { arcRadius, arcSweep, drillPlanes, planeAxes } from "../posts/motion";
+import { arcPoints, arcRadius, arcSweep, drillPlanes, planeAxes } from "../posts/motion";
 import type { NcBounds, NcStats, NcToolpath } from "./program";
 
 /**
@@ -144,6 +144,13 @@ export function ncStats(
             noteFeed(move.feed);
             cutBounds.add(from);
             cutBounds.add(move.to);
+            if (move.kind === "arc") {
+                // An arc bulges past its end points.
+                for (const point of arcPoints(from, move, 0.01)) {
+                    bounds.add(point);
+                    cutBounds.add(point);
+                }
+            }
             if (move.kind === "extrude") filament += move.extrude;
         });
     }

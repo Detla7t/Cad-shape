@@ -151,12 +151,14 @@ const PRECEDENCE: Record<string, number> = {
     XOR: 1,
 };
 
-/** Text messages: the rest of the line after these M codes is free text. */
-const MESSAGE_CODES = new Set([117, 118]);
+/** Printer text arguments: the rest of the line after these M codes is free text (M115 U5.1.2). */
+const MESSAGE_CODES = new Set([115, 117, 118]);
+
+const NO_ERRORS: readonly string[] = Object.freeze([]);
 
 class Cursor {
     pos = 0;
-    readonly errors: string[] = [];
+    private list: string[] | undefined;
     constructor(
         readonly text: string,
         /** Upper-case copy for matching. */
@@ -165,6 +167,25 @@ class Cursor {
 
     get done(): boolean {
         return this.pos >= this.text.length;
+    }
+
+    /** What could not be read (shared and empty until the first error). */
+    get errors(): readonly string[] {
+        return this.list ?? NO_ERRORS;
+    }
+
+    error(message: string): void {
+        this.list ??= [];
+        this.list.push(message);
+    }
+
+    get errorCount(): number {
+        return this.list?.length ?? 0;
+    }
+
+    /** Drops errors past `count` (a speculative parse that is retried another way). */
+    truncateErrors(count: number): void {
+        if (this.list !== undefined) this.list.length = count;
     }
 
     peek(offset = 0): number {
@@ -195,16 +216,23 @@ class Cursor {
 const isDigit = (c: number) => c >= 48 && c <= 57;
 const isLetter = (c: number) => (c >= 65 && c <= 90) || c === 95;
 
-/** A number literal at the cursor: `12`, `-1.5`, `.5`, `+3.`; undefined when there is none. */
-function readNumber(cursor: Cursor): { value: number; decimal: boolean } | undefined {
+/** Whether the last number `readNumber` read had a decimal point. */
+let numberDecimal = false;
+
+/** A number literal at the cursor: `12`, `-1.5`, `.5`, `+3.`; NaN when there is none. */
+function readNumber(cursor: Cursor): number {
     const start = cursor.pos;
     let at = start;
     const text = cursor.upper;
     let c = text.charCodeAt(at);
+    let spaced = false;
     if (c === 43 || c === 45) {
         at++;
         // Fanuc allows a space after the sign rarely; LinuxCNC allows spaces anywhere.
-        while (text.charCodeAt(at) === 32) at++;
+        while (text.charCodeAt(at) === 32) {
+            at++;
+            spaced = true;
+        }
         c = text.charCodeAt(at);
     }
     let digits = 0;
@@ -215,10 +243,11 @@ function readNumber(cursor: Cursor): { value: number; decimal: boolean } | undef
         at++;
         c = text.charCodeAt(at);
     }
-    if (digits === 0) return undefined;
-    const literal = text.slice(start, at).replace(/\s+/g, "");
+    if (digits === 0) return Number.NaN;
+    const literal = spaced ? text.slice(start, at).replace(/\s+/g, "") : text.slice(start, at);
     cursor.pos = at;
-    return { value: Number(literal), decimal };
+    numberDecimal = decimal;
+    return Number(literal);
 }
 
 /** A primary of an expression: number, parameter, bracketed expression, function, unary. */
@@ -230,7 +259,7 @@ function parsePrimary(cursor: Cursor): Expr | undefined {
         const inner = parseExpression(cursor);
         cursor.skipFiller();
         if (cursor.peek() === 93) cursor.pos++;
-        else cursor.errors.push("missing ]");
+        else cursor.error("missing ]");
         return inner;
     }
     if (c === 35) return parseParameter(cursor);
@@ -238,7 +267,7 @@ function parsePrimary(cursor: Cursor): Expr | undefined {
         const next = cursor.peek(1);
         if (isDigit(next) || next === 46) {
             const number = readNumber(cursor);
-            if (number !== undefined) return { k: "num", v: number.value };
+            if (!Number.isNaN(number)) return { k: "num", v: number };
         }
         cursor.pos++;
         const a = parsePrimary(cursor);
@@ -247,7 +276,7 @@ function parsePrimary(cursor: Cursor): Expr | undefined {
     }
     if (isDigit(c) || c === 46) {
         const number = readNumber(cursor);
-        return number === undefined ? undefined : { k: "num", v: number.value };
+        return Number.isNaN(number) ? undefined : { k: "num", v: number };
     }
     if (isLetter(c)) {
         const start = cursor.pos;
@@ -260,7 +289,7 @@ function parsePrimary(cursor: Cursor): Expr | undefined {
         if (FUNCTIONS.has(name)) {
             cursor.skipFiller();
             if (cursor.peek() !== 91) {
-                cursor.errors.push(`${name} needs [ ]`);
+                cursor.error(`${name} needs [ ]`);
                 return undefined;
             }
             const args: Expr[] = [];
@@ -295,7 +324,7 @@ function parseParameter(cursor: Cursor): Expr | undefined {
     if (c === 60) {
         const close = cursor.text.indexOf(">", cursor.pos);
         if (close < 0) {
-            cursor.errors.push("missing > in a named parameter");
+            cursor.error("missing > in a named parameter");
             cursor.pos = cursor.text.length;
             return undefined;
         }
@@ -310,7 +339,7 @@ function parseParameter(cursor: Cursor): Expr | undefined {
     const start = cursor.pos;
     while (isDigit(cursor.peek())) cursor.pos++;
     if (cursor.pos === start) {
-        cursor.errors.push("# needs a parameter number");
+        cursor.error("# needs a parameter number");
         return undefined;
     }
     return { k: "var", index: { k: "num", v: Number(cursor.upper.slice(start, cursor.pos)) } };
@@ -337,7 +366,7 @@ function peekOperator(cursor: Cursor): { op: string; length: number } | undefine
 export function parseExpression(cursor: Cursor, minPrecedence = 1): Expr {
     let left = parsePrimary(cursor);
     if (left === undefined) {
-        cursor.errors.push("expected a value");
+        cursor.error("expected a value");
         return { k: "num", v: Number.NaN };
     }
     for (;;) {
@@ -352,30 +381,62 @@ export function parseExpression(cursor: Cursor, minPrecedence = 1): Expr {
     return left;
 }
 
-/** A word's value: a literal, a parameter, a bracketed expression, or a signed one of those. */
-function readWordValue(cursor: Cursor): { value: number; expr?: Expr; decimal: boolean } | undefined {
+/** The last word value `readWordValue` read. */
+let wordValue = Number.NaN;
+let wordExpr: Expr | undefined;
+let wordDecimal = false;
+
+/**
+ * A word's value — a literal, a parameter, a bracketed expression, or a signed one of
+ * those — into `wordValue` / `wordExpr` / `wordDecimal`; false when there is none.
+ */
+function readWordValue(cursor: Cursor): boolean {
     cursor.skipSpaces();
     const c = cursor.peek();
-    if (
-        isDigit(c) ||
-        c === 46 ||
-        ((c === 43 || c === 45) && /[\d.]/.test(cursor.upper[cursor.pos + 1] ?? ""))
-    ) {
-        const number = readNumber(cursor);
-        if (number !== undefined) return { value: number.value, decimal: number.decimal };
-    }
-    if ((c === 43 || c === 45) && cursor.upper[cursor.pos + 1] === " ") {
+    wordExpr = undefined;
+    wordDecimal = false;
+    const next = cursor.peek(1);
+    const signed = c === 43 || c === 45;
+    if (isDigit(c) || c === 46 || (signed && (isDigit(next) || next === 46 || next === 32))) {
         // "X - 1.5": LinuxCNC tolerates spaces inside numbers.
         const number = readNumber(cursor);
-        if (number !== undefined) return { value: number.value, decimal: number.decimal };
+        if (!Number.isNaN(number)) {
+            wordValue = number;
+            wordDecimal = numberDecimal;
+            return true;
+        }
     }
-    if (c === 35 || c === 91 || c === 43 || c === 45) {
+    if (c === 35 || c === 91 || signed) {
         const expr = parsePrimary(cursor);
-        if (expr === undefined) return undefined;
-        if (expr.k === "num") return { value: expr.v, decimal: true };
-        return { value: Number.NaN, expr, decimal: true };
+        if (expr === undefined) return false;
+        wordDecimal = true;
+        if (expr.k === "num") {
+            wordValue = expr.v;
+            return true;
+        }
+        wordValue = Number.NaN;
+        wordExpr = expr;
+        return true;
     }
-    return undefined;
+    wordValue = Number.NaN;
+    return false;
+}
+
+const NO_WORDS: readonly NcWord[] = Object.freeze([]);
+
+/** `list` with `item` appended; a list is only allocated for its first item. */
+function append<T>(list: T[] | undefined, item: T): T[] {
+    if (list === undefined) return [item];
+    list.push(item);
+    return list;
+}
+const NONE: readonly never[] = Object.freeze([]);
+
+function word(letter: string, column: number, found: boolean): NcWord {
+    if (!found) return { letter, value: Number.NaN, decimal: false, column };
+    return wordExpr === undefined
+        ? { letter, value: wordValue, decimal: wordDecimal, column }
+        : { letter, value: Number.NaN, expr: wordExpr, decimal: wordDecimal, column };
 }
 
 function makeCursor(text: string): Cursor {
@@ -387,7 +448,7 @@ export function parseExpressionText(text: string): { expr: Expr; errors: readonl
     const cursor = makeCursor(text);
     const expr = parseExpression(cursor);
     cursor.skipFiller();
-    if (!cursor.done) cursor.errors.push(`unexpected "${text.slice(cursor.pos)}"`);
+    if (!cursor.done) cursor.error(`unexpected "${text.slice(cursor.pos)}"`);
     return { expr, errors: cursor.errors };
 }
 
@@ -408,7 +469,7 @@ function readAssignment(cursor: Cursor): NcAssignment | undefined {
     cursor.skipSpaces();
     if (target === undefined) return undefined;
     if (cursor.peek() !== 61) {
-        cursor.errors.push("a parameter outside a word needs = (an assignment)");
+        cursor.error("a parameter outside a word needs = (an assignment)");
         return undefined;
     }
     cursor.pos++;
@@ -423,7 +484,7 @@ function readMacro(cursor: Cursor, keyword: string, comments: string[]): NcMacro
     if (keyword === "IF") {
         cursor.skipFiller(comments);
         if (cursor.peek() !== 91) {
-            cursor.errors.push("IF needs a [condition]");
+            cursor.error("IF needs a [condition]");
             return undefined;
         }
         const condition = parsePrimary(cursor) ?? { k: "num", v: 0 };
@@ -446,7 +507,7 @@ function readMacro(cursor: Cursor, keyword: string, comments: string[]): NcMacro
             }
             return { kind: "if", condition, then };
         }
-        cursor.errors.push("IF needs GOTO or THEN");
+        cursor.error("IF needs GOTO or THEN");
         return undefined;
     }
     if (keyword === "WHILE") {
@@ -455,7 +516,7 @@ function readMacro(cursor: Cursor, keyword: string, comments: string[]): NcMacro
         cursor.skipFiller(comments);
         const match = /^DO\s*(\d+)/.exec(cursor.upper.slice(cursor.pos));
         if (match === null) {
-            cursor.errors.push("WHILE needs DOm");
+            cursor.error("WHILE needs DOm");
             return undefined;
         }
         cursor.pos += match[0].length;
@@ -467,11 +528,11 @@ function readMacro(cursor: Cursor, keyword: string, comments: string[]): NcMacro
 /** Reads one line into a block. */
 export function lexBlock(text: string, line: number): NcBlock {
     const cursor = makeCursor(text.endsWith("\r") ? text.slice(0, -1) : text);
-    const words: NcWord[] = [];
-    const assignments: NcAssignment[] = [];
-    const named: NcNamed[] = [];
-    const keywords: string[] = [];
-    const calls: { name: string; args: string }[] = [];
+    let words: NcWord[] | undefined;
+    let assignments: NcAssignment[] | undefined;
+    let named: NcNamed[] | undefined;
+    let keywords: string[] | undefined;
+    let calls: { name: string; args: string }[] | undefined;
     const comments: string[] = [];
     let deleted = false;
     let percent = false;
@@ -509,7 +570,7 @@ export function lexBlock(text: string, line: number): NcBlock {
             const close = cursor.text.indexOf(")", cursor.pos + 1);
             if (close < 0) {
                 comments.push(cursor.text.slice(cursor.pos + 1).trim());
-                cursor.errors.push("comment without )");
+                cursor.error("comment without )");
                 break;
             }
             comments.push(cursor.text.slice(cursor.pos + 1, close).trim());
@@ -523,7 +584,7 @@ export function lexBlock(text: string, line: number): NcBlock {
         if (c === 42 && /^\*\d+\s*$/.test(cursor.text.slice(cursor.pos))) break; // printer checksum
         if (c === 35) {
             const assignment = readAssignment(cursor);
-            if (assignment !== undefined) assignments.push(assignment);
+            if (assignment !== undefined) assignments = append(assignments, assignment);
             else {
                 // Skip to the next space so one bad parameter does not swallow the line.
                 while (!cursor.done && cursor.peek() !== 32) cursor.pos++;
@@ -543,14 +604,7 @@ export function lexBlock(text: string, line: number): NcBlock {
         }
         if (c === 36) {
             cursor.pos++;
-            const value = readWordValue(cursor);
-            words.push({
-                letter: "$",
-                value: value?.value ?? Number.NaN,
-                expr: value?.expr,
-                decimal: false,
-                column,
-            });
+            words = append(words, word("$", column, readWordValue(cursor)));
             first = false;
             continue;
         }
@@ -558,14 +612,7 @@ export function lexBlock(text: string, line: number): NcBlock {
             // Fanuc ",R2." corner rounding / ",C1." chamfer.
             const letter = cursor.upper[cursor.pos + 1];
             cursor.pos += 2;
-            const value = readWordValue(cursor);
-            words.push({
-                letter: `,${letter}`,
-                value: value?.value ?? Number.NaN,
-                expr: value?.expr,
-                decimal: value?.decimal ?? false,
-                column,
-            });
+            words = append(words, word(`,${letter}`, column, readWordValue(cursor)));
             first = false;
             continue;
         }
@@ -576,7 +623,7 @@ export function lexBlock(text: string, line: number): NcBlock {
                 cursor.pos = close < 0 ? cursor.text.length : close + 1;
                 continue;
             }
-            cursor.errors.push(`unexpected "${cursor.text[cursor.pos]}"`);
+            cursor.error(`unexpected "${cursor.text[cursor.pos]}"`);
             cursor.pos++;
             continue;
         }
@@ -615,36 +662,36 @@ export function lexBlock(text: string, line: number): NcBlock {
         }
         if (run.length === 1) {
             // "A3=…", "R1=…" (Siemens): a letter with digits then '='.
-            const indexed = /^(\d+)\s*=/.exec(cursor.upper.slice(cursor.pos));
-            if (indexed !== null) {
-                cursor.pos += indexed[0].length;
-                named.push(readNamedValue(cursor, `${run}${indexed[1]}`));
-                first = false;
-                continue;
+            let digitsEnd = cursor.pos;
+            while (isDigit(cursor.upper.charCodeAt(digitsEnd))) digitsEnd++;
+            if (digitsEnd > cursor.pos) {
+                let after = digitsEnd;
+                while (cursor.upper.charCodeAt(after) === 32) after++;
+                if (cursor.upper.charCodeAt(after) === 61) {
+                    const name = `${run}${cursor.upper.slice(cursor.pos, digitsEnd)}`;
+                    cursor.pos = after + 1;
+                    named = append(named, readNamedValue(cursor, name));
+                    first = false;
+                    continue;
+                }
             }
             cursor.skipSpaces();
             if (cursor.peek() === 61) {
                 cursor.pos++;
-                named.push(readNamedValue(cursor, run));
+                named = append(named, readNamedValue(cursor, run));
                 first = false;
                 continue;
             }
             if (run === "N" && sequence === undefined) {
                 const number = readNumber(cursor);
-                if (number !== undefined) {
-                    sequence = number.value;
+                if (!Number.isNaN(number)) {
+                    sequence = number;
                     continue;
                 }
             }
-            const value = readWordValue(cursor);
-            words.push({
-                letter: run,
-                value: value?.value ?? Number.NaN,
-                expr: value?.expr,
-                decimal: value?.decimal ?? false,
-                column,
-            });
-            if (run === "M" && value !== undefined && MESSAGE_CODES.has(value.value)) {
+            const found = readWordValue(cursor);
+            words = append(words, word(run, column, found));
+            if (run === "M" && found && MESSAGE_CODES.has(wordValue)) {
                 message = cursor.text.slice(cursor.pos).replace(/^\s/, "");
                 break;
             }
@@ -671,7 +718,7 @@ export function lexBlock(text: string, line: number): NcBlock {
         cursor.skipSpaces();
         if (cursor.peek() === 61) {
             cursor.pos++;
-            named.push(readNamedValue(cursor, keyword));
+            named = append(named, readNamedValue(cursor, keyword));
         } else if (cursor.peek() === 40) {
             let depth = 0;
             let end = cursor.pos;
@@ -680,19 +727,19 @@ export function lexBlock(text: string, line: number): NcBlock {
                 if (ch === "(") depth++;
                 else if (ch === ")" && --depth === 0) break;
             }
-            calls.push({ name: keyword, args: cursor.text.slice(cursor.pos + 1, end) });
+            calls = append(calls, { name: keyword, args: cursor.text.slice(cursor.pos + 1, end) });
             cursor.pos = Math.min(cursor.text.length, end + 1);
         } else {
-            keywords.push(keyword);
+            keywords = append(keywords, keyword);
         }
         first = false;
     }
     const empty =
-        words.length === 0 &&
-        assignments.length === 0 &&
-        named.length === 0 &&
-        keywords.length === 0 &&
-        calls.length === 0 &&
+        words === undefined &&
+        assignments === undefined &&
+        named === undefined &&
+        keywords === undefined &&
+        calls === undefined &&
         macro === undefined &&
         oword === undefined &&
         programNumber === undefined &&
@@ -702,18 +749,18 @@ export function lexBlock(text: string, line: number): NcBlock {
         line,
         deleted,
         percent,
-        ...(sequence === undefined ? {} : { sequence }),
-        ...(programNumber === undefined ? {} : { programNumber }),
-        ...(oword === undefined ? {} : { oword }),
-        words,
-        assignments,
-        named,
-        keywords,
-        calls,
-        ...(macro === undefined ? {} : { macro }),
+        sequence,
+        programNumber,
+        oword,
+        words: words ?? NO_WORDS,
+        assignments: assignments ?? NONE,
+        named: named ?? NONE,
+        keywords: keywords ?? NONE,
+        calls: calls ?? NONE,
+        macro,
         comments,
-        ...(message === undefined ? {} : { message }),
-        ...(system === undefined ? {} : { system }),
+        message,
+        system,
         errors: cursor.errors,
         empty,
     };
@@ -734,17 +781,17 @@ function readNamedValue(cursor: Cursor, name: string): NcNamed {
         return { name, value: { k: "fn", name: mode[1], args: [value] }, text: "" };
     }
     if (isDigit(c) || c === 46 || c === 45 || c === 43 || c === 35 || c === 91) {
-        const save = cursor.errors.length;
+        const save = cursor.errorCount;
         const value = parseExpression(cursor);
         // The expression must end the value: the line ends, or a space, comment or word follows.
         const ended =
             cursor.done ||
             /[\s;(]/.test(cursor.text[cursor.pos] ?? "") ||
             /\s/.test(cursor.text[cursor.pos - 1] ?? "");
-        if (cursor.errors.length === save && ended) {
+        if (cursor.errorCount === save && ended) {
             return { name, value, text: cursor.text.slice(start, cursor.pos).trim() };
         }
-        cursor.errors.length = save;
+        cursor.truncateErrors(save);
         cursor.pos = start;
     }
     if (c === 34) {
