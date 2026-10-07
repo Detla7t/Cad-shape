@@ -843,13 +843,10 @@ describe("fillet and chamfer", () => {
         expectSolid(body, V0 - FILLET_LOSS * 25 * 40);
     });
 
-    // OCCT raises on these, and the Release wasm build turns every raise into a module abort
-    // (`RuntimeError: Aborted`): the row must carry a real error instead of a kernel crash.
-    // Expected to fail until the WASM build catches OCCT's exceptions (`-fwasm-exceptions` in
-    // cpp/CMakeLists.txt): the Release build disables exception catching, so the kernel's own
-    // try/catch around BRepFilletAPI cannot turn an oversize radius into an error result and the
-    // module aborts. `test.fails` turns red once the rebuilt binary lands; drop it then.
-    test.fails.each<["fillet" | "chamfer", number]>([
+    // OCCT raises on these. The WASM build catches its exceptions (`-fwasm-exceptions` in
+    // cpp/CMakeLists.txt), so the kernel's own try/catch around BRepFilletAPI turns an oversize
+    // radius into an error result: the row must carry a real error, not a module abort.
+    test.each<["fillet" | "chamfer", number]>([
         ["fillet", 25],
         ["chamfer", 25],
         ["chamfer", 20],
