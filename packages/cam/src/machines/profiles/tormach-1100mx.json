@@ -1,0 +1,73 @@
+{
+    "id": "tormach-1100mx",
+    "name": "Tormach 1100MX (PathPilot / LinuxCNC)",
+    "vendor": "Tormach",
+    "kind": "mill",
+    "linearAxes": [
+        { "name": "X", "min": 0, "max": 457 },
+        { "name": "Y", "min": 0, "max": 279 },
+        { "name": "Z", "min": -413, "max": 0 }
+    ],
+    "spindle": { "minRpm": 100, "maxRpm": 10000, "powerKw": 1.5 },
+    "maxFeed": 7620,
+    "rapidFeed": 7620,
+    "post": { "id": "linuxcnc" },
+    "tools": [
+        {
+            "id": "t1",
+            "number": 1,
+            "name": "3/8\" flat endmill",
+            "kind": "flatEndmill",
+            "diameter": 9.525,
+            "fluteLength": 22,
+            "overallLength": 63,
+            "stickout": 30,
+            "flutes": 3,
+            "cutting": {
+                "spindleRpm": 6000,
+                "feed": 760,
+                "plungeFeed": 200,
+                "stepdown": 2,
+                "stepover": 3.8,
+                "coolant": "flood"
+            }
+        },
+        {
+            "id": "t2",
+            "number": 2,
+            "name": "1/8\" flat endmill",
+            "kind": "flatEndmill",
+            "diameter": 3.175,
+            "fluteLength": 9.5,
+            "overallLength": 38,
+            "stickout": 15,
+            "flutes": 2,
+            "cutting": {
+                "spindleRpm": 10000,
+                "feed": 500,
+                "plungeFeed": 120,
+                "stepdown": 0.8,
+                "stepover": 1.2,
+                "coolant": "mist"
+            }
+        },
+        {
+            "id": "t3",
+            "number": 3,
+            "name": "Ø5 drill",
+            "kind": "drill",
+            "diameter": 5,
+            "tipAngle": 118,
+            "cutting": { "spindleRpm": 3000, "feed": 250, "coolant": "flood" }
+        },
+        {
+            "id": "t4",
+            "number": 4,
+            "name": "90° engraver",
+            "kind": "engraver",
+            "diameter": 3,
+            "tipAngle": 90,
+            "cutting": { "spindleRpm": 10000, "feed": 600, "plungeFeed": 150, "coolant": "off" }
+        }
+    ]
+}

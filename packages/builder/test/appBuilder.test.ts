@@ -139,6 +139,7 @@ describe("AppBuilder", () => {
             "useIndexedDB",
             "useWasmOcc",
             "useParametric",
+            "useCam",
             "useThree",
             "useUI",
         ] as const)("%s should return this and push init function", (method) => {

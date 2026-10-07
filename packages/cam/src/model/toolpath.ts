@@ -32,8 +32,20 @@ export type ToolpathMove =
       }
     /** Wire EDM taper: the upper guide's (UV plane) position for the same instant as `to`. */
     | { readonly kind: "taper"; readonly to: Vec3; readonly upper: Vec3; readonly feed: number }
+    /**
+     * A pause. `seconds <= 0` is a program stop (M00) — the operator acts and restarts: a
+     * wire EDM stop point (secure the slug before the last cut), a manual step.
+     */
     | { readonly kind: "dwell"; readonly seconds: number }
-    /** Mill drilling cycle at one hole (posts may expand it into moves). */
+    /**
+     * Mill drilling cycle at one hole (posts may expand it into moves). `at` is the hole's
+     * centre at its top surface (WCS; the tool is positioned above it at the current height
+     * first), `depth` the POSITIVE distance below `at` (Z = at.z − depth), `retract` the
+     * ABSOLUTE WCS Z of the R plane (≥ at.z). `peck` is the positive increment of
+     * `peck`/`chipBreak`, `dwell` seconds at the bottom, `feed` the plunge feed (for `tap`:
+     * pitch × rpm). Canned: G81/G82 (dwell)/G83 (peck)/G73 (chipBreak)/G84 (tap)/G85
+     * (bore). After the cycle the tool is back at the height it started from (G98).
+     */
     | {
           readonly kind: "drill";
           readonly at: Vec3;

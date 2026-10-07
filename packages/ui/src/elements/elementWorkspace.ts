@@ -279,13 +279,15 @@ export class ElementWorkspace implements IElementHost {
         }
     }
 
-    /** Shows the active element of the current document and hides everything else. */
+    /**
+     * Shows the active element of the current document and hides everything else. An
+     * element whose kind is `besideViewport` is shown as a side panel next to the Part
+     * Studio's viewport (whose own sidebar steps aside meanwhile).
+     */
     private apply(): void {
         const document = this._document;
         const activeId = this.activeId;
         const showPartStudio = activeId === PART_STUDIO_ID;
-        setShown(this.partStudio, showPartStudio);
-        setShown(this.viewArea, !showPartStudio);
         let active: MountedView | undefined;
         for (const [owner, state] of this.states) {
             for (const [id, mounted] of state.views) {
@@ -294,8 +296,17 @@ export class ElementWorkspace implements IElementHost {
                 if (visible) active = mounted;
             }
         }
+        const beside =
+            !showPartStudio &&
+            active !== undefined &&
+            DocumentElements.kindOf(active.node)?.besideViewport === true;
+        setShown(this.partStudio, showPartStudio || beside);
+        setShown(this.viewArea, !showPartStudio);
+        this.partStudio.toggleAttribute("data-viewport-only", beside);
+        this.viewArea.toggleAttribute("data-beside-viewport", beside);
         this.strip.render();
         if (active?.view !== this.shownView) {
+            this.shownView?.deactivated?.();
             this.shownView = active?.view;
             this.shownView?.activated?.();
         }

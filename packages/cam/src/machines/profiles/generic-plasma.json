@@ -1,0 +1,31 @@
+{
+    "id": "generic-plasma",
+    "name": "Generic plasma table (45 A, THC)",
+    "vendor": "Generic",
+    "kind": "plasma",
+    "linearAxes": [
+        { "name": "X", "min": 0, "max": 2500 },
+        { "name": "Y", "min": 0, "max": 1250 },
+        { "name": "Z", "min": -100, "max": 0 }
+    ],
+    "maxFeed": 15000,
+    "rapidFeed": 20000,
+    "cutting": {
+        "kerf": 1.5,
+        "pierceDelay": 0.5,
+        "pierceHeight": 3.8,
+        "cutHeight": 1.5,
+        "torchHeightControl": true
+    },
+    "post": { "id": "plasma" },
+    "tools": [
+        {
+            "id": "torch",
+            "number": 1,
+            "name": "45 A shielded consumables",
+            "kind": "jet",
+            "diameter": 1.5,
+            "cutting": { "feed": 3000 }
+        }
+    ]
+}

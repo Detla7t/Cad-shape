@@ -1,0 +1,83 @@
+{
+    "id": "grbl-router",
+    "name": "Shapeoko / generic GRBL router",
+    "vendor": "Generic",
+    "kind": "mill",
+    "linearAxes": [
+        { "name": "X", "min": 0, "max": 838 },
+        { "name": "Y", "min": 0, "max": 838 },
+        { "name": "Z", "min": -95, "max": 0 }
+    ],
+    "spindle": { "minRpm": 10000, "maxRpm": 30000, "powerKw": 0.71 },
+    "maxFeed": 5000,
+    "rapidFeed": 5000,
+    "post": { "id": "grbl" },
+    "tools": [
+        {
+            "id": "t1",
+            "number": 1,
+            "name": "1/4\" flat endmill (#201)",
+            "kind": "flatEndmill",
+            "diameter": 6.35,
+            "fluteLength": 19,
+            "overallLength": 63,
+            "stickout": 25,
+            "flutes": 3,
+            "cutting": {
+                "spindleRpm": 18000,
+                "feed": 1500,
+                "plungeFeed": 400,
+                "stepdown": 1.5,
+                "stepover": 2.5,
+                "coolant": "off"
+            }
+        },
+        {
+            "id": "t2",
+            "number": 2,
+            "name": "1/8\" flat endmill (#102)",
+            "kind": "flatEndmill",
+            "diameter": 3.175,
+            "fluteLength": 12.7,
+            "overallLength": 38,
+            "stickout": 18,
+            "flutes": 2,
+            "cutting": {
+                "spindleRpm": 18000,
+                "feed": 1000,
+                "plungeFeed": 250,
+                "stepdown": 0.75,
+                "stepover": 1.2,
+                "coolant": "off"
+            }
+        },
+        {
+            "id": "t3",
+            "number": 3,
+            "name": "1/4\" ball endmill",
+            "kind": "ballEndmill",
+            "diameter": 6.35,
+            "fluteLength": 19,
+            "overallLength": 63,
+            "stickout": 25,
+            "flutes": 2,
+            "cutting": {
+                "spindleRpm": 18000,
+                "feed": 1500,
+                "plungeFeed": 400,
+                "stepdown": 0.6,
+                "stepover": 0.6,
+                "coolant": "off"
+            }
+        },
+        {
+            "id": "t4",
+            "number": 4,
+            "name": "60° V-bit (#302)",
+            "kind": "vBit",
+            "diameter": 12.7,
+            "tipAngle": 60,
+            "cutting": { "spindleRpm": 18000, "feed": 1200, "plungeFeed": 300, "coolant": "off" }
+        }
+    ]
+}

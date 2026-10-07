@@ -5,6 +5,8 @@
     "main": "src/index.ts",
     "type": "module",
     "devDependencies": {
-        "@chili3d/core": "*"
+        "@chili3d/core": "*",
+        "@chili3d/element": "*",
+        "@chili3d/parametric": "*"
     }
 }

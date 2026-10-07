@@ -48,6 +48,20 @@
         background-color: var(--panel-background-color);
     }
 
+    /* An element shown beside the viewport (a CAM Studio): a side panel where the Part
+       Studio's sidebar was, the viewport keeping the rest. */
+    & .elementViews[data-beside-viewport] {
+        order: -1;
+        flex: 0 0 auto;
+        width: 460px;
+        max-width: 60%;
+        border-right: 1px solid var(--border-color);
+    }
+
+    & .partStudio[data-viewport-only] .sidebar {
+        display: none;
+    }
+
     & .viewportContainer {
         position: relative;
         background-color: var(--viewport-background-color);
@@ -128,6 +142,13 @@
         & .elementViews {
             width: 100%;
             min-height: 0;
+        }
+
+        & .elementViews[data-beside-viewport] {
+            width: 100%;
+            max-width: none;
+            height: 45%;
+            border-right: none;
         }
 
         & .viewportContainer {

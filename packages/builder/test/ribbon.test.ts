@@ -3,6 +3,7 @@
 
 import { SketchRibbonProfiles } from "@chili3d/parametric";
 import {
+    CamRibbonProfiles,
     DefaultRibbon,
     mergeRibbonProfiles,
     ParametricRibbonProfiles,
@@ -239,6 +240,20 @@ describe("SheetMetalRibbonProfiles", () => {
             "sheetMetal.roll",
             "sheetMetal.crimp",
             "sheetMetal.bead",
+        ]);
+    });
+});
+
+describe("CamRibbonProfiles", () => {
+    test("adds the CAM tab before the manager tab: CAM Studios and regenerating toolpaths", () => {
+        const merged = mergeRibbonProfiles(DefaultRibbon, CamRibbonProfiles);
+        const names = merged.map((t) => t.tabName);
+        expect(names.indexOf("ribbon.tab.cam")).toBe(names.indexOf("ribbon.tab.manager") - 1);
+        const tab = merged.find((t) => t.tabName === "ribbon.tab.cam")!;
+        expect(flattenItems(tab.groups.flatMap((g) => g.items))).toEqual([
+            "cam.newStudio",
+            "cam.openStudio",
+            "cam.generateAll",
         ]);
     });
 });
