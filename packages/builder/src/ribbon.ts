@@ -224,7 +224,8 @@ export const DataRibbonProfiles: RibbonProfileExtra[] = [
 
 /**
  * The CAM tab, applied by `AppBuilder.useCam`: CAM Studios (setups, tools, operations,
- * posts) and regenerating every toolpath of the document.
+ * posts), regenerating every toolpath of the document, and NC Programs (G-code read into
+ * a backplot, re-posted with any post).
  */
 export const CamRibbonProfiles: RibbonProfileExtra[] = [
     {
@@ -234,6 +235,10 @@ export const CamRibbonProfiles: RibbonProfileExtra[] = [
             {
                 groupName: "ribbon.group.cam",
                 items: ["cam.newStudio", "cam.openStudio", "cam.generateAll"],
+            },
+            {
+                groupName: "ribbon.group.nc",
+                items: ["nc.newProgram"],
             },
         ],
     },

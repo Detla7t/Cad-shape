@@ -24,6 +24,7 @@ export {
     type NcWord,
     parseExpressionText as parseNcExpression,
 } from "./lexer";
+export * from "./ncProgramNode";
 export * from "./program";
 export { programMoves, readNcProgram } from "./reader";
 export {
@@ -34,3 +35,4 @@ export {
     repostNcProgram,
 } from "./repost";
 export { ASSUMED_RAPID_FEED, formatNcDuration, moveLength, ncStats } from "./stats";
+export * from "./ui";
