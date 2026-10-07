@@ -20,6 +20,7 @@ import { showVariablesPanel } from "./property/variables";
 import { RibbonUI } from "./ribbon";
 import { CommandContext } from "./ribbon/commandContext";
 import { Statusbar } from "./statusbar";
+import { VersionsDock } from "./versions";
 import { LayoutViewport } from "./viewport";
 
 export class Editor extends HTMLElement {
@@ -34,12 +35,14 @@ export class Editor extends HTMLElement {
     private _chatWidth: number = 320;
     private _isResizingSidebar: boolean = false;
     private _sidebarEl: HTMLDivElement | null = null;
+    private readonly versionsDock: VersionsDock;
 
     constructor(
         readonly app: IApplication,
         readonly ribbonContent: Ribbon,
     ) {
         super();
+        this.versionsDock = new VersionsDock(app, () => this._contentEl);
         const viewport = new LayoutViewport(app);
         viewport.classList.add(style.viewport);
         this._viewportContainer = div({ className: style.viewportContainer }, viewport);
@@ -220,6 +223,7 @@ export class Editor extends HTMLElement {
         PubSub.default.sub("openCommandContext", this.openContext);
         PubSub.default.sub("closeCommandContext", this.closeContext);
         PubSub.default.sub("toggleChatPanel", this.toggleChat);
+        PubSub.default.sub("toggleVersionsPanel", this.versionsDock.toggle);
     }
 
     disconnectedCallback(): void {
@@ -228,6 +232,8 @@ export class Editor extends HTMLElement {
         PubSub.default.remove("openCommandContext", this.openContext);
         PubSub.default.remove("closeCommandContext", this.closeContext);
         PubSub.default.remove("toggleChatPanel", this.toggleChat);
+        PubSub.default.remove("toggleVersionsPanel", this.versionsDock.toggle);
+        this.versionsDock.hide();
         this.chatDock?.remove();
         this.chatDock = undefined;
         this.closeFloatingChat();

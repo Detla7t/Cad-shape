@@ -13,6 +13,11 @@ export class Transaction {
         readonly name: string,
     ) {}
 
+    /** True while a transaction is open on `document` — its edits are not complete yet. */
+    static isActive(document: IDocument): boolean {
+        return Transaction._transactionMap.has(document);
+    }
+
     static add(document: IDocument, record: IHistoryRecord) {
         if (document.history.disabled) return;
         const arrayRecord = Transaction._transactionMap.get(document);

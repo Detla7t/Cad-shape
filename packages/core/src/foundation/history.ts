@@ -10,9 +10,14 @@ export interface IHistoryRecord extends IDisposable {
     redo(): void;
 }
 
+/** What happened to the history: a record was added (a completed edit), undone or redone. */
+export type HistoryAction = "add" | "undo" | "redo";
+export type HistoryListener = (action: HistoryAction, record: IHistoryRecord) => void;
+
 export class History implements IDisposable {
     private readonly _undos: IHistoryRecord[] = [];
     private readonly _redos: IHistoryRecord[] = [];
+    private readonly _listeners = new Set<HistoryListener>();
 
     disabled = false;
     undoLimits = 50;
@@ -27,9 +32,40 @@ export class History implements IDisposable {
     }
 
     dispose(): void {
+        this.reset();
+        this._listeners.clear();
+    }
+
+    /**
+     * Drops every undo and redo step (disposing their records) — for when the document is
+     * replaced underneath them (e.g. switching to another branch), where they no longer apply.
+     */
+    reset(): void {
         this._redos.forEach((record) => record.dispose());
         this._undos.forEach((record) => record.dispose());
         this.clear();
+    }
+
+    /**
+     * Observes every completed, undoable change: a record added (a committed transaction or a
+     * lone recorded edit), undone or redone. The version history captures microversions here.
+     */
+    onChanged(listener: HistoryListener): void {
+        this._listeners.add(listener);
+    }
+
+    removeChanged(listener: HistoryListener): void {
+        this._listeners.delete(listener);
+    }
+
+    private emit(action: HistoryAction, record: IHistoryRecord): void {
+        for (const listener of [...this._listeners]) {
+            try {
+                listener(action, record);
+            } catch (error) {
+                console.error(`history: a ${action} listener threw`, error);
+            }
+        }
     }
 
     private clear(): void {
@@ -47,6 +83,7 @@ export class History implements IDisposable {
             const removed = this._undos.shift();
             removed?.dispose();
         }
+        this.emit("add", record);
     }
 
     undoCount() {
@@ -59,6 +96,7 @@ export class History implements IDisposable {
 
     undo() {
         this.#isUndoing = true;
+        let undone: IHistoryRecord | undefined;
         this.tryOperate(
             () => {
                 const record = this._undos.pop();
@@ -66,15 +104,18 @@ export class History implements IDisposable {
 
                 record.undo();
                 this._redos.push(record);
+                undone = record;
             },
             () => {
                 this.#isUndoing = false;
             },
         );
+        if (undone) this.emit("undo", undone);
     }
 
     redo() {
         this.#isRedoing = true;
+        let redone: IHistoryRecord | undefined;
         this.tryOperate(
             () => {
                 const record = this._redos.pop();
@@ -82,11 +123,13 @@ export class History implements IDisposable {
 
                 record.redo();
                 this._undos.push(record);
+                redone = record;
             },
             () => {
                 this.#isRedoing = false;
             },
         );
+        if (redone) this.emit("redo", redone);
     }
 
     private tryOperate(action: () => void, onFinally: () => void) {

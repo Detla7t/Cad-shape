@@ -7,4 +7,5 @@ export * from "./parametricBodyNode";
 export * from "./program";
 export * from "./sheetMetal";
 export * from "./sketch";
+export * from "./versioning";
 import "./commands";
