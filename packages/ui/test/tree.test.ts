@@ -90,6 +90,20 @@ class MockBodyNode extends MockNode {
     removeFeature() {}
 }
 
+/** A node with nothing in the scene (a Feature Studio holds code): not a VisualNode. */
+class MockScenelessNode {
+    readonly sceneless = true;
+    isGroup = false;
+    visible = true;
+    parentVisible = true;
+    parent: MockNode | undefined;
+
+    constructor(readonly name: string) {}
+
+    onPropertyChanged() {}
+    removePropertyChanged() {}
+}
+
 function withId(node: MockNode, id: string) {
     (node as unknown as { id: string }).id = id;
     return node;
@@ -238,6 +252,24 @@ describe("Tree", () => {
             // inserted after model1 (newPrevious)
             const model1El = fixture.tree.treeItem(fixture.model1 as unknown as INode)!;
             expect(model1El.nextSibling).toBe(model3El);
+        });
+
+        test("should give a node outside the scene a plain row without a visibility toggle", () => {
+            fixture = createFixture();
+            const studio = new MockScenelessNode("studio");
+            studio.parent = fixture.root;
+
+            fixture.doc.emitNodeChanged([
+                {
+                    node: studio,
+                    newParent: fixture.root,
+                    newPrevious: fixture.groupA,
+                } as unknown as NodeRecord,
+            ]);
+
+            const item = fixture.tree.treeItem(studio as unknown as INode);
+            expect(item).toBeInstanceOf(TreeModel);
+            expect(item!.visibleIcon.classList.contains("ti-hidden")).toBe(true);
         });
 
         test("should remove node element on node-removed record", () => {

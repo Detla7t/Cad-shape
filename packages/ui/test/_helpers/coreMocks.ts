@@ -75,6 +75,11 @@ export function isNodeIconMock(node: unknown): boolean {
     return typeof (node as { icon?: unknown } | undefined)?.icon === "string";
 }
 
+/** Mirror of core's real guard (the mid-init snapshot can miss function exports). */
+export function isNodeScenelessMock(node: unknown): boolean {
+    return (node as { sceneless?: unknown } | undefined)?.sceneless === true;
+}
+
 /** No-op PubSub stub. */
 export const PubSubMock = {
     default: {

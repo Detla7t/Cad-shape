@@ -8,6 +8,7 @@ import {
     type IDocument,
     type INode,
     isNodeIcon,
+    isNodeSceneless,
     isNodeWarning,
     Transaction,
 } from "@chili3d/core";
@@ -62,7 +63,8 @@ export abstract class TreeItem extends HTMLElement {
      */
     refreshVisibleIcon() {
         const consumed = this.node.parent !== undefined && !(this.node.parent instanceof FolderNode);
-        this.visibleIcon.classList.toggle(style.hidden, consumed);
+        // A node with nothing in the scene has no visibility to toggle either.
+        this.visibleIcon.classList.toggle(style.hidden, consumed || isNodeSceneless(this.node));
     }
 
     connectedCallback(): void {

@@ -1,7 +1,15 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type IDocument, Id, type INodeIcon, Node, serializable, serialize } from "@chili3d/core";
+import {
+    type IDocument,
+    Id,
+    type INodeIcon,
+    type INodeSceneless,
+    Node,
+    serializable,
+    serialize,
+} from "@chili3d/core";
 
 export interface FeatureStudioNodeOptions {
     document: IDocument;
@@ -19,10 +27,12 @@ export interface FeatureStudioNodeOptions {
  * Other studios import this one by its name: `import(path : "<name>", version : "")`.
  */
 @serializable()
-export class FeatureStudioNode extends Node implements INodeIcon {
+export class FeatureStudioNode extends Node implements INodeIcon, INodeSceneless {
     get icon(): string {
         return "icon-macro";
     }
+
+    readonly sceneless = true as const;
 
     constructor(options: FeatureStudioNodeOptions) {
         super(options.document, options.name ?? "Feature Studio", options.id ?? Id.generate());

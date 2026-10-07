@@ -42,6 +42,8 @@ class MockNode {
     warningTooltip?: string;
     /** Present only on nodes opting into the `INodeIcon` contract. */
     icon?: string;
+    /** Present only on nodes opting into the `INodeSceneless` contract. */
+    sceneless?: true;
     private handlers = new Set<PropertyHandler>();
 
     onPropertyChanged(handler: PropertyHandler) {
@@ -140,6 +142,11 @@ describe("TreeModel (TreeItem)", () => {
 
         test("should hide the visible icon for children of a non-folder parent (consumed tools)", () => {
             const item = createItem({ parent: new MockNode() });
+            expect(item.visibleIcon.classList.contains("ti-hidden")).toBe(true);
+        });
+
+        test("should hide the visible icon for a node with nothing in the scene", () => {
+            const item = createItem({ sceneless: true });
             expect(item.visibleIcon.classList.contains("ti-hidden")).toBe(true);
         });
 
