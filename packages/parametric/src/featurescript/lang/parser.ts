@@ -158,8 +158,9 @@ class Parser {
         if (this.accept("predicate")) {
             const name = this.identifier("a predicate name").text;
             const params = this.parameters();
+            const precondition = this.accept("precondition") ? this.preconditionBody() : undefined;
             const body = this.block();
-            return { kind: "Predicate", pos, exported, annotations, name, params, body };
+            return { kind: "Predicate", pos, exported, annotations, name, params, precondition, body };
         }
         if (this.accept("operator")) {
             const token = this.next();
@@ -255,9 +256,18 @@ class Parser {
     private functionRest(pos: SourcePosition, name?: string): FunctionExpression {
         const params = this.parameters();
         const returns = this.accept("returns") ? this.typeReference() : undefined;
-        const precondition = this.accept("precondition") ? this.block() : undefined;
+        const precondition = this.accept("precondition") ? this.preconditionBody() : undefined;
         const body = this.block();
         return { kind: "Function", pos, name, params, returns, precondition, body };
+    }
+
+    /** `precondition { ... }`, or the one-expression form `precondition a == b;`. */
+    private preconditionBody(): Block {
+        if (this.is("{")) return this.block();
+        const pos = this.current.pos;
+        const expression = this.expression();
+        this.expect(";");
+        return { kind: "Block", pos, body: [{ kind: "ExpressionStatement", pos, expression }] };
     }
 
     // ------------------------------------------------------------------ Statements
@@ -445,13 +455,22 @@ class Parser {
     }
 
     private conditional(): Expression {
-        const test = this.logicalOr();
+        const test = this.nullish();
         if (!this.is("?")) return test;
         const pos = this.next().pos;
         const consequent = this.assignment();
         this.expect(":");
         const alternate = this.assignment();
         return { kind: "Conditional", pos, test, consequent, alternate };
+    }
+
+    private nullish(): Expression {
+        let left = this.logicalOr();
+        while (this.is("??")) {
+            const pos = this.next().pos;
+            left = { kind: "Logical", pos, operator: "??", left, right: this.logicalOr() };
+        }
+        return left;
     }
 
     private logicalOr(): Expression {
@@ -515,12 +534,22 @@ class Parser {
     }
 
     private multiplicative(): Expression {
-        let left = this.unary();
+        let left = this.cast();
         while (this.is("*") || this.is("/") || this.is("%")) {
             const token = this.next();
-            left = this.binary(token, left, this.unary());
+            left = this.binary(token, left, this.cast());
         }
         return left;
+    }
+
+    /** `as` binds tighter than the arithmetic operators: `x as Vector * meter`. */
+    private cast(): Expression {
+        let value = this.unary();
+        while (this.is("as")) {
+            const pos = this.next().pos;
+            value = { kind: "As", pos, value, type: this.typeReference() };
+        }
+        return value;
     }
 
     private unary(): Expression {
@@ -560,13 +589,26 @@ class Parser {
                 }
                 this.expect(")");
                 expression = { kind: "Call", pos, callee: expression, args };
-            } else if (this.is(".")) {
+            } else if (this.is("->")) {
+                // `a->f(b)` calls `f(a, b)`.
                 const pos = this.next().pos;
+                const callee = this.calleeName();
+                this.expect("(");
+                const args: Expression[] = [expression];
+                while (!this.is(")")) {
+                    args.push(this.expression());
+                    if (!this.accept(",")) break;
+                }
+                this.expect(")");
+                expression = { kind: "Call", pos, callee, args };
+            } else if (this.is(".") || this.is("?.")) {
+                const optional = this.next().text === "?.";
+                const pos = this.current.pos;
                 const token = this.next();
                 if (token.kind !== "identifier" && token.kind !== "keyword") {
                     throw this.error(`Expected a member name but found ${describe(token)}`, token.pos);
                 }
-                expression = { kind: "Member", pos, object: expression, property: token.text };
+                expression = { kind: "Member", pos, object: expression, property: token.text, optional };
             } else if (this.is("[")) {
                 const pos = this.next().pos;
                 if (this.accept("]")) {
@@ -593,6 +635,7 @@ class Parser {
                 this.next();
                 return { kind: "String", pos, value: token.text };
             case "identifier": {
+                if (this.is("=>", this.peek())) return this.arrowFunction();
                 this.next();
                 if (this.is("::") && this.peek().kind === "identifier") {
                     this.next();
@@ -609,11 +652,13 @@ class Parser {
         if (this.accept("true")) return { kind: "Boolean", pos, value: true };
         if (this.accept("false")) return { kind: "Boolean", pos, value: false };
         if (this.accept("undefined")) return { kind: "Undefined", pos };
+        if (this.is("(") && this.isArrowParameters()) return this.arrowFunction();
         if (this.accept("(")) {
             const expression = this.expression();
             this.expect(")");
             return expression;
         }
+        if (this.accept("switch")) return this.switchExpression(pos);
         if (this.is("[")) return this.arrayLiteral();
         if (this.is("{")) return this.mapLiteral();
         if (this.accept("function")) {
@@ -643,6 +688,81 @@ class Parser {
         throw this.error(`Unexpected ${describe(token)}`);
     }
 
+    /** The function name after `->`, optionally namespaced. */
+    private calleeName(): Expression {
+        const token = this.identifier("a function name after ->");
+        if (this.accept("::")) {
+            const name = this.identifier("a function name").text;
+            return { kind: "Identifier", pos: token.pos, name, namespace: token.text };
+        }
+        return { kind: "Identifier", pos: token.pos, name: token.text };
+    }
+
+    /** Looks past a parenthesized list for `=>` or `returns`, without consuming anything. */
+    private isArrowParameters(): boolean {
+        let depth = 0;
+        for (let offset = 0; ; offset++) {
+            const token = this.peek(offset);
+            if (token.kind === "eof") return false;
+            if (this.is("(", token)) depth++;
+            else if (this.is(")", token)) {
+                depth--;
+                if (depth === 0) {
+                    const after = this.peek(offset + 1);
+                    return this.is("=>", after) || this.is("returns", after);
+                }
+            }
+        }
+    }
+
+    /**
+     * `x => expr`, `(a is T, b) returns R => expr`. A `{ ... }` body is a map literal when
+     * it parses as one (`index => { "index" : index }`), otherwise a statement block.
+     */
+    private arrowFunction(): FunctionExpression {
+        const pos = this.current.pos;
+        let params: Parameter[];
+        if (this.current.kind === "identifier") {
+            const token = this.next();
+            params = [{ name: token.text, pos: token.pos }];
+        } else {
+            params = this.parameters();
+        }
+        const returns = this.accept("returns") ? this.typeReference() : undefined;
+        this.expect("=>");
+        if (this.is("{")) {
+            const start = this.index;
+            try {
+                const map = this.mapLiteral();
+                if (!this.is(",") && !this.is(")") && !this.is(";") && !this.is("]") && !this.is("}")) {
+                    throw this.error("not a map body");
+                }
+                return { kind: "Function", pos, params, returns, body: returnBlock(map) };
+            } catch (error) {
+                if (!(error instanceof FsSyntaxError)) throw error;
+                this.index = start;
+            }
+            return { kind: "Function", pos, params, returns, body: this.block() };
+        }
+        return { kind: "Function", pos, params, returns, body: returnBlock(this.assignment()) };
+    }
+
+    private switchExpression(pos: SourcePosition): Expression {
+        this.expect("(");
+        const subject = this.expression();
+        this.expect(")");
+        this.expect("{");
+        const cases: { key: Expression; value: Expression }[] = [];
+        while (!this.is("}")) {
+            const key = this.nullish();
+            this.expect(":");
+            cases.push({ key, value: this.assignment() });
+            if (!this.accept(",")) break;
+        }
+        this.expect("}", '"}" to close the switch');
+        return { kind: "Switch", pos, subject, cases };
+    }
+
     private arrayLiteral(): Expression {
         const pos = this.expect("[").pos;
         const elements: Expression[] = [];
@@ -655,8 +775,8 @@ class Parser {
     }
 
     /**
-     * `{ "key" : value, (expr) : value, ident : value }` — a bare identifier key is its own
-     * name as a string (lenient, matching how most std code reads); `(expr)` is any value.
+     * `{ "key" : value, ident : value, (expr) : value, Enum.VALUE : value }` — a bare
+     * identifier key is its own name as a string; any other key is an expression.
      */
     private mapLiteral(): MapLiteral {
         const pos = this.expect("{").pos;
@@ -664,25 +784,19 @@ class Parser {
         while (!this.is("}")) {
             const token = this.current;
             let key: Expression;
-            if (token.kind === "string") {
+            const bare =
+                (token.kind === "identifier" || token.kind === "keyword") && this.is(":", this.peek());
+            if (bare && (token.text === "true" || token.text === "false")) {
+                this.next();
+                key = { kind: "Boolean", pos: token.pos, value: token.text === "true" };
+            } else if (bare) {
                 this.next();
                 key = { kind: "String", pos: token.pos, value: token.text };
-            } else if (token.kind === "identifier" || token.kind === "keyword") {
-                if (token.text === "true" || token.text === "false") {
-                    this.next();
-                    key = { kind: "Boolean", pos: token.pos, value: token.text === "true" };
-                } else {
-                    this.next();
-                    key = { kind: "String", pos: token.pos, value: token.text };
-                }
-            } else if (token.kind === "number" || this.is("-")) {
-                key = this.unary();
-            } else if (this.is("(")) {
+            } else if (token.kind === "string" && this.is(":", this.peek())) {
                 this.next();
-                key = this.expression();
-                this.expect(")");
+                key = { kind: "String", pos: token.pos, value: token.text };
             } else {
-                throw this.error(`Expected a map key but found ${describe(token)}`);
+                key = this.nullish();
             }
             this.expect(":");
             entries.push({ key, value: this.expression() });
@@ -691,6 +805,10 @@ class Parser {
         this.expect("}", '"}" to close the map');
         return { kind: "Map", pos, entries };
     }
+}
+
+function returnBlock(value: Expression): Block {
+    return { kind: "Block", pos: value.pos, body: [{ kind: "Return", pos: value.pos, value }] };
 }
 
 function isAssignable(expression: Expression): boolean {

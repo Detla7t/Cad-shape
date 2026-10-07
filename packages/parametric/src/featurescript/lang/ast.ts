@@ -28,6 +28,7 @@ export type Expression =
     | BinaryExpression
     | LogicalExpression
     | ConditionalExpression
+    | SwitchExpression
     | IsExpression
     | AsExpression
     | CallExpression
@@ -120,9 +121,20 @@ export interface BinaryExpression extends NodeBase {
 
 export interface LogicalExpression extends NodeBase {
     readonly kind: "Logical";
-    readonly operator: "&&" | "||";
+    /** `??` yields the left side unless it is undefined. */
+    readonly operator: "&&" | "||" | "??";
     readonly left: Expression;
     readonly right: Expression;
+}
+
+/**
+ * `switch (subject) { key : value, ... }` — the value of the case whose key equals the
+ * subject; only that case's value is evaluated. No matching case yields undefined.
+ */
+export interface SwitchExpression extends NodeBase {
+    readonly kind: "Switch";
+    readonly subject: Expression;
+    readonly cases: readonly { readonly key: Expression; readonly value: Expression }[];
 }
 
 export interface ConditionalExpression extends NodeBase {
@@ -154,6 +166,8 @@ export interface MemberExpression extends NodeBase {
     readonly kind: "Member";
     readonly object: Expression;
     readonly property: string;
+    /** `a?.b`: undefined when `a` is, and so is the rest of the chain. */
+    readonly optional?: boolean;
 }
 
 export interface IndexExpression extends NodeBase {
@@ -358,6 +372,7 @@ export interface PredicateDeclaration extends TopLevelBase {
     readonly kind: "Predicate";
     readonly name: string;
     readonly params: Parameter[];
+    readonly precondition?: Block;
     readonly body: Block;
 }
 

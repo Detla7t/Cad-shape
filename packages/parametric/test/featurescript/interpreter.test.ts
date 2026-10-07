@@ -277,6 +277,77 @@ describe("std containers", () => {
     });
 });
 
+describe("language forms Onshape's std uses", () => {
+    test.each([
+        // `switch` evaluates only the matching case; no match is undefined.
+        ['return switch (2) { 1 : "one", 2 : "two" };', "two"],
+        ['return switch (3) { 1 : "one", 2 : "two" };', undefined],
+        // Arrow functions: expression bodies, typed parameters, map-literal bodies.
+        ["const twice = x => x * 2; return twice(4);", 8],
+        ["const add = (a is number, b is number) returns number => a + b; return add(2, 3);", 5],
+        ['const wrap = (i) => { "index" : i }; return wrap(7).index;', 7],
+        ["const f = (n) => { const m = n + 1; return m * 2; }; return f(1);", 4],
+        // `a->f(b)` calls `f(a, b)`.
+        ["return [3, 1, 2]->size();", 3],
+        // `??` and `?.`.
+        ["var m = {}; return m.missing ?? 5;", 5],
+        ["var m = undefined; return m?.a.b;", undefined],
+        ['var m = { "a" : { "b" : 1 } }; return m?.a.b;', 1],
+        // Bare identifier map keys are strings; other keys are expressions.
+        ["const k = 2; return { a : 1, (k) : 3 }[2];", 3],
+        ['return { a : 1 }["a"];', 1],
+    ])("%s", (source, expected) => {
+        expect(value(source)).toEqual(expected);
+    });
+
+    test("`as` binds tighter than arithmetic", () => {
+        expect(text("return [1, 2] as Vector * 2;")).toBe("[ 2, 4 ]");
+    });
+
+    test("maps iterate in key order, and one loop variable walks key/value entries", () => {
+        expect(
+            text(
+                'var out = ""; for (var e in { "c" : 3, "a" : 1, "b" : 2 }) out ~= e.key ~ e.value; return out;',
+            ),
+        ).toBe("a1b2c3");
+    });
+
+    test("storing undefined removes a key", () => {
+        expect(value('var m = { "a" : 1, "b" : 2 }; m.a = undefined; return size(m);')).toBe(1);
+        expect(value('return size({ "a" : undefined });')).toBe(0);
+    });
+
+    test("a one-expression precondition guards a function", () => {
+        const prelude = "function half(x is number) precondition x > 0; { return x / 2; }";
+        expect(value("return half(4);", prelude)).toBe(2);
+        expect(() => value("return half(-4);", prelude)).toThrow(/Precondition of half failed/);
+    });
+
+    test("the most specific overload wins, whatever the declaration order", () => {
+        const prelude =
+            'function kind(v) { return "any"; } function kind(v is map) { return "map"; } function kind(v is Vector) { return "vector"; }';
+        expect(value("return [kind(1), kind({}), kind(vector(1, 2))];", prelude)).toEqual(
+            value('return ["any", "map", "vector"];'),
+        );
+    });
+
+    test("enum values convert from their names, and compare equal to them", () => {
+        const prelude = "enum Mode { FAST, SLOW }";
+        expect(value('return ("SLOW" as Mode) == Mode.SLOW;', prelude)).toBe(true);
+        expect(value('return Mode["FAST"] == "FAST";', prelude)).toBe(true);
+        expect(value('return Mode["NOPE"];', prelude)).toBeUndefined();
+    });
+
+    test("a constant may refer to one declared after it", () => {
+        expect(value("return LATER + 1;", "const EARLIER = LATER * 2; const LATER = 20;")).toBe(21);
+        expect(value("return EARLIER;", "const EARLIER = LATER * 2; const LATER = 20;")).toBe(40);
+    });
+
+    test("inf is a language constant", () => {
+        expect(value("return inf > 1e300;")).toBe(true);
+    });
+});
+
 describe("syntax errors", () => {
     test("report the line and column", () => {
         const interpreter = createInterpreter();

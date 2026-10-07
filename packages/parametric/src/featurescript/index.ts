@@ -8,5 +8,11 @@ export * from "./featureStudioNode";
 export * from "./lang/errors";
 export { type FeatureExport, Interpreter, type ModuleInstance, type ModuleSource } from "./lang/interpreter";
 export { parseExpression, parseProgram } from "./lang/parser";
+export {
+    createOnshapeInterpreter,
+    type OnshapeInterpreterSetup,
+    type OnshapeStdSource,
+} from "./onshape/onshapeStd";
+export { type OnshapeStdBundle, onshapeStdFromBundle } from "./onshape/stdBundle";
 export * from "./runtime";
 export * from "./studioCompiler";

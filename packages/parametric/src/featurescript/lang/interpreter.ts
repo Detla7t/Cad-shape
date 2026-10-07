@@ -5,6 +5,7 @@ import type {
     AssignmentExpression,
     BinaryOperator,
     Block,
+    ConstDeclaration,
     EnumDeclaration,
     Expression,
     FunctionExpression,
@@ -134,6 +135,8 @@ export interface FeatureExport {
 
 export class ModuleInstance {
     readonly exports = new Map<string, FsValue>();
+    /** Names an `export import` passes on; exported with their final (merged) value. */
+    readonly reexported = new Set<string>();
     readonly namespaces = new Map<string, ModuleInstance>();
     readonly features: FeatureExport[] = [];
 
@@ -151,6 +154,17 @@ export class ModuleInstance {
 /** Std module paths resolve to the ambient std library — importing them is a no-op. */
 export function isStdPath(path: string): boolean {
     return path.startsWith("onshape/std/") || path.startsWith("chili3d/std/") || path === "std";
+}
+
+/** A top-level constant not evaluated yet (see `Interpreter.force`). */
+class LazyConst {
+    state: "pending" | "evaluating" | "done" = "pending";
+    value: FsValue;
+
+    constructor(
+        readonly module: ModuleInstance,
+        readonly item: ConstDeclaration,
+    ) {}
 }
 
 // ------------------------------------------------------------------ Control-flow signals
@@ -178,6 +192,12 @@ export interface InterpreterOptions {
     maxSteps?: number;
     maxDepth?: number;
     resolveModule?: ModuleResolver;
+    /**
+     * True (the default): `onshape/std/...` imports name the ambient native std and are
+     * no-ops. False: they resolve through `resolveModule` like any other module — for
+     * running Onshape's own std source on the `@` builtins.
+     */
+    ambientStd?: boolean;
 }
 
 /** A native operator implementation keyed by the operand tags (`Transform * Vector`, ...). */
@@ -191,6 +211,9 @@ export const NOT_HANDLED = Symbol("not handled");
  */
 export class Interpreter {
     readonly std = new Environment();
+    /** `@name` built-ins — the native layer Onshape's std source calls into. */
+    readonly builtins = new Map<string, FsValue>();
+    private readonly ambientStd: boolean;
     private readonly modules = new Map<string, ModuleInstance>();
     private readonly loading = new Set<string>();
     private readonly moduleByEnv = new WeakMap<Environment, ModuleInstance>();
@@ -208,6 +231,9 @@ export class Interpreter {
         this.maxDepth = options.maxDepth ?? 400;
         this.printer = options.print ?? (() => {});
         this.resolveModule = options.resolveModule;
+        this.ambientStd = options.ambientStd ?? true;
+        // Language-level constants, below every std.
+        this.std.define("inf", Number.POSITIVE_INFINITY);
     }
 
     print(text: string): void {
@@ -228,6 +254,19 @@ export class Interpreter {
     }
 
     // ------------------------------------------------------------------ Modules
+
+    /**
+     * An export of any loaded module, by name (first loaded wins) — how the native layer
+     * reaches std's own enums and constants (`QueryType`, `EntityType`) to build values.
+     */
+    findExport(name: string): FsValue | undefined {
+        for (const module of this.modules.values()) {
+            if (!module.exports.has(name)) continue;
+            const value = module.exports.get(name);
+            return value instanceof LazyConst ? this.force(value) : value;
+        }
+        return undefined;
+    }
 
     /** Parses and instantiates a module (cached by path + source). Throws FsError. */
     load(source: ModuleSource): ModuleInstance {
@@ -268,6 +307,7 @@ export class Interpreter {
                         kind: "user",
                         name: item.name,
                         params: item.params,
+                        precondition: item.precondition,
                         body: item.body,
                         pos: item.pos,
                         closure: env,
@@ -295,15 +335,20 @@ export class Interpreter {
                     break;
             }
         }
+        // Top-level constants are lazy: each evaluates on first reference, so one may name a
+        // later one, and a std table nothing uses is never built. A Feature Studio forces
+        // them all here, so its mistakes surface when it compiles.
         for (const item of program.body) {
-            if (item.kind !== "Const") continue;
-            const value = this.evaluateValue(item.value, env);
-            if (item.type !== undefined) this.checkType(value, item.type, env, `Constant "${item.name}"`);
-            if (isCallable(value) && value.kind === "native" && value.feature !== undefined) {
-                // Name the feature after its constant so stack traces read naturally.
-                (value as { name: string }).name = item.name;
-            }
-            env.declare(item.name, value, true, item.pos);
+            if (item.kind === "Const")
+                env.declare(item.name, new LazyConst(module, item) as never, true, item.pos);
+        }
+        if (!this.lazyModule(path)) {
+            for (const item of program.body)
+                if (item.kind === "Const") this.resolveName(item.name, undefined, env, item.pos);
+        }
+        for (const name of module.reexported) {
+            const binding = env.vars.get(name);
+            if (binding !== undefined) module.exports.set(name, binding.value);
         }
         for (const item of program.body) {
             if (!item.exported) continue;
@@ -318,6 +363,36 @@ export class Interpreter {
         return module;
     }
 
+    /** Modules whose constants stay lazy after loading: the std source. */
+    private lazyModule(path: string): boolean {
+        return !this.ambientStd && isStdPath(path);
+    }
+
+    /** Evaluates a lazy constant once; later references read the cached value. */
+    private force(lazy: LazyConst, pos?: SourcePosition): FsValue {
+        if (lazy.state === "done") return lazy.value;
+        if (lazy.state === "evaluating") {
+            throw new FsRuntimeError(`Constant "${lazy.item.name}" refers to itself`, pos ?? lazy.item.pos);
+        }
+        lazy.state = "evaluating";
+        try {
+            const { item } = lazy;
+            const env = lazy.module.env;
+            const value = this.evaluateValue(item.value, env);
+            if (item.type !== undefined) this.checkType(value, item.type, env, `Constant "${item.name}"`);
+            if (isCallable(value) && value.kind === "native" && value.feature !== undefined) {
+                // Name the feature after its constant so stack traces read naturally.
+                (value as { name: string }).name = item.name;
+            }
+            lazy.value = value;
+            lazy.state = "done";
+            return value;
+        } catch (error) {
+            lazy.state = "pending";
+            throw error;
+        }
+    }
+
     private importModule(
         module: ModuleInstance,
         path: string,
@@ -325,7 +400,7 @@ export class Interpreter {
         reexport: boolean,
         pos: SourcePosition,
     ): void {
-        if (isStdPath(path)) return;
+        if (this.ambientStd && isStdPath(path)) return;
         const source = this.resolveModule?.(path);
         if (source === undefined) throw new FsRuntimeError(`Cannot find the module "${path}" to import`, pos);
         let imported: ModuleInstance;
@@ -342,9 +417,15 @@ export class Interpreter {
             return;
         }
         for (const [name, value] of imported.exports) {
-            if (module.env.vars.has(name)) continue;
-            module.env.define(name, value);
-            if (reexport) module.exports.set(name, value);
+            const own = module.env.vars.get(name);
+            if (own === undefined) module.env.define(name, value);
+            else if (own.value !== value) {
+                // Overloads of one name spread over modules (`toString` for each type)
+                // merge into one set; any other clash keeps the first import.
+                const merged = mergeOverloads(own.value, value);
+                if (merged !== undefined) own.value = merged;
+            }
+            if (reexport) module.reexported.add(name);
         }
         for (const [name, nested] of imported.namespaces) {
             if (!module.namespaces.has(name)) module.namespaces.set(name, nested);
@@ -490,12 +571,43 @@ export class Interpreter {
     }
 
     private callOverloads(fn: OverloadSet, args: FsValue[], pos?: SourcePosition): FsValue {
-        for (const candidate of fn.candidates) {
-            if (this.matches(candidate, args)) return this.callUser(candidate, args, pos);
-        }
+        const candidate = this.selectOverload(fn.candidates, args);
+        if (candidate !== undefined) return this.callUser(candidate, args, pos);
         if (fn.fallback !== undefined) return this.callFunction(fn.fallback, args, pos);
         const types = args.map(describeValue).join(", ");
         throw new FsRuntimeError(`No overload of ${fn.name} accepts (${types})`, pos);
+    }
+
+    /**
+     * The matching candidate with the most specific parameter types: a custom type or enum
+     * beats a built-in type, which beats an untyped parameter (`toString(value is Vector)`
+     * over `toString(value is array)` over `toString(value)`). Ties go to the first declared.
+     */
+    private selectOverload(candidates: readonly UserFunction[], args: FsValue[]): UserFunction | undefined {
+        let best: UserFunction | undefined;
+        let bestScore = -1;
+        for (const candidate of candidates) {
+            if (!this.matches(candidate, args)) continue;
+            const score = this.specificity(candidate);
+            if (score > bestScore) {
+                best = candidate;
+                bestScore = score;
+            }
+        }
+        return best;
+    }
+
+    private specificity(fn: UserFunction): number {
+        let score = 0;
+        for (const param of fn.params) {
+            if (param.type === undefined) continue;
+            const builtin =
+                BUILTIN_TYPES[param.type.name] !== undefined &&
+                param.type.namespace === undefined &&
+                !this.declaresType(param.type.name, fn.closure as Environment);
+            score += builtin ? 1 : 2;
+        }
+        return score;
     }
 
     private matches(fn: UserFunction, args: FsValue[]): boolean {
@@ -620,6 +732,15 @@ export class Interpreter {
             return value;
         }
         const resolved = this.resolveName(type.name, type.namespace, env, type.pos);
+        if (resolved instanceof FsEnumType) {
+            // Enum values are names tagged with their type: `"REGEN_ERROR" as ErrorStringEnum`.
+            if (value instanceof FsEnumValue && value.type === resolved) return value;
+            const name = value instanceof FsEnumValue ? value.name : value;
+            const member = typeof name === "string" ? resolved.member(name) : undefined;
+            if (member === undefined)
+                throw new FsRuntimeError(`Cannot convert ${describeValue(value)} to ${type.name}`, pos);
+            return member;
+        }
         const definition = asTypeDefinition(resolved);
         if (definition === undefined) throw new FsRuntimeError(`"${type.name}" is not a type`, pos);
         const valid = definition.validate !== undefined ? definition.validate(value) : true;
@@ -644,10 +765,12 @@ export class Interpreter {
             if (module === undefined) throw new FsRuntimeError(`Unknown namespace "${namespace}"`, pos);
             if (!module.exports.has(name))
                 throw new FsRuntimeError(`"${namespace}::${name}" is not exported`, pos);
-            return module.exports.get(name);
+            const exported = module.exports.get(name);
+            return exported instanceof LazyConst ? this.force(exported, pos) : exported;
         }
         const binding = env.lookup(name);
         if (binding === undefined) throw new FsRuntimeError(`"${name}" is not defined`, pos);
+        if (binding.value instanceof LazyConst) binding.value = this.force(binding.value, pos);
         return binding.value;
     }
 
@@ -791,7 +914,12 @@ export class Interpreter {
                 pairs.push(statement.second === undefined ? [item, undefined] : [i, item]);
             });
         } else if (iterable instanceof FsMap) {
-            for (const pair of iterable.pairs()) pairs.push(pair);
+            for (const [key, value] of iterable.pairs()) {
+                // One loop variable walks `{ "key" : k, "value" : v }` entries.
+                pairs.push(
+                    statement.second === undefined ? [fsMap({ key, value }), undefined] : [key, value],
+                );
+            }
         } else {
             throw new FsRuntimeError(
                 `Cannot iterate over a ${describeValue(iterable)}`,
@@ -864,17 +992,20 @@ export class Interpreter {
             case "Identifier":
                 return freeze(this.resolveName(expression.name, expression.namespace, env, expression.pos));
             case "Builtin": {
-                const binding = this.std.vars.get(expression.name);
-                if (binding === undefined)
+                const builtin =
+                    this.builtins.get(expression.name) ?? this.std.vars.get(expression.name)?.value;
+                if (builtin === undefined)
                     throw new FsRuntimeError(`Unknown built-in @${expression.name}`, expression.pos);
-                return binding.value;
+                return builtin;
             }
             case "Array":
                 return new FsArray(expression.elements.map((element) => this.evaluateValue(element, env)));
             case "Map": {
                 const map = new FsMap();
                 for (const entry of expression.entries) {
-                    map.set(this.evaluateValue(entry.key, env), this.evaluateValue(entry.value, env));
+                    // A map never holds undefined: `{ "a" : undefined }` is empty.
+                    const value = this.evaluateValue(entry.value, env);
+                    if (value !== undefined) map.set(this.evaluateValue(entry.key, env), value);
                 }
                 return map;
             }
@@ -895,6 +1026,9 @@ export class Interpreter {
                 );
             case "Logical": {
                 const left = this.evaluate(expression.left, env);
+                if (expression.operator === "??") {
+                    return left !== undefined ? left : this.evaluate(expression.right, env);
+                }
                 if (typeof left !== "boolean") {
                     throw new FsRuntimeError(
                         `${expression.operator} needs booleans, got ${describeValue(left)}`,
@@ -910,6 +1044,16 @@ export class Interpreter {
                     );
                 }
                 return right;
+            }
+            case "Switch": {
+                const subject = this.evaluate(expression.subject, env);
+                for (const entry of expression.cases) {
+                    const key = this.evaluate(entry.key, env);
+                    if (this.binary("==", subject, key, expression.pos) === true) {
+                        return this.evaluate(entry.value, env);
+                    }
+                }
+                return undefined;
             }
             case "Conditional":
                 return this.condition(expression.test, env, "?:")
@@ -966,6 +1110,8 @@ export class Interpreter {
         env: Environment,
     ): FsValue {
         const object = this.peek(expression.object, env);
+        if (object === undefined && expression.kind !== "BoxDeref" && inOptionalChain(expression))
+            return undefined;
         if (expression.kind === "BoxDeref") {
             if (!(object instanceof FsBox))
                 throw new FsRuntimeError(`Cannot dereference a ${describeValue(object)}`, expression.pos);
@@ -1011,6 +1157,8 @@ export class Interpreter {
             return object.items[index];
         }
         if (object instanceof FsMap) return object.get(index);
+        // `ErrorStringEnum[name]`: the member of that name, or undefined.
+        if (object instanceof FsEnumType) return typeof index === "string" ? object.member(index) : undefined;
         throw new FsRuntimeError(`Cannot index a ${describeValue(object)}`, pos);
     }
 
@@ -1087,10 +1235,8 @@ export class Interpreter {
         // Only values carrying a custom tag can reach a user overload — plain numbers and
         // strings never pay for the dispatch.
         if (!args.some((arg) => isContainer(arg) && arg.tag !== undefined)) return NOT_HANDLED;
-        for (const candidate of candidates) {
-            if (this.matches(candidate, args)) return this.callUser(candidate, args, pos);
-        }
-        return NOT_HANDLED;
+        const candidate = this.selectOverload(candidates, args);
+        return candidate === undefined ? NOT_HANDLED : this.callUser(candidate, args, pos);
     }
 
     // ------------------------------------------------------------------ Assignment
@@ -1148,14 +1294,17 @@ export class Interpreter {
                         pos,
                     );
                 }
-                container.set(target.property, value);
+                // Storing undefined removes the key: `unit[key] = undefined` cancels a unit.
+                if (value === undefined) container.delete(target.property);
+                else container.set(target.property, value);
                 return;
             }
             case "Index": {
                 const container = this.writable(target.object, env, pos);
                 const index = this.evaluateValue(target.index, env);
                 if (container instanceof FsMap) {
-                    container.set(index, value);
+                    if (value === undefined) container.delete(index);
+                    else container.set(index, value);
                     return;
                 }
                 if (container instanceof FsArray) {
@@ -1242,8 +1391,45 @@ export function thrownMessage(value: FsValue): string {
 /** What `catch (e)` binds: the thrown value itself, or a regenError-shaped map for internal errors. */
 function caughtValue(error: FsRuntimeError): FsValue {
     if (error instanceof FsThrow) return error.value as FsValue;
-    return fsMap({ message: error.detail }, "RegenError");
+    // `customMessage` is what std's `processError` reports as the feature's status text.
+    return fsMap({ message: error.detail, customMessage: error.detail }, "RegenError");
 }
 
 export type { FsCallable };
 export { fail, typeName };
+
+/** True when `expression` follows a `?.` in its member/index chain (`a?.b.c`, `a?.b[0]`). */
+function inOptionalChain(expression: Expression): boolean {
+    for (let node: Expression = expression; ; ) {
+        if (node.kind === "Member") {
+            if (node.optional) return true;
+            node = node.object;
+        } else if (node.kind === "Index") {
+            node = node.object;
+        } else {
+            return false;
+        }
+    }
+}
+
+/** Merges two callables of one name into an overload set; undefined when either is not a user function or set. */
+function mergeOverloads(a: FsValue, b: FsValue): OverloadSet | undefined {
+    const candidatesOf = (value: FsValue): readonly UserFunction[] | undefined => {
+        if (!isCallable(value)) return undefined;
+        if (value.kind === "user") return [value];
+        if (value.kind === "overloads") return value.candidates;
+        return undefined;
+    };
+    const first = candidatesOf(a);
+    const second = candidatesOf(b);
+    if (first === undefined || second === undefined) return undefined;
+    const candidates = [...first];
+    for (const candidate of second) if (!candidates.includes(candidate)) candidates.push(candidate);
+    const fallback =
+        (isCallable(a) && a.kind === "overloads" ? a.fallback : undefined) ??
+        (isCallable(b) && b.kind === "overloads" ? b.fallback : undefined);
+    const name = (a as UserFunction | OverloadSet).name;
+    return fallback === undefined
+        ? { kind: "overloads", name, candidates }
+        : { kind: "overloads", name, candidates, fallback };
+}

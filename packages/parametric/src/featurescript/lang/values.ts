@@ -47,10 +47,16 @@ export class FsArray {
     }
 }
 
+/**
+ * A map. Iteration (`for`, `keys`, printing) walks entries in KEY order, as FeatureScript
+ * maps are ordered: `keys({ "a" : 1, "c" : 2, "b" : 3 })` is `["a", "b", "c"]`.
+ */
 export class FsMap {
     frozen = false;
-    /** Canonical key → [original key, value]; insertion ordered. */
+    /** Canonical key → [original key, value]; insertion ordered (see `pairs` for key order). */
     readonly entries = new Map<string, [FsValue, FsValue]>();
+    /** `entries` sorted by key; dropped whenever the key set changes. */
+    private sorted?: [FsValue, FsValue][];
 
     constructor(
         entries?: Iterable<[FsValue, FsValue]>,
@@ -81,14 +87,20 @@ export class FsMap {
 
     set(key: FsValue, value: FsValue): void {
         this.entries.set(keyOf(key), [key, value]);
+        this.sorted = undefined;
     }
 
     delete(key: FsValue): void {
-        this.entries.delete(keyOf(key));
+        if (this.entries.delete(keyOf(key))) this.sorted = undefined;
     }
 
-    *pairs(): IterableIterator<[FsValue, FsValue]> {
-        yield* this.entries.values();
+    /** Entries in key order. */
+    pairs(): readonly [FsValue, FsValue][] {
+        if (this.sorted === undefined) {
+            this.sorted = [...this.entries.values()];
+            if (this.sorted.length > 1) this.sorted.sort((a, b) => compareKeys(a[0], b[0]));
+        }
+        return this.sorted;
     }
 }
 
@@ -191,7 +203,10 @@ export class FsEnumType {
         members: readonly { name: string; display?: string }[],
     ) {
         for (const member of members) {
-            this.values.set(member.name, new FsEnumValue(this, member.name, member.display));
+            this.values.set(
+                member.name,
+                new FsEnumValue(this, member.name, member.display, this.values.size),
+            );
         }
     }
 
@@ -206,6 +221,8 @@ export class FsEnumValue {
         readonly name: string,
         /** The `annotation { "Name" : ... }` of the member, for parameter UIs. */
         readonly display?: string,
+        /** Declaration order — enum map keys sort by it. */
+        readonly ordinal = 0,
     ) {}
 }
 
@@ -343,9 +360,58 @@ export function keyOf(value: FsValue): string {
     if (value instanceof FsEnumValue) return `e${value.type.id}.${value.name}`;
     if (value instanceof FsArray) return `a[${value.items.map(keyOf).join(",")}]`;
     if (value instanceof FsMap) {
-        return `m{${[...value.entries.entries()].map(([k, [, v]]) => `${k}:${keyOf(v)}`).join(",")}}`;
+        return `m{${value
+            .pairs()
+            .map(([k, v]) => `${keyOf(k)}:${keyOf(v)}`)
+            .join(",")}}`;
     }
     return `r${identityOf(value as object)}`;
+}
+
+/** Map key order: by kind (undefined, boolean, number, string, array, map, enum, other), then value. */
+export function compareKeys(a: FsValue, b: FsValue): number {
+    const rankA = keyRank(a);
+    const rankB = keyRank(b);
+    if (rankA !== rankB) return rankA - rankB;
+    if (typeof a === "number" && typeof b === "number") return a - b;
+    if (typeof a === "string" && typeof b === "string") return a < b ? -1 : a > b ? 1 : 0;
+    if (typeof a === "boolean" && typeof b === "boolean") return Number(a) - Number(b);
+    if (a instanceof FsQuantity && b instanceof FsQuantity) return a.value - b.value;
+    if (a instanceof FsArray && b instanceof FsArray) {
+        for (let i = 0; i < Math.min(a.size, b.size); i++) {
+            const order = compareKeys(a.items[i], b.items[i]);
+            if (order !== 0) return order;
+        }
+        return a.size - b.size;
+    }
+    if (a instanceof FsMap && b instanceof FsMap) {
+        const pa = a.pairs();
+        const pb = b.pairs();
+        for (let i = 0; i < Math.min(pa.length, pb.length); i++) {
+            const order = compareKeys(pa[i][0], pb[i][0]) || compareKeys(pa[i][1], pb[i][1]);
+            if (order !== 0) return order;
+        }
+        return pa.length - pb.length;
+    }
+    if (a instanceof FsEnumValue && b instanceof FsEnumValue) {
+        if (a.type !== b.type) return a.type.id < b.type.id ? -1 : 1;
+        return a.ordinal - b.ordinal;
+    }
+    const ka = keyOf(a);
+    const kb = keyOf(b);
+    return ka < kb ? -1 : ka > kb ? 1 : 0;
+}
+
+function keyRank(value: FsValue): number {
+    if (value === undefined) return 0;
+    if (typeof value === "boolean") return 1;
+    if (typeof value === "number") return 2;
+    if (value instanceof FsQuantity) return 3;
+    if (typeof value === "string") return 4;
+    if (value instanceof FsArray) return 5;
+    if (value instanceof FsMap) return 6;
+    if (value instanceof FsEnumValue) return 7;
+    return 8;
 }
 
 /** `==`: structural for value types (tags ignored, as the language does), identity otherwise. */
@@ -356,6 +422,9 @@ export function valuesEqual(a: FsValue, b: FsValue): boolean {
         return a.value === b.value && unitsEqual(a.units, b.units);
     }
     if (a instanceof FsEnumValue && b instanceof FsEnumValue) return a.type === b.type && a.name === b.name;
+    // An enum value is its name with a type tag, and `==` ignores tags.
+    if (a instanceof FsEnumValue && typeof b === "string") return a.name === b;
+    if (b instanceof FsEnumValue && typeof a === "string") return b.name === a;
     if (a instanceof FsArray && b instanceof FsArray) {
         return a.items.length === b.items.length && a.items.every((item, i) => valuesEqual(item, b.items[i]));
     }
@@ -468,9 +537,9 @@ export function expectMap(value: FsValue, what: string): FsMap {
     return value;
 }
 
-/** A quantity of the given units (a unitless one accepts a plain number). */
+/** A quantity of the given units (a unitless one accepts a plain number; zero is zero in any unit). */
 export function expectQuantity(value: FsValue, units: Units, what: string): number {
-    if (isUnitless(units) && typeof value === "number") return value;
+    if (typeof value === "number" && (value === 0 || isUnitless(units))) return value;
     if (value instanceof FsQuantity && unitsEqual(value.units, units)) return value.value;
     fail(`${what} must be a ${unitsLabel(units)} value, got ${describeValue(value)}`);
 }

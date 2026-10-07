@@ -14,6 +14,7 @@ import {
     fail,
     fsMap,
     LENGTH,
+    toDisplayString,
     unitsEqual,
 } from "../lang/values";
 import { createdByMatches, idString } from "../std/feature";
@@ -63,9 +64,22 @@ export function transientQuery(ref: EntityRef): FsMap {
 
 // ------------------------------------------------------------------ Resolution
 
+/** Resolvers for query types another layer defines (std attribute filters, ...). */
+const extensions = new Map<string, (ctx: FsContext, value: FsMap) => EntityRef[]>();
+
+export function registerQueryType(
+    type: string,
+    resolve: (ctx: FsContext, value: FsMap) => EntityRef[],
+): void {
+    extensions.set(type, resolve);
+}
+
 export function resolveQuery(ctx: FsContext, value: FsValue): EntityRef[] {
     if (value instanceof FsArray) return union(value.items.map((item) => resolveQuery(ctx, item)));
-    if (!isQuery(value)) fail(`Expected a Query, got ${describeValue(value)}`);
+    if (!isQuery(value)) {
+        const shown = value instanceof FsMap ? ` ${toDisplayString(value).slice(0, 160)}` : "";
+        fail(`Expected a Query, got ${describeValue(value)}${shown}`);
+    }
     const type = value.field("queryType");
     switch (type) {
         case "NOTHING":
@@ -207,8 +221,11 @@ export function resolveQuery(ctx: FsContext, value: FsValue): EntityRef[] {
             return allEntities(ctx, optionalKind(value.field("entityType"))).filter(
                 (ref) => ref.body.bodyAttr.createdBy === HOST_ID,
             );
-        default:
+        default: {
+            const extension = typeof type === "string" ? extensions.get(type) : undefined;
+            if (extension !== undefined) return extension(ctx, value);
             fail(`Unknown query type ${String(type)}`);
+        }
     }
 }
 

@@ -72,6 +72,8 @@ const PUNCTUATION = [
     "^=",
     "~=",
     "->",
+    "=>",
+    "??",
     "(",
     ")",
     "{",
@@ -252,6 +254,11 @@ class Lexer {
     private punctuation(): Token {
         const pos = this.position();
         const start = this.pos;
+        // `a?.b` is optional chaining; `c ? .5 : 1` is a conditional.
+        if (this.source.startsWith("?.", this.pos) && !isDigit(this.source[this.pos + 2])) {
+            this.advance(2);
+            return { kind: "punct", text: "?.", pos, start, end: this.pos };
+        }
         for (const punct of PUNCTUATION) {
             if (this.source.startsWith(punct, this.pos)) {
                 this.advance(punct.length);

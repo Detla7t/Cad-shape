@@ -119,10 +119,48 @@ export class FsBody {
         return kind === "FACE" ? this.faces() : kind === "EDGE" ? this.edges() : this.vertices();
     }
 
+    /** The geometry and attributes `ContextSnapshot` captures. */
+    state(): BodyState {
+        return {
+            shape: this._shape,
+            kind: this.kind,
+            faceAttrs: this.faceAttrs,
+            edgeAttrs: this.edgeAttrs,
+            vertexAttrs: this.vertexAttrs,
+            name: this.name,
+        };
+    }
+
+    restore(state: BodyState): void {
+        if (state.shape !== this._shape) {
+            this._shape = state.shape;
+            this.cache = {};
+        }
+        this.kind = state.kind;
+        this.faceAttrs = state.faceAttrs;
+        this.edgeAttrs = state.edgeAttrs;
+        this.vertexAttrs = state.vertexAttrs;
+        this.name = state.name;
+    }
+
     /** True for bodies that end up in the feature's output (not sketches, planes or points). */
     get isModelGeometry(): boolean {
         return !this.flags.construction && !this.flags.sketch && this.kind !== "POINT";
     }
+}
+
+export interface BodyState {
+    readonly shape: IShape;
+    readonly kind: BodyKind;
+    readonly faceAttrs: EntityAttribute[];
+    readonly edgeAttrs: EntityAttribute[];
+    readonly vertexAttrs: EntityAttribute[];
+    readonly name?: string;
+}
+
+/** The bodies of a context at one moment — `abortFeature` rolls back to one. */
+export interface ContextSnapshot {
+    readonly bodies: readonly { readonly body: FsBody; readonly state: BodyState }[];
 }
 
 export function bodyKindOf(shape: IShape): BodyKind {
@@ -285,6 +323,20 @@ export class FsContext {
         body.vertexAttrs = body.vertices().map(() => this.freshAttr(HOST_ID));
         this.bodies.push(body);
         return body;
+    }
+
+    /** Captures every body's geometry and attributes (shapes are immutable, so this is cheap). */
+    snapshot(): ContextSnapshot {
+        return { bodies: this.bodies.map((body) => ({ body, state: body.state() })) };
+    }
+
+    /** Rolls back to a snapshot: later bodies vanish, modified ones get their old geometry back. */
+    restore(snapshot: ContextSnapshot): void {
+        this.bodies.length = 0;
+        for (const { body, state } of snapshot.bodies) {
+            body.restore(state);
+            this.bodies.push(body);
+        }
     }
 
     removeBody(body: FsBody): void {
