@@ -22,6 +22,7 @@ import {
     mergeRibbonProfiles,
     ParametricRibbonProfiles,
     type RibbonProfileExtra,
+    SheetMetalRibbonProfiles,
 } from "./ribbon";
 
 export class AppBuilder {
@@ -96,7 +97,11 @@ export class AppBuilder {
             // serializers, and exposes the sketch ribbon contributions
             const parametric = await import("@chili3d/parametric");
             await parametric.initGarlic();
-            this._ribbonExtras.push(...parametric.SketchRibbonProfiles, ...ParametricRibbonProfiles);
+            this._ribbonExtras.push(
+                ...parametric.SketchRibbonProfiles,
+                ...ParametricRibbonProfiles,
+                ...SheetMetalRibbonProfiles,
+            );
         });
         return this;
     }

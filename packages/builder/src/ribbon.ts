@@ -148,6 +148,36 @@ export const ParametricRibbonProfiles: RibbonProfileExtra[] = [
 ];
 
 /**
+ * The sheet metal tab: flat-first parts (blank, bend lines, flatten), seam and edge
+ * treatments (Pittsburgh pocket and its easy edge, hem, flange), and round duct (roll,
+ * crimp, bead).
+ */
+export const SheetMetalRibbonProfiles: RibbonProfileExtra[] = [
+    {
+        tabName: "ribbon.tab.sheetMetal",
+        before: "ribbon.tab.manager",
+        groups: [
+            {
+                groupName: "ribbon.group.sheetMetal",
+                items: ["sheetMetal.base", "sheetMetal.bend", "sheetMetal.flatten"],
+            },
+            {
+                groupName: "ribbon.group.seams",
+                items: [
+                    "sheetMetal.pittsburgh",
+                    "sheetMetal.easyEdge",
+                    ["sheetMetal.hem", "sheetMetal.flange"],
+                ],
+            },
+            {
+                groupName: "ribbon.group.roundDuct",
+                items: ["sheetMetal.roll", "sheetMetal.crimp", "sheetMetal.bead"],
+            },
+        ],
+    },
+];
+
+/**
  * Returns a new profile list with `extras` merged into a copy of `base`: extra
  * items are prepended to the matching group (contributions land first), unknown
  * groups are appended, and new tabs are inserted before their `before` tab or

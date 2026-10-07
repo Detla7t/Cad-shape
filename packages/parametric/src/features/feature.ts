@@ -36,7 +36,8 @@ export type FeatureData =
     | FilletFeatureData
     | ChamferFeatureData
     | BooleanFeatureData
-    | FeatureScriptFeatureData;
+    | FeatureScriptFeatureData
+    | SheetMetalFeatureData;
 
 export interface ExtrudeFeatureData extends FeatureBase {
     readonly type: "extrude";
@@ -155,6 +156,99 @@ export interface FeatureScriptFeatureData extends FeatureBase {
     readonly featureName: string;
     readonly definition: Record<string, FeatureScriptParameterValue>;
 }
+
+/** A straight sketch line a sheet metal feature uses (a bend line, a bead path). */
+export interface SheetLineRef {
+    /** The sketch (or other node) the line belongs to — watched for changes. */
+    readonly nodeId: string;
+    readonly edge: EdgeRef;
+    /** World-space snapshot, the fallback when the line can no longer be matched. */
+    readonly start: XYZLike;
+    readonly end: XYZLike;
+}
+
+export type SheetDirection = "up" | "down";
+
+/** Sheet metal from a closed sketch profile: the flat blank and the part's material settings. */
+export interface SheetMetalBaseFeatureData extends FeatureBase {
+    readonly type: "smBase";
+    readonly sketchId: string;
+    readonly profiles?: ProfileRef[];
+    readonly thickness: ParameterValue;
+    readonly radius: ParameterValue;
+    readonly kFactor: ParameterValue;
+}
+
+/** Bends the sheet along sketch lines. */
+export interface SheetMetalBendFeatureData extends FeatureBase {
+    readonly type: "smBend";
+    readonly lines: SheetLineRef[];
+    readonly angle: ParameterValue;
+    readonly direction: SheetDirection;
+    /** Inner radius override; the part's default bend radius when undefined. */
+    readonly radius?: ParameterValue;
+}
+
+/** An edge treatment on straight outline edges of the sheet (picked on the formed part). */
+export interface SheetMetalEdgeFeatureData extends FeatureBase {
+    readonly type: "smEdge";
+    readonly kind: "easyEdge" | "pittsburgh" | "hem" | "flange";
+    readonly edges: EdgeRef[];
+    readonly direction: SheetDirection;
+    /** Easy edge / flange leg, hem length, or Pittsburgh pocket depth. */
+    readonly length: ParameterValue;
+    /** Pittsburgh lip height. */
+    readonly height?: ParameterValue;
+    /** Pittsburgh slot clearance. */
+    readonly clearance?: ParameterValue;
+    /** Flange angle, degrees. */
+    readonly angle?: ParameterValue;
+    readonly radius?: ParameterValue;
+}
+
+/** Rolls the flat blank into a cylinder (round duct). */
+export interface SheetMetalRollFeatureData extends FeatureBase {
+    readonly type: "smRoll";
+    /** The sketch axis the roll axis runs along. */
+    readonly axis: "u" | "v";
+    /** Inner radius; 0 closes the blank into a full cylinder. */
+    readonly radius: ParameterValue;
+    readonly direction: SheetDirection;
+}
+
+/** A crimped end on a round duct. */
+export interface SheetMetalCrimpFeatureData extends FeatureBase {
+    readonly type: "smCrimp";
+    readonly end: "start" | "end";
+    readonly length: ParameterValue;
+    readonly depth: ParameterValue;
+    readonly count: ParameterValue;
+}
+
+/** A stiffening bead: along a sketch line on a flat sheet, or around a rolled one. */
+export interface SheetMetalBeadFeatureData extends FeatureBase {
+    readonly type: "smBead";
+    readonly line?: SheetLineRef;
+    readonly offset?: ParameterValue;
+    readonly from?: "start" | "end";
+    readonly width: ParameterValue;
+    readonly height: ParameterValue;
+    readonly direction: "out" | "in";
+}
+
+/** Shows the part as its flat pattern, bend lines marked. */
+export interface SheetMetalFlattenFeatureData extends FeatureBase {
+    readonly type: "smFlatten";
+}
+
+export type SheetMetalFeatureData =
+    | SheetMetalBaseFeatureData
+    | SheetMetalBendFeatureData
+    | SheetMetalEdgeFeatureData
+    | SheetMetalRollFeatureData
+    | SheetMetalCrimpFeatureData
+    | SheetMetalBeadFeatureData
+    | SheetMetalFlattenFeatureData;
 
 /**
  * What a feature may ask of the body replaying it: its identity (to recognise a

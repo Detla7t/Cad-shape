@@ -2,7 +2,12 @@
 // See LICENSE file in the project root for full license information.
 
 import { SketchRibbonProfiles } from "@chili3d/parametric";
-import { DefaultRibbon, mergeRibbonProfiles, ParametricRibbonProfiles } from "../src/ribbon";
+import {
+    DefaultRibbon,
+    mergeRibbonProfiles,
+    ParametricRibbonProfiles,
+    SheetMetalRibbonProfiles,
+} from "../src/ribbon";
 
 describe("DefaultRibbon", () => {
     test("should be a non-empty array of tab profiles", () => {
@@ -176,6 +181,32 @@ describe("ParametricRibbonProfiles", () => {
             "featurescript.newStudio",
             "featurescript.editStudio",
             "feature.variable",
+        ]);
+    });
+});
+
+describe("SheetMetalRibbonProfiles", () => {
+    test("adds the sheet metal tab before the manager tab", () => {
+        const merged = mergeRibbonProfiles(DefaultRibbon, SheetMetalRibbonProfiles);
+        const names = merged.map((t) => t.tabName);
+        expect(names.indexOf("ribbon.tab.sheetMetal")).toBe(names.indexOf("ribbon.tab.manager") - 1);
+        const tab = merged.find((t) => t.tabName === "ribbon.tab.sheetMetal")!;
+        expect(tab.groups.map((g) => g.groupName)).toEqual([
+            "ribbon.group.sheetMetal",
+            "ribbon.group.seams",
+            "ribbon.group.roundDuct",
+        ]);
+        expect(flattenItems(tab.groups.flatMap((g) => g.items))).toEqual([
+            "sheetMetal.base",
+            "sheetMetal.bend",
+            "sheetMetal.flatten",
+            "sheetMetal.pittsburgh",
+            "sheetMetal.easyEdge",
+            "sheetMetal.hem",
+            "sheetMetal.flange",
+            "sheetMetal.roll",
+            "sheetMetal.crimp",
+            "sheetMetal.bead",
         ]);
     });
 });
