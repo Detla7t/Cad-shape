@@ -32,6 +32,30 @@ describe("5-axis posts", () => {
         expect(output.value).toBe(GOLDEN[id]);
     });
 
+    test.each([
+        ["fanuc-30i-5axis", GENERIC_AC_TRUNNION],
+        ["haas-umc-5axis", GENERIC_AC_TRUNNION],
+        ["siemens-840d-5axis", GENERIC_AC_TRUNNION],
+        ["heidenhain-tnc-5axis", GENERIC_BC_HEAD_TABLE],
+    ])("%s writes its comments in ASCII", (id, machine) => {
+        const base = program(machine);
+        const named = {
+            ...base,
+            name: "Gehäuse",
+            tools: new Map([...base.tools].map(([key, tool]) => [key, { ...tool, name: "Kugelfräser Ø6" }])),
+            toolpaths: base.toolpaths.map((path) => ({
+                ...path,
+                label: `${path.label} Ø6, 30°`,
+                moves: [{ kind: "comment", text: "tool Ø6 × 2" } as ToolpathMove, ...path.moves],
+            })),
+        };
+        const output = postProcessor(id)!.post(named);
+        expect(output.isOk).toBe(true);
+        expect(output.value).toMatch(/^[\x20-\x7e\n]*$/);
+        expect(output.value.toUpperCase()).toContain("KUGELFRASER D6");
+        expect(output.value.toUpperCase()).toContain("TOOL D6 X 2");
+    });
+
     test("toolpaths are classified by their tool axes", () => {
         const { toolpaths } = program(GENERIC_AC_TRUNNION);
         expect(toolpaths.map((path) => toolpathMode(path).mode)).toEqual([

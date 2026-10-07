@@ -83,6 +83,46 @@ describe("booleans", () => {
     });
 });
 
+describe("successive offsets of curves", () => {
+    // A roughing level clears a pocket ring by ring, each ring the offset of the one before.
+    test("a hole's rings grow without multiplying the curve's vertices, within the tolerance", () => {
+        const tolerance = 0.01;
+        const hole = circlePoints([0, 0], 8, tolerance, false);
+        let loops: Point2[][] = [rect(-40, -40, 40, 40), hole];
+        for (let k = 1; k <= 8; k++) {
+            loops = offset(loops, -1, { tolerance });
+            const found = regions(loops);
+            expect(found).toHaveLength(1);
+            expect(found[0].holes).toHaveLength(1);
+            const ring = found[0].holes[0];
+            // Every vertex is at least the offset from the hole, and at most the tolerance more.
+            for (const p of ring) {
+                const r = Math.hypot(p[0], p[1]);
+                expect(r).toBeGreaterThan(8 + k - 2 * tolerance);
+                expect(r).toBeLessThan(8 + k + 2 * tolerance);
+            }
+            // Before, every offset doubled the circle's vertices (68 → 136 → 272 → …).
+            expect(ring.length).toBeLessThanOrEqual(hole.length + 4);
+        }
+    });
+
+    test("a grown circle keeps its vertex count and its exact distance", () => {
+        const tolerance = 0.01;
+        const circle = circlePoints([5, 5], 10, tolerance, true);
+        let loops: Point2[][] = [circle];
+        for (let k = 1; k <= 6; k++) {
+            loops = offset(loops, 2, { tolerance });
+            expect(loops).toHaveLength(1);
+            expect(loops[0].length).toBeLessThanOrEqual(circle.length + 4);
+            for (const p of loops[0]) {
+                const r = Math.hypot(p[0] - 5, p[1] - 5);
+                expect(r).toBeGreaterThan(10 + 2 * k - 2 * tolerance);
+                expect(r).toBeLessThan(10 + 2 * k + 2 * tolerance);
+            }
+        }
+    });
+});
+
 describe("arc fitting", () => {
     test("a circle polygon comes back as two half arcs on the exact circle", () => {
         const path = fitArcs(circlePoints([3, 4], 7.5), true);

@@ -11,7 +11,7 @@ import type { ToolData } from "../model/tool";
 import type { ToolpathData, ToolpathMove } from "../model/toolpath";
 import { FEED_PARAMETERS, feedDefaults, feedsOf, HEIGHT_PARAMETERS, heightsOf, toolpathOf } from "./common";
 import { circleOfEdge, stockBottom } from "./geometry";
-import { detectHoles, type Hole, holesFromCircles, holesFromFaces } from "./holes";
+import { detectHoles, type Hole, holesFromCircles, holesFromFaces, holesFromRims } from "./holes";
 import { MoveBuilder } from "./moves";
 import { ParamReader, when } from "./params";
 
@@ -107,8 +107,12 @@ export function tipLength(tool: ToolData): number {
     return tool.diameter / 2 / Math.tan((angle * Math.PI) / 360);
 }
 
-/** The holes an operation drills: picked faces, edges or sketch circles, else every hole of the parts. */
-export function operationHoles(context: CamOperationContext, depth: number): Hole[] {
+/**
+ * The holes an operation drills: picked faces, edges or sketch circles, else every hole of the
+ * parts. Picked circles are `depth` deep or — given `rimBottom`, when drilling to the hole
+ * bottom — the part hole they lie on, else holes down to `rimBottom`.
+ */
+export function operationHoles(context: CamOperationContext, depth: number, rimBottom?: number): Hole[] {
     const faces = context.selectedFaces();
     if (faces.length > 0) {
         const fromFaces = holesFromFaces(faces, context.parts);
@@ -127,7 +131,10 @@ export function operationHoles(context: CamOperationContext, depth: number): Hol
         );
         if (circle !== undefined) circles.push({ ...circle, z: loop.z ?? 0 });
     }
-    if (circles.length > 0) return holesFromCircles(circles, depth);
+    if (circles.length > 0)
+        return rimBottom === undefined
+            ? holesFromCircles(circles, depth)
+            : holesFromRims(circles, context.parts, rimBottom);
     if (faces.length > 0 || context.selectedEdges().length > 0) return [];
     return detectHoles(context.parts);
 }
@@ -145,6 +152,7 @@ export function generateDrill(
     const holes = operationHoles(
         context,
         depthFrom === "depth" ? fixedDepth : context.stock.max[2] - stockBottom(context),
+        depthFrom === "depth" ? undefined : stockBottom(context),
     ).filter(
         (hole) =>
             hole.diameter >= minDiameter - 1e-9 && (maxDiameter <= 0 || hole.diameter <= maxDiameter + 1e-9),

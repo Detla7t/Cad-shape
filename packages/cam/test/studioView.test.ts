@@ -215,6 +215,52 @@ test("a 5-axis machine posts with its 5-axis post", () => {
     expect(view.element.querySelector('[data-action="post"]')).not.toBeNull();
 });
 
+test("changing the machine moves its operations to the new machine's defaults and keeps the user's values", () => {
+    const { doc, studio, view } = setup();
+    click(view.element, '[data-action="add-setup"]');
+    const machineSelect = () => must<HTMLSelectElement>(view.element, '[data-field="setup.machine"]');
+    change(machineSelect(), "generic-plasma");
+    change(must<HTMLSelectElement>(view.element, 'select[data-action="add-operation"]'), "profileCut");
+    const plasma = studio.setups[0].operations[0];
+    expect([
+        plasma.toolId,
+        plasma.params["kerf"],
+        plasma.params["feed"],
+        plasma.params["pierceDelay"],
+    ]).toEqual(["torch", 1.5, 3000, 0.5]);
+    change(must<HTMLInputElement>(view.element, '[data-field="param.leadIn"]'), "7");
+
+    click(view.element, '[data-action="tab-setup"]');
+    change(machineSelect(), "generic-waterjet");
+    const moved = studio.setups[0].operations[0];
+    expect(moved.id).toBe(plasma.id);
+    expect(moved.toolId).toBe("jet");
+    expect(moved.params["kerf"]).toBe(0.8);
+    expect(moved.params["feed"]).toBe(400);
+    expect(moved.params["pierceDelay"]).toBe(1.5);
+    expect(moved.params["marks"]).toBe("skip");
+    expect(moved.params["leadIn"]).toBe(7);
+
+    // One undo step brings back the plasma machine with the operation as it was.
+    doc.history.undo();
+    expect(studio.setups[0].machineId).toBe("generic-plasma");
+    expect(studio.setups[0].operations[0].params["kerf"]).toBe(1.5);
+    expect(studio.setups[0].operations[0].toolId).toBe("torch");
+});
+
+test("3D roughing starts with an end mill, 3D finishing with a ball", () => {
+    const { studio, view } = setup();
+    click(view.element, '[data-action="add-setup"]');
+    const add = () => must<HTMLSelectElement>(view.element, 'select[data-action="add-operation"]');
+    change(add(), "zLevelRoughing");
+    change(add(), "parallel3d");
+    const [roughing, finishing] = studio.setups[0].operations;
+    // generic-3-axis: t1 is the 10 mm flat end mill, t3 the 6 mm ball (0.4 mm stepover).
+    expect(roughing.toolId).toBe("t1");
+    expect(roughing.params["stepover"]).toBe(4);
+    expect(finishing.toolId).toBe("t3");
+});
+
 test("suppressing, reordering and deleting operations are undoable edits", () => {
     const { doc, studio, view } = setup();
     click(view.element, '[data-action="add-setup"]');

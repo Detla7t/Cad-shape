@@ -39,6 +39,43 @@ export function formatGCodeNumber(value: number, format: NumberFormat): string {
     return negative ? `-${text}` : text;
 }
 
+const ASCII_SPELLINGS: Readonly<Record<string, string>> = {
+    Ø: "D",
+    ø: "D",
+    "⌀": "D",
+    "°": " deg",
+    "×": "x",
+    "±": "+/-",
+    µ: "u",
+    μ: "u",
+    "²": "2",
+    "³": "3",
+    "–": "-",
+    "—": "-",
+    "‘": "'",
+    "’": "'",
+    "“": '"',
+    "”": '"',
+    "…": "...",
+};
+
+/**
+ * Comment text a controller accepts: printable ASCII only. Controllers read programs as
+ * ASCII — a Fanuc or Haas raises an alarm on the bytes of "Ø", and GRBL takes bytes from
+ * 0x80 up as realtime commands (the second byte of "×" is its 25 % rapid override). The
+ * symbols the toolpaths use are spelled out (Ø6 → D6, 3° → 3 deg), accents are dropped and
+ * any other character is left out.
+ */
+export function asciiCommentText(text: string): string {
+    let out = "";
+    for (const char of text.normalize("NFKD")) {
+        if (char >= " " && char <= "~") out += char;
+        else if (char === "\t" || char === "\r" || char === "\n") out += " ";
+        else out += ASCII_SPELLINGS[char.normalize("NFC")] ?? "";
+    }
+    return out.replace(/ {2,}/g, " ").trim();
+}
+
 export type CommentStyle = "parens" | "semicolon" | "none";
 
 export interface LineNumberOptions {
@@ -120,10 +157,7 @@ export class GCodeWriter {
     commentText(text: string): string | undefined {
         const style = this.options.comments ?? "parens";
         if (style === "none") return undefined;
-        let clean = text
-            .replace(/[()]/g, "")
-            .replace(/[\r\n]+/g, " ")
-            .trim();
+        let clean = asciiCommentText(text.replace(/[()]/g, ""));
         if (this.options.uppercaseComments) clean = clean.toUpperCase();
         if (clean === "") return undefined;
         return style === "parens" ? `(${clean})` : `; ${clean}`;

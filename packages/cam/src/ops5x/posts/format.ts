@@ -4,6 +4,7 @@
 import type { CamProgram } from "../../model/post";
 import type { ToolData } from "../../model/tool";
 import type { ToolpathData } from "../../model/toolpath";
+import { asciiCommentText } from "../../posts/gcodeWriter";
 
 /**
  * The few formatting helpers the 5-axis posts share: number styles, modal word
@@ -88,5 +89,10 @@ export function toolDescription(tool: ToolData): string {
 
 /** Text safe inside a Fanuc-style ( ) comment. */
 export function parenComment(text: string): string {
-    return `(${text.replace(/[()]/g, "").toUpperCase()})`;
+    return `(${asciiCommentText(text.replace(/[()]/g, "")).toUpperCase()})`;
+}
+
+/** A `; text` comment line (Heidenhain, Siemens), in the ASCII a control reads. */
+export function semicolonComment(text: string): string {
+    return `; ${asciiCommentText(text)}`;
 }

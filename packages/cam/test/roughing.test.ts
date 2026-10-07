@@ -279,4 +279,23 @@ describe("Z-level roughing", () => {
             expect(regionArea(level.region)).toBeLessThan(regionArea(below.region) / 3);
         }
     });
+
+    test("the rings around a boss keep its outline's vertices: moves grow with the rings only", async () => {
+        // One level around a 10 × 10 boss in a 40 × 40 stock, 1 mm apart: about fifteen rings.
+        const stock = { min: [-20, -20, 0] as Vec3, max: [20, 20, 10] as Vec3 };
+        const params = {
+            stepdown: 50,
+            stepover: 1,
+            stockToLeave: 0,
+            tolerance: 0.02,
+            detectFlats: false,
+            sampling: 2,
+            entry: "plunge",
+        };
+        const { path } = await rough(mergeMeshes(boxMesh([-5, -5, 0], [5, 5, 10])), params, stock);
+        const atZero = path.moves.filter((move) => move.kind === "linear" && Math.abs(move.to[2]) < 1e-9);
+        expect(atZero.length).toBeGreaterThan(100);
+        // Each offset used to double the rounded rings' vertices: over 15 000 moves for this level.
+        expect(path.moves.length).toBeLessThan(2000);
+    });
 });
