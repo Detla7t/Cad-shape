@@ -13,6 +13,7 @@ export * from "./model/post";
 export * from "./model/setup";
 export * from "./model/tool";
 export * from "./model/toolpath";
+export * from "./nc";
 export * from "./ops2d";
 export * from "./ops3d";
 export * from "./ops5x";

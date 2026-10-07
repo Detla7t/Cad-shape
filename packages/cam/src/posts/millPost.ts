@@ -30,6 +30,8 @@ import {
  * as radius words (split at 180°), or linearized.
  */
 
+/** The widest arc a post writes in R format: well-conditioned (the centre error stays below 2× the end rounding). */
+const R_MAX_SWEEP = (150 * Math.PI) / 180;
 export type DrillCode = "G81" | "G82" | "G83" | "G73" | "G84" | "G85";
 type Coolant = NonNullable<ToolCuttingData["coolant"]>;
 
@@ -523,7 +525,10 @@ class MillProgramWriter {
             }
             return;
         }
-        const pieces = this.arcs === "r" ? splitArc(from, move, Math.PI + 1e-9) : [move];
+        // R names the centre only up to the chord's rounding, and near a half circle that error
+        // explodes (0.0005 mm on the ends moves a 180° arc's centre by ~0.1 mm; controllers
+        // alarm on the radius mismatch): R arcs stay at or below R_MAX_SWEEP.
+        const pieces = this.arcs === "r" ? splitArc(from, move, R_MAX_SWEEP) : [move];
         for (const piece of pieces) this.arcPiece(piece);
     }
 

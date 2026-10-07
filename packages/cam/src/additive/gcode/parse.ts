@@ -2,12 +2,14 @@
 // See LICENSE file in the project root for full license information.
 
 import type { ToolpathData, ToolpathMove, Vec3 } from "../../model/toolpath";
+import { NcReader } from "../../nc/interpreter";
+import { arcSweep, planeAxes } from "../../posts/motion";
 
 /**
- * Reads printer G-code back into moves for previews (a G-code from PrusaSlicer, or the raw
- * blocks of a toolpath): G0/G1 travel or extrude, G2/G3 arcs flattened into segments, G90/G91,
- * M82/M83 and G92 tracked, so every extrusion amount comes out relative. Also picks up the
- * statistics slicers write as comments.
+ * Printer G-code back into moves for previews (a G-code from PrusaSlicer, or the raw
+ * blocks of a toolpath) — read by the NC reader, so G0/G1 travel or extrude, G2/G3 arcs,
+ * G90/G91, M82/M83 and G92 follow the firmware and every extrusion amount comes out
+ * relative — and the statistics slicers write as comments.
  */
 
 export interface GcodeStats {
@@ -23,24 +25,6 @@ export interface ParsedGcode {
     readonly stats: GcodeStats;
     /** Bounding box of the extrusions. */
     readonly extrusionBounds?: { readonly min: Vec3; readonly max: Vec3 };
-}
-
-interface ParserState {
-    x: number;
-    y: number;
-    z: number;
-    e: number;
-    feed: number;
-    absolute: boolean;
-    absoluteE: boolean;
-}
-
-const WORD = /([A-Z])\s*([-+]?(?:\d+\.?\d*|\.\d+))/g;
-
-function words(code: string): Map<string, number> {
-    const out = new Map<string, number>();
-    for (const match of code.toUpperCase().matchAll(WORD)) out.set(match[1], Number.parseFloat(match[2]));
-    return out;
 }
 
 /** "1d 2h 3m 4s" → seconds. */
@@ -89,19 +73,29 @@ export function printerGcodeStats(text: string): GcodeStats {
     };
 }
 
-export function parsePrinterGcode(text: string, initial?: Partial<ParserState>): ParsedGcode {
-    const state: ParserState = {
-        x: 0,
-        y: 0,
-        z: 0,
-        e: 0,
-        feed: 3000,
-        absolute: true,
-        absoluteE: false,
-        ...initial,
-    };
+/** Where reading starts: the head's position and feed (a raw block continues a toolpath). */
+export interface PrinterGcodeStart {
+    readonly x?: number;
+    readonly y?: number;
+    readonly z?: number;
+    readonly feed?: number;
+}
+
+/**
+ * Printer G-code as preview moves — a thin adapter over the NC reader (`nc/`) in its
+ * Marlin dialect: travels are rapids with their feed, extrusions `extrude` moves with
+ * relative amounts, arcs flattened at ≤ 5° steps (an arc's extrusion shared by length);
+ * homing (G28) moves the head without a drawn move.
+ */
+export function parsePrinterGcode(text: string, initial?: PrinterGcodeStart): ParsedGcode {
+    const start: Vec3 = [initial?.x ?? 0, initial?.y ?? 0, initial?.z ?? 0];
+    const result = new NcReader(
+        text,
+        "marlin",
+        { start, ...(initial?.feed === undefined ? {} : { feed: initial.feed }) },
+        0,
+    ).run();
     const moves: ToolpathMove[] = [];
-    const stats: StatsAccumulator = { layers: 0 };
     const min: [number, number, number] = [Infinity, Infinity, Infinity];
     const max: [number, number, number] = [-Infinity, -Infinity, -Infinity];
     const extendBounds = (p: Vec3) => {
@@ -110,117 +104,63 @@ export function parsePrinterGcode(text: string, initial?: Partial<ParserState>):
             max[k] = Math.max(max[k], p[k]);
         }
     };
-    const push = (to: Vec3, extrude: number) => {
-        const moved = to[0] !== state.x || to[1] !== state.y || to[2] !== state.z;
-        if (!moved && extrude === 0) return;
-        if (extrude > 0 && (to[0] !== state.x || to[1] !== state.y || to[2] !== state.z)) {
-            extendBounds([state.x, state.y, state.z]);
-            extendBounds(to);
-        }
-        if (extrude !== 0) moves.push({ kind: "extrude", to, extrude, feed: state.feed });
-        else moves.push({ kind: "rapid", to, feed: state.feed });
-    };
-    for (const rawLine of text.split(/\r?\n/)) {
-        const semicolon = rawLine.indexOf(";");
-        const comment = semicolon >= 0 ? rawLine.slice(semicolon + 1).trim() : "";
-        const code = (semicolon >= 0 ? rawLine.slice(0, semicolon) : rawLine).trim();
-        if (comment) readStatComment(comment, stats);
-        if (code === "") continue;
-        const command = /^([GM])(\d+)/i.exec(code);
-        if (!command) continue;
-        const letter = command[1].toUpperCase();
-        const number = Number.parseInt(command[2], 10);
-        const w = words(code.slice(command[0].length));
-        if (letter === "M") {
-            if (number === 82) state.absoluteE = true;
-            else if (number === 83) state.absoluteE = false;
-            continue;
-        }
-        if (number === 90) state.absolute = true;
-        else if (number === 91) state.absolute = false;
-        else if (number === 92) {
-            if (w.has("X")) state.x = w.get("X") as number;
-            if (w.has("Y")) state.y = w.get("Y") as number;
-            if (w.has("Z")) state.z = w.get("Z") as number;
-            if (w.has("E")) state.e = w.get("E") as number;
-        } else if (number === 28) {
-            const all = !w.has("X") && !w.has("Y") && !w.has("Z");
-            if (all || w.has("X")) state.x = 0;
-            if (all || w.has("Y")) state.y = 0;
-            if (all || w.has("Z")) state.z = 0;
-        } else if (number === 0 || number === 1 || number === 2 || number === 3) {
-            if (w.has("F")) state.feed = w.get("F") as number;
-            const axis = (key: "X" | "Y" | "Z", current: number) => {
-                const value = w.get(key);
-                if (value === undefined) return current;
-                return state.absolute ? value : current + value;
-            };
-            const to: Vec3 = [axis("X", state.x), axis("Y", state.y), axis("Z", state.z)];
-            let extrude = 0;
-            const e = w.get("E");
-            if (e !== undefined) {
-                extrude = state.absoluteE ? e - state.e : e;
-                state.e = state.absoluteE ? e : state.e + e;
+    let at = start;
+    for (const path of result.toolpaths) {
+        path.moves.forEach((move, index) => {
+            if (path.homeMoves.has(index)) {
+                if ("to" in move) at = move.to;
+                return;
             }
-            if (number <= 1) push(to, extrude);
-            else {
-                const clockwise = number === 2;
-                const cx = state.x + (w.get("I") ?? 0);
-                const cy = state.y + (w.get("J") ?? 0);
-                const points = flattenArc([state.x, state.y, state.z], to, [cx, cy], clockwise);
-                let previous: Vec3 = [state.x, state.y, state.z];
-                const total = points.reduce((sum, p) => {
-                    const d = Math.hypot(p[0] - previous[0], p[1] - previous[1]);
-                    previous = p;
-                    return sum + d;
-                }, 0);
-                previous = [state.x, state.y, state.z];
-                for (const p of points) {
-                    const d = Math.hypot(p[0] - previous[0], p[1] - previous[1]);
-                    push(p, total > 0 ? (extrude * d) / total : 0);
-                    state.x = p[0];
-                    state.y = p[1];
-                    state.z = p[2];
-                    previous = p;
-                }
+            switch (move.kind) {
+                case "rapid":
+                    moves.push(move);
+                    at = move.to;
+                    return;
+                case "extrude":
+                    if (move.extrude > 0 && !samePoint(at, move.to)) {
+                        extendBounds(at);
+                        extendBounds(move.to);
+                    }
+                    moves.push(move);
+                    at = move.to;
+                    return;
+                case "arc":
+                    for (const point of flattenArc(at, move))
+                        moves.push({ kind: "rapid", to: point, feed: move.feed });
+                    at = move.to;
+                    return;
+                default:
+                    return;
             }
-            state.x = to[0];
-            state.y = to[1];
-            state.z = to[2];
-        }
+        });
     }
     const hasBounds = min[0] <= max[0];
     return {
         moves,
-        stats: {
-            seconds: stats.seconds,
-            filamentMm: stats.filamentMm,
-            filamentGrams: stats.filamentGrams,
-            layers: stats.layers || undefined,
-        },
+        stats: printerGcodeStats(text),
         extrusionBounds: hasBounds ? { min, max } : undefined,
     };
 }
 
-/** Points along an XY arc (with a linear Z) at ≤ 5° steps, ending exactly at `to`. */
-function flattenArc(from: Vec3, to: Vec3, center: readonly [number, number], clockwise: boolean): Vec3[] {
-    const r = Math.hypot(from[0] - center[0], from[1] - center[1]);
-    const a0 = Math.atan2(from[1] - center[1], from[0] - center[0]);
-    let a1 = Math.atan2(to[1] - center[1], to[0] - center[0]);
-    if (clockwise && a1 >= a0) a1 -= 2 * Math.PI;
-    if (!clockwise && a1 <= a0) a1 += 2 * Math.PI;
-    const sweep = a1 - a0;
+const samePoint = (a: Vec3, b: Vec3) => a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
+
+/** Points along an arc (the normal coordinate linear) at ≤ 5° steps, ending exactly at its end. */
+function flattenArc(from: Vec3, arc: Extract<ToolpathMove, { kind: "arc" }>): Vec3[] {
+    const [u, v, w] = planeAxes(arc.plane);
+    const r = Math.hypot(from[u] - arc.center[u], from[v] - arc.center[v]);
+    const a0 = Math.atan2(from[v] - arc.center[v], from[u] - arc.center[u]);
+    const sweep = arcSweep(from, arc);
     const steps = Math.max(1, Math.ceil(Math.abs(sweep) / (Math.PI / 36)));
     const points: Vec3[] = [];
     for (let i = 1; i < steps; i++) {
         const a = a0 + (sweep * i) / steps;
-        points.push([
-            center[0] + r * Math.cos(a),
-            center[1] + r * Math.sin(a),
-            from[2] + ((to[2] - from[2]) * i) / steps,
-        ]);
+        const point: [number, number, number] = [0, 0, 0];
+        point[u] = arc.center[u] + r * Math.cos(a);
+        point[v] = arc.center[v] + r * Math.sin(a);
+        point[w] = from[w] + ((arc.to[w] - from[w]) * i) / steps;
+        points.push(point);
     }
-    points.push(to);
+    points.push(arc.to);
     return points;
 }
 

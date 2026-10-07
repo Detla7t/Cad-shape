@@ -11,8 +11,9 @@ import {
     polygonOffset,
 } from "@chili3d/rs";
 import { ARC_TOLERANCE } from "./arcs";
+import { arcStepAngle } from "./path";
 import { oriented, removeDuplicatePoints, signedArea } from "./polygon";
-import type { Point2 } from "./vec";
+import { add, cross, dot, normalize, type Point2, perpRight, rotate, scale, sub } from "./vec";
 
 /**
  * Polygon offsetting, booleans, open-path clipping and nesting on the Rust polygon kernel
@@ -105,7 +106,51 @@ export function offset(
 ): Point2[][] {
     const prepared = orientRegionLoops(loops);
     if (Math.abs(delta) < 0.5 / SCALE) return union(prepared);
-    return pathsOf(polygonOffset(flatPaths(prepared), delta, { join: joinOf(options), scale: SCALE }));
+    if ((options.join ?? "round") !== "round") {
+        return pathsOf(polygonOffset(flatPaths(prepared), delta, { join: joinOf(options), scale: SCALE }));
+    }
+    // Round joins: the raw outline here, cleaned by a positive-fill union in the kernel. The
+    // kernel's own round offset keeps both edge ends at every vertex, which doubles a curve's
+    // chords with each successive offset (a roughing level offsets ring from ring).
+    const raw: Point2[][] = [];
+    for (const loop of prepared) {
+        const clean = removeDuplicatePoints(loop, true, 0.5 / SCALE);
+        if (clean.length >= 3) raw.push(rawRoundOffset(clean, delta, options.tolerance ?? ARC_TOLERANCE));
+    }
+    return pathsOf(polygonBoolean("union", flatPaths(raw), undefined, { scale: SCALE, fill: "positive" }));
+}
+
+/** The raw (self-intersecting) round-join offset outline of one oriented loop. */
+function rawRoundOffset(points: readonly Point2[], delta: number, tolerance: number): Point2[] {
+    const n = points.length;
+    const normals: Point2[] = [];
+    for (let i = 0; i < n; i++) normals.push(perpRight(normalize(sub(points[(i + 1) % n], points[i]))));
+    const step = arcStepAngle(Math.abs(delta), tolerance);
+    const out: Point2[] = [];
+    for (let j = 0; j < n; j++) {
+        const k = (j - 1 + n) % n;
+        const p = points[j];
+        const nk = normals[k];
+        const nj = normals[j];
+        const turn = Math.atan2(cross(nk, nj), dot(nk, nj));
+        if (Math.abs(turn) < 1e-9) {
+            out.push(add(p, scale(nj, delta)));
+        } else if (turn * delta < 0) {
+            // The offset edges overlap here: pass through the vertex so the union can clean it.
+            out.push(add(p, scale(nk, delta)), p, add(p, scale(nj, delta)));
+        } else if (Math.abs(turn) <= step) {
+            // A turn within one arc step (a vertex of a curve's chords): the edges meet at their
+            // mitre, within the tolerance of the arc and never closer than delta.
+            out.push(add(p, scale(add(nk, nj), delta / (1 + Math.cos(turn)))));
+        } else {
+            const steps = Math.max(1, Math.ceil(Math.abs(turn) / step));
+            const start = scale(nk, delta);
+            out.push(add(p, start));
+            for (let i = 1; i < steps; i++) out.push(add(p, rotate(start, (turn * i) / steps)));
+            out.push(add(p, scale(nj, delta)));
+        }
+    }
+    return out;
 }
 
 /**

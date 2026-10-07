@@ -245,7 +245,7 @@ describe("SheetMetalRibbonProfiles", () => {
 });
 
 describe("CamRibbonProfiles", () => {
-    test("adds the CAM tab before the manager tab: CAM Studios and regenerating toolpaths", () => {
+    test("adds the CAM tab before the manager tab: CAM Studios, regenerating toolpaths, NC Programs", () => {
         const merged = mergeRibbonProfiles(DefaultRibbon, CamRibbonProfiles);
         const names = merged.map((t) => t.tabName);
         expect(names.indexOf("ribbon.tab.cam")).toBe(names.indexOf("ribbon.tab.manager") - 1);
@@ -254,7 +254,9 @@ describe("CamRibbonProfiles", () => {
             "cam.newStudio",
             "cam.openStudio",
             "cam.generateAll",
+            "nc.newProgram",
         ]);
+        expect(tab.groups.map((g) => g.groupName)).toEqual(["ribbon.group.cam", "ribbon.group.nc"]);
     });
 });
 

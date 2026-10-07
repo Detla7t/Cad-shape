@@ -23,6 +23,8 @@ export type FileFormatCategory =
     | "image"
     /** Source code Chili3D runs: FeatureScript. */
     | "source"
+    /** NC programs: G-code for mills, cutting tables, wire EDM and 3D printers. */
+    | "nc"
     /** A closed CAD format no open-source reader exists for (Parasolid, SolidWorks, ...). */
     | "proprietary"
     | "unknown";
@@ -76,12 +78,32 @@ export const FILE_FORMATS: readonly FileFormat[] = [
     f("dxf", "drawing", "AutoCAD DXF", [".dxf"], "image/vnd.dxf"),
     f("dwg", "drawing", "AutoCAD DWG", [".dwg"], "image/vnd.dwg"),
     f("markdown", "document", "Markdown", [".md", ".markdown", ".mdown"], "text/markdown"),
+    f("text", "document", "Plain text", [".txt", ".text", ".log", ".ini", ".cfg"], "text/plain"),
     f(
-        "text",
-        "document",
-        "Plain text",
-        [".txt", ".text", ".log", ".ini", ".cfg", ".nc", ".gcode"],
-        "text/plain",
+        "nc",
+        "nc",
+        "NC program (G-code)",
+        [
+            ".nc",
+            ".ngc",
+            ".tap",
+            ".cnc",
+            ".gcode",
+            ".gco",
+            ".gc",
+            ".g",
+            ".iso",
+            ".eia",
+            ".mpf",
+            ".spf",
+            ".min",
+            ".ptp",
+            ".h",
+            ".ncc",
+            ".nc1",
+            ".fan",
+        ],
+        "text/x-gcode",
     ),
     f("json", "document", "JSON", [".json"], "application/json"),
     f("xml", "document", "XML", [".xml"], "application/xml"),
@@ -352,8 +374,48 @@ function sniffTextFormat(text: string): string | undefined {
     if (trimmed.startsWith("[")) return "json";
     if (trimmed.startsWith("<?xml") || /^<[A-Za-z][\w:.-]*[\s>/]/.test(trimmed)) return "xml";
     if (/^\s*v\s+-?[\d.]/m.test(body) && /^\s*f\s+\d/m.test(body)) return "obj";
+    if (looksLikeNcProgram(body)) return "nc";
     return undefined;
 }
+
+/**
+ * Whether text looks like an NC program: most non-blank lines are blocks of address words
+ * (`G1 X10`, `N10 M3`, `O1000`, `%`, `#1 = 2`, `o100 call`) and some are G or M codes — or a
+ * Heidenhain `BEGIN PGM`. For files whose name does not say (an extensionless file, a `.001`).
+ */
+export function looksLikeNcProgram(text: string): boolean {
+    const sample = text.length > SNIFF_LIMIT ? text.slice(0, SNIFF_LIMIT) : text;
+    if (/^\s*\d*\s*BEGIN\s+PGM\b/im.test(sample)) return true;
+    let blocks = 0;
+    let codes = 0;
+    let other = 0;
+    const lines = sample.split(/\r?\n/);
+    // The last line may be cut by the sample limit.
+    if (text.length > sample.length) lines.pop();
+    for (const raw of lines) {
+        const line = raw
+            .replace(/\([^)]*\)/g, " ")
+            .replace(/;.*$/, "")
+            .trim();
+        if (line === "") continue;
+        if (line.startsWith("%")) {
+            blocks++;
+            continue;
+        }
+        if (NC_BLOCK.test(line)) {
+            blocks++;
+            if (/(^|[^A-Z])[GM]\s*\d/i.test(line)) codes++;
+        } else if (/^(o\d+|o<[^>]+>)\s+\w+/i.test(line) || /^#\d+\s*=/.test(line)) {
+            blocks++;
+        } else {
+            other++;
+        }
+    }
+    return blocks >= 3 && codes >= 2 && blocks >= (blocks + other) * 0.8;
+}
+
+const NC_BLOCK =
+    /^\/?\s*(N\d+\s*)?((O|:)\d+|[GMTSFXYZIJKABCEUVWHDPQRL]\s*[-+]?(\d+\.?\d*|\.\d+|#\d+|\[)[^A-Z\s]*\s*)+(\*\d+)?$/i;
 
 interface Sniffed {
     readonly id: string;
@@ -413,6 +475,7 @@ const TEXT_FAMILY = [
     "step",
     "dxf",
     "creo",
+    "nc",
 ];
 
 /**
@@ -430,6 +493,8 @@ const REFINABLE: Record<string, readonly string[]> = {
     html: TEXT_FAMILY,
     svg: TEXT_FAMILY,
     obj: TEXT_FAMILY,
+    // A G-code-like text named as another text format (notes.txt, a .md) stays that format.
+    nc: TEXT_FAMILY,
 };
 
 /**

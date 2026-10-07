@@ -184,7 +184,7 @@ describe("mill posts", () => {
         );
     });
 
-    test("Fanuc with line numbers and radius arcs (a full circle split in halves)", () => {
+    test("Fanuc with line numbers and radius arcs (a full circle split in thirds: R stays well-conditioned)", () => {
         const text = post("fanuc", program(MILL, [CONTOUR], [ENDMILL]), {
             lineNumbers: true,
             lineStart: 10,
@@ -212,14 +212,15 @@ describe("mill posts", () => {
                 "N70 X20. F1000.",
                 "N75 G3 X30. Y10. R10.",
                 "N80 G1 Y20.",
-                "N85 G2 X20. R5. F800.",
-                "N90 X30. R5.",
-                "N95 G0 Z15.",
-                "N100 M9",
-                "N105 M5",
-                "N110 G28 G91 Z0.",
-                "N115 G90",
-                "N120 M30",
+                "N85 G2 X22.5 Y15.67 R5. F800.",
+                "N90 Y24.33 R5.",
+                "N95 X30. Y20. R5.",
+                "N100 G0 Z15.",
+                "N105 M9",
+                "N110 M5",
+                "N115 G28 G91 Z0.",
+                "N120 G90",
+                "N125 M30",
                 "%",
             ),
         );
