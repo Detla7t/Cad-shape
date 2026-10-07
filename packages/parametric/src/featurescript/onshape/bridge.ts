@@ -174,12 +174,14 @@ export class StdBridge {
             case "MESH_GEOMETRY_FILTER":
             case "ACTIVE_SM_FILTER":
             case "SM_FLAT_FILTER":
-            case "SM_FORM_FILTER": {
+            case "SM_FORM_FILTER":
+            case "CONSUMED": {
                 const field = {
                     MESH_GEOMETRY_FILTER: "meshGeometryFilter",
                     ACTIVE_SM_FILTER: "activeSheetMetal",
                     SM_FLAT_FILTER: "flatFilter",
                     SM_FORM_FILTER: "formFilter",
+                    CONSUMED: "consumed",
                 }[type];
                 const wanted = q.field(field);
                 const yes = wanted instanceof FsEnumValue ? wanted.name === "YES" : wanted === true;
@@ -200,8 +202,10 @@ export class StdBridge {
                 return query("NOTHING");
             // Operation-history queries: `makeQuery(id, "IMPRINT", ...)` names the faces a sketch made.
             case "IMPRINT":
-                return query("CREATED_BY", {
+                // With `derivedFrom`: only what the operation made from those entities (see `queryTypes.ts`).
+                return query(q.has("derivedFrom") ? "IMPRINT" : "CREATED_BY", {
                     featureId: stripSuffix(q.field("operationId"), "imprint"),
+                    ...(q.has("derivedFrom") ? { derivedFrom: sub("derivedFrom") } : {}),
                     ...kind,
                 });
             case "SKETCH_ENTITY":
@@ -213,6 +217,80 @@ export class StdBridge {
             case "SWEPT_FACE":
             case "SWEPT_EDGE":
                 return query("NON_CAP_ENTITY", { featureId: q.field("operationId"), ...kind });
+            // Topology, geometry and history queries (resolved in `context/queryTypes.ts`).
+            case "EDGE_TOPOLOGY_FILTER":
+                return query(type, { query: sub("subquery"), edgeTopology: q.field("edgeTopologyType") });
+            case "EDGE_VERTEX":
+                return query(type, { query: sub("query"), atStart: q.field("atStart") });
+            case "TANGENT_CONNECTED_FACES":
+                return query(type, { query: sub("subquery"), angleTolerance: q.field("angleTolerance") });
+            case "EDGE_CONVEXITY_FILTER":
+                return query(type, { query: sub("subquery"), convexityType: q.field("convexityType") });
+            case "FILLET_FACES":
+                return query(type, { query: sub("subquery"), compareType: q.field("compareType") });
+            case "PATTERN":
+                return query("MATCHING", { query: sub("subquery") });
+            case "PATTERN_INSTANCES":
+                return query(type, {
+                    featureId: q.field("featureId"),
+                    instanceNames: q.field("instanceNames"),
+                    ...kind,
+                });
+            case "TANGENT_CONNECTED_EDGES":
+            case "CONVEX_CONNECTED_FACES":
+            case "CONCAVE_CONNECTED_FACES":
+            case "LOOP_BOUNDED_FACES":
+            case "FACE_OR_EDGE_BOUNDED_FACES":
+            case "HOLE_FACES":
+            case "DEPENDENCY":
+            case "LAMINAR_DEPENDENCY":
+            case "UNIQUE_VERTICES":
+            // Declared by std without a constructor ("not yet implemented" in Onshape).
+            case "TANGENT_EDGES":
+            case "TANGENT_FACES":
+            case "LOOP_AROUND_FACE":
+            case "SHELL_CONTAINING_FACE":
+                return query(type, { query: sub(q.has("subquery") ? "subquery" : "query") });
+            case "INTERSECTS_LINE":
+                return query(type, { query: sub("subquery"), line: strippedLine(q.field("line")) });
+            case "AXIS":
+                return query(type, { query: sub("subquery"), axis: strippedLine(q.field("axis")) });
+            case "INTERSECTS_PLANE":
+            case "IN_FRONT_OF_PLANE":
+                return query(type, { query: sub("subquery"), plane: strippedPlane(q.field("plane")) });
+            case "PLANE_PARALLEL_DIRECTION":
+            case "FACE_PARALLEL_DIRECTION":
+                return query(type, { query: sub("subquery"), direction: q.field("direction") });
+            case "COINCIDENT":
+                return query(type, { query: sub("subquery"), target: sub("target") });
+            case "COEDGE":
+                return query(type, { face: sub("faceQuery"), edge: sub("edgeQuery") });
+            case "TRACKING":
+                // `startTracking` evaluated its subqueries into transient queries already.
+                return query(type, {
+                    tracked: q.has("subquery1") ? sub("subquery1") : fsArray([]),
+                    secondary: q.has("subquery2") ? sub("subquery2") : undefined,
+                    partial: q.field("trackPartialDependency") === true,
+                    lastOperationId: q.field("lastOperationId"),
+                    identityOnly: q.field("identityPreservingOnly") === true,
+                    followSplitMerge: q.field("followSplitMerge") === true,
+                    ...kind,
+                });
+            case "HISTORICAL":
+                return q.has("operationId")
+                    ? query("CREATED_BY", { featureId: q.field("operationId"), ...kind })
+                    : query("NOTHING");
+            // Nothing here is a mesh, a flat pattern, a std sheet metal definition or an opHole
+            // result, and kernel tolerances stay within the default: these find nothing.
+            case "TOLERANCE_FILTER":
+            case "SOURCE_MESH":
+            case "OP_HOLE_PROFILE":
+            case "OP_HOLE_FACE":
+            case "CORRESPONDING_IN_FLAT":
+            case "SM_DEFINITION_ENTITY_FILTER":
+            case "SM_APPLICATION_TYPE_FILTER":
+            case "PARTS_ATTACHED_TO":
+                return query("NOTHING");
             default:
                 fail(`Query type ${type} is not supported`);
         }
@@ -333,6 +411,14 @@ function lengthVector(value: FsValue): FsValue {
     return new FsArray(
         value.items.map((item) => (typeof item === "number" ? new FsQuantity(item, LENGTH) : item)),
         "Vector",
+    );
+}
+
+function strippedLine(value: FsValue): FsValue {
+    if (!(value instanceof FsMap)) fail("Expected a line");
+    return fsMap(
+        { origin: lengthVector(value.field("origin")), direction: value.field("direction") },
+        "Line",
     );
 }
 

@@ -161,6 +161,27 @@ export interface BodyState {
 /** The bodies of a context at one moment — `abortFeature` rolls back to one. */
 export interface ContextSnapshot {
     readonly bodies: readonly { readonly body: FsBody; readonly state: BodyState }[];
+    /** Lengths of the operation and derivation logs then. */
+    readonly operations?: number;
+    readonly derivations?: number;
+}
+
+/**
+ * How an entity came out of an operation: `modify` — the same entity changed (geometry or
+ * owner body), keeping its serial; `split` — a piece of an input that got a fresh serial;
+ * `merge` — one entity from several inputs; `create` — a new entity made from other ones
+ * (a sweep's side face from a profile edge, a pattern copy from its seed).
+ */
+export type DerivationKind = "modify" | "split" | "merge" | "create";
+
+/** One step of entity history: operation `op` (index into `FsContext.operations`) made `out` from `inputs`. */
+export interface Derivation {
+    readonly op: number;
+    /** Serial of the entity made. */
+    readonly out: number;
+    /** Serials of the entities it derives from. */
+    readonly inputs: readonly number[];
+    readonly kind: DerivationKind;
 }
 
 export function bodyKindOf(shape: IShape): BodyKind {
@@ -207,6 +228,8 @@ export function entityShape(ref: EntityRef): IShape {
 
 /** The inputs of a history-tracked rebuild: each body's sub-shapes, in kernel order. */
 export interface HistorySource {
+    /** The body the sub-shapes belong to (an entity changing body counts as modified). */
+    readonly body?: FsBody;
     readonly faces: readonly IFace[];
     readonly edges: readonly IEdge[];
     readonly vertices: readonly IVertex[];
@@ -217,6 +240,7 @@ export interface HistorySource {
 
 export function historySource(body: FsBody): HistorySource {
     return {
+        body,
         faces: body.faces(),
         edges: body.edges(),
         vertices: body.vertices(),
@@ -236,6 +260,10 @@ export class FsContext {
     readonly bodies: FsBody[] = [];
     readonly variables = new Map<string, FsValue>();
     readonly notes: FsRunNotes = { warnings: [], infos: [] };
+    /** Ids (`/`-joined) of the operations that changed geometry, in run order. */
+    readonly operations: string[] = [];
+    /** Entity history, in run order: what tracking and dependency queries walk. */
+    readonly derivations: Derivation[] = [];
     /** Sketches opened by `newSketch` and not yet solved, by Id string. */
     readonly openSketches = new Map<string, unknown>();
     /** Every shape wrapper created during the run; disposed by `dispose` except what is kept. */
@@ -281,6 +309,25 @@ export class FsContext {
         return this.nextSerial++;
     }
 
+    /** The next serial to be handed out: entities with this serial or above are newer. */
+    serialMark(): number {
+        return this.nextSerial;
+    }
+
+    // ------------------------------------------------------------------ History
+
+    /** The log index of operation `opId`, appending it when it is not the latest one. */
+    noteOperation(opId: string): number {
+        if (this.operations[this.operations.length - 1] !== opId) this.operations.push(opId);
+        return this.operations.length - 1;
+    }
+
+    /** Records that operation `opId` made the entity with serial `out` from `inputs`. */
+    derive(opId: string, out: number, inputs: readonly number[], kind: DerivationKind): void {
+        if (inputs.length === 0) return;
+        this.derivations.push({ op: this.noteOperation(opId), out, inputs, kind });
+    }
+
     freshAttr(
         createdBy: string,
         extra?: Partial<Omit<EntityAttribute, "serial" | "createdBy">>,
@@ -296,6 +343,7 @@ export class FsContext {
         options: { faceExtra?: (index: number) => Partial<EntityAttribute> } = {},
     ): FsBody {
         this.track(shape);
+        if (!flags.defaultGeometry) this.noteOperation(createdBy);
         const body = new FsBody(
             this,
             this.nextKey++,
@@ -327,7 +375,11 @@ export class FsContext {
 
     /** Captures every body's geometry and attributes (shapes are immutable, so this is cheap). */
     snapshot(): ContextSnapshot {
-        return { bodies: this.bodies.map((body) => ({ body, state: body.state() })) };
+        return {
+            bodies: this.bodies.map((body) => ({ body, state: body.state() })),
+            operations: this.operations.length,
+            derivations: this.derivations.length,
+        };
     }
 
     /** Rolls back to a snapshot: later bodies vanish, modified ones get their old geometry back. */
@@ -337,6 +389,8 @@ export class FsContext {
             body.restore(state);
             this.bodies.push(body);
         }
+        if (snapshot.operations !== undefined) this.operations.length = snapshot.operations;
+        if (snapshot.derivations !== undefined) this.derivations.length = snapshot.derivations;
     }
 
     removeBody(body: FsBody): void {
@@ -364,6 +418,7 @@ export class FsContext {
         body.faceAttrs = attrs.faces;
         body.edgeAttrs = attrs.edges;
         body.vertexAttrs = attrs.vertices;
+        this.derive(createdBy, body.bodyAttr.serial, [body.bodyAttr.serial], "modify");
     }
 
     /** Adds a body built by a history-tracked operation (the same inheritance as `rebuildBody`). */
@@ -389,6 +444,13 @@ export class FsContext {
         body.faceAttrs = attrs.faces;
         body.edgeAttrs = attrs.edges;
         body.vertexAttrs = attrs.vertices;
+        const owners = sources.flatMap((source) => (source.body === undefined ? [] : [source.body]));
+        this.derive(
+            createdBy,
+            body.bodyAttr.serial,
+            owners.map((owner) => owner.bodyAttr.serial),
+            "create",
+        );
         this.bodies.push(body);
         return body;
     }
@@ -416,6 +478,7 @@ export class FsContext {
             outputEdges,
             alignedMap(tracked?.edgeMap, outputEdges.length, inputEdges.length),
         );
+        const isCap = (i: number) => extra?.capFaces?.has(i) === true || extra?.startFaces?.has(i) === true;
         const faces = this.uniqueSerials(
             faceMap.map((input, i) => {
                 if (extra?.capFaces?.has(i)) return this.freshAttr(createdBy, { cap: "END" });
@@ -426,8 +489,84 @@ export class FsContext {
         const edges = this.uniqueSerials(
             edgeMap.map((input) => (input >= 0 ? edgeAttrs[input] : this.freshAttr(createdBy))),
         );
-        const vertices = this.inheritVertices(body.vertices(), sources, createdBy);
-        return { faces, edges, vertices };
+        const owner = (list: readonly HistorySource[], kind: "faces" | "edges" | "vertices") =>
+            list.flatMap((source) => source[kind].map(() => source.body));
+        this.recordInheritance(createdBy, {
+            output: body,
+            outputs: outputFaces,
+            attrs: faces,
+            inputs: inputFaces,
+            inputAttrs: faceAttrs,
+            owners: owner(sources, "faces"),
+            map: faceMap.map((input, i) => (isCap(i) ? -1 : input)),
+            ancestors: tracked?.faceAncestors,
+        });
+        this.recordInheritance(createdBy, {
+            output: body,
+            outputs: outputEdges,
+            attrs: edges,
+            inputs: inputEdges,
+            inputAttrs: edgeAttrs,
+            owners: owner(sources, "edges"),
+            map: edgeMap,
+            ancestors: tracked?.edgeAncestors,
+        });
+        const inherited = this.inheritVertices(body.vertices(), sources, createdBy);
+        this.recordInheritance(createdBy, {
+            output: body,
+            outputs: body.vertices(),
+            attrs: inherited.attrs,
+            inputs: sources.flatMap((source) => source.vertices),
+            inputAttrs: sources.flatMap((source) => source.vertexAttrs),
+            owners: owner(sources, "vertices"),
+            map: inherited.map,
+        });
+        return { faces, edges, vertices: inherited.attrs };
+    }
+
+    /**
+     * Logs how a rebuild's outputs relate to its inputs: a piece of a split input
+     * (fresh serial), a merge of several inputs (kernel ancestor pairs), or the input
+     * itself modified — changed geometry or moved to another body. Untouched entities
+     * (same kernel shape, same body) and brand-new ones are not logged.
+     */
+    private recordInheritance(
+        opId: string,
+        step: {
+            output: FsBody;
+            outputs: readonly IShape[];
+            attrs: readonly EntityAttribute[];
+            inputs: readonly IShape[];
+            inputAttrs: readonly EntityAttribute[];
+            owners: readonly (FsBody | undefined)[];
+            map: readonly number[];
+            ancestors?: readonly number[];
+        },
+    ): void {
+        const merged = new Map<number, Set<number>>();
+        const ancestors = step.ancestors ?? [];
+        for (let k = 0; k + 1 < ancestors.length; k += 2) {
+            const [out, input] = [ancestors[k], ancestors[k + 1]];
+            if (out < 0 || out >= step.outputs.length || input < 0 || input >= step.inputAttrs.length)
+                continue;
+            const set = merged.get(out) ?? new Set<number>();
+            set.add(step.inputAttrs[input].serial);
+            merged.set(out, set);
+        }
+        step.outputs.forEach((shape, i) => {
+            const input = step.map[i];
+            if (input === undefined || input < 0) return;
+            const serial = step.attrs[i].serial;
+            const source = step.inputAttrs[input].serial;
+            const all = merged.get(i);
+            if (all !== undefined && all.size > 1) {
+                this.derive(opId, serial, [...all], "merge");
+            } else if (serial !== source) {
+                this.derive(opId, serial, [source], "split");
+            } else if (step.owners[input] !== step.output || !shape.isSame(step.inputs[input])) {
+                this.derive(opId, serial, [serial], "modify");
+            }
+        });
     }
 
     /**
@@ -446,21 +585,27 @@ export class FsContext {
         });
     }
 
-    /** Vertices have no kernel history: a vertex at an input vertex's exact position inherits it. */
+    /**
+     * Vertices have no kernel history: a vertex at an input vertex's exact position inherits
+     * it. `map` gives each output's input (flat over the sources, -1 = new).
+     */
     private inheritVertices(
         vertices: readonly IVertex[],
         sources: readonly HistorySource[],
         createdBy: string,
-    ): EntityAttribute[] {
-        const inputs: { point: XYZ; attr: EntityAttribute }[] = [];
+    ): { attrs: EntityAttribute[]; map: number[] } {
+        const inputs: { point: XYZ; attr: EntityAttribute; flat: number }[] = [];
+        let flat = 0;
         for (const source of sources) {
             source.vertices.forEach((vertex, i) => {
                 const point = safePoint(vertex);
-                if (point !== undefined) inputs.push({ point, attr: source.vertexAttrs[i] });
+                if (point !== undefined) inputs.push({ point, attr: source.vertexAttrs[i], flat: flat + i });
             });
+            flat += source.vertices.length;
         }
         const claimed = new Set<number>();
-        return vertices.map((vertex) => {
+        const map: number[] = [];
+        const attrs = vertices.map((vertex) => {
             const point = safePoint(vertex);
             if (point !== undefined) {
                 const index = inputs.findIndex(
@@ -468,11 +613,14 @@ export class FsContext {
                 );
                 if (index >= 0) {
                     claimed.add(index);
+                    map.push(inputs[index].flat);
                     return inputs[index].attr;
                 }
             }
+            map.push(-1);
             return this.freshAttr(createdBy);
         });
+        return { attrs, map };
     }
 
     // ------------------------------------------------------------------ Default geometry

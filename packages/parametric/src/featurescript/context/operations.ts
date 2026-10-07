@@ -54,6 +54,7 @@ import {
     MM_PER_METER,
     toKernelPlane,
 } from "./fsContext";
+import { profileHistory, recordBlends, recordCopy, recordMoved, recordSweep } from "./history";
 import {
     curveTypeOf,
     facePlane,
@@ -210,6 +211,7 @@ function sweepFace(
     face: IFace,
     direction: Vec3,
     extent: ExtrudeExtent,
+    owner?: FsBody,
 ): FsBody {
     if (extent.end + extent.start <= 1e-9) fail("Extrude depth must be positive");
     const dir = xyz(direction);
@@ -226,7 +228,7 @@ function sweepFace(
         const tracked = kernel(shapeFactory.prismTracked(profile, vector), "Extrude");
         const caps = new Set(tracked.capFaces ?? []);
         const starts = new Set(tracked.faceMap.flatMap((input, i) => (input >= 0 ? [i] : [])));
-        return ctx.addBody(
+        const body = ctx.addBody(
             tracked.shape,
             opId,
             {},
@@ -234,6 +236,8 @@ function sweepFace(
                 faceExtra: (i) => (caps.has(i) ? { cap: "END" } : starts.has(i) ? { cap: "START" } : {}),
             },
         );
+        if (owner !== undefined) recordSweep(ctx, opId, body, tracked, profileHistory(owner, face, profile));
+        return body;
     }
     return ctx.addBody(kernel(shapeFactory.prism(profile, vector), "Extrude"), opId);
 }
@@ -244,6 +248,7 @@ function sweepEdge(
     edge: IEdge,
     direction: Vec3,
     extent: ExtrudeExtent,
+    owner?: FsBody,
 ): FsBody {
     const dir = xyz(direction);
     let profile: IShape = edge;
@@ -254,10 +259,14 @@ function sweepEdge(
             ),
         );
     }
-    return ctx.addBody(
-        kernel(shapeFactory.prism(profile, dir.multiply(extent.end + extent.start)), "Extrude"),
-        opId,
-    );
+    const vector = dir.multiply(extent.end + extent.start);
+    if (shapeFactory.prismTracked !== undefined) {
+        const tracked = kernel(shapeFactory.prismTracked(profile, vector), "Extrude");
+        const body = ctx.addBody(tracked.shape, opId);
+        if (owner !== undefined) recordSweep(ctx, opId, body, tracked, profileHistory(owner, edge, profile));
+        return body;
+    }
+    return ctx.addBody(kernel(shapeFactory.prism(profile, vector), "Extrude"), opId);
 }
 
 /** Extrudes the faces (or edges, making sheets) of `refs`; returns the new bodies, merged when several. */
@@ -272,14 +281,14 @@ function extrudeEntities(
     const bodies: FsBody[] = [];
     for (const { body, face } of faces) {
         const dir = direction ?? profileNormal(body, face);
-        bodies.push(sweepFace(ctx, opId, face, dir, extent));
+        bodies.push(sweepFace(ctx, opId, face, dir, extent, body));
     }
     if (faces.length === 0) {
         const edges = edgeRefsOf(refs);
         if (edges.length === 0) fail("Extrude needs faces, sketch regions or edges");
         if (direction === undefined) fail("Extruding edges needs a direction");
         for (const ref of edges)
-            bodies.push(sweepEdge(ctx, opId, ref.body.edges()[ref.index], direction, extent));
+            bodies.push(sweepEdge(ctx, opId, ref.body.edges()[ref.index], direction, extent, ref.body));
     }
     // Adjacent regions (a sketch split into touching pieces) become one part, as they would
     // when extruded together.
@@ -665,27 +674,31 @@ function revolveEntities(
             ? kernelMatrix(rotationAffine(axis.origin, axis.direction, (-backDeg * Math.PI) / 180))
             : undefined;
     const bodies: FsBody[] = [];
-    const profiles: IShape[] = facesOf(refs).map((entry) => entry.face);
-    if (profiles.length === 0) for (const ref of edgeRefsOf(refs)) profiles.push(ref.body.edges()[ref.index]);
+    const profiles: { shape: IShape; owner: FsBody }[] = facesOf(refs).map((entry) => ({
+        shape: entry.face,
+        owner: entry.body,
+    }));
+    if (profiles.length === 0)
+        for (const ref of edgeRefsOf(refs))
+            profiles.push({ shape: ref.body.edges()[ref.index], owner: ref.body });
     if (profiles.length === 0) fail("Revolve needs faces, sketch regions or edges");
-    for (const profile of profiles) {
+    for (const { shape: profile, owner } of profiles) {
         const start = rotateBack === undefined ? profile : ctx.track(profile.transformedMul(rotateBack));
         const angle = Math.min(total, 360);
         if (shapeFactory.revolveTracked !== undefined) {
             const tracked = kernel(shapeFactory.revolveTracked(start, kernelAxis, angle), "Revolve");
             const caps = new Set(tracked.capFaces ?? []);
             const starts = new Set(tracked.faceMap.flatMap((input, i) => (input >= 0 ? [i] : [])));
-            bodies.push(
-                ctx.addBody(
-                    tracked.shape,
-                    opId,
-                    {},
-                    {
-                        faceExtra: (i) =>
-                            caps.has(i) ? { cap: "END" } : starts.has(i) ? { cap: "START" } : {},
-                    },
-                ),
+            const body = ctx.addBody(
+                tracked.shape,
+                opId,
+                {},
+                {
+                    faceExtra: (i) => (caps.has(i) ? { cap: "END" } : starts.has(i) ? { cap: "START" } : {}),
+                },
             );
+            recordSweep(ctx, opId, body, tracked, profileHistory(owner, profile, start));
+            bodies.push(body);
         } else {
             bodies.push(ctx.addBody(kernel(shapeFactory.revolve(start, kernelAxis, angle), "Revolve"), opId));
         }
@@ -781,7 +794,13 @@ function edgeCorner(
                       shapeFactory[method](body.shape, indexes, size),
                       method === "fillet" ? "Fillet" : "Chamfer",
                   );
+        const corners = indexes.map((index) => ({
+            shape: body.edges()[index],
+            serial: body.edgeAttrs[index].serial,
+        }));
+        const mark = ctx.serialMark();
         ctx.rebuildBody(body, result, [historySource(body)], opId);
+        recordBlends(ctx, opId, body, corners, mark);
     }
 }
 
@@ -828,10 +847,10 @@ function booleanOp(ctx: FsContext, opId: string, definition: FsMap): void {
 
 function installBodyOps(std: StdBuilder): void {
     std.fn("opTransform", (args) => {
-        const [ctx, , definition] = definitionOf(args, "opTransform");
+        const [ctx, id, definition] = definitionOf(args, "opTransform");
         const affine = readTransform(definition.field("transform"), "transform");
         for (const ref of ownerBodies(resolveQuery(ctx, definition.field("bodies")))) {
-            transformBody(ctx, ref.body, affine);
+            transformBody(ctx, id, ref.body, affine);
         }
         return undefined;
     });
@@ -881,7 +900,7 @@ function installBodyOps(std: StdBuilder): void {
     });
 }
 
-function transformBody(ctx: FsContext, body: FsBody, affine: AffineData): void {
+function transformBody(ctx: FsContext, opId: string, body: FsBody, affine: AffineData): void {
     const attrs = { faces: body.faceAttrs, edges: body.edgeAttrs, vertices: body.vertexAttrs };
     const shape = ctx.track(body.shape.transformedMul(kernelMatrix(affine)));
     body.setShape(shape);
@@ -889,6 +908,7 @@ function transformBody(ctx: FsContext, body: FsBody, affine: AffineData): void {
     body.faceAttrs = attrs.faces;
     body.edgeAttrs = attrs.edges;
     body.vertexAttrs = attrs.vertices;
+    recordMoved(ctx, opId, body);
     if (body.flags.plane !== undefined) {
         const plane = body.flags.plane;
         (body.flags as { plane?: typeof plane }).plane = {
@@ -918,6 +938,7 @@ function patternBodies(
                 ...ctx.freshAttr(createdBy),
                 sketchEntity: attr.sketchEntity,
             }));
+            recordCopy(ctx, createdBy, copy, body);
         }
     });
 }
@@ -1008,7 +1029,7 @@ function installFeatures(std: StdBuilder): void {
         } else {
             for (const { body, face } of faces) {
                 const base = direction ?? profileNormal(body, face);
-                created.push(sweepFace(ctx, id, face, flip ? vec.scale(base, -1) : base, extent));
+                created.push(sweepFace(ctx, id, face, flip ? vec.scale(base, -1) : base, extent, body));
             }
             if (created.length > 1) {
                 const [first, ...rest] = created;
@@ -1120,10 +1141,10 @@ function installFeatures(std: StdBuilder): void {
         return undefined;
     });
     std.fn("transformBodies", (args) => {
-        const [ctx, , definition] = definitionOf(args, "transformBodies");
+        const [ctx, id, definition] = definitionOf(args, "transformBodies");
         const affine = readTransform(definition.field("transform"), "transform");
         for (const ref of ownerBodies(resolveQuery(ctx, definition.field("entities"))))
-            transformBody(ctx, ref.body, affine);
+            transformBody(ctx, id, ref.body, affine);
         return undefined;
     });
     std.fn("composeTransforms", (args) => {

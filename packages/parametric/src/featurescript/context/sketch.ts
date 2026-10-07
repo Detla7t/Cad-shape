@@ -33,7 +33,8 @@ import {
     type Vec3,
 } from "../std/geometry";
 import { arg, type StdBuilder } from "../std/registry";
-import { FsContext, MM_PER_METER, toKernelPlane } from "./fsContext";
+import { type FsBody, FsContext, MM_PER_METER, toKernelPlane } from "./fsContext";
+import { recordSketchRegions } from "./history";
 import { facePlane, resolveQuery } from "./queries";
 
 /**
@@ -355,7 +356,7 @@ function solveSketch(sketch: FsSketch): void {
 
     const drawn = sketch.entities.filter((entity) => !entity.construction);
     const construction = sketch.entities.filter((entity) => entity.construction);
-    addWireBody(ctx, sketch, drawn, false);
+    const wires = addWireBody(ctx, sketch, drawn, false);
     addWireBody(ctx, sketch, construction, true);
 
     const edges = drawn.flatMap((entity) => entity.edges);
@@ -363,12 +364,13 @@ function solveSketch(sketch: FsSketch): void {
         const regions = sketchRegions(ctx, edges, toKernelPlane(sketch.plane));
         if (regions.faces.length > 0) {
             const compound = kernel(shapeFactory.combine(regions.faces), "sketch regions");
-            ctx.addBody(
+            const body = ctx.addBody(
                 compound,
                 sketch.id,
                 { sketch: true, plane: sketch.plane },
                 { faceExtra: (i) => ({ regionDepth: regions.depth[i] }) },
             );
+            if (wires !== undefined) recordSketchRegions(ctx, sketch.id, wires, body);
         }
     }
     for (const point of sketch.points) {
@@ -429,9 +431,9 @@ function addWireBody(
     sketch: FsSketch,
     entities: SketchEntity[],
     construction: boolean,
-): void {
+): FsBody | undefined {
     const edges = entities.flatMap((entity) => entity.edges);
-    if (edges.length === 0) return;
+    if (edges.length === 0) return undefined;
     const compound: IShape = kernel(shapeFactory.combine(edges), "sketch edges");
     const body = ctx.addBody(compound, sketch.id, { sketch: true, construction, plane: sketch.plane });
     const owners = entities.flatMap((entity) => entity.edges.map((edge) => ({ edge, id: entity.id })));
@@ -441,4 +443,5 @@ function addWireBody(
             : owners.find((candidate) => candidate.edge.isSame(edge));
         return { ...body.edgeAttrs[i], sketchEntity: owner?.id };
     });
+    return body;
 }
