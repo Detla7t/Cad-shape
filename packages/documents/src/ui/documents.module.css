@@ -1,0 +1,503 @@
+/* Part of the Chili3d Project, under the AGPL-3.0 License.
+   See LICENSE file in the project root for full license information. */
+
+/* ------------------------------------------------------------ the shell */
+
+.shell {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    color: var(--foreground-color);
+    background-color: var(--panel-background-color);
+    font-size: 13px;
+}
+
+.header {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+    min-height: 36px;
+    padding: 0 10px;
+    border-bottom: 1px solid var(--border-color);
+    background-color: var(--background-color);
+}
+
+.headerIcon {
+    flex: 0 0 auto;
+    width: 16px;
+    height: 16px;
+}
+
+.title {
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.info {
+    color: var(--foreground-muted-color);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.spacer {
+    flex: 1 1 auto;
+}
+
+.dirty {
+    color: var(--warning-color);
+    font-size: 12px;
+}
+
+.button {
+    flex: 0 0 auto;
+    height: 26px;
+    padding: 0 10px;
+    border: 1px solid var(--input-border-color);
+    border-radius: 4px;
+    background-color: var(--button-secondary-background);
+    color: var(--foreground-color);
+    font: inherit;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+        background-color: var(--button-secondary-hover);
+    }
+
+    &:disabled {
+        opacity: 0.5;
+        cursor: default;
+    }
+}
+
+.primary {
+    composes: button;
+    border-color: var(--button-primary-background);
+    background-color: var(--button-primary-background);
+    color: #fff;
+
+    &:hover:not(:disabled) {
+        background-color: var(--button-primary-hover);
+    }
+}
+
+.select {
+    height: 26px;
+    border: 1px solid var(--input-border-color);
+    border-radius: 4px;
+    background-color: var(--input-background-color);
+    color: var(--input-text-color);
+    font: inherit;
+}
+
+.body {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.notice {
+    flex: 0 0 auto;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border-color);
+    background-color: var(--title-background);
+    color: var(--foreground-secondary-color);
+    font-size: 12px;
+}
+
+.message {
+    margin: auto;
+    padding: 24px;
+    color: var(--foreground-muted-color);
+    text-align: center;
+}
+
+.error {
+    composes: message;
+    color: var(--error-color);
+}
+
+.toolbar {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    flex: 0 0 auto;
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.toolButton {
+    composes: button;
+    min-width: 28px;
+    padding: 0 6px;
+}
+
+.toolActive {
+    background-color: var(--checked-color);
+}
+
+.separator {
+    width: 1px;
+    height: 18px;
+    margin: 0 4px;
+    background-color: var(--border-color);
+}
+
+/* ------------------------------------------------------------ markdown / text */
+
+.split {
+    display: flex;
+    flex-direction: row;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.source {
+    flex: 1 1 50%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    border-right: 1px solid var(--border-color);
+}
+
+.preview {
+    flex: 1 1 50%;
+    min-width: 0;
+    overflow: auto;
+    padding: 12px 24px;
+    background-color: var(--control-background-color);
+}
+
+.richText {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    padding: 24px max(24px, calc(50% - 400px));
+    background-color: var(--background-color);
+}
+
+.page {
+    min-height: 100%;
+    box-sizing: border-box;
+    padding: 32px 48px;
+    background-color: var(--control-background-color);
+    box-shadow: var(--panel-shadow);
+    outline: none;
+}
+
+.preview,
+.page {
+    line-height: 1.55;
+
+    & table {
+        border-collapse: collapse;
+    }
+
+    & td,
+    & th {
+        min-width: 3em;
+        padding: 3px 8px;
+        border: 1px solid var(--border-color);
+        vertical-align: top;
+    }
+
+    & img {
+        max-width: 100%;
+    }
+
+    & pre,
+    & code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        background-color: var(--title-background);
+    }
+
+    & pre {
+        padding: 8px;
+        overflow: auto;
+    }
+
+    & blockquote {
+        margin: 0;
+        padding-left: 12px;
+        border-left: 3px solid var(--border-color);
+        color: var(--foreground-secondary-color);
+    }
+
+    & a {
+        color: var(--primary-color);
+    }
+}
+
+.code {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* ------------------------------------------------------------ spreadsheet */
+
+.formulaBar {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.cellName {
+    width: 80px;
+    height: 24px;
+    box-sizing: border-box;
+    padding: 0 6px;
+    border: 1px solid var(--input-border-color);
+    border-radius: 4px;
+    background-color: var(--input-background-color);
+    color: var(--input-text-color);
+    font: inherit;
+}
+
+.formulaInput {
+    composes: cellName;
+    flex: 1 1 auto;
+    width: auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.gridScroller {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    outline: none;
+    background-color: var(--control-background-color);
+}
+
+.grid {
+    border-collapse: separate;
+    border-spacing: 0;
+    table-layout: fixed;
+    font-variant-numeric: tabular-nums;
+}
+
+.grid td,
+.grid th {
+    height: 22px;
+    box-sizing: border-box;
+    padding: 0 4px;
+    border-right: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-color);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.grid th {
+    position: sticky;
+    z-index: 1;
+    background-color: var(--background-color);
+    color: var(--foreground-secondary-color);
+    font-weight: normal;
+    user-select: none;
+}
+
+.grid thead th {
+    top: 0;
+    z-index: 2;
+}
+
+.grid tbody th {
+    left: 0;
+    text-align: center;
+}
+
+.grid thead th:first-child {
+    left: 0;
+    z-index: 3;
+}
+
+.columnHeader {
+    position: relative;
+}
+
+.resizer {
+    position: absolute;
+    top: 0;
+    right: -3px;
+    width: 6px;
+    height: 100%;
+    cursor: col-resize;
+    z-index: 4;
+}
+
+.number {
+    text-align: right;
+}
+
+.boolean {
+    text-align: center;
+}
+
+.cellError {
+    color: var(--error-color);
+}
+
+.selected {
+    outline: 2px solid var(--primary-color);
+    outline-offset: -2px;
+    background-color: var(--checked-color);
+}
+
+.inRange {
+    background-color: var(--checked-color);
+}
+
+.cellEditor {
+    position: absolute;
+    z-index: 5;
+    box-sizing: border-box;
+    padding: 0 3px;
+    border: 2px solid var(--primary-color);
+    background-color: var(--input-background-color);
+    color: var(--input-text-color);
+    font: inherit;
+    outline: none;
+}
+
+.sheetTabs {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    flex: 0 0 auto;
+    height: 28px;
+    border-top: 1px solid var(--border-color);
+    background-color: var(--background-color);
+    overflow-x: auto;
+}
+
+.sheetTab {
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    border-right: 1px solid var(--border-color);
+    cursor: pointer;
+    white-space: nowrap;
+
+    &:hover {
+        background-color: var(--hover-background-color);
+    }
+}
+
+.sheetActive {
+    background-color: var(--control-background-color);
+    font-weight: 600;
+}
+
+/* ------------------------------------------------------------ pdf / image / drawing */
+
+.canvasScroller {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px;
+    background-color: var(--viewport-background-color);
+}
+
+.pdfPage {
+    flex: 0 0 auto;
+    box-shadow: var(--panel-shadow);
+    background-color: #fff;
+}
+
+.checker {
+    flex: 0 0 auto;
+    background-color: #fff;
+    background-image:
+        linear-gradient(45deg, #ddd 25%, transparent 25%), linear-gradient(-45deg, #ddd 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #ddd 75%), linear-gradient(-45deg, transparent 75%, #ddd 75%);
+    background-size: 16px 16px;
+    background-position:
+        0 0,
+        0 8px,
+        8px -8px,
+        -8px 0;
+}
+
+.pageInput {
+    composes: cellName;
+    width: 48px;
+    text-align: center;
+}
+
+.drawingBody {
+    display: flex;
+    flex-direction: row;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.drawingCanvas {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    background-color: #fff;
+    cursor: grab;
+
+    & svg {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+    }
+
+    & svg line,
+    & svg path,
+    & svg circle {
+        vector-effect: non-scaling-stroke;
+        stroke-width: 1px;
+    }
+}
+
+.layers {
+    flex: 0 0 200px;
+    overflow: auto;
+    padding: 8px;
+    border-left: 1px solid var(--border-color);
+}
+
+.layer {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 0;
+    white-space: nowrap;
+}
+
+.swatch {
+    flex: 0 0 auto;
+    width: 10px;
+    height: 10px;
+    border: 1px solid var(--border-color);
+}
+
+.facts {
+    margin: 0 0 8px;
+    color: var(--foreground-secondary-color);
+    font-size: 12px;
+    line-height: 1.6;
+}

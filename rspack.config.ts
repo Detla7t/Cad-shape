@@ -63,6 +63,9 @@ export default defineConfig({
     },
     resolve: {
         extensions: [".ts", ".js", ".json", ".wasm"],
+        // Emscripten glue (LibreDWG in @chili3d/documents) imports Node's `module` only when
+        // running under Node; in the browser bundle that branch never runs.
+        fallback: { module: false },
     },
     plugins: [
         new TsCheckerRspackPlugin(),

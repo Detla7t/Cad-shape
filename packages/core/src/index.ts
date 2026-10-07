@@ -9,6 +9,7 @@ export * from "./dataExchange";
 export * from "./document";
 export * from "./editor";
 export * from "./eventHandlers";
+export * from "./fileFormat";
 export * from "./foundation";
 export * from "./guide";
 export * from "./i18n";

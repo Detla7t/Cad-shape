@@ -8,6 +8,7 @@ import {
     PROJECT_MANIFEST_PATH,
     PROJECT_THUMBNAIL_PATH,
     type ProjectExtensionEntry,
+    projectSourceFolders,
 } from "./projectFormat";
 
 /**
@@ -48,7 +49,9 @@ export function isValidProjectPrefix(prefix: string): boolean {
     return (
         /^[a-z0-9][a-z0-9._-]*\/([a-z0-9][a-z0-9._-]*\/)*$/i.test(prefix) &&
         !prefix.split("/").includes("..") &&
-        !RESERVED_PREFIXES.some((reserved) => prefix.toLowerCase().startsWith(reserved)) &&
+        ![...RESERVED_PREFIXES, ...projectSourceFolders()].some((reserved) =>
+            prefix.toLowerCase().startsWith(reserved.toLowerCase()),
+        ) &&
         !RESERVED_FILES.some((file) => prefix.toLowerCase().startsWith(`${file}/`))
     );
 }
