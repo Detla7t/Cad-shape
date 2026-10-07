@@ -111,6 +111,7 @@ export class Document extends Observable implements IDocument {
             date: Date.now(),
             image,
         });
+        PubSub.default.pub("documentSaved", this);
     }
 
     async close() {

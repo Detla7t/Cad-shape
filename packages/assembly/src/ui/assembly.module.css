@@ -1,0 +1,326 @@
+/* Part of the Chili3d Project, under the AGPL-3.0 License.
+   See LICENSE file in the project root for full license information. */
+
+/* ------------------------------------------------------------ the assembly element */
+
+.root {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    font-size: 12px;
+    color: var(--foreground-color);
+    background-color: var(--panel-background-color);
+}
+
+.toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 6px;
+    border-bottom: 1px solid var(--border-color);
+    background-color: var(--background-color);
+}
+
+.button {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    font-size: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background-color: transparent;
+    color: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+
+    &:hover:not(:disabled) {
+        background-color: var(--hover-background-color);
+    }
+
+    &:disabled {
+        opacity: 0.45;
+        cursor: default;
+    }
+
+    & svg {
+        width: 14px;
+        height: 14px;
+    }
+}
+
+.active {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.select {
+    padding: 3px 4px;
+    font-size: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background-color: var(--input-background-color, transparent);
+    color: inherit;
+}
+
+.separator {
+    width: 1px;
+    height: 18px;
+    margin: 0 4px;
+    background-color: var(--border-color);
+}
+
+.prompt {
+    margin-left: auto;
+    padding: 2px 8px;
+    border-radius: 4px;
+    color: var(--primary-color);
+}
+
+.body {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.side {
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 260px;
+    min-width: 0;
+    overflow: auto;
+    border-right: 1px solid var(--border-color);
+}
+
+.section {
+    padding: 6px 8px 2px;
+    font-weight: 600;
+    color: var(--foreground-secondary-color);
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+}
+
+.list {
+    display: flex;
+    flex-direction: column;
+}
+
+.row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px;
+    cursor: default;
+    border-left: 2px solid transparent;
+
+    &:hover {
+        background-color: var(--panel-hover-background-color);
+    }
+}
+
+.selected {
+    background-color: var(--hover-background-color);
+    border-left-color: var(--primary-color);
+}
+
+.rowName {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.rowSub {
+    display: block;
+    font-size: 10px;
+    color: var(--foreground-secondary-color);
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.badge {
+    flex: 0 0 auto;
+    padding: 0 5px;
+    border-radius: 8px;
+    font-size: 10px;
+    line-height: 16px;
+    border: 1px solid var(--border-color);
+    color: var(--foreground-secondary-color);
+}
+
+.ok {
+    color: #3c9a5f;
+    border-color: #3c9a5f;
+}
+
+.warn {
+    color: #c27d0e;
+    border-color: #c27d0e;
+}
+
+.error {
+    color: #d14343;
+    border-color: #d14343;
+}
+
+.mini {
+    padding: 0 5px;
+    font-size: 10px;
+    line-height: 16px;
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+
+    &:hover {
+        background-color: var(--hover-background-color);
+    }
+}
+
+.empty {
+    padding: 6px 8px;
+    color: var(--foreground-secondary-color);
+    font-style: italic;
+}
+
+.status {
+    margin-top: auto;
+    padding: 6px 8px;
+    border-top: 1px solid var(--border-color);
+    color: var(--foreground-secondary-color);
+    line-height: 1.5;
+}
+
+.viewport {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    color: var(--foreground-secondary-color);
+}
+
+/* ------------------------------------------------------------ dialogs and panels */
+
+.panel {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    box-sizing: border-box;
+    padding: 8px;
+    font-size: 12px;
+}
+
+.columns {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.column {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    overflow: auto;
+}
+
+.field {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+
+    & > span {
+        flex: 0 0 auto;
+        color: var(--foreground-secondary-color);
+    }
+
+    & > select,
+    & > input {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+}
+
+.actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+
+    & th,
+    & td {
+        padding: 3px 6px;
+        border-bottom: 1px solid var(--border-color);
+        text-align: left;
+    }
+
+    & th {
+        font-weight: 600;
+        color: var(--foreground-secondary-color);
+    }
+
+    & td:last-child,
+    & th:last-child {
+        text-align: right;
+    }
+}
+
+.scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+}
+
+.hint {
+    color: var(--foreground-secondary-color);
+}
+
+.mateEditor {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 4px 8px 6px;
+    padding: 6px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+
+    & .field > span:first-child {
+        flex: 0 0 64px;
+    }
+
+    & input[type="number"] {
+        width: 0;
+        flex: 1 1 auto;
+    }
+}
+
+.limits {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}

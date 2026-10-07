@@ -1,15 +1,21 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import type { IApplication, IWindow } from "@chili3d/core";
-import { mockLocalStorage } from "@chili3d/core/test-utils";
+import { linkService, PartLinkService, setLinkService } from "@chili3d/assembly";
+import {
+    type IApplication,
+    type IWindow,
+    projectEntryProviders,
+    unregisterProjectEntryProvider,
+} from "@chili3d/core";
+import { createMockApplication, mockLocalStorage } from "@chili3d/core/test-utils";
 import { ThreeVisulFactory } from "@chili3d/three";
 import { MainWindow } from "@chili3d/ui";
 import { OccShapeProvider } from "@chili3d/wasm";
 import { rs } from "@rstest/core";
 import { AppBuilder } from "../src/appBuilder";
 import { DefaultDataExchange } from "../src/defaultDataExchange";
-import { DefaultRibbon } from "../src/ribbon";
+import { AssemblyRibbonProfiles, DefaultRibbon } from "../src/ribbon";
 
 // IMPORTANT: AppBuilder.createApp() calls new Application() which calls
 // setCurrentApplication() — a module-level singleton that throws if called more
@@ -142,6 +148,7 @@ describe("AppBuilder", () => {
             "useCam",
             "useThree",
             "useUI",
+            "useAssembly",
         ] as const)("%s should return this and push init function", (method) => {
             const builder = new AppBuilder();
             const before = (builder as any)._inits.length;
@@ -184,6 +191,25 @@ describe("AppBuilder", () => {
             const factory = (builder as any)._visualFactory;
             expect(factory).toBeInstanceOf(ThreeVisulFactory);
             expect(typeof factory.handler).toBe("function");
+        });
+
+        test("useAssembly init adds the assembly ribbon and, once built, the link service", async () => {
+            const builder = new AppBuilder();
+            builder.useAssembly();
+            await lastInit(builder)();
+            const extras = (builder as any)._ribbonExtras as unknown[];
+            expect(extras).toEqual(expect.arrayContaining(AssemblyRibbonProfiles));
+            const hooks = (builder as any)._onBuilt as ((app: IApplication) => void)[];
+            expect(hooks).toHaveLength(1);
+            try {
+                hooks[0](createMockApplication());
+                expect(linkService()).toBeInstanceOf(PartLinkService);
+                expect(projectEntryProviders().map((p) => p.prefix)).toContain("links/");
+            } finally {
+                linkService()?.dispose();
+                setLinkService(undefined);
+                unregisterProjectEntryProvider("links/");
+            }
         });
 
         test("useUI init should set the main window with the default ribbon and #app element", async () => {

@@ -23,6 +23,8 @@ export interface PubSubEventMap {
     displayError: (message: string) => void;
     displayHome: (show: boolean) => void;
     documentClosed: (document: IDocument) => void;
+    /** A document and its version history were written to storage (links into it may update). */
+    documentSaved: (document: IDocument) => void;
     editMaterial: (document: IDocument, material: Material, callback: (material: Material) => void) => void;
     editConfiguration: (document: IDocument) => void;
     editVariables: (document: IDocument, onApplied: () => void) => void;
