@@ -1,0 +1,76 @@
+// Part of the Chili3d Project, under the AGPL-3.0 License.
+// See LICENSE file in the project root for full license information.
+
+import {
+    type IDocument,
+    Id,
+    type INode,
+    type INodeIcon,
+    type INodeSceneless,
+    Logger,
+    Node,
+    serializable,
+    serialize,
+} from "@chili3d/core";
+import type { SetupData } from "./model/setup";
+
+export interface CamStudioNodeOptions {
+    document: IDocument;
+    name?: string;
+    id?: string;
+    /** The stored setups, as a loaded document hands them back. */
+    setupsJson?: string;
+    setups?: readonly SetupData[];
+}
+
+/**
+ * A CAM Studio: the document element (a bottom tab) that holds machining and printing
+ * setups for the Part Studio's parts. Like a parametric body it stores no geometry, only
+ * data — setups, their operations and tools — and toolpaths are regenerated from the live
+ * parts, so a model change flows into the programs.
+ *
+ * `setupsJson` is a recorded property: an edit is one undo step (and one microversion).
+ */
+@serializable()
+export class CamStudioNode extends Node implements INodeIcon, INodeSceneless {
+    get icon(): string {
+        return "icon-cog";
+    }
+
+    readonly sceneless = true as const;
+
+    constructor(options: CamStudioNodeOptions) {
+        super(options.document, options.name ?? "CAM Studio", options.id ?? Id.generate());
+        this.setPrivateValue("setupsJson", options.setupsJson ?? JSON.stringify(options.setups ?? []));
+    }
+
+    @serialize()
+    get setupsJson(): string {
+        return this.getPrivateValue("setupsJson");
+    }
+    set setupsJson(value: string) {
+        this.setProperty("setupsJson", value);
+    }
+
+    get setups(): readonly SetupData[] {
+        try {
+            const parsed: unknown = JSON.parse(this.setupsJson);
+            return Array.isArray(parsed) ? (parsed as SetupData[]) : [];
+        } catch (error) {
+            Logger.warn(`CAM Studio "${this.name}": unreadable setups`, error);
+            return [];
+        }
+    }
+
+    setSetups(setups: readonly SetupData[]): void {
+        this.setupsJson = JSON.stringify(setups);
+    }
+
+    protected onVisibleChanged(): void {}
+
+    protected onParentVisibleChanged(): void {}
+}
+
+export function isCamStudioNode(node: INode): node is CamStudioNode {
+    return node instanceof CamStudioNode;
+}

@@ -1,0 +1,10 @@
+{
+    "name": "@chili3d/cam",
+    "version": "0.7.1",
+    "description": "CAM: setups, tools, machine profiles, 2D/3D/5-axis toolpaths for mills, waterjets, plasma, lasers and wire EDM, slicing for 3D printers, and post-processors",
+    "main": "src/index.ts",
+    "type": "module",
+    "devDependencies": {
+        "@chili3d/core": "*"
+    }
+}
