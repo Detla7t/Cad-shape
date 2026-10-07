@@ -11,7 +11,6 @@ export {
     type DwellUnits,
     detectNcDialect,
     dialectOfPost,
-    looksLikeNcProgram,
     NC_DIALECTS,
     type NcDialect,
     ncDialect,
@@ -27,4 +26,11 @@ export {
 } from "./lexer";
 export * from "./program";
 export { programMoves, readNcProgram } from "./reader";
+export {
+    machineForPost,
+    ncCamProgram,
+    type RepostOptions,
+    type RepostResult,
+    repostNcProgram,
+} from "./repost";
 export { ASSUMED_RAPID_FEED, formatNcDuration, moveLength, ncStats } from "./stats";
