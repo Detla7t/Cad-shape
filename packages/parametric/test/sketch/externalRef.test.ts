@@ -385,7 +385,13 @@ function arcBasisEdge(cx: number, cy: number, radius: number, a0: number, a1: nu
     const end = at(a1);
     return {
         shapeType: ShapeTypes.edge,
-        curve: { basisCurve: { center: new XYZ({ x: cx, y: cy, z: 0 }), radius, axis: XYZ.unitZ } },
+        // A circle curve is parameterized by its angle; the edge trims it to [a0, a1].
+        curve: {
+            basisCurve: { center: new XYZ({ x: cx, y: cy, z: 0 }), radius, axis: XYZ.unitZ },
+            firstParameter: () => a0,
+            lastParameter: () => a1,
+            value: at,
+        },
         startPoint: () => start,
         endPoint: () => end,
         isEqual: () => false,

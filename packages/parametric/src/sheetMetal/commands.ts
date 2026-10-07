@@ -7,6 +7,7 @@ import {
     Combobox,
     CurveUtils,
     command,
+    commandTransactionName,
     GetOrSelectNodeStep,
     type I18nKeys,
     type IDocument,
@@ -128,7 +129,7 @@ export class SheetMetalBaseCommand extends MultistepCommand {
                 },
             ],
         });
-        Transaction.execute(this.document, "excute sheetMetal.base", () => {
+        Transaction.execute(this.document, commandTransactionName(this), () => {
             this.document.modelManager.addNode(body);
             sketch.visible = false;
             this.document.visual.update();
@@ -185,7 +186,7 @@ export class SheetMetalBendCommand extends MultistepCommand {
                 angle: this.angle,
                 direction: this.direction === "sheetMetal.down" ? "down" : "up",
             },
-            "excute sheetMetal.bend",
+            commandTransactionName(this),
             this.stepDatas[1].shapes.map((data) => data.owner.node),
         );
     }
@@ -247,7 +248,7 @@ abstract class SheetMetalEdgeCommand extends MultistepCommand {
                 direction: this.direction === "sheetMetal.down" ? "down" : "up",
                 ...this.extra(),
             },
-            `excute sheetMetal.${this.kind}`,
+            commandTransactionName(this),
         );
     }
 }
@@ -351,7 +352,7 @@ export class RollCommand extends SheetBodyCommand {
                 radius: this.radius,
                 direction: this.direction === "sheetMetal.down" ? "down" : "up",
             },
-            "excute sheetMetal.roll",
+            commandTransactionName(this),
         );
     }
 }
@@ -404,7 +405,7 @@ export class CrimpCommand extends SheetBodyCommand {
                 depth: this.depth,
                 count: this.count,
             },
-            "excute sheetMetal.crimp",
+            commandTransactionName(this),
         );
     }
 }
@@ -508,7 +509,7 @@ export class BeadCommand extends SheetBodyCommand {
                           ),
                       }),
             },
-            "excute sheetMetal.bead",
+            commandTransactionName(this),
             line === undefined ? [] : [line.owner.node],
         );
     }
@@ -533,13 +534,13 @@ export class FlattenCommand extends SheetBodyCommand {
         if (!(body instanceof ParametricBodyNode)) return;
         const existing = body.features.find((feature) => feature.type === "smFlatten");
         if (existing !== undefined) {
-            Transaction.execute(this.document, "excute sheetMetal.flatten", () => {
+            Transaction.execute(this.document, commandTransactionName(this), () => {
                 body.removeFeature(existing.id);
                 this.document.visual.update();
             });
             return;
         }
-        append(this.document, body, { id: Id.generate(), type: "smFlatten" }, "excute sheetMetal.flatten");
+        append(this.document, body, { id: Id.generate(), type: "smFlatten" }, commandTransactionName(this));
     }
 }
 

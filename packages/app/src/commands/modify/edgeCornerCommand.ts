@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    commandTransactionName,
     EditableShapeNode,
     I18n,
     type IEdge,
@@ -126,7 +127,7 @@ export abstract class EdgeCornerCommand extends MultistepCommand {
     protected abstract applyToEdgePair(edge1: IEdge, edge2: IEdge): Result<IEdge[]>;
 
     protected override executeMainTask() {
-        Transaction.execute(this.document, `excute ${Object.getPrototypeOf(this).data.name}`, () => {
+        Transaction.execute(this.document, commandTransactionName(this), () => {
             const shapes = this.stepDatas[0].shapes;
             const parent = (shapes[0].shape as ISubEdgeShape).parent;
 

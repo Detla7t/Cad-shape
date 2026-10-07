@@ -3,6 +3,7 @@
 
 import {
     command,
+    commandTransactionName,
     EditableShapeNode,
     type IFace,
     MultistepCommand,
@@ -19,7 +20,7 @@ import {
 })
 export class RemoveFaceCommand extends MultistepCommand {
     protected override executeMainTask() {
-        Transaction.execute(this.document, `excute ${Object.getPrototypeOf(this).data.name}`, () => {
+        Transaction.execute(this.document, commandTransactionName(this), () => {
             const node = this.stepDatas[0].shapes[0].owner.node as ShapeNode;
             const faces = this.stepDatas.at(-1)!.shapes.map((x) => x.shape as IFace);
             const filetShape = shapeFactory.removeFeature(node.shape.value, faces);

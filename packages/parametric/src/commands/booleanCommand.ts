@@ -3,6 +3,7 @@
 
 import {
     command,
+    commandTransactionName,
     GetOrSelectNodeStep,
     Id,
     type INode,
@@ -39,7 +40,7 @@ abstract class BooleanFeatureCommand extends MultistepCommand {
 
     protected override executeMainTask(): void {
         const toolIds = (this.stepDatas[1].nodes ?? []).map((node) => node.id);
-        Transaction.execute(this.document, `excute feature.${this.operation}`, () => {
+        Transaction.execute(this.document, commandTransactionName(this), () => {
             this.body.setFeaturesEmitShapeChanged([
                 ...this.body.features,
                 {

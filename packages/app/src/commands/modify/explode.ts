@@ -4,6 +4,7 @@
 import {
     ComponentNode,
     command,
+    commandTransactionName,
     EditableShapeNode,
     GetOrSelectNodeStep,
     GroupNode,
@@ -28,7 +29,7 @@ export class Explode extends MultistepCommand {
     protected override executeMainTask() {
         this.document.selection.clearSelection();
 
-        Transaction.execute(this.document, `excute ${Object.getPrototypeOf(this).data.name}`, () => {
+        Transaction.execute(this.document, commandTransactionName(this), () => {
             this.stepDatas[0].nodes?.forEach((x) => {
                 if (x instanceof ShapeNode) {
                     this.explodeShapeNode(x);

@@ -4,6 +4,7 @@
 import {
     Combobox,
     command,
+    commandTransactionName,
     debounce,
     EditableShapeNode,
     type I18nKeys,
@@ -69,7 +70,7 @@ export class ShellCommand extends MultistepCommand {
     }
 
     protected override executeMainTask() {
-        Transaction.execute(this.document, `excute ${Object.getPrototypeOf(this).data.name}`, () => {
+        Transaction.execute(this.document, commandTransactionName(this), () => {
             const node = this.stepDatas[0].shapes[0].owner.node as ShapeNode;
             const faces = this.stepDatas.at(-1)!.shapes.map((x) => x.shape as IFace);
             const shellShape = this.getShellShape(faces);

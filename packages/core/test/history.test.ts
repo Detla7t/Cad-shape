@@ -89,6 +89,33 @@ describe("History", () => {
         expect(history.redoCount()).toBe(0);
     });
 
+    test("reset keeps a node that an undone removal put back in the tree", () => {
+        const history = new History();
+        let disposed = 0;
+        const node = {
+            parent: undefined as unknown,
+            dispose() {
+                disposed++;
+            },
+        };
+        const parent = {
+            add() {},
+            insertAfter(_target: unknown, child: { parent: unknown }) {
+                child.parent = parent;
+            },
+        };
+        history.add(
+            new NodeLinkedListHistoryRecord([
+                { node: node as any, action: "remove", oldParent: parent as any },
+            ]),
+        );
+        history.undo();
+        expect(node.parent).toBe(parent);
+        history.reset();
+        expect(disposed).toBe(0);
+        expect(history.redoCount()).toBe(0);
+    });
+
     test("should clear redos when adding new record", () => {
         const obj = { val: 0 };
         const history = new History();
@@ -223,34 +250,44 @@ describe("History", () => {
         expect(removedNode).toBe(mockNode);
     });
 
-    test("NodeLinkedListHistoryRecord undo 'remove' action", () => {
-        let addCalled = false;
-        const mockParent = {
+    /** A parent recording where nodes come back: `insertAfter` keeps the place, `add` appends. */
+    function recordingParent() {
+        const calls: string[] = [];
+        const parent = {
             add(_node: unknown) {
-                addCalled = true;
+                calls.push("add");
+            },
+            insertAfter(target: { id?: string } | undefined, _node: unknown) {
+                calls.push(`insertAfter ${target?.id ?? "start"}`);
             },
         };
+        return { parent, calls };
+    }
+
+    test.each(["remove", "transfer"] as const)("undo '%s' puts the node back where it was", (action) => {
+        const { parent, calls } = recordingParent();
+        const sibling = { id: "sibling", parent };
         const mockNode = { dispose() {} };
-        const records: NodeRecord[] = [
-            { node: mockNode as any, action: "remove" as const, oldParent: mockParent as any },
-        ];
-        new NodeLinkedListHistoryRecord(records).undo();
-        expect(addCalled).toBe(true);
+        new NodeLinkedListHistoryRecord([
+            { node: mockNode as any, action, oldParent: parent as any, oldPrevious: sibling as any },
+        ]).undo();
+        // After its old previous sibling; first in the list when it had none.
+        new NodeLinkedListHistoryRecord([{ node: mockNode as any, action, oldParent: parent as any }]).undo();
+        expect(calls).toEqual(["insertAfter sibling", "insertAfter start"]);
     });
 
-    test("NodeLinkedListHistoryRecord undo 'transfer' action", () => {
-        let addCalled = false;
-        const mockOldParent = {
-            add(_node: unknown) {
-                addCalled = true;
+    test("undo 'remove' appends when the old previous sibling has moved away", () => {
+        const { parent, calls } = recordingParent();
+        const moved = { id: "moved", parent: {} };
+        new NodeLinkedListHistoryRecord([
+            {
+                node: { dispose() {} } as any,
+                action: "remove",
+                oldParent: parent as any,
+                oldPrevious: moved as any,
             },
-        };
-        const mockNode = { dispose() {} };
-        const records: NodeRecord[] = [
-            { node: mockNode as any, action: "transfer" as const, oldParent: mockOldParent as any },
-        ];
-        new NodeLinkedListHistoryRecord(records).undo();
-        expect(addCalled).toBe(true);
+        ]).undo();
+        expect(calls).toEqual(["add"]);
     });
 
     test("NodeLinkedListHistoryRecord undo 'move' action", () => {

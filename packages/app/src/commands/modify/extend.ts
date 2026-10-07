@@ -4,6 +4,7 @@
 import {
     CurveUtils,
     command,
+    commandTransactionName,
     EditableShapeNode,
     type ICircle,
     type ICurve,
@@ -389,7 +390,7 @@ export class ExtendCommand extends MultistepCommand {
     }
 
     protected override executeMainTask() {
-        Transaction.execute(this.document, `excute ${Object.getPrototypeOf(this).data.name}`, () => {
+        Transaction.execute(this.document, commandTransactionName(this), () => {
             const target = this.stepDatas[0].shapes[0];
             const boundary = this.stepDatas[1].shapes[0];
 

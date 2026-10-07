@@ -11,7 +11,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { type IEdge, Plane, type Result } from "@chili3d/core";
+import { type IEdge, type IFace, Plane, type Result, ShapeTypes, XYZ } from "@chili3d/core";
 import { createMockApplication, createMockVisualWithDocument, TestDocument } from "@chili3d/core/test-utils";
 import { initWasm, ShapeFactory } from "@chili3d/wasm";
 import { type FeatureHandler, registerFeature } from "../src/features/feature";
@@ -122,5 +122,31 @@ describe("a throwing feature step", () => {
         } finally {
             internals.generateShape = generate;
         }
+    });
+});
+
+describe("projected arcs", () => {
+    test("every fillet arc on a face projects as its own 90° arc, whatever the edge's orientation", () => {
+        const box = shapeFactory.box(Plane.XY, 40, 30, 10).value;
+        const vertical = (box.findSubShapes(ShapeTypes.edge) as IEdge[]).flatMap((edge, index) =>
+            Math.abs(edge.startPoint().z - edge.endPoint().z) > 1 ? [index] : [],
+        );
+        expect(vertical).toHaveLength(4);
+        const filleted = shapeFactory.fillet(box, vertical, 5).value;
+        const top = (filleted.findSubShapes(ShapeTypes.face) as IFace[]).find(
+            (face) => face.normal(0, 0)[1].z > 0.99 && face.boundingBox()!.min.z > 9.99,
+        );
+        expect(top).not.toBeUndefined();
+        const plane = new Plane({ origin: new XYZ(0, 0, 10), normal: XYZ.unitZ, xvec: XYZ.unitX });
+        const sweeps = (top!.findSubShapes(ShapeTypes.edge) as IEdge[])
+            .map((edge) => edgeSnapshotUV(plane, edge))
+            .filter((snapshot) => snapshot?.type === "arc")
+            .map((snapshot) => {
+                const [cu, cv, su, sv, eu, ev] = snapshot!.params;
+                const sweep = Math.atan2(ev - cv, eu - cu) - Math.atan2(sv - cv, su - cu);
+                return ((sweep % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+            });
+        expect(sweeps).toHaveLength(4);
+        for (const sweep of sweeps) expect(sweep).toBeCloseTo(Math.PI / 2, 9);
     });
 });

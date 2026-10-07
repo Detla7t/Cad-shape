@@ -3,6 +3,7 @@
 
 import {
     command,
+    commandTransactionName,
     EditableShapeNode,
     type IEdge,
     type IStep,
@@ -34,7 +35,7 @@ export class Split extends MultistepCommand {
     }
 
     protected override executeMainTask() {
-        Transaction.execute(this.document, `excute ${Object.getPrototypeOf(this).data.name}`, () => {
+        Transaction.execute(this.document, commandTransactionName(this), () => {
             const old = this.stepDatas[0].nodes![0];
             const shape = this.splitedShape();
             const subShapes = shape.directSubShapes();

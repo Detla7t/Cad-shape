@@ -6,6 +6,7 @@ import {
     BoundingBox,
     Combobox,
     command,
+    commandTransactionName,
     type I18nKeys,
     type IDocument,
     Id,
@@ -515,7 +516,7 @@ export class ExtrudeFeatureCommand extends MultistepCommand {
         const worldFaces = this.dragData.shapes.map((x) => ExtrudeFeatureCommand.worldFace(x, owned));
         const feature = this.buildFeature(node, this.depth, worldFaces);
         try {
-            Transaction.execute(this.document, "excute feature.extrude", () => {
+            Transaction.execute(this.document, commandTransactionName(this), () => {
                 this.commitFeature(node, feature, depth, plane.normal, worldFaces);
                 if (node instanceof SketchNode) {
                     // The sketch is consumed by the feature; hide it. Same transaction,

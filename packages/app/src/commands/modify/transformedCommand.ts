@@ -5,6 +5,7 @@ import {
     AsyncController,
     BoundingBox,
     ComponentNode,
+    commandTransactionName,
     type EdgeMeshData,
     GeometryNode,
     isConsumedTool,
@@ -93,7 +94,7 @@ export abstract class TransformedCommand extends MultistepCommand {
     }
 
     protected executeMainTask(): void {
-        Transaction.execute(this.document, `excute ${Object.getPrototypeOf(this).data.name}`, () => {
+        Transaction.execute(this.document, commandTransactionName(this), () => {
             const transform = this.transfrom(this.stepDatas.at(-1)!.point!);
 
             // `canExcute` already filtered consumed boolean tools out of `models`.

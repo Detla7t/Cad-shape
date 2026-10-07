@@ -41,7 +41,9 @@ export class History implements IDisposable {
      * replaced underneath them (e.g. switching to another branch), where they no longer apply.
      */
     reset(): void {
-        this._redos.forEach((record) => record.dispose());
+        // Only the undo steps are disposed. Redo steps are dropped as `add()` drops them: a
+        // node a redo step would remove again is live in the tree after its undo, and
+        // disposing the step would dispose that live node.
         this._undos.forEach((record) => record.dispose());
         this.clear();
     }
@@ -186,7 +188,8 @@ export class NodeLinkedListHistoryRecord implements IHistoryRecord {
 
     dispose(): void {
         this.records.forEach((record) => {
-            if (record.action === "remove") {
+            // A removed node is owned by its record — unless an undo put it back in a tree.
+            if (record.action === "remove" && record.node.parent === undefined) {
                 record.node.dispose();
             }
         });
@@ -209,11 +212,19 @@ export class NodeLinkedListHistoryRecord implements IHistoryRecord {
                 record.newParent?.remove(record.node);
                 break;
             case "remove":
-                record.oldParent?.add(record.node);
+            case "transfer": {
+                // Back where it was: after the sibling it followed, or first when it led the
+                // list (order matters — it decides which Variable Studio wins a name). A stale
+                // anchor (that sibling moved away since) appends instead.
+                const previous = NodeLinkedListHistoryRecord.normalizePrevious(
+                    record.oldPrevious,
+                    record.oldParent,
+                );
+                if (record.oldPrevious !== undefined && previous === undefined)
+                    record.oldParent?.add(record.node);
+                else record.oldParent?.insertAfter(previous, record.node);
                 break;
-            case "transfer":
-                record.oldParent?.add(record.node);
-                break;
+            }
             case "move":
                 record.newParent?.move(
                     record.node,

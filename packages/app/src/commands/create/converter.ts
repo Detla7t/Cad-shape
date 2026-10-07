@@ -5,6 +5,7 @@ import {
     AsyncController,
     CancelableCommand,
     command,
+    commandTransactionName,
     EditableShapeNode,
     type GeometryNode,
     type IDocument,
@@ -33,7 +34,7 @@ abstract class ConvertCommand extends CancelableCommand {
             PubSub.default.pub("showToast", "toast.select.noSelected");
             return;
         }
-        Transaction.execute(this.document, `excute ${Object.getPrototypeOf(this).data.name}`, () => {
+        Transaction.execute(this.document, commandTransactionName(this), () => {
             const node = this.create(this.document, models);
             if (!node.isOk) {
                 PubSub.default.pub("showToast", "error.default:{0}", node.error);

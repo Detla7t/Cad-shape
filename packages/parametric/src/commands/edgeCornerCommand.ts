@@ -5,6 +5,7 @@ import {
     BoundingBox,
     CurveUtils,
     command,
+    commandTransactionName,
     Id,
     type IEdge,
     type INode,
@@ -229,7 +230,7 @@ abstract class EdgeCornerFeatureCommand extends MultistepCommand {
             }
             return captureEdgeRef(data.shape as unknown as IEdge, edgeId, this.body.edgeIdIsShared(edgeId));
         });
-        Transaction.execute(this.document, `excute ${this.featureType}`, () => {
+        Transaction.execute(this.document, commandTransactionName(this), () => {
             this.body.setFeaturesEmitShapeChanged([...this.body.features, this.feature(this.value, edges)]);
             this.document.visual.update();
         });

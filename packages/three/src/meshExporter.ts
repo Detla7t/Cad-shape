@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type IMeshExporter, type INode, NodeUtils, Result, type VisualNode } from "@chili3d/core";
+import { type IMeshExporter, type INode, NodeUtils, Result, VisualNode } from "@chili3d/core";
 import { Color, Group, type Material, Mesh, MeshStandardMaterial, Object3D } from "three";
 import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
 import { OBJExporter } from "three/examples/jsm/exporters/OBJExporter.js";
@@ -74,7 +74,9 @@ export class ThreeMeshExporter implements IMeshExporter {
 
     private gltfObject(node: INode, materials: Map<Material, MeshStandardMaterial>): Object3D | undefined {
         const parts: Object3D[] = [];
-        if (NodeUtils.isLinkedListNode(node)) {
+        // A node with geometry first: a parametric body is also a linked list (of the consumed
+        // tools it hides), and walking only those children would export nothing of the body.
+        if (!(node instanceof VisualNode) && NodeUtils.isLinkedListNode(node)) {
             for (let child = node.firstChild; child !== undefined; child = child.nextSibling) {
                 const object = this.gltfObject(child, materials);
                 if (object !== undefined) parts.push(object);

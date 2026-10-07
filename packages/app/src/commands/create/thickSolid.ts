@@ -3,6 +3,7 @@
 
 import {
     command,
+    commandTransactionName,
     EditableShapeNode,
     I18n,
     type IStep,
@@ -28,7 +29,7 @@ export class ThickSolidCommand extends MultistepCommand {
     }
 
     protected override executeMainTask(): void {
-        Transaction.execute(this.document, `excute ${Object.getPrototypeOf(this).data.name}`, () => {
+        Transaction.execute(this.document, commandTransactionName(this), () => {
             this.stepDatas[0].shapes.forEach((x) => {
                 const subShape = shapeFactory.makeThickSolidBySimple(x.shape, this.thickness);
                 if (!subShape.isOk) {

@@ -189,7 +189,8 @@ describe("DocumentVersionControl", () => {
             document.history.disabled = false;
             b.name = "B2";
             await settle();
-            expect(vc.headCommit().summary).toEqual(["A › visible on → off", "Renamed B → B2"]);
+            // Structural changes (the rename) lead the summary; property details follow.
+            expect(vc.headCommit().summary).toEqual(["Renamed B → B2", "A › visible on → off"]);
         });
     });
 

@@ -28,7 +28,10 @@ describe("NewDocument", () => {
 
         const cmd = new NewDocument();
         await cmd.execute(app);
+        const first = newDocName;
+        await cmd.execute(app);
 
-        expect(newDocName).toContain("undefined");
+        expect(first).toMatch(/^Document \d+$/);
+        expect(Number(newDocName.split(" ")[1])).toBe(Number(first.split(" ")[1]) + 1);
     });
 });

@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import type { VisualNode } from "@chili3d/core";
+import { VisualNode } from "@chili3d/core";
 import { BufferAttribute, BufferGeometry, Group, Mesh, MeshBasicMaterial } from "three";
 import { ThreeMeshExporter } from "../src/meshExporter";
 import { createThreeMockVisualContext } from "./mocks";
@@ -205,6 +205,35 @@ describe("ThreeMeshExporter", () => {
                 "Flange",
             ]);
             expect(json.buffers[0].uri).toMatch(/^data:application\/octet-stream;base64,/);
+        });
+
+        test("exports a body that is also a node list (a parametric body) from its own visual", async () => {
+            // A parametric body lists the consumed tools it hides as children; its geometry is its own.
+            // Own data properties: the class's `name` accessor would need a document.
+            const body = Object.create(VisualNode.prototype, {
+                id: { value: "body" },
+                name: { value: "Parametric Body1" },
+                firstChild: { value: undefined },
+                add: { value: () => {} },
+            }) as VisualNode;
+            const geometry = new BufferGeometry();
+            geometry.setAttribute(
+                "position",
+                new BufferAttribute(new Float32Array([0, 0, 0, 2, 0, 0, 0, 2, 0]), 3),
+            );
+            const mesh = new Mesh(geometry, new MeshBasicMaterial({ color: 0x00ff00 }));
+            meshesToDispose.push(mesh);
+            const exporter = new ThreeMeshExporter(
+                createThreeMockVisualContext(new Map([[body, mesh as any]])),
+            );
+            const result = await exporter.exportToGltf([body], false);
+            expect(result.isOk).toBe(true);
+            const json = JSON.parse(result.value as string);
+            expect(json.nodes.map((node: { name: string }) => node.name)).toEqual([
+                "Chili3D",
+                "Parametric Body1",
+            ]);
+            expect(json.meshes).toHaveLength(1);
         });
     });
 });

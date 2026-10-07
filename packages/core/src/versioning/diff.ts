@@ -450,28 +450,32 @@ export function describeDetail(detail: DetailChange): string {
 
 /** One line per change, e.g. `Part 1 › Extrude 2: depth 10 mm → 20 mm`, `Added Fillet 1`. */
 export function summarizeDiff(diff: DocumentDiff, limit = 40): string[] {
-    const lines: string[] = [];
+    // Structural changes lead: the first lines become a commit's title, and "Added Part 2"
+    // must not hide behind the consumed sketch's visibility toggle that came with it.
+    const structure: string[] = [];
+    const details: string[] = [];
     for (const node of diff.nodes) {
         if (node.status === "added") {
-            lines.push(`Added ${node.name}`);
+            structure.push(`Added ${node.name}`);
             continue;
         }
         if (node.status === "removed") {
-            lines.push(`Removed ${node.name}`);
+            structure.push(`Removed ${node.name}`);
             continue;
         }
-        if (node.renamedFrom !== undefined) lines.push(`Renamed ${node.renamedFrom}${ARROW}${node.name}`);
-        if (node.moved?.reordered) lines.push(`Reordered ${node.name}`);
+        if (node.renamedFrom !== undefined) structure.push(`Renamed ${node.renamedFrom}${ARROW}${node.name}`);
+        if (node.moved?.reordered) structure.push(`Reordered ${node.name}`);
         else if (node.moved !== undefined)
-            lines.push(`Moved ${node.name} to ${node.moved.to ?? "top level"}`);
+            structure.push(`Moved ${node.name} to ${node.moved.to ?? "top level"}`);
         for (const detail of node.changes) {
-            lines.push(
+            details.push(
                 detail.kind === "text"
                     ? `${node.name}: ${describeDetail(detail)}`
                     : `${node.name} › ${describeDetail(detail)}`,
             );
         }
     }
+    const lines = [...structure, ...details];
     for (const detail of diff.variables) lines.push(`Variables › ${describeDetail(detail)}`);
     for (const detail of diff.materials) lines.push(`Materials › ${describeDetail(detail)}`);
     for (const detail of diff.components) lines.push(`Components › ${describeDetail(detail)}`);

@@ -5,6 +5,7 @@ import {
     ANGLE_UNITS,
     CurveUtils,
     command,
+    commandTransactionName,
     Id,
     type IEdge,
     type IFace,
@@ -72,7 +73,7 @@ export class RevolveFeatureCommand extends MultistepCommand {
             document: this.document,
             features: [this.buildFeature()],
         });
-        Transaction.execute(this.document, "excute feature.revolve", () => {
+        Transaction.execute(this.document, commandTransactionName(this), () => {
             this.document.modelManager.addNode(node);
             // The sketch is consumed by the feature; hide it. Same transaction, so
             // undo restores the visibility together with the body.

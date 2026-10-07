@@ -3,6 +3,7 @@
 
 import {
     command,
+    commandTransactionName,
     Dimensions,
     EditableShapeNode,
     type IEdge,
@@ -24,7 +25,7 @@ import {
 })
 export class Break extends MultistepCommand {
     protected override executeMainTask() {
-        Transaction.execute(this.document, `excute ${Object.getPrototypeOf(this).data.name}`, () => {
+        Transaction.execute(this.document, commandTransactionName(this), () => {
             const shape = this.stepDatas[0].shapes[0].shape as IEdge;
             const curve = shape.curve;
             const point = this.stepDatas[0].shapes[0].owner.node

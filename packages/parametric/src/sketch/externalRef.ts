@@ -83,12 +83,21 @@ export function edgeSnapshotUV(plane: Plane, edge: IEdge): ExternalSnapshot | un
     if (edge.startPoint().distanceTo(edge.endPoint()) < Precision.Distance) {
         return { type: "circle", params: [cu, cv, basis.radius] };
     }
-    let start = edge.startPoint();
-    let end = edge.endPoint();
+    let [start, end] = curveEnds(edge);
     // An anti-parallel axis reverses the apparent sweep; sketch arcs are always
     // counter-clockwise about the plane normal, so swap the trim points.
     if (axis.dot(plane.normal) < 0) [start, end] = [end, start];
     return { type: "arc", params: [cu, cv, ...toUV(plane, start), ...toUV(plane, end)] };
+}
+
+/**
+ * An edge's ends in its CURVE's parameter order — the order the circle's axis sweeps them.
+ * `startPoint()`/`endPoint()` follow the edge's orientation instead, so a reversed arc (a
+ * fillet on some sides of a face) would read as its complement (270° for a 90° arc).
+ */
+function curveEnds(edge: IEdge): [XYZ, XYZ] {
+    const curve = edge.curve;
+    return [curve.value(curve.firstParameter()), curve.value(curve.lastParameter())];
 }
 
 /**
@@ -607,8 +616,7 @@ function arcCoverageSpans(
     if (sweep <= 0) sweep = Math.PI * 2;
     const spans: [number, number][] = [];
     for (const edge of candidates) {
-        let start = edge.startPoint();
-        let end = edge.endPoint();
+        let [start, end] = curveEnds(edge);
         const basis = basisCurveOf(edge);
         if (
             basis !== undefined &&
