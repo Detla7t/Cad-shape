@@ -14,8 +14,11 @@
 export type Vec3 = readonly [number, number, number];
 
 export type ToolpathMove =
-    /** Positioning at rapid traverse. */
-    | { readonly kind: "rapid"; readonly to: Vec3; readonly axis?: Vec3 }
+    /**
+     * Positioning at rapid traverse. `feed` (mm/min) caps it where the machine travels at a
+     * programmed speed rather than full rapid (a printer's travel speed); mills ignore it.
+     */
+    | { readonly kind: "rapid"; readonly to: Vec3; readonly axis?: Vec3; readonly feed?: number }
     /** Cutting move at `feed` (mm/min). */
     | { readonly kind: "linear"; readonly to: Vec3; readonly feed: number; readonly axis?: Vec3 }
     /**

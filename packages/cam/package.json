@@ -8,5 +8,8 @@
         "@chili3d/core": "*",
         "@chili3d/element": "*",
         "@chili3d/parametric": "*"
+    },
+    "dependencies": {
+        "clipper2-js": "^1.2.4"
     }
 }
