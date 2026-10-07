@@ -617,6 +617,80 @@ describe("2D cutting posts", () => {
         );
     });
 
+    const ETCHED: ToolpathData = {
+        toolId: "jet",
+        moves: [
+            { kind: "rapid", to: [30, 0, 0] },
+            { kind: "cutterOn", mode: "mark" },
+            { kind: "linear", to: [30, 40, 0], feed: 3000 },
+            { kind: "cutterOff" },
+            { kind: "rapid", to: [0, 0, 0] },
+            { kind: "cutterOn" },
+            { kind: "linear", to: [60, 0, 0], feed: 3000 },
+            { kind: "cutterOff" },
+        ],
+    };
+
+    test("plasma: a marking pass switches the marker, with no pierce delay and no torch height control", () => {
+        expect(post("plasma", program(PLASMA, [ETCHED], [JET]), { comments: false })).toBe(
+            lines(
+                "%",
+                "G90 G94 G17 G40",
+                "G21",
+                "G0 X30 Y0",
+                "M09",
+                "G1 Y40 F3000",
+                "M10",
+                "G0 X0 Y0",
+                "M07",
+                "G4 P0.5",
+                "M51",
+                "G1 X60",
+                "M50",
+                "M08",
+                "M30",
+                "%",
+            ),
+        );
+    });
+
+    test("laser: a marking pass fires at the marking power", () => {
+        const laser = {
+            ...PLASMA,
+            kind: "laser" as const,
+            cutting: { kerf: 0.2 },
+            post: { id: "laser-generic" },
+        };
+        const text = post("laser-generic", program(laser, [ETCHED], [JET]), {
+            power: 900,
+            markPower: 120,
+            comments: false,
+        });
+        expect(text).toContain(lines("G0 X30 Y0", "M3 S120", "G1 Y40 F3000", "M5", "G0 X0 Y0", "M3 S900"));
+    });
+
+    test("a waterjet has no standard marking code: marks need the post's marker codes", () => {
+        const waterjet = {
+            ...PLASMA,
+            kind: "waterjet" as const,
+            cutting: { kerf: 0.8, pierceDelay: 1.5 },
+            post: { id: "waterjet" },
+        };
+        const refused = postProcessor("waterjet")!.post(program(waterjet, [ETCHED], [JET]), {
+            comments: false,
+        });
+        expect(refused.isOk).toBe(false);
+        expect(refused.isOk ? "" : refused.error).toContain("marking code");
+        const text = post("waterjet", program(waterjet, [ETCHED], [JET]), {
+            comments: false,
+            markOn: "M13",
+            markOff: "M14",
+        });
+        expect(text).toContain(
+            lines("G0 X30 Y0", "M13", "G1 Y40 F3000", "M14", "G0 X0 Y0", "M03", "G4 P1.5"),
+        );
+    });
+
     test("GRBL laser mode switches the beam with M4 S-power", () => {
         const laser = {
             ...PLASMA,

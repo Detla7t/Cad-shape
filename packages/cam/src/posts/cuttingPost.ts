@@ -14,7 +14,9 @@ import { type ArcMove, arcPoints, resolvePostOptions } from "./motion";
  * toolpaths already carry the kerf (offset by half of it), so programs run with G40; the
  * table works in XY (Z only when asked), and the beam is switched by `cutterOn` /
  * `cutterOff`: the on code, the pierce delay as G4, then torch height control enabled
- * (plasma), and in reverse at the end of the cut.
+ * (plasma), and in reverse at the end of the cut. A marking pass (`cutterOn` with
+ * `mode: "mark"`) switches the marker instead — its own codes (a laser at the marking
+ * power), no pierce, no torch height control — so an etched bend line is never cut through.
  */
 
 export interface CuttingDialect {
@@ -32,6 +34,11 @@ export interface CuttingDialect {
     readonly beamOff: string;
     /** Torch height control codes; plasma only. */
     readonly thc?: { readonly on: string; readonly off: string };
+    /**
+     * Marker on/off for marking passes (`{power}` is the marking power). Absent when the
+     * machine has no standard marking code: marks then need the post options' codes.
+     */
+    readonly mark?: { readonly on: string; readonly off: string };
     /** Header comments (e.g. GRBL's laser mode setting). */
     readonly notes?: readonly string[];
 }
@@ -49,6 +56,8 @@ export const PLASMA_DIALECT: CuttingDialect = {
     beamOn: "M07",
     beamOff: "M08",
     thc: { on: "M51", off: "M50" },
+    // Hypertherm-style marker 1 enable / disable.
+    mark: { on: "M09", off: "M10" },
 };
 
 export const WATERJET_DIALECT: CuttingDialect = {
@@ -77,6 +86,7 @@ export const LASER_DIALECT: CuttingDialect = {
     end: ["M30"],
     beamOn: "M3 S{power}",
     beamOff: "M5",
+    mark: { on: "M3 S{power}", off: "M5" },
 };
 
 export const LASER_GRBL_DIALECT: CuttingDialect = {
@@ -91,6 +101,7 @@ export const LASER_GRBL_DIALECT: CuttingDialect = {
     end: ["M30"],
     beamOn: "M4 S{power}",
     beamOff: "M5",
+    mark: { on: "M4 S{power}", off: "M5" },
     notes: ["Laser mode: set $32=1 (dynamic power M4)"],
 };
 
@@ -98,6 +109,8 @@ const CUTTING_PARAMETERS: readonly CamParameterSpec[] = [
     { key: "pierceDelay", label: "Pierce delay (s)", kind: "number", min: 0 },
     { key: "beamOn", label: "Beam on code", kind: "string" },
     { key: "beamOff", label: "Beam off code", kind: "string" },
+    { key: "markOn", label: "Marker on code", kind: "string" },
+    { key: "markOff", label: "Marker off code", kind: "string" },
     { key: "outputZ", label: "Output Z", kind: "boolean" },
     {
         key: "arcs",
@@ -122,6 +135,7 @@ const PLASMA_PARAMETERS: readonly CamParameterSpec[] = [
 const LASER_PARAMETERS: readonly CamParameterSpec[] = [
     ...CUTTING_PARAMETERS,
     { key: "power", label: "Power (S)", kind: "number", min: 0 },
+    { key: "markPower", label: "Marking power (S)", kind: "number", min: 0 },
 ];
 
 class CuttingPostError extends Error {}
@@ -149,7 +163,8 @@ export class CuttingPost implements PostProcessor {
             lineNumbers: false,
             comments: true,
             ...(dialect.thc ? { thcOn: dialect.thc.on, thcOff: dialect.thc.off } : {}),
-            ...(laser ? { power: 1000 } : {}),
+            ...(dialect.mark ? { markOn: dialect.mark.on, markOff: dialect.mark.off } : {}),
+            ...(laser ? { power: 1000, markPower: 100 } : {}),
         };
     }
 
@@ -167,7 +182,7 @@ export class CuttingPost implements PostProcessor {
 class CuttingProgramWriter {
     private readonly w: GCodeWriter;
     private position: [number, number, number] | undefined;
-    private beamOn = false;
+    private beam: "off" | "cut" | "mark" = "off";
     private thcOn = false;
     private readonly outputZ: boolean;
     private readonly thc: boolean;
@@ -224,7 +239,8 @@ class CuttingProgramWriter {
                 this.arc(move);
                 return;
             case "cutterOn":
-                this.cutterOn(move.pierceDelay);
+                if (move.mode === "mark") this.markerOn();
+                else this.cutterOn(move.pierceDelay);
                 return;
             case "cutterOff":
                 this.cutterOff();
@@ -282,12 +298,13 @@ class CuttingProgramWriter {
 
     private cutterOn(pierceDelay: number | undefined): void {
         const { w } = this;
-        if (this.beamOn) return;
+        if (this.beam === "cut") return;
+        this.cutterOff();
         const power = optionOf(this.options, "power", 1000);
         w.block(
             optionOf(this.options, "beamOn", this.dialect.beamOn).replace("{power}", w.spindleNum(power)),
         );
-        this.beamOn = true;
+        this.beam = "cut";
         const delay =
             pierceDelay ??
             optionOf(this.options, "pierceDelay", this.program.machine.cutting?.pierceDelay ?? 0);
@@ -298,15 +315,36 @@ class CuttingProgramWriter {
         }
     }
 
+    /** A marking pass: the marker's code (a laser at the marking power), no pierce, no THC. */
+    private markerOn(): void {
+        const { w } = this;
+        if (this.beam === "mark") return;
+        this.cutterOff();
+        const code = optionOf(this.options, "markOn", this.dialect.mark?.on ?? "").trim();
+        if (code === "")
+            throw new CuttingPostError(
+                `${this.dialect.name} has no marking code: set the marker on/off codes in the post options, or skip the marks`,
+            );
+        const power = optionOf(this.options, "markPower", 100);
+        w.block(code.replace("{power}", w.spindleNum(power)));
+        this.beam = "mark";
+    }
+
     private cutterOff(): void {
         const { w } = this;
-        if (!this.beamOn) return;
+        if (this.beam === "off") return;
+        if (this.beam === "mark") {
+            const code = optionOf(this.options, "markOff", this.dialect.mark?.off ?? "").trim();
+            if (code !== "") w.block(code);
+            this.beam = "off";
+            return;
+        }
         if (this.thcOn) {
             w.block(optionOf(this.options, "thcOff", this.dialect.thc!.off));
             this.thcOn = false;
         }
         w.block(optionOf(this.options, "beamOff", this.dialect.beamOff));
-        this.beamOn = false;
+        this.beam = "off";
     }
 }
 
