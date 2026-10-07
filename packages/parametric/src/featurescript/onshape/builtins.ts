@@ -7,11 +7,17 @@ import { fsMap, native, toDisplayString } from "../lang/values";
 import { makeId } from "../std/feature";
 import { installAttributeBuiltins } from "./attributeBuiltins";
 import { StdBridge } from "./bridge";
+import { installEvaluationBuiltins } from "./evaluationBuiltins";
 import { installFeatureBuiltins } from "./featureBuiltins";
 import { installModelingBuiltins } from "./modelingBuiltins";
 import { installPatternBuiltins } from "./patternBuiltins";
+import { installPropertyBuiltins } from "./propertyBuiltins";
 import { installPureBuiltins } from "./pureBuiltins";
 import type { BuiltinRegistry } from "./registry";
+import { installSheetMetalBuiltins } from "./sheetMetalBuiltins";
+import { installSplineBuiltins } from "./splineBuiltins";
+import { installTrackingBuiltins } from "./trackingBuiltins";
+import { installUtilityBuiltins } from "./utilityBuiltins";
 
 /** Installs the `@` built-ins Onshape's std source calls; returns the bridge they convert values with. */
 export function installOnshapeBuiltins(interpreter: Interpreter, version: number): StdBridge {
@@ -29,7 +35,14 @@ export function installOnshapeBuiltins(interpreter: Interpreter, version: number
     installPatternBuiltins(define, bridge);
     installAttributeBuiltins(define, bridge);
     installFeatureBuiltins(define, bridge);
+    installPropertyBuiltins(define, bridge);
+    installSplineBuiltins(define, bridge);
+    installEvaluationBuiltins(define, bridge);
+    installSheetMetalBuiltins(define, bridge);
+    installUtilityBuiltins(define, bridge);
     installExtensions(interpreter, bridge);
+    // Last: it wraps every op* built-in installed above to record the operations run.
+    installTrackingBuiltins(interpreter, define, bridge, version);
     return bridge;
 }
 

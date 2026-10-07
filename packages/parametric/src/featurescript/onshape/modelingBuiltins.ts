@@ -12,7 +12,6 @@ import {
     FsQuantity,
     type FsValue,
     fail,
-    fsArray,
     fsMap,
     isCallable,
     LENGTH,
@@ -107,16 +106,6 @@ export function installModelingBuiltins(define: BuiltinRegistry, bridge: StdBrid
         return bridge.toStd(makePlane(makePlaneData(plane.origin, plane.normal, vec.normalize(x))));
     });
 
-    // Feature patterns: no feature runs inside one here, so every remaining transform is identity.
-    const identity = () =>
-        fsMap({
-            linear: fsArray([fsArray([1, 0, 0]), fsArray([0, 1, 0]), fsArray([0, 0, 1])]),
-            translation: fsArray([0, 0, 0]),
-        });
-    define("getRemainderPatternTransform", identity);
-    define("getFullPatternTransform", identity);
-    define("isInFeaturePattern", () => false);
-
     // Queries: std passes `{ "query" : q }`.
     const unwrapQuery = (args: FsValue[]) => {
         const wrapper = args[1];
@@ -172,11 +161,6 @@ export function installModelingBuiltins(define: BuiltinRegistry, bridge: StdBrid
     forward("evArea", "evArea", renameField("faces", "entities"));
     forward("evVolume", "evVolume", renameField("bodies", "entities"));
     forward("evBox", "evBox3d");
-
-    // Properties: bodies keep a name (custom tables read their parts' names); any other
-    // property is accepted and reads back as unset.
-    forward("setProperty");
-    forward("getProperty");
 }
 
 /** An enum field of an operation's definition (argument 2) by member name: `ExtendedToolBodyType.SOLID` → "SOLID". */
