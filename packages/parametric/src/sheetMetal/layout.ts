@@ -169,6 +169,9 @@ function foldLayout(arena: Arena, model: SheetMetalModel, frame: PlaneFrame, bla
     const zonesInBlank = strips.map((strip) =>
         arena.track(kernel(shapeFactory.booleanCommon([blank], [strip]), "bend zone")),
     );
+    if (zonesInBlank.some((zone) => facesOf(arena, zone).length === 0)) {
+        throw new SheetError("A bend line must run fully across the sheet (this one misses it)");
+    }
     for (let i = 0; i < strips.length; i++) {
         for (let j = i + 1; j < strips.length; j++) {
             const overlap = arena.track(
@@ -201,15 +204,25 @@ function foldLayout(arena: Arena, model: SheetMetalModel, frame: PlaneFrame, bla
                 const mean = points.reduce((acc, p) => add2(acc, p), [0, 0] as V2);
                 return dot2(sub2(scale2(mean, 1 / points.length), zone.a), zone.left) >= 0 ? 1 : -1;
             };
-            const along = facePoints(face, frame).map((p) => dot2(sub2(p, zone.a), zone.e));
+            const points = facePoints(face, frame);
+            const along = points.map((p) => dot2(sub2(p, zone.a), zone.e));
+            const across = points.map((p) => dot2(sub2(p, zone.a), zone.left));
+            // The extent along the bend line at the zone's center line: where an outline edge
+            // crosses the zone obliquely, the midpoint keeps the bend's material exact.
+            const extent = (pick: (values: number[]) => number) => {
+                const sides = [-1, 1].map((sign) => along.filter((_, i) => across[i] * sign > 0));
+                return sides.every((values) => values.length > 0)
+                    ? (pick(sides[0]) + pick(sides[1])) / 2
+                    : pick(along);
+            };
             pieces.push({
                 zone,
                 face,
                 parent: touching[0],
                 child: touching[1],
                 sigma: side(touching[1]) as 1 | -1,
-                emin: Math.min(...along),
-                emax: Math.max(...along),
+                emin: extent((values) => Math.min(...values)),
+                emax: extent((values) => Math.max(...values)),
             });
         }
     });
@@ -219,12 +232,14 @@ function foldLayout(arena: Arena, model: SheetMetalModel, frame: PlaneFrame, bla
     root.placed = true;
     const queue: Facet[] = [root];
     const resolved: BendPiece[] = [];
+    const used = new Set<BendPiece>();
     while (queue.length > 0) {
         const current = queue.shift() as Facet;
         for (const piece of pieces) {
             const other =
                 piece.parent === current ? piece.child : piece.child === current ? piece.parent : undefined;
             if (other === undefined || other.placed) continue;
+            used.add(piece);
             // Orient the piece from the placed facet to the new one.
             const oriented: BendPiece =
                 piece.parent === current
@@ -238,6 +253,23 @@ function foldLayout(arena: Arena, model: SheetMetalModel, frame: PlaneFrame, bla
     }
     if (facets.some((facet) => !facet.placed))
         throw new SheetError("Part of the sheet is not connected to the rest");
+    // A bend line crossing a hole meets the same two facets in several pieces: build every one,
+    // oriented like the piece that placed its facets.
+    for (const piece of pieces) {
+        if (used.has(piece)) continue;
+        const twin = resolved.find(
+            (r) =>
+                r.zone === piece.zone &&
+                ((r.parent === piece.parent && r.child === piece.child) ||
+                    (r.parent === piece.child && r.child === piece.parent)),
+        );
+        if (twin === undefined) throw new SheetError("The bend lines close a loop through the sheet");
+        resolved.push(
+            twin.parent === piece.parent
+                ? piece
+                : { ...piece, parent: twin.parent, child: twin.child, sigma: -piece.sigma as 1 | -1 },
+        );
+    }
     return { kind: "fold", frame, blank, facets, pieces: resolved };
 }
 

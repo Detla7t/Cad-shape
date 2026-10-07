@@ -332,7 +332,6 @@ export const EDGE_LENGTH_DEFAULT: Record<SheetMetalEdgeFeatureData["kind"], numb
 const edgeHandler: FeatureHandler<SheetMetalEdgeFeatureData> = {
     display: (feature) => EDGE_DISPLAY[feature.kind],
     icon: (feature) => EDGE_ICON[feature.kind],
-    reselectable: true,
     nodeIds: () => [],
     parameters(feature) {
         const lengthLabel: I18nKeys =
@@ -445,7 +444,11 @@ function matchBlankEdges(
                 const b = mapPoint(layout, edge.b, z);
                 if (a !== undefined && b !== undefined) images.push([a, b]);
             }
-            return images.length === 0 ? [] : [{ ...edge, images }];
+            if (images.length === 0) return [];
+            // Anchors are stored flat (below): they stay put when bends change or are suppressed.
+            const flat = (p: V2) => layout.frame.point(p[0], p[1]);
+            images.push([flat(edge.a), flat(edge.b)]);
+            return [{ ...edge, images }];
         });
         return refs.map((ref) => {
             if (ref.kind !== "line") throw new SheetError("Pick straight outline edges of the sheet");
@@ -464,7 +467,8 @@ function matchBlankEdges(
                 throw new SheetError("A picked edge is not a straight outline edge of the sheet");
             }
             used.add(key(best.a, best.b));
-            const [a, b] = best.image;
+            const a = layout.frame.point(best.a[0], best.a[1]);
+            const b = layout.frame.point(best.b[0], best.b[1]);
             return {
                 a: best.a,
                 b: best.b,
@@ -500,8 +504,16 @@ function seamFit(model: SheetMetalModel): string | undefined {
     const pocket = model.flanges.find((flange) => flange.kind === "pittsburgh");
     const male = model.flanges.find((flange) => flange.kind === "easyEdge");
     if (pocket?.seamDepth === undefined || male?.seamDepth === undefined) return undefined;
-    if (male.seamDepth > pocket.seamDepth + 1e-9) {
-        return `The easy edge (${round(male.seamDepth)} mm) is deeper than the Pittsburgh pocket (${round(pocket.seamDepth)} mm)`;
+    // Closed seam: the male panel's outside face lies against the lip, flush with the pocket's
+    // edge; its leg reaches bend radius + leg into the slot, which runs to the fold's inside.
+    const radius = (flange: SheetFlange) => {
+        const bend = flange.elements.find((element) => element.kind === "bend");
+        return bend?.kind === "bend" ? bend.radius : 0;
+    };
+    const reach = radius(male) + male.seamDepth;
+    const depth = pocket.seamDepth + radius(pocket);
+    if (reach > depth + 1e-9) {
+        return `The easy edge (${round(reach)} mm with its bend) is deeper than the Pittsburgh pocket (${round(depth)} mm)`;
     }
     return undefined;
 }

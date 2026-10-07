@@ -142,6 +142,15 @@ function flangeSolid(arena: Arena, model: SheetMetalModel, layout: Layout, flang
                 : "An edge treatment must sit on a straight edge of a flat region",
         );
     }
+    if (layout.kind === "fold") {
+        // The whole edge must ride one facet: a strip cannot follow the sheet around a bend.
+        const e2 = unit2(sub2(flange.b, flange.a));
+        const inset = 1e-3 * Math.hypot(flange.b[0] - flange.a[0], flange.b[1] - flange.a[1]);
+        const ends = [add2(flange.a, scale2(e2, inset)), add2(flange.b, scale2(e2, -inset))];
+        if (ends.some((point) => motionAt(layout, point) !== motion)) {
+            throw new SheetError("An edge treatment cannot run across a bend line");
+        }
+    }
     const { frame, along, length } = flangeFrame(layout, flange);
     const section = stripSection(flange.elements, model.thickness, model.kFactor);
     const face = sectionFace(arena, frame, section.pieces);
@@ -234,8 +243,10 @@ function rolledSolids(arena: Arena, model: SheetMetalModel, layout: RollLayout):
     if ((startCrimp !== undefined || endCrimp !== undefined) && !layout.full) {
         throw new SheetError("A crimp needs a fully closed roll");
     }
-    const from = startCrimp?.length ?? 0;
-    const to = length - (endCrimp?.length ?? 0);
+    // A crimped end steps in one thickness through a short swage, so it slips into the next duct.
+    const swage = 2 * t;
+    const from = startCrimp === undefined ? 0 : startCrimp.length + swage;
+    const to = length - (endCrimp === undefined ? 0 : endCrimp.length + swage);
     if (to - from <= 1e-6) throw new SheetError("The crimps are longer than the duct");
 
     const plainSection = (offset: number): IShape => {
@@ -260,9 +271,24 @@ function rolledSolids(arena: Arena, model: SheetMetalModel, layout: RollLayout):
             throw new SheetError("The crimp depth must be positive and smaller than the radius");
         if (!Number.isInteger(crimp.count) || crimp.count < 3)
             throw new SheetError("A crimp needs at least 3 corrugations");
-        const offset = crimp.end === "start" ? 0 : to;
-        const face = corrugatedFace(arena, axial(offset), u, w, ri + t, t, crimp.depth, crimp.count);
+        const offset = crimp.end === "start" ? 0 : to + swage;
+        // The flutes' crests sit at the bore: the crimped end's outside is the duct's inside.
+        const face = corrugatedFace(arena, axial(offset), u, w, ri, t, crimp.depth, crimp.count);
         parts.push(prism(arena, face, vec.scale(layout.axisDirection, crimp.length)));
+        const plain = crimp.end === "start" ? swage : 0;
+        const reduced = swage - plain;
+        const swageFace = sectionFace(
+            arena,
+            { origin: axial(crimp.end === "start" ? crimp.length : to), s: layout.axisDirection, z: radial },
+            [
+                { kind: "line", a: [plain, ri], b: [plain, ri + t] },
+                { kind: "line", a: [plain, ri + t], b: [reduced, ri] },
+                { kind: "line", a: [reduced, ri], b: [reduced, ri - t] },
+                { kind: "line", a: [reduced, ri - t], b: [plain, ri] },
+            ],
+        );
+        const axis = new Line({ point: xyz(layout.axisPoint), direction: xyz(layout.axisDirection) });
+        parts.push(arena.track(kernel(shapeFactory.revolve(swageFace, axis, 360), "crimp swage")));
     }
     for (const bead of model.beads) {
         if (bead.kind !== "ring") throw new SheetError("Line beads go on a flat sheet, before rolling");

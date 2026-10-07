@@ -57,9 +57,10 @@ export function treatmentElements(p: TreatmentParameters): FlangeElement[] {
                 { kind: "straight", length: p.length },
             ];
         case "hem":
-            // A closed hem: the fold's inner radius is half a thickness, so the two layers touch.
+            // A closed hem: the layers lie 2 × the fold's inner radius apart, so a (near) zero
+            // inner radius makes them touch.
             return [
-                { kind: "bend", angle: 180 * d, radius: p.thickness / 2 },
+                { kind: "bend", angle: 180 * d, radius: p.thickness * 1e-3 },
                 { kind: "straight", length: p.length },
             ];
         case "pittsburgh": {
