@@ -1,0 +1,461 @@
+/* Part of the Chili3d Project, under the AGPL-3.0 License.
+   See LICENSE file in the project root for full license information. */
+
+/* Syntax and editor colors; the app's `theme` attribute on :root switches them. */
+.theme {
+    --fs-editor-background: var(--panel-background-color, #fff);
+    --fs-gutter-background: var(--panel-background-color, #fff);
+    --fs-active-line: rgba(14, 98, 215, 0.06);
+    --fs-selection: rgba(14, 98, 215, 0.22);
+    --fs-selection-match: rgba(14, 98, 215, 0.12);
+    --fs-search-match: rgba(255, 196, 0, 0.35);
+    --fs-bracket-match: rgba(14, 98, 215, 0.14);
+    --fs-keyword: #0033b3;
+    --fs-control: #8a1bb3;
+    --fs-type: #1f7a8c;
+    --fs-function: #7a5a00;
+    --fs-definition: #00627a;
+    --fs-string: #a31515;
+    --fs-escape: #e2007a;
+    --fs-number: #098658;
+    --fs-unit: #0a7d6a;
+    --fs-constant: #6f42c1;
+    --fs-atom: #0033b3;
+    --fs-comment: #5c7a5c;
+    --fs-doc: #4f7a4f;
+    --fs-doc-tag: #2a6099;
+    --fs-annotation: #9a6700;
+    --fs-annotation-key: #8c6d1f;
+    --fs-builtin: #af00db;
+    --fs-operator: #5a5a5a;
+    --fs-property: #264f99;
+    --fs-invalid: #e00000;
+}
+
+:global(:root[theme="dark"]) .theme {
+    --fs-active-line: rgba(255, 255, 255, 0.05);
+    --fs-selection: rgba(74, 158, 255, 0.3);
+    --fs-selection-match: rgba(74, 158, 255, 0.16);
+    --fs-search-match: rgba(255, 196, 0, 0.3);
+    --fs-bracket-match: rgba(74, 158, 255, 0.22);
+    --fs-keyword: #569cd6;
+    --fs-control: #c586c0;
+    --fs-type: #4ec9b0;
+    --fs-function: #dcdcaa;
+    --fs-definition: #e5d58f;
+    --fs-string: #ce9178;
+    --fs-escape: #d7ba7d;
+    --fs-number: #b5cea8;
+    --fs-unit: #7fd4b8;
+    --fs-constant: #4fc1ff;
+    --fs-atom: #569cd6;
+    --fs-comment: #6a9955;
+    --fs-doc: #6a9955;
+    --fs-doc-tag: #8fc1e3;
+    --fs-annotation: #d7ba7d;
+    --fs-annotation-key: #e0c890;
+    --fs-builtin: #c586c0;
+    --fs-operator: #c8c8c8;
+    --fs-property: #9cdcfe;
+    --fs-invalid: #ff6b6b;
+}
+
+.tkKeyword {
+    color: var(--fs-keyword);
+}
+.tkControl {
+    color: var(--fs-control);
+}
+.tkType {
+    color: var(--fs-type);
+}
+.tkFunction {
+    color: var(--fs-function);
+}
+.tkDefinition {
+    color: var(--fs-definition);
+    font-weight: 600;
+}
+.tkString {
+    color: var(--fs-string);
+}
+.tkEscape {
+    color: var(--fs-escape);
+}
+.tkNumber {
+    color: var(--fs-number);
+}
+.tkUnit {
+    color: var(--fs-unit);
+    font-style: italic;
+}
+.tkConstant {
+    color: var(--fs-constant);
+}
+.tkAtom {
+    color: var(--fs-atom);
+}
+.tkComment {
+    color: var(--fs-comment);
+    font-style: italic;
+}
+.tkDoc {
+    color: var(--fs-doc);
+}
+.tkDocTag {
+    color: var(--fs-doc-tag);
+    font-weight: 600;
+}
+.tkAnnotation {
+    color: var(--fs-annotation);
+    font-weight: 600;
+}
+.tkAnnotationKey {
+    color: var(--fs-annotation-key);
+}
+.tkBuiltin {
+    color: var(--fs-builtin);
+}
+.tkOperator {
+    color: var(--fs-operator);
+}
+.tkProperty {
+    color: var(--fs-property);
+}
+.tkInvalid {
+    color: var(--fs-invalid);
+    text-decoration: underline wavy;
+}
+
+/* Above floating panels (z-index 1000); tooltips inside are fixed to the viewport. */
+.tooltipHost {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 0;
+    height: 0;
+    z-index: 2000;
+}
+
+/* ------------------------------------------------------------------ Layout */
+
+.root {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    box-sizing: border-box;
+    padding: 6px;
+}
+
+.toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+.name {
+    flex: 0 1 200px;
+    min-width: 80px;
+    padding: 3px 6px;
+    font-size: 13px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background-color: transparent;
+    color: inherit;
+}
+
+.status {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 12px;
+    opacity: 0.8;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: default;
+
+    &.error {
+        color: var(--error-color);
+        opacity: 1;
+        cursor: pointer;
+    }
+
+    &.ok {
+        color: var(--success-color, var(--primary-color));
+    }
+}
+
+.button {
+    flex-shrink: 0;
+    padding: 3px 10px;
+    font-size: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background-color: transparent;
+    color: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+
+    &:hover:not(:disabled) {
+        background-color: var(--panel-hover-background-color);
+    }
+
+    &:disabled {
+        opacity: 0.4;
+        cursor: default;
+    }
+
+    &.primary {
+        border-color: var(--primary-color);
+        color: var(--primary-color);
+    }
+
+    &.toggled {
+        background-color: var(--checked-color);
+    }
+}
+
+.main {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+    gap: 6px;
+}
+
+.outline {
+    flex: 0 0 168px;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 12px;
+    padding: 4px 0;
+
+    &.hidden {
+        display: none;
+    }
+}
+
+.outlineTitle {
+    padding: 0 8px 4px;
+    font-size: 11px;
+    text-transform: uppercase;
+    opacity: 0.6;
+}
+
+.outlineItem {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    padding: 2px 8px;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+
+    &:hover {
+        background-color: var(--panel-hover-background-color);
+    }
+
+    &.private {
+        opacity: 0.65;
+    }
+}
+
+.outlineKind {
+    flex: 0 0 auto;
+    width: 14px;
+    font-size: 10px;
+    font-weight: 700;
+    text-align: center;
+    border-radius: 3px;
+    color: var(--fs-keyword);
+
+    &.feature {
+        color: var(--primary-color);
+    }
+    &.function,
+    &.predicate,
+    &.operator {
+        color: var(--fs-function);
+    }
+    &.type,
+    &.enum {
+        color: var(--fs-type);
+    }
+    &.const {
+        color: var(--fs-constant);
+    }
+}
+
+.outlineName {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.outlineEmpty {
+    padding: 2px 8px;
+    opacity: 0.6;
+}
+
+.editor {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    overflow: hidden;
+
+    & :global(.cm-editor) {
+        height: 100%;
+    }
+}
+
+.output {
+    flex: 0 0 auto;
+    max-height: 30%;
+    min-height: 40px;
+    overflow: auto;
+    padding: 4px 6px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    font-size: 12px;
+    white-space: pre-wrap;
+}
+
+.outputTitle {
+    font-size: 11px;
+    text-transform: uppercase;
+    opacity: 0.6;
+    margin-bottom: 2px;
+}
+
+.outputFeature {
+    color: var(--primary-color);
+}
+
+.errorLine {
+    color: var(--error-color);
+    cursor: pointer;
+}
+
+/* ------------------------------------------------------------------ Docs (hover, completion info, signature help) */
+
+.doc {
+    max-width: 520px;
+    max-height: 360px;
+    overflow: auto;
+    padding: 6px 8px;
+    font-size: 12px;
+    line-height: 1.45;
+
+    & code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+        font-size: 11.5px;
+        padding: 0 2px;
+        border-radius: 3px;
+        background-color: var(--fs-active-line);
+    }
+
+    & pre {
+        margin: 4px 0;
+        padding: 4px 6px;
+        white-space: pre-wrap;
+        border-radius: 3px;
+        background-color: var(--fs-active-line);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+        font-size: 11.5px;
+    }
+
+    & p {
+        margin: 4px 0;
+    }
+}
+
+.docSignature {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    font-size: 12px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    padding-bottom: 4px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid var(--border-color);
+
+    & + .docSignature {
+        margin-top: -2px;
+    }
+}
+
+.docKind {
+    opacity: 0.6;
+    font-size: 11px;
+    margin-left: 6px;
+}
+
+.docActive {
+    font-weight: 700;
+    text-decoration: underline;
+}
+
+.docSection {
+    margin-top: 6px;
+    font-size: 11px;
+    text-transform: uppercase;
+    opacity: 0.6;
+}
+
+.docItem {
+    margin: 2px 0 2px 8px;
+}
+
+.docItemName {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    font-weight: 600;
+}
+
+.docMuted {
+    opacity: 0.65;
+}
+
+.docInternal {
+    color: var(--warning-color);
+    font-size: 11px;
+}
+
+/* ------------------------------------------------------------------ Std source viewer */
+
+.viewer {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    box-sizing: border-box;
+    padding: 6px;
+}
+
+.viewerHeader {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+
+    & > span {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    }
+
+    & > .docMuted {
+        flex: 1 1 auto;
+        text-align: right;
+    }
+}

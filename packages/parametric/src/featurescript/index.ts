@@ -25,3 +25,5 @@ export * from "./runtime";
 export * from "./studioCompiler";
 export * from "./studioFiles";
 export * from "./tableRuntime";
+export { createFeatureScriptIde, showFeatureStudioEditor } from "./ui/featureStudioEditor";
+export type { FeatureScriptIde, FeatureScriptIdeOptions } from "./ui/ide/featureScriptIde";

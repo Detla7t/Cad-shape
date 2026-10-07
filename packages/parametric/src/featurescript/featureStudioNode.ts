@@ -104,14 +104,13 @@ export const roundedPlate = defineFeature(function(context is Context, id is Id,
         });
         skSolve(sketch1);
 
+        // Merge with the part, once there is one (std's ADD needs a part to merge with).
+        const isFirstPart = isQueryEmpty(context, qAllModifiableSolidBodies());
         extrude(context, id + "extrude1", {
                 "entities" : qSketchRegion(id + "sketch1"),
                 "endBound" : BoundingType.BLIND,
                 "depth" : definition.thickness,
-                // Merge with the part, once there is one (std's ADD needs a part to merge with).
-                "operationType" : isQueryEmpty(context, qAllModifiableSolidBodies())
-                        ? NewBodyOperationType.NEW
-                        : NewBodyOperationType.ADD
+                "operationType" : isFirstPart ? NewBodyOperationType.NEW : NewBodyOperationType.ADD
         });
 
         if (definition.rounded)

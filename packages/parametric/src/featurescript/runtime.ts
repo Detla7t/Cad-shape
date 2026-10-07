@@ -49,6 +49,11 @@ export function onshapeStdVersion(): number | undefined {
     return onshapeStd?.version;
 }
 
+/** The std source provided by `provideOnshapeStd` — what the editor indexes for completion and docs. */
+export function providedOnshapeStd(): OnshapeStdSource | undefined {
+    return onshapeStd;
+}
+
 function onshapeInterpreter(source: OnshapeStdSource): Interpreter {
     onshapeBase ??= createOnshapeInterpreter({ std: source });
     return onshapeBase;
@@ -97,11 +102,27 @@ export function compileStudio(source: ModuleSource, setup: InterpreterSetup = {}
     }
 }
 
-export function describeError(error: unknown): { error: string; line?: number; column?: number } {
+/** An error as data: the message, and where it happened (`file` is the module the position is in). */
+export function describeError(error: unknown): {
+    error: string;
+    line?: number;
+    column?: number;
+    file?: string;
+} {
     if (error instanceof FsRuntimeError)
-        return { error: error.describe(), line: error.pos?.line, column: error.pos?.column };
+        return {
+            error: error.describe(),
+            line: error.pos?.line,
+            column: error.pos?.column,
+            file: error.pos?.file,
+        };
     if (error instanceof FsError)
-        return { error: error.message, line: error.pos?.line, column: error.pos?.column };
+        return {
+            error: error.message,
+            line: error.pos?.line,
+            column: error.pos?.column,
+            file: error.pos?.file,
+        };
     return { error: error instanceof Error ? error.message : String(error) };
 }
 
