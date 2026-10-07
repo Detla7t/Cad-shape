@@ -1,0 +1,13 @@
+[package]
+name = "chili-rs"
+description = "The wasm-bindgen boundary of the Rust kernels: thin bindings over the library crates."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen.workspace = true

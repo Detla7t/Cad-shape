@@ -1,0 +1,25 @@
+# Part of the Chili3d Project, under the AGPL-3.0 License.
+# See LICENSE file in the project root for full license information.
+#
+# Pure-compute kernels in Rust, compiled to one WebAssembly module (`crates/chili-rs`, the
+# wasm-bindgen boundary) that `@chili3d/rs` loads. Algorithms live in plain library crates
+# beside it, tested natively with `cargo test`; OCCT stays in cpp/.
+
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.7.1"
+edition = "2024"
+license = "AGPL-3.0-only"
+publish = false
+
+[workspace.dependencies]
+wasm-bindgen = "=0.2.129"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"

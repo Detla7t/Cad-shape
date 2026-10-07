@@ -6,12 +6,15 @@ import packages from "./package.json" with { type: "json" };
 const configDir = import.meta.dirname;
 
 export default defineConfig({
-    exclude: ["**/cpp/**", "**/.claude/**"],
+    exclude: ["**/cpp/**", "**/rust/**", "**/.claude/**"],
     coverage: {
-        exclude: ["**/wasm/lib/**", "**/test-utils/**"],
+        exclude: ["**/wasm/lib/**", "**/rs/lib/**", "**/test-utils/**"],
     },
     globals: true,
-    setupFiles: [resolve(configDir, "packages/core/test-utils/setup.ts")],
+    setupFiles: [
+        resolve(configDir, "packages/core/test-utils/setup.ts"),
+        resolve(configDir, "packages/rs/test-utils/setup.ts"),
+    ],
     testEnvironment: "happy-dom",
     tools: {
         rspack: {

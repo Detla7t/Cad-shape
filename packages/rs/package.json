@@ -1,0 +1,7 @@
+{
+    "name": "@chili3d/rs",
+    "version": "0.7.1",
+    "description": "Rust compute kernels compiled to WebAssembly (built from rust/ by `npm run build:rust`)",
+    "main": "src/index.ts",
+    "type": "module"
+}

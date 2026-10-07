@@ -21,6 +21,7 @@ Browser-based parametric 3D CAD: OCCT C++ kernel compiled to WebAssembly, render
 ```
 web ──> builder ──> app ──> core
                   ──> i18n / three / wasm ──> core
+                  ──> rs (Rust → wasm, no deps)
                   ──> ui ──> core + element
                   ──> parametric ──> core
                   ──> data ──> core + element
@@ -41,6 +42,7 @@ web ──> builder ──> app ──> core
 - **`onshape-std`** — Onshape's FeatureScript std 3083 (MIT, PTC) as one gzipped JSON asset (`std/onshape-std-3083.json.gz`, `{version, license, files}`); `loadOnshapeStd()` fetches and decodes it. Regenerate with `node scripts/bundle-onshape-std.mjs <std-dir> <version> <out.json.gz>`; tests read the same file
 - **`documents`** — Drawing and office files (`useDocuments()`): content sniffing lives in core (`fileFormat.ts`: magic bytes, zip/OLE entries; `registerFileImporter` in `dataExchange.ts` routes the one Import command). DXF (`cad/dxfReader.ts` → `dxfToDrawing.ts` → `drawingToSketch.ts`: a `SketchNode` on XY plus a drawing element) and DWG (LibreDWG wasm DWG→DXF, acad-ts fallback; DWG/DXF R12/SVG export of HLR projections in `cad/projection.ts`), OBJ/glTF/3MF → `MeshNode`. Document elements are `DocumentFileNode`s holding the file in one serialized property (text or base64; raw under `files/` in `.chili3d`), shown by lazily loaded viewers in `ui/viewers/` (Markdown, DOCX/ODT rich text, CSV/XLSX/ODS grid with its own formula engine in `sheet/`, PDF, images, text). `api.ts` is the synchronous table/text API for data binding (`DOCUMENT_TABLE_PROVIDER`, `readDocumentTable`, `documentRevision`, `readDocumentText`). Heavy libraries (LibreDWG, acad-ts, ExcelJS, pdf.js, mammoth, docx, CodeMirror) stay in lazy chunks
 - **`wasm`** — Concrete `ShapeFactory` → OCCT via Emscripten; exports `initWasm()`
+- **`rs`** — The Rust kernels' WebAssembly module (`rust/`, see below); exports `initRust()` / `initRustSync()` and typed wrappers
 - **`three`** — Three.js viewport, camera controller, visuals, highlighter, gizmo, mesh export
 - **`element`** — Custom reactive DOM elements (radio groups, expanders, data converters)
 - **`ui`** — App chrome: main window, ribbon, property panels, project tree, dialogs, toast, status bar
@@ -53,6 +55,10 @@ Import via workspace names (`import { ... } from "@chili3d/core"`); one root `ts
 ## C++ WASM (`cpp/`)
 
 OCCT v8.0.0 → `chili-wasm.wasm` via Emscripten. `cpp/src/`: `factory.cpp` (shape creation; the tracked ops report per-output history twice — single-valued `faceMap`/`edgeMap` keeping the first ancestor, plus flat (out, in) `faceAncestors`/`edgeAncestors` pairs keeping every derivation so boolean-merged faces record all their inputs), `shape.cpp` (topology traversal), `converter.cpp` (STEP/IGES/BREP/STL), `mesher.cpp` (B-rep → mesh), `geometry.cpp` (curve/surface queries). The build uses native WebAssembly exceptions (`-fwasm-exceptions`), so the C++ try/catch around OCCT algorithms turns a raise into an error result (an oversize fillet is a feature error, not a module abort); the query files (`shape.cpp`/`mesher.cpp`/`geometry.cpp`) still guard degenerate and null-geometry paths preventively (`IsGeometric`/`IsNull`/`IsDone` prechecks; `Edge::curve` reports degenerate edges through a JS-level throw), and the tracked sweep ops report cap faces through a separate `capFaces` channel on the tracked result (`LastShape()` of the sweep; empty when it coincides with `FirstShape()`, e.g. a 360° revolve). Output: `packages/wasm/lib/chili-wasm.{wasm,js,d.ts}`. C++ style: WebKit (clang-format); license LGPL-3.0 (TS is AGPL-3.0).
+
+## Rust WASM (`rust/`)
+
+Pure-compute kernels with no OCCT dependency are written in Rust (the OCCT bindings stay C++: every `cpp/src` file is embind glue over OpenCASCADE, which has no Rust counterpart). `rust/` is a Cargo workspace: algorithms live in plain library crates under `rust/crates/` (tested natively, `npm run test:rust`), and `crates/chili-rs` is the only `cdylib` — thin `wasm-bindgen` bindings over them (numbers and typed arrays across the boundary, errors as `Result<_, JsError>`, no panics on bad input; `panic = "abort"`). `npm run build:rust` (one-time `npm run setup:rust`: the `wasm32-unknown-unknown` target and `wasm-bindgen-cli` pinned to the crate's exact version) writes `packages/rs/lib/chili_rs{.js,.d.ts,_bg.wasm}`, checked in like the OCCT module. `@chili3d/rs` loads it — `initRust()` in the browser (an asset via the glue's `new URL(…, import.meta.url)`; the builder awaits it in `useCam()`), `initRustSync(bytes)` under Node (rstest's `packages/rs/test-utils/setup.ts` does it for every test file) — after which kernels are called synchronously. Rust files carry the AGPL header like TS; `rustfmt` with `max_width = 110`.
 
 ## Key Patterns
 

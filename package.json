@@ -16,6 +16,9 @@
         "preview": "rspack preview",
         "release": "node scripts/release.mjs",
         "setup:wasm": "node scripts/setup_wasm_deps.mjs",
+        "build:rust": "node scripts/build-rust.mjs",
+        "setup:rust": "rustup target add wasm32-unknown-unknown && cargo install wasm-bindgen-cli --version 0.2.129 --locked",
+        "test:rust": "cargo test --manifest-path rust/Cargo.toml",
         "test": "rstest",
         "testc": "rstest --coverage"
     },

@@ -138,6 +138,10 @@ export class AppBuilder {
         this._inits.push(async () => {
             Logger.info("initializing cam");
 
+            // CAM kernels call the Rust module synchronously
+            const rs = await import("@chili3d/rs");
+            await rs.initRust();
+
             // registers the CAM Studio element and commands, the machine library and the posts;
             // plugins reach the registries (operations, posts, machines) through the global
             const cam = await import("@chili3d/cam");
