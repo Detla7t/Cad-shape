@@ -37,6 +37,8 @@ describe("parametricTools", () => {
             "boolean",
             "editFeature",
             "features",
+            "studio",
+            "featurescript",
         ]);
         expect(opsSchema().required).toEqual(["op"]);
         expect((runParametric().parameters as any).required).toEqual(["ops"]);
