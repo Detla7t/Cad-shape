@@ -1,0 +1,10 @@
+[package]
+name = "polygon"
+description = "2D polygon operations for CAM over i_overlay: booleans, offsets, open-path clipping and nesting, in millimetres."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+i_overlay = { version = "9.0.0", default-features = false }

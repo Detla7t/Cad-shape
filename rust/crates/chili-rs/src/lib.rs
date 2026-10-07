@@ -7,6 +7,8 @@
 
 use wasm_bindgen::prelude::*;
 
+mod polygon;
+
 /// The module's version (the workspace version), for a loaded-module check.
 #[wasm_bindgen]
 pub fn version() -> String {

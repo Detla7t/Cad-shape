@@ -52,3 +52,5 @@ export function rustVersion(): string {
     assertRustReady();
     return version();
 }
+
+export * from "./polygon";
