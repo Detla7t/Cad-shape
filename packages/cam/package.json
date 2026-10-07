@@ -5,7 +5,9 @@
     "main": "src/index.ts",
     "type": "module",
     "devDependencies": {
-        "@chili3d/core": "*"
+        "@chili3d/core": "*",
+        "@chili3d/parametric": "*",
+        "@chili3d/wasm": "*"
     },
     "dependencies": {
         "clipper2-js": "^1.2.4"

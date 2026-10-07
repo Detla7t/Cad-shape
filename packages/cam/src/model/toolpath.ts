@@ -44,8 +44,11 @@ export type ToolpathMove =
           readonly dwell?: number;
           readonly feed: number;
       }
-    /** Waterjet/plasma/laser beam on (after the pierce) and off. */
-    | { readonly kind: "cutterOn"; readonly pierceDelay?: number }
+    /**
+     * Waterjet/plasma/laser beam on (after the pierce) and off. `mode: "mark"` is a marking
+     * pass (plasma marking, laser etch, low-pressure waterjet): low power, no pierce.
+     */
+    | { readonly kind: "cutterOn"; readonly pierceDelay?: number; readonly mode?: "cut" | "mark" }
     | { readonly kind: "cutterOff" }
     /** Printer extrusion: a linear move that also feeds `extrude` mm of filament (relative). */
     | { readonly kind: "extrude"; readonly to: Vec3; readonly extrude: number; readonly feed: number }
