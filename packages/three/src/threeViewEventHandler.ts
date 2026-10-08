@@ -47,6 +47,9 @@ export class ThreeViewHandler implements IEventHandler {
             event.pointerType === "mouse" ||
             (event.pointerType === "pen" && Config.instance.preferences.mouse.penAsMouse)
         ) {
+            // Selection and sketch handlers invalidate when their visuals change. Merely moving
+            // the cursor over the viewport must not redraw the entire WebGL scene.
+            if (event.buttons !== MOUSE_MIDDLE && event.buttons !== MOUSE_RIGHT) return;
             this.handleMouseMove(view, event);
         } else {
             this.handleTouchMove(view, event);

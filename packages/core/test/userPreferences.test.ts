@@ -87,7 +87,9 @@ test.each([
     ["device", 3, 3],
     ["device", 8, 4],
     ["automatic", 3, 2],
-    ["automatic", 1, 1.5],
+    ["automatic", 1, 1],
+    ["automatic", 1.25, 1.25],
+    ["automatic", Number.NaN, 1],
 ] as const)("%s display density at %s gives %s", (mode, device, expected) => {
     expect(displayPixelRatio(mode, device)).toBe(expected);
 });

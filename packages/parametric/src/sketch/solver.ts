@@ -1049,6 +1049,30 @@ export class SketchSolver implements ExternalEntityHost {
         id: number,
     ): ConstraintParams {
         if (DATUM_CONSTRAINTS.has(constraint.kind)) return this.datumConstraintParams(constraint, id);
+        if (constraint.kind === ConstraintKind.EqualRadius) {
+            const [a, b] = constraint.refs;
+            const aArc = this.entityTypes.get(a.entityId) === "arc";
+            const bArc = this.entityTypes.get(b.entityId) === "arc";
+            const radiusPoints = (ref: SketchPointRef) =>
+                this.arcParams(ref, { entityId: ref.entityId, pointIndex: 1 });
+            if (aArc && bArc)
+                return {
+                    garlicKind: ConstraintKind.EqualArcRadius,
+                    params: [...radiusPoints(a), ...radiusPoints(b)],
+                };
+            if (aArc || bArc) {
+                // A mixed pair equates the arc's center/start distance to the circle's
+                // live radius parameter. It must stay variable, not become a fixed datum.
+                const [arc, circle] = aArc ? [a, b] : [b, a];
+                return {
+                    garlicKind: ConstraintKind.PointOnCircle,
+                    params: [
+                        ...this.arcParams({ entityId: arc.entityId, pointIndex: 1 }, arc),
+                        this.radiusParamId(circle.entityId),
+                    ],
+                };
+            }
+        }
         return { params: this.geometricConstraintParams(constraint) };
     }
 

@@ -113,6 +113,25 @@ describe("Document", () => {
     });
 
     describe("save", () => {
+        test.each([
+            true,
+            false,
+        ])("saving prefers a fitted model thumbnail when available: %s", async (fitted) => {
+            const view = createMockView({ document });
+            view.toThumbnail = () => (fitted ? "data:image/png;base64,fitted" : undefined);
+            view.toImage = () => "data:image/png;base64,viewport";
+            mockApp.views.push(view);
+            const writes: { table: string; value: unknown }[] = [];
+            mockApp.storage.put = async (_db, table, _id, value) => {
+                writes.push({ table, value });
+                return true;
+            };
+            await document.save();
+            expect(writes.find((write) => write.table === Constants.RecentTable)?.value).toMatchObject({
+                id: document.id,
+                image: fitted ? "data:image/png;base64,fitted" : "data:image/png;base64,viewport",
+            });
+        });
         test("saving a document without a view preserves its last thumbnail", async () => {
             mockApp.storage.get = async (_db, table) =>
                 table === Constants.RecentTable ? { image: "data:image/png;base64,saved" } : undefined;

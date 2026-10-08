@@ -80,7 +80,7 @@ function documentThumbnail(document: IDocument): Uint8Array | undefined {
             : document.application.views?.find((v) => v.document === document);
     if (view === undefined) return undefined;
     try {
-        return pngDataUrlBytes(view.toImage());
+        return pngDataUrlBytes(view.toThumbnail?.() ?? view.toImage());
     } catch (error) {
         Logger.warn("project: no thumbnail", error);
         return undefined;

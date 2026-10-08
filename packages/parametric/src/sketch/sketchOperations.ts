@@ -8,7 +8,10 @@ import {
     type SketchConstraintData,
     type SketchData,
     type SketchEntityData,
+    type SketchPointRef,
 } from "./sketchModel";
+
+import { tangentConstraintFor } from "./solverEntities";
 
 const TAU = Math.PI * 2,
     EPS = 1e-8;
@@ -255,6 +258,18 @@ export function trimOrSplit(
             continue;
         if (constraint.kind === ConstraintKind.P2PDistance && constraint.refs.every((r) => r.entityId === id))
             continue;
+        // Curve references include radius-defining points, not just physical endpoints.
+        // A surviving circle becomes an arc, so retain incidence/tangency with arc wiring.
+        const curveConstraint = retargetCurveConstraint(
+            data,
+            constraint,
+            id,
+            parts.map((p) => p.entity),
+        );
+        if (curveConstraint !== undefined) {
+            if (curveConstraint) data.constraints.push(curveConstraint);
+            continue;
+        }
         const refs = constraint.refs.map((r) => (r.entityId === id ? mapPoint(r.pointIndex) : r));
         if (refs.every((r) => r !== undefined))
             data.constraints.push({ ...structuredClone(constraint), refs });
@@ -289,6 +304,70 @@ export function trimOrSplit(
             });
     }
 }
+/** null means the referenced curve was removed; undefined means an ordinary point constraint. */
+function retargetCurveConstraint(
+    data: SketchData,
+    constraint: SketchConstraintData,
+    replaced: number,
+    parts: SketchEntityData[],
+): SketchConstraintData | null | undefined {
+    const entity = (id: number) =>
+        data.entities.find((e) => e.id === id) ?? data.externalRefs?.find((e) => e.entityId === id);
+    const center = (id: number): SketchPointRef => ({ entityId: id, pointIndex: 0 });
+    const start = (id: number): SketchPointRef => ({ entityId: id, pointIndex: 1 });
+    if (
+        [ConstraintKind.PointOnCircle, ConstraintKind.PointOnArc].includes(constraint.kind) &&
+        constraint.refs[1].entityId === replaced
+    ) {
+        const point = constraint.refs[0];
+        const source = entity(point.entityId);
+        const coords = source && ("params" in source ? source.params : source.snapshot);
+        const uv: UV | undefined = coords
+            ? [coords[point.pointIndex * 2], coords[point.pointIndex * 2 + 1]]
+            : undefined;
+        const part = uv
+            ? parts.find((p) => {
+                  const t = parameterAt(p, uv);
+                  return (
+                      (t >= -EPS && t <= 1 + EPS) ||
+                      distance(uv, pointAt(p, 0)) < EPS ||
+                      distance(uv, pointAt(p, 1)) < EPS
+                  );
+              })
+            : parts[0];
+        return part
+            ? {
+                  ...structuredClone(constraint),
+                  kind: ConstraintKind.PointOnArc,
+                  refs: [point, center(part.id), start(part.id)],
+              }
+            : null;
+    }
+    const first = constraint.refs[0].entityId;
+    const second =
+        constraint.kind === ConstraintKind.TangentLineCircle ||
+        constraint.kind === ConstraintKind.TangentLineArc
+            ? constraint.refs[2].entityId
+            : constraint.kind === ConstraintKind.TangentArcArc
+              ? constraint.refs[2].entityId
+              : constraint.refs[1]?.entityId;
+    if (
+        ![
+            ConstraintKind.TangentLineCircle,
+            ConstraintKind.TangentLineArc,
+            ConstraintKind.TangentCircleCircle,
+            ConstraintKind.TangentCircleArc,
+            ConstraintKind.TangentArcArc,
+        ].includes(constraint.kind)
+    )
+        return undefined;
+    if (!parts.length) return null;
+    const a = first === replaced ? parts[0].id : first;
+    const b = second === replaced ? parts[0].id : second;
+    const tangent = tangentConstraintFor(entity(a)?.type, a, entity(b)?.type, b);
+    return tangent ? { ...structuredClone(constraint), ...tangent } : null;
+}
+
 export function transformEntity(
     e: SketchEntityData,
     fn: (p: UV) => UV,

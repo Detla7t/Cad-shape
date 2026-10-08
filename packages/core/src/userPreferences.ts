@@ -161,11 +161,7 @@ export function mergeUserPreferences(value?: Partial<UserPreferences>): UserPref
 
 export function displayPixelRatio(mode: UserPreferences["pixelDensity"], deviceRatio: number): number {
     const ratio = Math.max(1, Number.isFinite(deviceRatio) ? deviceRatio : 1);
-    return mode === "standard"
-        ? 1
-        : mode === "device"
-          ? Math.min(4, ratio)
-          : Math.min(2, Math.max(1.5, ratio));
+    return mode === "standard" ? 1 : mode === "device" ? Math.min(4, ratio) : Math.min(2, ratio);
 }
 
 export function exportFileName(

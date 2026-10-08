@@ -1,0 +1,291 @@
+{
+    "purpose": "Construction diagnostics only. These measurements do not substitute for raw-byte equality.",
+    "specimens": [
+        {
+            "feature": "extrude",
+            "onshape": {
+                "area": 700.0000000000001,
+                "edges": 12,
+                "faces": 6,
+                "max": [20, 10, 5],
+                "min": [0, 0, 0],
+                "solids": 1,
+                "volume": 1000
+            },
+            "chili3d": {
+                "area": 699.9999999999999,
+                "edges": 12,
+                "faces": 6,
+                "max": [20, 10, 5],
+                "min": [0, 0, 0],
+                "solids": 1,
+                "volume": 999.9999999999997
+            },
+            "volumeDifferenceMm3": -3.410605131648481e-13
+        },
+        {
+            "feature": "revolve",
+            "onshape": {
+                "area": 3769.911184307752,
+                "edges": 4,
+                "faces": 4,
+                "max": [20, 20, 10],
+                "min": [-20, -20, 0],
+                "solids": 1,
+                "volume": 9424.77796076938
+            },
+            "chili3d": {
+                "area": 3769.9111843077517,
+                "edges": 4,
+                "faces": 4,
+                "max": [20, 20, 10],
+                "min": [-20, -20, 0],
+                "solids": 1,
+                "volume": 9424.777960769377
+            },
+            "volumeDifferenceMm3": -1.8189894035458565e-12
+        },
+        {
+            "feature": "fillet",
+            "onshape": {
+                "area": 1558.79644737231,
+                "edges": 24,
+                "faces": 10,
+                "max": [20.000000000000004, 20.000000000000004, 10],
+                "min": [0, 0, 0],
+                "solids": 1,
+                "volume": 3965.663706143592
+            },
+            "chili3d": {
+                "area": 1558.7964473723098,
+                "edges": 24,
+                "faces": 10,
+                "max": [20, 20, 10],
+                "min": [-4.440892098500626e-16, -4.440892098500626e-16, 0],
+                "solids": 1,
+                "volume": 3965.6637061435904
+            },
+            "volumeDifferenceMm3": -1.8189894035458565e-12
+        },
+        {
+            "feature": "chamfer",
+            "onshape": {
+                "area": 1537.1370849898476,
+                "edges": 24,
+                "faces": 10,
+                "max": [20, 20, 10],
+                "min": [0, 0, 0],
+                "solids": 1,
+                "volume": 3920
+            },
+            "chili3d": {
+                "area": 1537.1370849898476,
+                "edges": 24,
+                "faces": 10,
+                "max": [20, 20, 10],
+                "min": [0, 0, 0],
+                "solids": 1,
+                "volume": 3919.9999999999986
+            },
+            "volumeDifferenceMm3": -1.3642420526593924e-12
+        },
+        {
+            "feature": "shell",
+            "onshape": {
+                "area": 2248.0000000000005,
+                "edges": 24,
+                "faces": 11,
+                "max": [20, 20, 10],
+                "min": [0, 0, 0],
+                "solids": 1,
+                "volume": 1084.0000000000007
+            },
+            "chili3d": {
+                "area": 2248,
+                "edges": 24,
+                "faces": 11,
+                "max": [20, 20, 10],
+                "min": [0, 0, 0],
+                "solids": 1,
+                "volume": 1083.9999999999989
+            },
+            "volumeDifferenceMm3": -1.8189894035458565e-12
+        },
+        {
+            "feature": "mirror",
+            "onshape": {
+                "area": 1599.9999999999998,
+                "edges": 24,
+                "faces": 12,
+                "max": [20, 10, 10],
+                "min": [-20, 0, 0],
+                "solids": 2,
+                "volume": 2999.999999999999
+            },
+            "chili3d": {
+                "area": 1600,
+                "edges": 24,
+                "faces": 12,
+                "max": [20, 10, 10],
+                "min": [-20, 0, 0],
+                "solids": 2,
+                "volume": 2999.9999999999995
+            },
+            "volumeDifferenceMm3": 4.547473508864641e-13
+        },
+        {
+            "feature": "linearPattern",
+            "onshape": {
+                "area": 1800.0000000000007,
+                "edges": 36,
+                "faces": 18,
+                "max": [40, 10, 10],
+                "min": [0, 0, 0],
+                "solids": 3,
+                "volume": 3000.0000000000005
+            },
+            "chili3d": {
+                "area": 1799.9999999999998,
+                "edges": 36,
+                "faces": 18,
+                "max": [40, 10, 10],
+                "min": [0, 0, 0],
+                "solids": 3,
+                "volume": 2999.999999999999
+            },
+            "volumeDifferenceMm3": -1.3642420526593924e-12
+        },
+        {
+            "feature": "circularPattern",
+            "onshape": {
+                "area": 1600,
+                "edges": 48,
+                "faces": 24,
+                "max": [30, 30, 10],
+                "min": [-30, -30, 0],
+                "solids": 4,
+                "volume": 2000
+            },
+            "chili3d": {
+                "area": 1599.9999999999998,
+                "edges": 48,
+                "faces": 24,
+                "max": [30, 30, 10],
+                "min": [-30, -30, 0],
+                "solids": 4,
+                "volume": 1999.9999999999998
+            },
+            "volumeDifferenceMm3": -2.2737367544323206e-13
+        },
+        {
+            "feature": "booleanBodies",
+            "onshape": {
+                "area": 2599.999999999999,
+                "edges": 24,
+                "faces": 10,
+                "max": [30, 30, 10],
+                "min": [0, 0, 0],
+                "solids": 1,
+                "volume": 6999.999999999998
+            },
+            "chili3d": {
+                "area": 2600,
+                "edges": 24,
+                "faces": 10,
+                "max": [30, 30, 10],
+                "min": [0, 0, 0],
+                "solids": 1,
+                "volume": 7000
+            },
+            "volumeDifferenceMm3": 1.8189894035458565e-12
+        },
+        {
+            "feature": "loft",
+            "onshape": {
+                "area": 363.12167216582304,
+                "edges": 2,
+                "faces": 3,
+                "max": [5, 5, 12],
+                "min": [-5, -5, 0],
+                "solids": 1,
+                "volume": 490.0884539600077
+            },
+            "chili3d": {
+                "area": 363.12167216582304,
+                "edges": 2,
+                "faces": 3,
+                "max": [5.0000001, 5.0000001, 12.0000001],
+                "min": [-5.0000001, -5.0000001, -1.0000000000000001e-7],
+                "solids": 1,
+                "volume": 490.0884539600076
+            },
+            "volumeDifferenceMm3": -1.1368683772161603e-13
+        },
+        {
+            "feature": "sweep",
+            "onshape": {
+                "area": 659.7344572538567,
+                "edges": 4,
+                "faces": 4,
+                "max": [5, 5, 12],
+                "min": [-5, -5, 0],
+                "solids": 1,
+                "volume": 791.6813487046278
+            },
+            "chili3d": {
+                "area": 659.7344572538566,
+                "edges": 4,
+                "faces": 4,
+                "max": [5, 5, 12],
+                "min": [-5, -5, 0],
+                "solids": 1,
+                "volume": 791.6813487046278
+            },
+            "volumeDifferenceMm3": 0.0
+        },
+        {
+            "feature": "draft",
+            "onshape": {
+                "area": 1500.997503309169,
+                "edges": 12,
+                "faces": 6,
+                "max": [20, 20, 10],
+                "min": [0, 0, 0],
+                "solids": 1,
+                "volume": 3660.251034223708
+            },
+            "chili3d": {
+                "area": 1500.9975033091687,
+                "edges": 12,
+                "faces": 6,
+                "max": [20, 20, 10],
+                "min": [-2.7755575615628914e-17, -2.7755575615628914e-17, -1.1102230246251565e-16],
+                "solids": 1,
+                "volume": 3660.2510342237065
+            },
+            "volumeDifferenceMm3": -1.3642420526593924e-12
+        },
+        {
+            "feature": "thicken",
+            "onshape": {
+                "area": 520.0000000000001,
+                "edges": 12,
+                "faces": 6,
+                "max": [20, 10, 2],
+                "min": [0, 0, 0],
+                "solids": 1,
+                "volume": 400
+            },
+            "chili3d": {
+                "area": 520,
+                "edges": 12,
+                "faces": 6,
+                "max": [20, 10, 0],
+                "min": [0, 0, -2],
+                "solids": 1,
+                "volume": 399.99999999999983
+            },
+            "volumeDifferenceMm3": -1.7053025658242404e-13
+        }
+    ]
+}

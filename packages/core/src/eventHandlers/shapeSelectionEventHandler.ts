@@ -71,6 +71,7 @@ export abstract class ShapeSelectionHandler extends SelectionHandler {
     }
 
     protected highlightDetecteds(view: IView, detecteds: VisualShapeData[]) {
+        if (detecteds.length === 0 && !this._highlights?.length) return;
         this.cleanHighlights();
         detecteds.forEach((x) => {
             this.document.visual.highlighter.addState(

@@ -79,6 +79,25 @@ function setupNodeSelectionHandler(options: SetupOptions = {}) {
 }
 
 describe("NodeSelectionHandler", () => {
+    test("empty hover sleeps, but clearing a previous highlight redraws once", () => {
+        const { handler, view, removeCalls } = setupNodeSelectionHandler();
+        view.update = rs.fn();
+        const event = createPointerEvent({ buttons: 0 });
+        handler.pointerMove(view, event);
+        handler.pointerMove(view, event);
+        expect(view.update).not.toHaveBeenCalled();
+        const visual = createMockVisualObject();
+        view.detectVisual = () => [visual];
+        handler.pointerMove(view, event);
+        expect(view.update).toHaveBeenCalledTimes(1);
+        view.detectVisual = () => [];
+        handler.pointerMove(view, event);
+        handler.pointerMove(view, event);
+        expect(removeCalls).toHaveLength(1);
+        expect(removeCalls[0].shape).toBe(visual);
+        expect(view.update).toHaveBeenCalledTimes(2);
+    });
+
     describe("constructor", () => {
         test("should initialize with defaults", () => {
             const { handler } = setupNodeSelectionHandler();

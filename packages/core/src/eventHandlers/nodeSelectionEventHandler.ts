@@ -88,6 +88,7 @@ export class NodeSelectionHandler extends SelectionHandler {
     }
 
     private highlightDetecteds(view: IView, detecteds: IVisualObject[]) {
+        if (detecteds.length === 0 && !this._highlights?.length) return;
         this.cleanHighlights();
         detecteds.forEach((x) => {
             view.document.visual.highlighter.addState(x, this.highlighState, ShapeTypes.shape);

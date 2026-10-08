@@ -1,0 +1,66 @@
+{
+    "document": "https://cad.onshape.com/documents/bcf2b0f57a114bba79c81ac1/w/f824c55ae3e3a7f33d2eb028",
+    "featureStudioElement": "9a19ef4b07c7d73116a0ffed",
+    "sourceElementMicroversion": "fbc7730f95f3c5d6e8097f21",
+    "sourceSha256": "0c291a2371ad7bd4485f6cba6a2cc85eaadac53054526b180af69a8151e4fb69",
+    "libraryVersion": 3083,
+    "galleryElement": "1ce0bbac12cd0844361d26dd",
+    "galleryFeature": "FjT6plvrVrXUIly_0",
+    "drawingElement": "4f3b4a27c9a4818bd3f28ead",
+    "drawingFeature": "FOPxVmSevFe2jK9_0",
+    "galleryTranslation": "6ac81ae05e2bd90b32217293",
+    "galleryExternalData": "6ac81ae270549012ab2d3607",
+    "stepOptions": {
+        "stepVersionString": "AP214",
+        "stepUnit": "MILLIMETER",
+        "storeInDocument": false,
+        "grouping": true
+    },
+    "source": "../testing.fs",
+    "files": {
+        "gallery.step": {
+            "bytes": 153517,
+            "sha256": "04566de10a940c0809e116ef459b78b992af54fc42599cac9a5bad173b400739"
+        },
+        "drawing.dxf": {
+            "bytes": 12642,
+            "sha256": "0c71447fddbb90e28a445327012dde052169a4f3b5e6a1e09a16246599ea6eb3",
+            "capturedAt": "2026-10-08T22:59:55.135Z",
+            "sourceMicroversion": "0233c6fab854c80f75d3101b"
+        }
+    },
+    "uniqueSpecimenFeatures": [
+        "extrude",
+        "revolve",
+        "fillet",
+        "chamfer",
+        "shell",
+        "mirror",
+        "linearPattern",
+        "circularPattern",
+        "booleanBodies",
+        "loft",
+        "sweep",
+        "draft",
+        "thicken"
+    ],
+    "sharedFeatures": ["sketch", "transform", "deleteBodies"],
+    "notes": "Original export bytes are immutable references. No normalization, header replacement, rounding, or geometry substitution is used for equality.",
+    "drawingExportStatus": "Cached: completed, byte-preserved DXF R12 in millimetres",
+    "drawingOptions": {
+        "documentId": "bcf2b0f57a114bba79c81ac1",
+        "workspaceId": "f824c55ae3e3a7f33d2eb028",
+        "elementId": "4f3b4a27c9a4818bd3f28ead",
+        "format": "DXF",
+        "featureIds": "FOPxVmSevFe2jK9_0",
+        "flatten": true,
+        "includeSketches": true,
+        "version": "12",
+        "units": "millimeter",
+        "scale": 1,
+        "zipSingleFileOutput": false,
+        "storeInDocument": false,
+        "destinationName": "drawing",
+        "splinesAsPolylines": false
+    }
+}

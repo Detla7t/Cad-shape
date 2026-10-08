@@ -80,6 +80,25 @@ function setupSubshapeSelectionHandler(options: SetupOptions = {}) {
 }
 
 describe("SubshapeSelectionHandler", () => {
+    test("empty hover sleeps, but clearing a previous subshape highlight redraws once", () => {
+        const { handler, view, removeCalls } = setupSubshapeSelectionHandler();
+        view.update = rs.fn();
+        const event = createPointerEvent({ buttons: 0 });
+        handler.pointerMove(view, event);
+        handler.pointerMove(view, event);
+        expect(view.update).not.toHaveBeenCalled();
+        const data = createVisualShapeData();
+        view.detectShapes = () => [data];
+        handler.pointerMove(view, event);
+        expect(view.update).toHaveBeenCalledTimes(1);
+        view.detectShapes = () => [];
+        handler.pointerMove(view, event);
+        handler.pointerMove(view, event);
+        expect(removeCalls).toHaveLength(1);
+        expect(removeCalls[0].shape).toBe(data.owner);
+        expect(view.update).toHaveBeenCalledTimes(2);
+    });
+
     describe("constructor", () => {
         test("should initialize with defaults", () => {
             const { handler } = setupSubshapeSelectionHandler();

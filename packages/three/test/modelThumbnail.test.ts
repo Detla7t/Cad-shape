@@ -32,3 +32,20 @@ test.each([
     expect(source.toJSON()).toEqual(before);
     expect(camera).not.toBe(source);
 });
+
+test.each(["orthographic", "perspective"])("%s thumbnails preserve a circle's proportions", (kind) => {
+    const source =
+        kind === "orthographic"
+            ? new OrthographicCamera(-200, 200, 100, -100, 0.1, 5000)
+            : new PerspectiveCamera(45, 2, 0.1, 5000);
+    source.position.set(0, 0, 100);
+    source.lookAt(0, 0, 0);
+    source.updateMatrixWorld(true);
+    const camera = thumbnailCamera(source, new Box3(new Vector3(-20, -20, 0), new Vector3(20, 20, 0)), 1.6);
+    const left = new Vector3(-20, 0, 0).project(camera);
+    const right = new Vector3(20, 0, 0).project(camera);
+    const top = new Vector3(0, 20, 0).project(camera);
+    const bottom = new Vector3(0, -20, 0).project(camera);
+    // NDC must be scaled by the actual 320 x 200 target, not the source viewport.
+    expect((right.x - left.x) * 160).toBeCloseTo((top.y - bottom.y) * 100, 8);
+});

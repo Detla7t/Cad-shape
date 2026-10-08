@@ -109,6 +109,19 @@ export class ThreeView extends Observable implements IView {
     }
     private _dom?: HTMLElement;
     private _needsUpdate: boolean = false;
+    private frameRequest?: number;
+    private viewportVisible = true;
+    private readonly visibilityObserver?: IntersectionObserver;
+    private renderWidth = 0;
+    private renderHeight = 0;
+    private renderedFrames = 0;
+    private frameCpuMs = 0;
+    private readonly lightDirection = new Vector3();
+    private readonly cameraChanged = () => this.update();
+    private readonly visibilityChanged = () => {
+        if (globalThis.document.visibilityState === "hidden") this.cancelFrame();
+        else this.requestFrame();
+    };
     private _workplane: Plane;
     private _isolatedNodes?: INode[];
 
@@ -117,9 +130,11 @@ export class ThreeView extends Observable implements IView {
     private readonly effects = new ViewEffects(this);
     private readonly graphicsChanged = (key: keyof Config) => {
         if (key === "preferences") {
-            this._renderer.setPixelRatio(
-                displayPixelRatio(Config.instance.preferences.pixelDensity, window.devicePixelRatio),
+            const ratio = displayPixelRatio(
+                Config.instance.preferences.pixelDensity,
+                window.devicePixelRatio,
             );
+            if (this._renderer.getPixelRatio() !== ratio) this._renderer.setPixelRatio(ratio);
             this.update();
         }
         if (key === "graphics") {
@@ -164,6 +179,7 @@ export class ThreeView extends Observable implements IView {
     set mode(value: ViewMode) {
         this.setProperty("mode", value, () => {
             this.cameraController.setCameraLayer(this.camera, this.mode);
+            this.update();
         });
     }
 
@@ -188,10 +204,25 @@ export class ThreeView extends Observable implements IView {
         this.camera.layers.enableAll();
         this.document.application.views.push(this);
         Config.instance.onPropertyChanged(this.graphicsChanged);
-        this.animate();
+        this.cameraController.onPropertyChanged(this.cameraChanged);
+        globalThis.document.addEventListener("visibilitychange", this.visibilityChanged);
+        if (typeof IntersectionObserver !== "undefined") {
+            this.visibilityObserver = new IntersectionObserver((entries) => {
+                for (const entry of entries) {
+                    if (entry.target !== this._dom) continue;
+                    this.viewportVisible = entry.isIntersecting;
+                    if (this.viewportVisible) this.requestFrame();
+                    else this.cancelFrame();
+                }
+            });
+        }
     }
 
     override disposeInternal(): void {
+        this.cancelFrame();
+        this.visibilityObserver?.disconnect();
+        globalThis.document.removeEventListener("visibilitychange", this.visibilityChanged);
+        this.cameraController.removePropertyChanged(this.cameraChanged);
         Config.instance.removePropertyChanged(this.graphicsChanged);
         this.effects.dispose();
         this.display.dispose();
@@ -239,7 +270,7 @@ export class ThreeView extends Observable implements IView {
             antialias: true,
             alpha: true,
         });
-        // Supersample standard-density displays as well; cap the cost on high-DPI screens.
+        // Match display pixels rather than supersampling every standard-density screen.
         renderer.setPixelRatio(
             displayPixelRatio(Config.instance.preferences.pixelDensity, window.devicePixelRatio),
         );
@@ -259,8 +290,10 @@ export class ThreeView extends Observable implements IView {
     setDom(element: HTMLElement) {
         if (this._dom) {
             this._resizeObserver.unobserve(this._dom);
+            this.visibilityObserver?.unobserve(this._dom);
         }
         this._dom = element;
+        this.viewportVisible = true;
         this._gizmo.setDom(element);
 
         this._renderer.domElement.remove();
@@ -277,6 +310,7 @@ export class ThreeView extends Observable implements IView {
 
         this.resize(element.clientWidth, element.clientHeight);
         this._resizeObserver.observe(element);
+        this.visibilityObserver?.observe(element);
         this.cameraController.updateCameraPosionTarget();
     }
 
@@ -285,11 +319,13 @@ export class ThreeView extends Observable implements IView {
             options?.onDispose?.();
             this.labelScene.remove(cssObject);
             cssObject.element.remove();
+            this.update();
         };
         const cssObject = new CSS2DObject(this.htmlElement(text, dispose, options));
         cssObject.position.set(point.x, point.y, point.z);
         if (options?.center) cssObject.center.set(options.center.x, options.center.y);
         this.labelScene.add(cssObject);
+        this.update();
         return { dispose };
     }
 
@@ -330,6 +366,7 @@ export class ThreeView extends Observable implements IView {
     }
 
     private renderFrame() {
+        const start = performance.now();
         const reset = this._renderer.info.autoReset;
         this._renderer.info.autoReset = false;
         this._renderer.info.reset();
@@ -340,6 +377,8 @@ export class ThreeView extends Observable implements IView {
             });
         } finally {
             this._renderer.info.autoReset = reset;
+            this.renderedFrames++;
+            this.frameCpuMs = performance.now() - start;
         }
     }
 
@@ -366,6 +405,9 @@ export class ThreeView extends Observable implements IView {
             "Line segments": info.render.lines,
             "GPU geometries": info.memory.geometries,
             "GPU textures": info.memory.textures,
+            "Rendered frames": this.renderedFrames,
+            "Frame CPU submission (ms)": Number(this.frameCpuMs.toFixed(2)),
+            "Render pixel ratio": this.renderer.getPixelRatio(),
         };
     }
 
@@ -378,31 +420,55 @@ export class ThreeView extends Observable implements IView {
     }
 
     update() {
+        if (this._isClosed || this._isDisposed) return;
         this._needsUpdate = true;
+        this.requestFrame();
     }
 
-    private animate() {
-        // stop the loop when the view is closed — or disposed directly, so a
-        // dispose() that bypasses close() cannot leave the rAF loop running
-        if (this._isClosed || this._isDisposed) {
-            return;
-        }
-        requestAnimationFrame(() => {
-            this.animate();
-        });
-        if (!this._needsUpdate) return;
+    private canRender(): boolean {
+        return (
+            !this._isClosed &&
+            !this._isDisposed &&
+            this.viewportVisible &&
+            !!this._dom?.isConnected &&
+            globalThis.document.visibilityState !== "hidden" &&
+            this.renderWidth > 0 &&
+            this.renderHeight > 0
+        );
+    }
 
-        const dir = this.camera.position.clone().sub(this.cameraController.target);
-        this.dynamicLight.position.copy(dir);
+    private requestFrame() {
+        if (this._needsUpdate && this.frameRequest === undefined && this.canRender()) {
+            this.frameRequest = requestAnimationFrame(this.animate);
+        }
+    }
+
+    private cancelFrame() {
+        if (this.frameRequest !== undefined) cancelAnimationFrame(this.frameRequest);
+        this.frameRequest = undefined;
+    }
+
+    private readonly animate = () => {
+        this.frameRequest = undefined;
+        if (!this._needsUpdate || !this.canRender()) return;
+        // Clear before drawing: an invalidation during rendering must survive to the next frame.
+        this._needsUpdate = false;
+
+        this.lightDirection.copy(this.camera.position).sub(this.cameraController.target);
+        this.dynamicLight.position.copy(this.lightDirection);
         this.renderFrame();
         this._cssRenderer.render(this.labelScene, this.camera);
         this._gizmo?.update();
-
-        this._needsUpdate = false;
-    }
+    };
 
     resize(width: number, height: number) {
-        if (height < 0.00001) {
+        if (!Number.isFinite(width) || !Number.isFinite(height)) return;
+        if (this.renderWidth === width && this.renderHeight === height) return;
+        this.renderWidth = width;
+        this.renderHeight = height;
+        if (width <= 0 || height <= 0) {
+            this._needsUpdate = true;
+            this.cancelFrame();
             return;
         }
         if (this.camera instanceof PerspectiveCamera) {

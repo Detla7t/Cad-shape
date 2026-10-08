@@ -146,10 +146,12 @@ describe("ThreeViewHandler — pointerMove (mouse)", () => {
         cc.zoom = () => {
             gestureCalled = true;
         };
-        const view = createHandlerMockView({ cameraController: cc });
+        let redraws = 0;
+        const view = createHandlerMockView({ cameraController: cc, update: () => redraws++ });
 
         handler.pointerMove(view, createPointerEvent({ pointerType: "mouse", buttons: 0 }));
         expect(gestureCalled).toBe(false);
+        expect(redraws).toBe(0);
     });
 
     test("pointerMove with middle button but no prior pointerDown pans with zero delta", () => {

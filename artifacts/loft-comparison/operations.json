@@ -1,0 +1,112 @@
+{
+    "scenario": "Circle to square Loft",
+    "updated": "2026-10-08",
+    "onshape": {
+        "document": "Testing",
+        "partStudio": "Part Studio 2",
+        "url": "https://cad.onshape.com/documents/bcf2b0f57a114bba79c81ac1/w/f824c55ae3e3a7f33d2eb028/e/1132c38835feda5550a69620"
+    },
+    "operations": [
+        {
+            "step": 1,
+            "action": "Create an isolated Part Studio",
+            "onshape": "verified: bottom + > Create Part Studio",
+            "chili3d": "pending"
+        },
+        {
+            "step": 2,
+            "action": "Select Top plane and start Sketch",
+            "onshape": "verified: Top tree row > Sketch toolbar",
+            "chili3d": "pending"
+        },
+        {
+            "step": 3,
+            "action": "Orient camera normal to sketch plane",
+            "onshape": "verified: viewport context menu > View normal to sketch plane",
+            "chili3d": "pending"
+        },
+        {
+            "step": 4,
+            "action": "Draw center point circle at origin",
+            "onshape": "verified: C, origin click, radius click; center coincident with origin",
+            "chili3d": "pending"
+        },
+        {
+            "step": 5,
+            "action": "Dimension circle diameter to 40 mm",
+            "onshape": "verified: D, circumference click, label placement, 40 mm, Enter, Escape",
+            "chili3d": "pending"
+        },
+        {
+            "step": 6,
+            "action": "Confirm sketch",
+            "onshape": "verified: green check",
+            "chili3d": "pending"
+        },
+        {
+            "step": 7,
+            "action": "Create offset plane from Top by 50 mm",
+            "onshape": "verified: Top tree selection, Search tools > Plane, Offset, 50 mm, green check",
+            "chili3d": "pending"
+        },
+        {
+            "step": 8,
+            "action": "Start sketch on offset plane",
+            "onshape": "verified: Sketch > Plane 1 tree row; waiting for plane creation to finish was required before preselection",
+            "chili3d": "pending"
+        },
+        {
+            "step": 9,
+            "action": "Draw square profile using Corner rectangle",
+            "onshape": "verified: Search tools > Corner rectangle, diagonal corners; square drawn but exact side dimension not yet verified",
+            "chili3d": "pending"
+        },
+        {
+            "step": 10,
+            "action": "Confirm square sketch",
+            "onshape": "verified: sketch persisted when the shared tab reconnected",
+            "chili3d": "pending"
+        },
+        {
+            "step": 11,
+            "action": "Switch to isometric view and open Loft",
+            "onshape": "verified: new tab restored isometric view; Search tools > Loft",
+            "chili3d": "pending"
+        },
+        {
+            "step": 12,
+            "action": "Select circle region then square region",
+            "onshape": "verified: click Sketch 1 then Sketch 2 in feature tree; each expands to Face of Sketch 1/2",
+            "chili3d": "pending; source inspection shows legacy command accepts vertex/wire/edge and creates a frozen shape"
+        },
+        {
+            "step": 13,
+            "action": "Inspect solid preview, profile order, and matching",
+            "onshape": "verified: Solid and New are default; second sketch immediately produces a capped circle-to-square solid preview",
+            "chili3d": "pending"
+        },
+        {
+            "step": 14,
+            "action": "Confirm Loft and inspect feature history",
+            "onshape": "pending",
+            "chili3d": "pending"
+        },
+        {
+            "step": 15,
+            "action": "Edit Loft selections and parameters with rollback; cancel restores original",
+            "onshape": "pending",
+            "chili3d": "pending"
+        },
+        {
+            "step": 16,
+            "action": "Edit upstream profile/plane; verify Loft rebuilds",
+            "onshape": "pending",
+            "chili3d": "pending"
+        }
+    ],
+    "notes": [
+        "Native browser only for Onshape interaction; source inspection is not marked as UI verification.",
+        "All comparison steps must be run in Chili3D; unresolved steps stay pending or blocked.",
+        "An attempted rectangle dimension did not open an input; its value has not been changed or verified."
+    ]
+}

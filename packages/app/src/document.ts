@@ -124,7 +124,7 @@ export class Document extends Observable implements IDocument {
                 ? this.application.activeView
                 : this.application.views.find((item) => item.document === this);
         const image = view
-            ? view.toImage()
+            ? (view.toThumbnail?.() ?? view.toImage())
             : (await this.application.storage.get(Constants.DBName, Constants.RecentTable, this.id))?.image;
         const writes: StorageOperation[] = [
             { type: "put", table: Constants.DocumentTable, id: this.id, value: data },

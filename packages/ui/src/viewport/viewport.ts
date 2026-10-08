@@ -273,6 +273,8 @@ export class Viewport extends HTMLElement {
     }
 
     connectedCallback() {
+        // setDom runs before attachment; resume a dirty viewport when its tab becomes visible.
+        this.view.update();
         this.addEventListener("pointerdown", this.activate, true);
         this.addEventListener("wheel", this.activate, true);
         this.initEvent();

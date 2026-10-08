@@ -35,14 +35,14 @@ afterAll(() => {
     else Reflect.deleteProperty(globalThis, "shapeFactory");
 });
 
-function plain(value: FsValue): any {
+function plain(value: FsValue): unknown {
     if (value instanceof FsArray) return value.items.map(plain);
     if (value instanceof FsMap)
         return Object.fromEntries(value.pairs().map(([k, v]) => [String(k), plain(v)]));
     return value;
 }
 
-function run(body: string, inspect: (context: FsContext, result: any) => void) {
+function run<T>(body: string, inspect: (context: FsContext, result: T) => void) {
     const interpreter = createOnshapeInterpreter({ std: ONSHAPE_STD });
     const module = interpreter.load({
         path: "testing",
@@ -55,7 +55,7 @@ function run(body: string, inspect: (context: FsContext, result: any) => void) {
             .map(([id, status]) => ({ id, ...describeStatus(status) }))
             .filter((status) => status.kind === "ERROR");
         expect(errors).toEqual([]);
-        inspect(context, result);
+        inspect(context, result as T);
     } finally {
         context.dispose();
     }
@@ -78,16 +78,23 @@ const expectedVolumes = [
     400,
 ];
 
+interface Measurement {
+    volume: number;
+}
+
 test.each(
     expectedVolumes.map((volume, index) => ({ volume, index })),
 )("specimen $index has its analytical volume", ({ volume, index }) => {
-    run(`return buildSpecimen(context, makeId("specimen"), ${index});`, (_context, measurement) => {
-        expect(measurement.volume).toBeCloseTo(volume, 5);
-    });
+    run<Measurement>(
+        `return buildSpecimen(context, makeId("specimen"), ${index});`,
+        (_context, measurement) => {
+            expect(measurement.volume).toBeCloseTo(volume, 5);
+        },
+    );
 });
 
 test("13 sketch-based specimens produce 19 valid gallery solids and raw STEP", () => {
-    run('return buildGallery(context, makeId("testing"));', (context, measurements) => {
+    run<Measurement[]>('return buildGallery(context, makeId("testing"));', (context, measurements) => {
         expect(measurements).toHaveLength(13);
         measurements.forEach((measurement: { volume: number }, i: number) => {
             expect(measurement.volume, `specimen ${i}`).toBeCloseTo(expectedVolumes[i], 5);
@@ -114,6 +121,10 @@ test("13 sketch-based specimens produce 19 valid gallery solids and raw STEP", (
                     2,
                 )}\n`,
             );
+            const preview = new OccShapeConverter().convertToSTL(solids.map((body) => body.shape));
+            expect(preview.isOk).toBe(true);
+            if (!preview.isOk) throw new Error(preview.error);
+            writeFileSync(path.join(exportDirectory, "gallery.stl"), preview.value);
         }
     });
 });

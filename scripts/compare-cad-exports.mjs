@@ -33,6 +33,28 @@ export function compareBytes(reference, actual) {
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
     const directory = resolve(process.argv[2] ?? "artifacts/cad-parity-testing");
     const names = ["gallery.step", "drawing.dxf"];
+    const integrityErrors = [];
+    try {
+        const manifest = JSON.parse(readFileSync(resolve(directory, "onshape/manifest.json"), "utf8"));
+        const local = JSON.parse(readFileSync(resolve(directory, "chili3d/measurements.json"), "utf8"));
+        const source = readFileSync(resolve(directory, "onshape", manifest.source));
+        const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
+        if (manifest.sourceSha256 !== hash(source) || local.sourceSha256 !== hash(source))
+            integrityErrors.push("Source differs from the cached Onshape or Chili3D execution");
+        if (manifest.libraryVersion !== local.libraryVersion)
+            integrityErrors.push("FeatureScript standard library versions differ");
+        for (const name of names) {
+            const cached = manifest.files[name];
+            if (!cached) integrityErrors.push(`Missing Onshape cache provenance for ${name}`);
+            else {
+                const bytes = readFileSync(resolve(directory, "onshape", name));
+                if (bytes.length !== cached.bytes || hash(bytes) !== cached.sha256)
+                    integrityErrors.push(`Cached Onshape export was changed: ${name}`);
+            }
+        }
+    } catch (error) {
+        integrityErrors.push(`Cannot verify execution provenance: ${String(error)}`);
+    }
     const results = names.map((name) => {
         try {
             return {
@@ -48,7 +70,8 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     });
     const report = {
         requirement: "Byte-for-byte equality of raw CAD exports; no normalization or tolerances",
-        passed: results.every((result) => result.equal),
+        passed: integrityErrors.length === 0 && results.every((result) => result.equal),
+        integrityErrors,
         results,
     };
     writeFileSync(resolve(directory, "comparison.json"), `${JSON.stringify(report, null, 2)}\n`);

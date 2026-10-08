@@ -1,0 +1,186 @@
+{
+    "date": "2026-10-08",
+    "sourceHead": "d47116d56ef991e289dd4a70c13208ad002b636e",
+    "viewport": [1280, 720],
+    "comparison": "Production build before these changes versus production build with these changes, same Chrome SwiftShader backend. Automatic pixel-density behavior evaluated for 1x and 2x displays.",
+    "methodology": "Five warm-up frames, followed by 40 samples at 1x or 25 at 2x. Timed synchronous WebGL frame completion includes CPU submission, renderer/IPC, software rasterization, and a one-pixel readback. These are not pure hardware GPU timings or presented FPS.",
+    "fixture": "100 independent OCCT boxes in a 10x10 grid: origins (column*15, row*15, 0), width/depth 10 mm, height 8+(index%7)*2 mm. Default datum planes, solid-and-wireframe, ambient occlusion 37.5%, fit-content camera. Empty case has only default datum planes.",
+    "limitations": [
+        "The original RTX 3090 browser connection became unavailable; its initial GPU timings cannot be compared against these software-renderer timings.",
+        "No OS-level idle GPU-utilization percentage was measured. Before and after both submitted zero render passes at rest; the change removes idle animation callbacks and empty-space hover redraws.",
+        "120 FPS on a CPU/GPU five times slower is not verified. No hardware performance guarantee is inferred from these measurements.",
+        "Automatic standard-density mode now renders at native 1x rather than forced 1.5x supersampling, with MSAA retained. Ambient occlusion uses half-resolution targets; geometry and edge targets remain at the selected display resolution."
+    ],
+    "results": {
+        "empty": {
+            "before": {
+                "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+                "timing": "synchronous frame completion including CPU and pixel readback",
+                "viewport": [1280, 720],
+                "drawingBuffer": [1920, 1080],
+                "pixelRatio": 1.5,
+                "frameMs": {
+                    "samples": 40,
+                    "median": 146.39999997615814,
+                    "p95": 149.5
+                },
+                "cpuSubmissionMs": {
+                    "samples": 40,
+                    "median": 0.5,
+                    "p95": 0.8999999761581421
+                },
+                "disjoint": 0,
+                "drawCalls": 24,
+                "triangles": 39,
+                "aoBuffer": [1920, 1080]
+            },
+            "after": {
+                "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+                "timing": "synchronous frame completion including CPU and pixel readback",
+                "viewport": [1280, 720],
+                "drawingBuffer": [1280, 720],
+                "pixelRatio": 1,
+                "frameMs": {
+                    "samples": 40,
+                    "median": 3.9000000953674316,
+                    "p95": 4.5
+                },
+                "cpuSubmissionMs": {
+                    "samples": 40,
+                    "median": 0.3999999761581421,
+                    "p95": 0.5
+                },
+                "disjoint": 0,
+                "drawCalls": 15,
+                "triangles": 24,
+                "aoBuffer": null
+            }
+        },
+        "boxes": {
+            "before": {
+                "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+                "timing": "synchronous frame completion including CPU and pixel readback",
+                "viewport": [1280, 720],
+                "drawingBuffer": [1920, 1080],
+                "pixelRatio": 1.5,
+                "frameMs": {
+                    "samples": 40,
+                    "median": 160.39999997615814,
+                    "p95": 166.79999995231628
+                },
+                "cpuSubmissionMs": {
+                    "samples": 40,
+                    "median": 1.5,
+                    "p95": 1.9000000953674316
+                },
+                "disjoint": 0,
+                "drawCalls": 324,
+                "triangles": 9639,
+                "aoBuffer": [1920, 1080]
+            },
+            "after": {
+                "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+                "timing": "synchronous frame completion including CPU and pixel readback",
+                "viewport": [1280, 720],
+                "drawingBuffer": [1280, 720],
+                "pixelRatio": 1,
+                "frameMs": {
+                    "samples": 40,
+                    "median": 38,
+                    "p95": 41.60000002384186
+                },
+                "cpuSubmissionMs": {
+                    "samples": 40,
+                    "median": 1.5,
+                    "p95": 2.100000023841858
+                },
+                "disjoint": 0,
+                "drawCalls": 318,
+                "triangles": 9627,
+                "aoBuffer": [640, 360]
+            }
+        },
+        "hidpi": {
+            "before": {
+                "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+                "timing": "synchronous frame completion including CPU and pixel readback",
+                "viewport": [1280, 720],
+                "drawingBuffer": [2560, 1440],
+                "pixelRatio": 2,
+                "frameMs": {
+                    "samples": 25,
+                    "median": 226.10000002384186,
+                    "p95": 309.5
+                },
+                "cpuSubmissionMs": {
+                    "samples": 25,
+                    "median": 1.399999976158142,
+                    "p95": 2.100000023841858
+                },
+                "disjoint": 0,
+                "drawCalls": 324,
+                "triangles": 9639,
+                "aoBuffer": [2560, 1440]
+            },
+            "after": {
+                "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+                "timing": "synchronous frame completion including CPU and pixel readback",
+                "viewport": [1280, 720],
+                "drawingBuffer": [2560, 1440],
+                "pixelRatio": 2,
+                "frameMs": {
+                    "samples": 25,
+                    "median": 104.79999995231628,
+                    "p95": 124
+                },
+                "cpuSubmissionMs": {
+                    "samples": 25,
+                    "median": 1.399999976158142,
+                    "p95": 1.8000000715255737
+                },
+                "disjoint": 0,
+                "drawCalls": 318,
+                "triangles": 9627,
+                "aoBuffer": [1280, 720]
+            }
+        },
+        "idle": {
+            "before": {
+                "idle": {
+                    "durationMs": 3000,
+                    "callbacks": 179,
+                    "passes": 0
+                },
+                "emptyHover": {
+                    "events": 60,
+                    "callbacks": 115,
+                    "passes": 295
+                }
+            },
+            "after": {
+                "idle": {
+                    "durationMs": 3000,
+                    "callbacks": 0,
+                    "passes": 0
+                },
+                "emptyHover": {
+                    "events": 60,
+                    "callbacks": 0,
+                    "passes": 0
+                }
+            }
+        }
+    },
+    "speedup": {
+        "empty": 37.538460614413225,
+        "boxesAt1x": 4.22105263095153,
+        "boxesAt2x": 2.157442749300732
+    },
+    "validation": {
+        "focusedTests": 590,
+        "failedTests": 0,
+        "typecheck": "passed (ts-rust)",
+        "productionBuild": "passed; 207 offline assets verified",
+        "browser": "Camera pan, wireframe/solid switching, visible geometry, real pointer hover and selecting GPU fixture 34 verified."
+    }
+}
