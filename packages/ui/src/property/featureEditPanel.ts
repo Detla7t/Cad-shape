@@ -7,8 +7,9 @@ import {
     type IFeatureEditSession,
     type IFeatureListNode,
     type INode,
+    Transaction,
 } from "@chili3d/core";
-import { createCadIcon } from "@chili3d/element";
+import { createCadIcon, createEditableTitle } from "@chili3d/element";
 import { showFloatPanel } from "../floatPanel";
 import { FeatureListProperty } from "./featureListProperty";
 import style from "./featureListProperty.module.css";
@@ -20,9 +21,14 @@ export function showFeatureEditPanel(
 ): void {
     const content = document.createElement("section");
     content.setAttribute("aria-label", "Edit feature");
-    const feature = node.featureItems().find((item) => item.id === session.featureId);
-    const title = document.createElement("strong");
-    title.textContent = feature?.name ?? (feature ? I18n.translate(feature.display) : "Edit feature");
+    const title = createEditableTitle(
+        () => {
+            const feature = node.featureItems().find((item) => item.id === session.featureId);
+            return feature?.name ?? (feature ? I18n.translate(feature.display) : "Edit feature");
+        },
+        (name) =>
+            Transaction.execute(model, "Rename feature", () => node.renameFeature?.(session.featureId, name)),
+    );
     const hint = document.createElement("p");
     hint.className = style.editHint;
     hint.textContent = "Later features are rolled back while editing. Apply rebuilds the remaining history.";
@@ -54,7 +60,7 @@ export function showFeatureEditPanel(
             void session.cancel();
         }
     });
-    content.append(title, new FeatureListProperty(model, node, session.featureId), hint, error);
+    content.append(title.element, new FeatureListProperty(model, node, session.featureId), hint, error);
     const panel = showFloatPanel({
         title: "properties.header",
         document: model,

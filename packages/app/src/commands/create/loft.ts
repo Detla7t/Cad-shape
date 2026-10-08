@@ -86,8 +86,19 @@ export class LoftCommand extends CancelableCommand {
 
     @property("common.confirm")
     readonly confirm = () => {
+        if (!this.validResult()) return;
         this.controller?.success();
     };
+
+    private validResult(): boolean {
+        if (this.shapes.length >= 2 && this.shape.isOk) return true;
+        PubSub.default.pub(
+            "showToast",
+            "error.default:{0}",
+            this.shapes.length < 2 ? "Select at least two loft sections." : this.shape.error,
+        );
+        return false;
+    }
 
     protected override async executeAsync(): Promise<void> {
         try {
@@ -114,6 +125,9 @@ export class LoftCommand extends CancelableCommand {
 
     /** Adds the lofted node and drops the picked sections, as one undo step. */
     private commitLoft(): void {
+        // Enter can finish the selection independently of the panel's Confirm button.
+        // A failed preview must never create an error node or consume its source sketches.
+        if (!this.validResult()) return;
         Transaction.execute(this.document, "loft", () => {
             this.document.modelManager.addNode(
                 new EditableShapeNode({ document: this.document, name: "loft", shape: this.shape }),

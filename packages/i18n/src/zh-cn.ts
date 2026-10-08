@@ -145,6 +145,7 @@ export default {
         "body.multiShape": "多形状",
         "body.parametricBody": "参数化实体",
         "body.point": "点",
+        "body.origin": "原点",
         "body.polygon": "多段线",
         "body.regularPolygon": "正多边形",
         "body.pipe": "管状体",

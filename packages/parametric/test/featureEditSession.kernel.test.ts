@@ -268,3 +268,25 @@ test("a reselected Revolve axis stays in the draft until Apply and rebuilds from
     doc.history.undo();
     expect(revolved.shape.value.volume()).toBeCloseTo(12000 * Math.PI, 5);
 });
+
+test("renaming in a feature edit is a draft: cancel restores, apply records one undoable change", async () => {
+    const { doc, body } = chain();
+    const original = body.featuresJson;
+    const undo = doc.history.undoCount();
+    const edit = await body.beginFeatureEdit("f");
+    expect(edit.isOk).toBe(true);
+    body.renameFeature("f", "Edge round");
+    expect(body.featureItems().find((f) => f.id === "f")?.name).toBe("Edge round");
+    expect(body.featuresJson).toBe(original);
+    await edit.value.cancel();
+    expect(body.featuresJson).toBe(original);
+    expect(doc.history.undoCount()).toBe(undo);
+    const again = await body.beginFeatureEdit("f");
+    expect(again.isOk).toBe(true);
+    body.renameFeature("f", "Edge round");
+    expect((await again.value.apply()).isOk).toBe(true);
+    expect(body.features.find((f) => f.id === "f")?.name).toBe("Edge round");
+    expect(doc.history.undoCount()).toBe(undo + 1);
+    doc.history.undo();
+    expect(body.featuresJson).toBe(original);
+});

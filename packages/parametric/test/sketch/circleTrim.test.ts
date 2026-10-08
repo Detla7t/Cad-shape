@@ -18,7 +18,10 @@ function dimensionedCircle() {
     return { solver, circle, radius };
 }
 
-test("trim a dimensioned circle with snapped diameter endpoints and keep those attachments editable", () => {
+test.each([
+    false,
+    true,
+])("trim an attached horizontal chord (fixed height: %s) without adding freedom", (fixedHeight) => {
     const { solver, circle, radius } = dimensionedCircle();
     try {
         const line = solver.addLine(-10, 0, 10, 0);
@@ -28,7 +31,14 @@ test("trim a dimensioned circle with snapped diameter endpoints and keep those a
                 kind: ConstraintKind.PointOnCircle,
                 refs: [ref(line, pointIndex), ref(circle)],
             });
+        if (fixedHeight)
+            solver.addConstraint({
+                kind: ConstraintKind.PointOnLine,
+                refs: [originRef(), ref(line), ref(line, 1)],
+            });
         expect(solver.solve(true).result).toMatch(/^Ok/);
+        const freedomBeforeTrim = solver.dofs();
+        expect(freedomBeforeTrim).toBe(fixedHeight ? 0 : 1);
         const before = solver.toData();
         const data = structuredClone(before);
         const preview = trimPreview(data, circle, [0, 10])!;
@@ -37,6 +47,7 @@ test("trim a dimensioned circle with snapped diameter endpoints and keep those a
         trimOrSplit(data, circle, [0, 10], "trim");
         solver.reset(data);
         expect(solver.solve(true).result).toMatch(/^Ok/);
+        expect(solver.dofs()).toBe(freedomBeforeTrim);
         expect(solver.entity(circle)!.type).toBe("arc");
         expect(solver.entity(circle)!.params[2]).toBeCloseTo(-10);
         expect(solver.entity(circle)!.params[4]).toBeCloseTo(10);
@@ -50,12 +61,43 @@ test("trim a dimensioned circle with snapped diameter endpoints and keep those a
         expect(solver.pointOf(ref(circle))[1]).toBeCloseTo(0);
         for (const pointIndex of [0, 1])
             expect(Math.hypot(...solver.pointOf(ref(line, pointIndex)))).toBeCloseTo(15, 5);
+        for (const [a, b] of [
+            [0, 1],
+            [1, 2],
+        ]) {
+            const point = solver.pointOf(ref(line, a));
+            const endpoint = solver.pointOf(ref(circle, b));
+            expect(point[0]).toBeCloseTo(endpoint[0], 5);
+            expect(point[1]).toBeCloseTo(endpoint[1], 5);
+        }
+        expect(solver.dofs()).toBe(freedomBeforeTrim);
         const saved = solver.toData();
         solver.reset(saved);
         expect(solver.solve(true).result).toMatch(/^Ok/);
         solver.reset(before);
         expect(solver.entity(circle)!.type).toBe("circle");
         expect(solver.toData()).toEqual(before);
+    } finally {
+        solver.dispose();
+    }
+});
+
+test("an interior point attachment stays free to slide along a trimmed arc", () => {
+    const { solver, circle } = dimensionedCircle();
+    try {
+        solver.addLine(-20, 0, 20, 0);
+        const point = solver.addEntity("point", [0, -10]);
+        const attachment = solver.addConstraint({
+            kind: ConstraintKind.PointOnCircle,
+            refs: [ref(point), ref(circle)],
+        });
+        const data = solver.toData();
+        trimOrSplit(data, circle, [0, 10], "trim");
+        const retained = data.constraints.find((c) => c.id === attachment)!;
+        expect(retained.kind).toBe(ConstraintKind.PointOnArc);
+        expect(retained.refs).toEqual([ref(point), ref(circle), ref(circle, 1)]);
+        solver.reset(data);
+        expect(solver.solve(true).result).toMatch(/^Ok/);
     } finally {
         solver.dispose();
     }

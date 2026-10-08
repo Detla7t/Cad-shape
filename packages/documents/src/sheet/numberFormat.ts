@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { generalNumberText } from "./formula";
+import { generalNumberText } from "./generalNumber";
 import type { CellValue } from "./model";
 
 /**
@@ -20,6 +20,9 @@ export const COMMON_NUMBER_FORMATS: readonly string[] = [
     "#,##0.00",
     "0%",
     "0.00%",
+    '"$"#,##0.00',
+    '"€"#,##0.00',
+    '"£"#,##0.00',
     "0.00E+00",
     "yyyy-mm-dd",
     "hh:mm:ss",

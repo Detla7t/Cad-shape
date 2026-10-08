@@ -11,6 +11,7 @@ import {
     type IVisualGeometry,
     type Matrix4,
     MeshUtils,
+    OriginNode,
     type ShapeMeshRange,
     ShapeNode,
     type ShapeType,
@@ -36,6 +37,7 @@ import {
     edgeMaterialOfWidth,
     lockFaceMaterial,
     lockLineMaterial,
+    originVertexMaterial,
 } from "./materials";
 import { ThreeGeometryFactory, TopRenderOrder } from "./threeGeometryFactory";
 import { ThreeHelper } from "./threeHelper";
@@ -45,6 +47,9 @@ import { ThreeVisualObject } from "./threeVisualObject";
 const OnTopMaterialKey = "onTopMaterial";
 
 export class ThreeGeometry extends ThreeVisualObject implements IVisualGeometry {
+    private get vertexMaterial() {
+        return this.geometryNode instanceof OriginNode ? originVertexMaterial : defaultVertexMaterial;
+    }
     private _faceMaterial: Material | Material[];
     private _edgeMaterial: LineMaterial = defaultEdgeMaterial;
     private _edges?: LineSegments2;
@@ -81,7 +86,7 @@ export class ThreeGeometry extends ThreeVisualObject implements IVisualGeometry 
     setRenderOnTop(value: boolean): void {
         if (this._renderOnTop === value) return;
         this._renderOnTop = value;
-        if (this._vertexs) this.applyOnTopMaterial(this._vertexs, defaultVertexMaterial);
+        if (this._vertexs) this.applyOnTopMaterial(this._vertexs, this.vertexMaterial);
         if (this._edges) this.applyOnTopMaterial(this._edges, this._edgeMaterial);
         if (this._faces) this.applyOnTopMaterial(this._faces, this._faceMaterial);
     }
@@ -188,9 +193,10 @@ export class ThreeGeometry extends ThreeVisualObject implements IVisualGeometry 
 
     private initVertexs(data: VertexMeshData) {
         const buff = ThreeGeometryFactory.createVertexBufferGeometry(data);
-        this._vertexs = new Points(buff, defaultVertexMaterial);
+        this._vertexs = new Points(buff, this.vertexMaterial);
         this._vertexs.layers.set(Constants.Layers.Wireframe);
-        if (this._renderOnTop) this.applyOnTopMaterial(this._vertexs, defaultVertexMaterial);
+        if (this.geometryNode instanceof OriginNode) this._vertexs.layers.enable(Constants.Layers.Solid);
+        if (this._renderOnTop) this.applyOnTopMaterial(this._vertexs, this.vertexMaterial);
         this.add(this._vertexs);
     }
 
@@ -230,14 +236,14 @@ export class ThreeGeometry extends ThreeVisualObject implements IVisualGeometry 
     }
 
     removeTemperaryMaterial(): void {
-        if (this._vertexs) this._vertexs.material = defaultVertexMaterial;
+        if (this._vertexs) this._vertexs.material = this.vertexMaterial;
         if (this._edges && this._edges.material !== lockLineMaterial)
             this._edges.material = this._edgeMaterial;
         if (this._faces && this._faces.material !== lockFaceMaterial)
             this._faces.material = this._faceMaterial;
         // restore the on-top state the temporary material replaced
         if (this._renderOnTop) {
-            if (this._vertexs) this.applyOnTopMaterial(this._vertexs, defaultVertexMaterial);
+            if (this._vertexs) this.applyOnTopMaterial(this._vertexs, this.vertexMaterial);
             if (this._edges && this._edges.material !== lockLineMaterial)
                 this.applyOnTopMaterial(this._edges, this._edgeMaterial);
             if (this._faces && this._faces.material !== lockFaceMaterial)

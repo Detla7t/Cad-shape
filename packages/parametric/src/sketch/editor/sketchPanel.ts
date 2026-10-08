@@ -1,7 +1,8 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { createCadIcon } from "@chili3d/element";
+import { Transaction } from "@chili3d/core";
+import { createCadIcon, createEditableTitle } from "@chili3d/element";
 import type { SketchLayer } from "../sketchModel";
 import type { SolveOutcome } from "../solver";
 import { showSketchDiagnostics } from "./sketchDiagnostics";
@@ -17,7 +18,7 @@ function element<K extends keyof HTMLElementTagNameMap>(tag: K, text?: string): 
 /** Persistent sketch status and drawing styles, independent of transient command prompts. */
 export class SketchPanel {
     private readonly root = element("section");
-    private readonly title = element("strong");
+    private readonly title: ReturnType<typeof createEditableTitle>;
     private readonly status = element("div");
     private readonly detail = element("div");
     private readonly selection = element("span");
@@ -33,6 +34,14 @@ export class SketchPanel {
         this.root.addEventListener("pointerdown", (event) => event.stopPropagation());
         this.root.addEventListener("pointermove", (event) => event.stopPropagation());
         this.root.addEventListener("keydown", (event) => event.stopPropagation());
+        this.title = createEditableTitle(
+            () => this.editor.node.name || "Sketch",
+            (name) => {
+                Transaction.execute(this.editor.node.document, "Rename sketch", () => {
+                    this.editor.node.name = name;
+                });
+            },
+        );
         const header = element("header");
         const finish = this.action("Finish sketch", () => this.editor.exit());
         finish.className = style.finish;
@@ -44,7 +53,7 @@ export class SketchPanel {
         cancel.title = "Cancel sketch edits";
         cancel.setAttribute("aria-label", "Cancel sketch");
         cancel.replaceChildren(createCadIcon("close"));
-        header.append(this.title, finish, cancel);
+        header.append(this.title.element, finish, cancel);
         const plane = element("div");
         plane.className = style.plane;
         const normal = this.editor.node.plane.normal;
@@ -196,7 +205,7 @@ export class SketchPanel {
     }
 
     refresh(outcome: SolveOutcome): void {
-        this.title.textContent = this.editor.node.name || "Sketch";
+        this.title.refresh();
         const ok = outcome.result.startsWith("Ok") && this.editor.solver.datumErrors.size === 0;
         const count = this.editor.solver.entities().length;
         this.status.dataset["state"] = ok ? (outcome.dofs === 0 ? "solved" : "under") : "error";

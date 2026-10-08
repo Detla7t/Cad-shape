@@ -1,8 +1,8 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { Continuities, PubSub, ShapeTypes } from "@chili3d/core";
-import { afterAll, beforeAll, describe, expect, test } from "@rstest/core";
+import { Continuities, EditableShapeNode, PubSub, Result, ShapeTypes } from "@chili3d/core";
+import { afterAll, beforeAll, describe, expect, rs, test } from "@rstest/core";
 import { LoftCommand } from "../../../src/commands/create/loft";
 import { ensureGlobalStubApp, mockShape, wireCommand } from "../commandTestUtils";
 
@@ -66,6 +66,8 @@ describe("LoftCommand", () => {
     describe("confirm", () => {
         test("should succeed the controller when one is present", () => {
             const cmd = new LoftCommand() as any;
+            cmd.shapes.push(mockShape(), mockShape());
+            cmd.shape = Result.ok(mockShape());
             const calls: string[] = [];
             cmd.controller = {
                 success: () => {
@@ -74,6 +76,32 @@ describe("LoftCommand", () => {
             };
             cmd.confirm();
             expect(calls).toEqual(["success"]);
+        });
+
+        test.each([
+            1, 2,
+        ])("rejects confirmation of %i sections without a valid loft and preserves sources", (count) => {
+            const cmd = new LoftCommand() as any;
+            const { doc, addedNodes } = wireCommand(cmd);
+            const section = mockShape({ shapeType: ShapeTypes.edge });
+            const source = new EditableShapeNode({
+                document: doc,
+                name: "Circle sketch",
+                shape: Result.ok(section),
+            });
+            const remove = rs.fn();
+            Object.defineProperty(source, "parent", { value: { remove } });
+            cmd.selectedDatas.push({ shapes: [{ shape: section, owner: { node: source } }] });
+            cmd.shapes.push(...Array.from({ length: count }, () => section));
+            cmd.shape = Result.err("Failed to loft");
+            const success = rs.fn();
+            cmd.controller = { success };
+            cmd.confirm();
+            expect(success).not.toHaveBeenCalled();
+            // The selection picker can also finish through Enter, bypassing confirm().
+            cmd.commitLoft();
+            expect(addedNodes).toEqual([]);
+            expect(remove).not.toHaveBeenCalled();
         });
     });
 
@@ -164,7 +192,7 @@ describe("LoftCommand", () => {
             const cmd = new LoftCommand() as any;
             const { doc, addedNodes } = wireCommand(cmd);
             // Loft's selectSection uses document.picker.pickShape(prompt, controller, opts).
-            // Wire it to succeed with one shape the first call, then break with an empty list.
+            // A valid loft needs two section picks before confirming.
             const pickedShape = {
                 shape: mockShape({ shapeType: ShapeTypes.wire }),
                 owner: { node: { worldTransform: () => identityLikeMatrix() } },
@@ -173,8 +201,7 @@ describe("LoftCommand", () => {
             (doc.picker as any).pickShape = async (_prompt: unknown, controller: any) => {
                 pickCall += 1;
                 controller.success();
-                // First pick returns a shape; second returns empty to terminate the loop.
-                return pickCall === 1 ? [pickedShape] : [];
+                return pickCall <= 2 ? [pickedShape] : [];
             };
             // selectSection reads document.application.activeView; wire a minimal app.
             (doc as any).application = { activeView: (cmd as any)._application.activeView };
@@ -184,7 +211,7 @@ describe("LoftCommand", () => {
             await cmd.executeAsync();
 
             // The selected shape should have been collected.
-            expect(cmd.shapes).toHaveLength(1);
+            expect(cmd.shapes).toHaveLength(2);
             // A loft node should have been added to the document.
             expect(addedNodes).toHaveLength(1);
         });

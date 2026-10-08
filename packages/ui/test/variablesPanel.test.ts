@@ -3,9 +3,11 @@
 
 import {
     type FloatPanelOptions,
+    I18n,
     PubSub,
     setDocumentUnits,
     type VariableData,
+    VariableStudioNode,
     type VariableType,
 } from "@chili3d/core";
 import { TestDocument } from "@chili3d/core/test-utils";
@@ -18,6 +20,7 @@ import "./_helpers/mockElement";
 
 rs.mock("../src/property/variables/variablesEditor.module.css", () => ({
     root: "v-root",
+    sectionToggle: "v-section-toggle",
     table: "v-table",
     toolbar: "v-toolbar",
     addButton: "v-add-button",
@@ -43,6 +46,7 @@ rs.mock("../src/property/variables/variablesEditor.module.css", () => ({
 
 import { VariablesEditor } from "../src/property/variables/variablesEditor";
 import { showVariablesPanel } from "../src/property/variables/variablesPanel";
+import { VariableTablePanel } from "../src/sidebar/variableTablePanel";
 
 function variable(id: string, name: string, expression: string, type: VariableType = "length"): VariableData {
     return { id, name, expression, type };
@@ -55,6 +59,54 @@ function documentWith(items: VariableData[]): TestDocument {
     document.history.disabled = false;
     return document;
 }
+
+test("variable table sections fold independently, preserve draft cells and track studio names", () => {
+    const doc = documentWith([variable("w", "width", "10")]);
+    const studio = new VariableStudioNode({ document: doc, name: "Stock" });
+    studio.setItems([variable("t", "thickness", "2")]);
+    doc.modelManager.addNode(studio);
+    const panel = new VariableTablePanel(doc);
+    window.document.body.append(panel.element);
+    try {
+        const sections = panel.element.querySelectorAll<HTMLButtonElement>(".v-section-toggle");
+        expect(sections).toHaveLength(2);
+        expect(sections[0].textContent).toContain(I18n.translate("elements.partStudio{0}", 1));
+        expect(sections[1].textContent).toContain("Stock");
+        const tables = panel.element.querySelectorAll<HTMLElement>(".v-table");
+        expect(tables).toHaveLength(2);
+        const draft = mustQuery<HTMLInputElement>(tables[0], ".v-value");
+        draft.value = "width *";
+        sections[0].click();
+        expect(sections[0].getAttribute("aria-expanded")).toBe("false");
+        expect(tables[0].hidden).toBe(true);
+        expect(tables[1].hidden).toBe(false);
+        sections[0].click();
+        expect(tables[0].hidden).toBe(false);
+        expect(mustQuery<HTMLInputElement>(tables[0], ".v-value")).toBe(draft);
+        expect(draft.value).toBe("width *");
+        draft.focus();
+        studio.name = "Material";
+        expect(sections[1].textContent).toContain("Material");
+        sections[1].click();
+        doc.modelManager.addNode(new VariableStudioNode({ document: doc, name: "Dimensions" }));
+        expect(panel.element.querySelectorAll(".v-section-toggle")).toHaveLength(3);
+        expect(panel.element.querySelector(".v-value")).toBe(draft);
+        expect(draft.value).toBe("width *");
+        expect(tables[1].hidden).toBe(true);
+    } finally {
+        panel.dispose();
+        panel.element.remove();
+    }
+    const reopened = new VariableTablePanel(doc);
+    try {
+        const tables = reopened.element.querySelectorAll<HTMLElement>(".v-table");
+        expect(tables[0].hidden).toBe(false);
+        expect(tables[1].hidden).toBe(true);
+        expect(doc.variables.items[0].expression).toBe("10");
+    } finally {
+        reopened.dispose();
+    }
+});
 
 describe("showVariablesPanel", () => {
     const opened: FloatPanelOptions[] = [];

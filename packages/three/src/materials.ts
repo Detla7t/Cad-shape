@@ -13,6 +13,12 @@ export const defaultVertexMaterial = new RoundPointsMaterial({
     size: 3,
 });
 
+export const originVertexMaterial = new RoundPointsMaterial({
+    color: ThreeHelper.fromColor(VisualConfig.defaultEdgeColor),
+    sizeAttenuation: false,
+    size: 7,
+});
+
 export const highlightVertexMaterial = new RoundPointsMaterial({
     color: ThreeHelper.fromColor(VisualConfig.highlightEdgeColor),
     sizeAttenuation: false,
@@ -69,6 +75,7 @@ VisualConfig.onPropertyChanged((property: keyof VisualItemConfig) => {
     if (property === "defaultEdgeColor") {
         defaultEdgeMaterial.color.set(VisualConfig.defaultEdgeColor);
         defaultVertexMaterial.color.set(VisualConfig.defaultEdgeColor);
+        originVertexMaterial.color.set(VisualConfig.defaultEdgeColor);
         edgeMaterialsByWidth.forEach((material) => material.color.set(VisualConfig.defaultEdgeColor));
     }
 });

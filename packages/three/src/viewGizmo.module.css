@@ -20,22 +20,16 @@
     cursor: pointer;
     outline: none;
 
-    polygon {
-        fill: var(--panel-background-color, #fff);
-        stroke: color-mix(in srgb, var(--foreground-color, #39434d) 16%, #dbe7f3);
-        stroke-width: 0.8px;
-        stroke-linejoin: round;
+    &[data-kind="edge"] .surface,
+    &[data-kind="corner"] .surface {
+        fill: color-mix(in srgb, var(--panel-background-color, #fff) 94%, #dce7f2);
+        stroke-width: 0.7px;
     }
 
-    &[data-kind="edge"] polygon,
-    &[data-kind="corner"] polygon {
-        fill: color-mix(in srgb, var(--panel-background-color, #fff) 78%, #adc5dd);
-    }
-
-    &:hover polygon,
-    &:focus-visible polygon {
-        fill: #c4dff6;
-        stroke: #65a4d5;
+    &:hover .surface,
+    &:focus-visible .surface {
+        fill: #b5dcef;
+        stroke: #91c4de;
     }
 
     &:hover text,
@@ -52,6 +46,19 @@
     }
 }
 
+.hitTarget {
+    fill: transparent;
+    stroke: none;
+}
+
+.surface {
+    fill: color-mix(in srgb, var(--panel-background-color, #fff) 96%, #e6edf4);
+    stroke: color-mix(in srgb, var(--panel-background-color, #fff) 50%, #d6e1eb);
+    stroke-width: 1.4px;
+    stroke-linejoin: round;
+    pointer-events: none;
+}
+
 .control {
     cursor: pointer;
     outline: none;
@@ -66,6 +73,7 @@
 .axes {
     pointer-events: none;
     stroke-width: 1.3px;
+    stroke-linecap: round;
 
     text {
         font:

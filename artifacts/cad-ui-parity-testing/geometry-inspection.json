@@ -1,0 +1,158 @@
+{
+    "method": "Read-only inspection of the unchanged UI-exported STEP files using the repository OCCT WASM reader; separate from raw-byte verdict.",
+    "units": "mm",
+    "onshape": {
+        "solids": [
+            {
+                "name": "Part 2",
+                "volumeMm3": 566.2386609959044,
+                "valid": true,
+                "bounds": {
+                    "min": {
+                        "x": 40,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "max": {
+                        "x": 60,
+                        "y": 20,
+                        "z": 10
+                    }
+                },
+                "faceCount": 15
+            },
+            {
+                "name": "Part 3",
+                "volumeMm3": 566.2386609959049,
+                "valid": true,
+                "bounds": {
+                    "min": {
+                        "x": -59,
+                        "y": -21,
+                        "z": 20
+                    },
+                    "max": {
+                        "x": -39,
+                        "y": -0.9999999999999988,
+                        "z": 30
+                    }
+                },
+                "faceCount": 15
+            },
+            {
+                "name": "Part 4",
+                "volumeMm3": 25132.741228718343,
+                "valid": true,
+                "bounds": {
+                    "min": {
+                        "x": 79.9999999,
+                        "y": -1e-7,
+                        "z": -20.0000001
+                    },
+                    "max": {
+                        "x": 120.0000001,
+                        "y": 20.0000001,
+                        "z": 20.0000001
+                    }
+                },
+                "faceCount": 3
+            },
+            {
+                "name": "Part 1",
+                "volumeMm3": 1132.4773219918109,
+                "valid": true,
+                "bounds": {
+                    "min": {
+                        "x": -3.552713678800501e-15,
+                        "y": -20,
+                        "z": 0
+                    },
+                    "max": {
+                        "x": 20,
+                        "y": 20,
+                        "z": 10
+                    }
+                },
+                "faceCount": 25
+            }
+        ],
+        "totalVolumeMm3": 27397.695872701963
+    },
+    "chili3d": {
+        "solids": [
+            {
+                "name": "Open CASCADE STEP translator 8.0 1",
+                "volumeMm3": 566.2386609959307,
+                "valid": true,
+                "bounds": {
+                    "min": {
+                        "x": 40,
+                        "y": -2.22044604925e-16,
+                        "z": 0
+                    },
+                    "max": {
+                        "x": 60,
+                        "y": 20,
+                        "z": 10
+                    }
+                },
+                "faceCount": 15
+            },
+            {
+                "name": "Open CASCADE STEP translator 8.0 2",
+                "volumeMm3": 566.2386609963119,
+                "valid": true,
+                "bounds": {
+                    "min": {
+                        "x": -59.700748129671716,
+                        "y": -2.22044604925e-16,
+                        "z": 4.064837905236607
+                    },
+                    "max": {
+                        "x": -38.802992518696136,
+                        "y": 20.00000000000332,
+                        "z": 16.009975062344
+                    }
+                },
+                "faceCount": 15
+            },
+            {
+                "name": "Open CASCADE STEP translator 8.0 3",
+                "volumeMm3": 25132.741228718343,
+                "valid": true,
+                "bounds": {
+                    "min": {
+                        "x": 80,
+                        "y": 0,
+                        "z": -20
+                    },
+                    "max": {
+                        "x": 120,
+                        "y": 20,
+                        "z": 20
+                    }
+                },
+                "faceCount": 3
+            },
+            {
+                "name": "Open CASCADE STEP translator 8.0 4",
+                "volumeMm3": 1132.4773219918925,
+                "valid": true,
+                "bounds": {
+                    "min": {
+                        "x": 0,
+                        "y": -20,
+                        "z": 0
+                    },
+                    "max": {
+                        "x": 20,
+                        "y": 20,
+                        "z": 10
+                    }
+                },
+                "faceCount": 25
+            }
+        ],
+        "totalVolumeMm3": 27397.69587270248
+    }
+}

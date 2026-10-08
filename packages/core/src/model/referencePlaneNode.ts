@@ -9,6 +9,7 @@ import { property } from "../property";
 import { serializable, serialize } from "../serialize";
 import { FolderNode } from "./folderNode";
 import { NodeUtils } from "./node";
+import { OriginNode } from "./originNode";
 import { VisualNode } from "./visualNode";
 
 export interface ReferencePlaneNodeOptions {
@@ -97,10 +98,11 @@ export class ReferencePlaneNode extends VisualNode {
     }
 }
 
-/** Called for new documents before the initial version snapshot is captured. */
+/** Adds the datum origin and planes before a new document's initial version snapshot. */
 export function addDefaultPlanes(document: IDocument): void {
     const folder = new FolderNode({ document, name: I18n.translate("plane.defaultGeometry") });
     folder.add(
+        new OriginNode({ document }),
         ...(
             [
                 ["plane.top", Plane.XY],

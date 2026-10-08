@@ -21,14 +21,14 @@
 .panel strong {
     flex: 1;
 }
-.panel header button {
+.panel header > button {
     font-size: 20px;
     background: transparent;
     border: none;
     color: #bd3030;
     cursor: pointer;
 }
-.panel header button:first-of-type {
+.panel header > button:first-of-type {
     background: #008a08;
     color: white;
 }

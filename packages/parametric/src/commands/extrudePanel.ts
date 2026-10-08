@@ -11,10 +11,12 @@ import {
     type ParameterValue,
     resolveUnitSpec,
 } from "@chili3d/core";
+import { createEditableTitle } from "@chili3d/element";
 import style from "./extrudePanel.module.css";
 
 export interface ExtrudePanelModel {
     document: IDocument;
+    featureName?: string;
     operation: I18nKeys;
     depth: ParameterValue;
     symmetric: boolean;
@@ -49,8 +51,12 @@ export class ExtrudePanel {
             if (event.key === "Enter" && !this.accept.disabled) confirm();
         });
         const header = document.createElement("header");
-        const title = document.createElement("strong");
-        title.textContent = "Extrude";
+        const title = createEditableTitle(
+            () => model.featureName || "Extrude",
+            (name) => {
+                model.featureName = name;
+            },
+        );
         this.accept.textContent = "✓";
         this.accept.setAttribute("aria-label", "Accept extrude");
         this.accept.onclick = confirm;
@@ -58,7 +64,7 @@ export class ExtrudePanel {
         close.textContent = "×";
         close.setAttribute("aria-label", "Cancel extrude");
         close.onclick = cancel;
-        header.append(title, this.accept, close);
+        header.append(title.element, this.accept, close);
         root.append(header);
         const kind = document.createElement("div");
         kind.className = style.kind;

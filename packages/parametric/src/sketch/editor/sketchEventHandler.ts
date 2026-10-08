@@ -103,6 +103,7 @@ export class SketchEventHandler implements IEventHandler {
     private draggingRef?: SketchPointRef;
     private dragStart?: [number, number];
     private dragMoved = false;
+    private trimEntityUnderPointer?: number;
     private dragWithoutSnapping = false;
     private readonly pointSelection = new Map<string, SketchPointRef>();
     private geometryDisplayId?: number;
@@ -132,8 +133,11 @@ export class SketchEventHandler implements IEventHandler {
     private boxSelection?: { x: number; y: number; element: HTMLDivElement };
     private selectionMeshId?: number;
     private pickMeshId?: number;
+    private pickHighlightIds: number[] = [];
+    private constraintHighlightIds: number[] = [];
 
     highlightPicks(ids: number[]): void {
+        this.pickHighlightIds = [...ids];
         const context = this.editor.document.visual.context;
         if (this.pickMeshId !== undefined) context.removeMesh(this.pickMeshId);
         this.pickMeshId = undefined;
@@ -255,6 +259,11 @@ export class SketchEventHandler implements IEventHandler {
             const meshes = styledEntityMeshes(this.editor);
             if (meshes.length)
                 this.geometryDisplayId = view.document.visual.context.displayMesh(meshes, { onTop: true });
+            // Interaction meshes are snapshots too. Rebuild persistent highlights
+            // from the solved entities and drop hover geometry at the old position.
+            this.clearHover(view);
+            this.highlightPicks(this.pickHighlightIds);
+            this.updateConstraintHighlight(view);
             this.updateSelectionHighlight(view);
         }
         this.showExternalRefs();
@@ -415,7 +424,11 @@ export class SketchEventHandler implements IEventHandler {
 
     pointerMove(view: IView, event: PointerEvent): void {
         if (this.editor.powerTrim && event.buttons === 1 && this.editor.isPicking) {
-            this.editor.handlePickPointerDown(view, event);
+            // Trimming retains the first surviving piece's id. Don't immediately
+            // trim it again while the same stroke is still within its pick aperture.
+            const id = this.hitTestEntity(view, event, ["line", "circle", "arc"]);
+            if (id !== this.trimEntityUnderPointer) this.consumePickClick(view, event);
+            this.trimEntityUnderPointer = id;
             return;
         }
         if (!this.isEnabled) return;
@@ -501,6 +514,7 @@ export class SketchEventHandler implements IEventHandler {
 
     pointerDown(view: IView, event: PointerEvent): void {
         if (!this.isEnabled) return;
+        this.trimEntityUnderPointer = undefined;
         // a click while a dimension label follows the cursor drops it here
         if (this.editor.annotations.isLabelDragging) {
             this.editor.annotations.endLabelDrag(true);
@@ -552,7 +566,6 @@ export class SketchEventHandler implements IEventHandler {
                 this.dragStart = [event.offsetX, event.offsetY];
                 this.dragMoved = false;
                 this.clearHover(view);
-                this.clearPersistentDragGeometry(view);
                 this.editor.solver.beginDrag(
                     Array.from({ length: entityPointCount(entity.type, entity.params) }, (_, pointIndex) => ({
                         entityId: entity.id,
@@ -567,6 +580,8 @@ export class SketchEventHandler implements IEventHandler {
 
     /** Hands the click to an active pick; returns whether the pick consumed it. */
     private consumePickClick(view: IView, event: PointerEvent): boolean {
+        if (this.editor.powerTrim && this.editor.isPicking)
+            this.trimEntityUnderPointer = this.hitTestEntity(view, event, ["line", "circle", "arc"]);
         if (!this.editor.handlePickPointerDown(view, event)) return false;
 
         // the pick consumed the click; drop the pre-click hover highlight and
@@ -602,9 +617,6 @@ export class SketchEventHandler implements IEventHandler {
         this.dragSnapshot = this.editor.solver.toData();
         this.draggingRef = ref;
         this.clearHover(view);
-        // the drag preview carries the markers while dragging; the persistent ones
-        // would otherwise sit at the pre-drag positions
-        this.clearPersistentDragGeometry(view);
         const group = this.editor.solver.coincidentGroup(ref);
         this.editor.solver.beginDrag(group);
         // keep the dragged entities' constraint symbols visible during the drag
@@ -811,18 +823,23 @@ export class SketchEventHandler implements IEventHandler {
 
     /** Highlights the entities a hovered/selected constraint badge refers to. */
     highlightConstraintEntities(entityIds: number[]): void {
+        this.constraintHighlightIds = [...entityIds];
         const view = this.editor.document.application.activeView;
         if (view === undefined) return;
         // a badge hover replaces any entity hover: pointerMove ignores events over
         // badges, so the entity highlight would otherwise linger next to the badge's
         this.clearHover(view);
         this.syncAnnotationHighlights();
+        this.updateConstraintHighlight(view);
+        view.update();
+    }
+
+    private updateConstraintHighlight(view: IView): void {
         this.clearConstraintHighlight(view);
-        const meshes = this.constraintHighlightMeshes(entityIds);
+        const meshes = this.constraintHighlightMeshes(this.constraintHighlightIds);
         if (meshes.length > 0) {
             this.constraintMeshId = view.document.visual.context.displayMesh(meshes, { onTop: true });
         }
-        view.update();
     }
 
     private constraintHighlightMeshes(entityIds: number[]): ShapeMeshData[] {
@@ -1073,6 +1090,9 @@ export class SketchEventHandler implements IEventHandler {
     }
 
     private updateDragPreview(view: IView): void {
+        // A press is still a selection until the drag threshold is crossed. Keep
+        // the sketch visible until a preview is ready to replace its geometry.
+        this.clearPersistentDragGeometry(view);
         this.clearDragPreview(view);
         // the markers ride along with the dragged geometry; the persistent overlay
         // was dropped when the drag began, and comes back on the commit that ends it

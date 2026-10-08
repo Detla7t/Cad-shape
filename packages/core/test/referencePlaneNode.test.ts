@@ -1,7 +1,17 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { addDefaultPlanes, I18n, Plane, ReferencePlaneNode, Serializer, Transaction, XYZ } from "../src";
+import {
+    addDefaultPlanes,
+    I18n,
+    Matrix4,
+    OriginNode,
+    Plane,
+    ReferencePlaneNode,
+    Serializer,
+    Transaction,
+    XYZ,
+} from "../src";
 import { TestDocument } from "../test-utils";
 
 test("default planes are named, centered on the origin and serialized as reference geometry", () => {
@@ -42,4 +52,23 @@ test("offset and size survive save/reload and undo/redo", () => {
     expect(copy.size).toBe(160);
     expect(copy.boundingBox().min.x).toBe(-80);
     expect(copy.boundingBox().max.y).toBe(80);
+});
+
+test("new documents include a fixed origin that retains its identity and visibility through save/reload", () => {
+    const document = new TestDocument();
+    addDefaultPlanes(document);
+    const origins = document.modelManager.findNodes().filter((node) => node instanceof OriginNode);
+    expect(origins).toHaveLength(1);
+    const origin = origins[0];
+    expect(origin.name).toBe(I18n.translate("body.origin"));
+    expect(origin.position).toEqual(XYZ.zero);
+    origin.transform = Matrix4.fromTranslation(10, 20, 30);
+    expect(origin.transform.ofPoint(origin.position)).toEqual(XYZ.zero);
+    origin.visible = false;
+    const copy = Serializer.deserializeObject(document, Serializer.serializeObject(origin)) as OriginNode;
+    expect(copy).toBeInstanceOf(OriginNode);
+    expect(copy.id).toBe(origin.id);
+    expect(copy.visible).toBe(false);
+    expect(copy.position).toEqual(XYZ.zero);
+    expect(copy.boundingBox()).toEqual({ min: XYZ.zero, max: XYZ.zero });
 });

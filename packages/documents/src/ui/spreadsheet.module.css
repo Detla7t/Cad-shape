@@ -1,0 +1,108 @@
+.toolbar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--background-color);
+    color: var(--foreground-color);
+    font:
+        12px Arial,
+        sans-serif;
+}
+
+.toolbar button,
+.toolbar select {
+    height: 28px;
+    min-width: 28px;
+    padding: 0 6px;
+    color: inherit;
+    font: inherit;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.toolbar select {
+    border-color: var(--border-color);
+    max-width: 145px;
+    background: var(--control-background-color);
+}
+.toolbar button:hover,
+.toolbar button[aria-pressed="true"] {
+    background: var(--checked-color);
+    border-color: var(--border-color);
+}
+.toolbar button:focus-visible,
+.toolbar select:focus-visible {
+    outline: 2px solid var(--primary-color);
+}
+.colorControl {
+    display: flex;
+    gap: 3px;
+    align-items: center;
+    padding: 0 4px;
+}
+.colorControl input {
+    width: 22px;
+    height: 24px;
+    border: 0;
+    padding: 1px;
+    background: none;
+    cursor: pointer;
+}
+
+.formulaAssist {
+    position: fixed;
+    z-index: 10000;
+    max-width: calc(100vw - 16px);
+    max-height: calc(100vh - 24px);
+    overflow: auto;
+    font:
+        12px / 1.45 Arial,
+        sans-serif;
+    background: var(--control-background-color, white);
+    color: var(--foreground-color, #242424);
+    border: 1px solid var(--border-color, #ccc);
+    border-radius: 3px;
+    box-shadow: 0 3px 12px #0003;
+}
+
+.formulaAssist[hidden] {
+    display: none;
+}
+.functionHelp {
+    padding: 10px;
+    background: var(--background-color, #f5f6f7);
+}
+.signature {
+    font-family: ui-monospace, monospace;
+    margin-bottom: 5px;
+    overflow-wrap: anywhere;
+}
+.activeArgument {
+    font-weight: 700;
+    color: var(--primary-color, #185abc);
+    text-decoration: underline;
+}
+.functionList {
+    max-height: 190px;
+    overflow-y: auto;
+}
+.functionList [role="option"] {
+    padding: 5px 10px;
+    font-family: ui-monospace, monospace;
+    cursor: pointer;
+}
+.functionList [role="option"]:hover,
+.functionList [aria-selected="true"] {
+    background: var(--checked-color, #dce8fa);
+}
+.suggestionFooter {
+    padding: 6px 10px;
+    border-top: 1px solid var(--border-color, #ccc);
+    font-size: 11px;
+}

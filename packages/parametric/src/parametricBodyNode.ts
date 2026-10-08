@@ -458,7 +458,10 @@ export class ParametricBodyNode
         const features = this.features.map((feature) =>
             feature.id === featureId ? { ...feature, name: name === "" ? undefined : name } : feature,
         );
-        this.setProperty("featuresJson", JSON.stringify(features));
+        if (this._featureDraft) {
+            this._featureDraft.features = features;
+            this.emitPropertyChanged("featuresJson", this.featuresJson);
+        } else this.setProperty("featuresJson", JSON.stringify(features));
     }
 
     removeFeature(featureId: string): void {

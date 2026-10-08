@@ -4,16 +4,20 @@
 import { I18n, Localize, Transaction } from "@chili3d/core";
 import { div, input, option, select, span } from "@chili3d/element";
 import { setDocumentWorkbook } from "../../api";
+import { applyCellStyle } from "../../sheet/cellStyle";
 import { isFormulaError, WorkbookEvaluator } from "../../sheet/formula";
 import {
     addressOf,
     type CellAddress,
+    type CellStyle,
     cellFromInput,
     cellInputText,
     cloneWorkbook,
     columnName,
     normalizeRange,
     parseAddress,
+    parseRange,
+    rangeText,
     usedSize,
     type WorkbookData,
 } from "../../sheet/model";
@@ -22,6 +26,8 @@ import { isWorkbookFormat, readWorkbook, type WorkbookFormat, writeWorkbook } fr
 import { labelButton } from "../controls";
 import style from "../documents.module.css";
 import type { DocumentExport, IDocumentViewer, ViewerContext } from "../viewer";
+import { createFormulaAssist } from "./formulaAssist";
+import { createSheetToolbar } from "./sheetToolbar";
 
 /**
  * Spreadsheets (CSV, TSV, XLSX, XLS, ODS) in a grid: sheet tabs, a formula bar, cell
@@ -46,6 +52,10 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
     let dirty = false;
     let loaded = false;
     let editor: HTMLInputElement | undefined;
+    let disposeEditorAssist: (() => void) | undefined;
+    const assist = createFormulaAssist();
+    let rowTops: number[] = [];
+    let layoutDirty = true;
 
     const cellName = input({ className: style.cellName, spellcheck: false });
     const formulaInput = input({ className: style.formulaInput, spellcheck: false });
@@ -53,6 +63,11 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
         { className: style.select, title: new Localize("documents.sheet.numberFormat") },
         ...COMMON_NUMBER_FORMATS.map((code) => option({ value: code, textContent: code })),
     );
+    cellName.setAttribute("aria-label", "Cell or range");
+    formulaInput.setAttribute("aria-label", "Formula bar");
+    assist.bind(formulaInput);
+    const toolbar = createSheetToolbar(applyStyle, clearFormat, mergeSelection);
+    toolbar.element.append(formatMenu);
     const notice = div({ className: style.notice });
     const table = window.document.createElement("table");
     table.className = style.grid;
@@ -65,13 +80,14 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
 
     const sheet = () => workbook.sheets[sheetIndex];
     const size = () => {
-        const used = usedSize(sheet());
+        const used = usedSize(sheet(), true);
         return { rows: Math.max(used.rows + 30, 100), cols: Math.max(used.cols + 6, 26) };
     };
     const widthOf = (col: number) => sheet().cols?.[col] ?? DEFAULT_WIDTH;
 
     const markDirty = () => {
         dirty = true;
+        layoutDirty = true;
         evaluator = new WorkbookEvaluator(workbook);
         changed();
     };
@@ -119,11 +135,46 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
         };
     };
 
+    const layoutRows = () => {
+        if (!layoutDirty && rowTops.length) return;
+        const { rows } = size();
+        const heights = Array.from({ length: rows }, (_, r) => sheet().rows?.[r] ?? ROW_HEIGHT);
+        for (const [address, cell] of Object.entries(sheet().cells)) {
+            const at = parseAddress(address);
+            if (!at || sheet().rows?.[at.row] !== undefined) continue;
+            const fontHeight = ((cell.s?.font?.size ?? 11) * 4) / 3;
+            const lines = cell.s?.alignment?.wrapText
+                ? Math.max(
+                      1,
+                      Math.ceil(
+                          (cellText(at.row, at.col).text.length * fontHeight * 0.55) /
+                              Math.max(24, widthOf(at.col) - 8),
+                      ),
+                  )
+                : 1;
+            heights[at.row] = Math.max(
+                heights[at.row] ?? ROW_HEIGHT,
+                Math.ceil(fontHeight * 1.35 * lines + 3),
+            );
+        }
+        rowTops = [0];
+        for (const height of heights) rowTops.push(rowTops[rowTops.length - 1] + height);
+        layoutDirty = false;
+    };
     const renderRows = () => {
         const { rows, cols } = size();
         const top = scroller.scrollTop;
-        const first = Math.max(0, Math.floor(top / ROW_HEIGHT) - OVERSCAN);
-        const last = Math.min(rows - 1, Math.ceil((top + scroller.clientHeight) / ROW_HEIGHT) + OVERSCAN);
+        layoutRows();
+        let visible = 0;
+        while (visible < rows - 1 && rowTops[visible + 1] < top) visible++;
+        let first = Math.max(0, visible - OVERSCAN);
+        let last = visible;
+        while (last < rows - 1 && rowTops[last] < top + scroller.clientHeight) last++;
+        last = Math.min(rows - 1, last + OVERSCAN);
+        const merges = (sheet().merges ?? []).map((text) => parseRange(text)).filter((r) => r !== undefined);
+        // Include the master of a merged cell that spans into the visible window.
+        for (const merge of merges)
+            if (merge.start.row < first && merge.end.row >= first) first = merge.start.row;
         const range = normalizeRange(anchor, focus);
         const spacer = (height: number) => {
             const tr = window.document.createElement("tr");
@@ -131,9 +182,10 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
             return tr;
         };
         const fragment = window.document.createDocumentFragment();
-        if (first > 0) fragment.append(spacer(first * ROW_HEIGHT));
+        if (first > 0) fragment.append(spacer(rowTops[first]));
         for (let r = first; r <= last; r++) {
             const tr = window.document.createElement("tr");
+            tr.style.height = `${rowTops[r + 1] - rowTops[r]}px`;
             const th = window.document.createElement("th");
             th.textContent = String(r + 1);
             th.addEventListener("click", () =>
@@ -141,9 +193,18 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
             );
             tr.append(th);
             for (let c = 0; c < cols; c++) {
+                const merge = merges.find(
+                    (m) => r >= m.start.row && r <= m.end.row && c >= m.start.col && c <= m.end.col,
+                );
+                if (merge && (r !== merge.start.row || c !== merge.start.col)) continue;
                 const td = window.document.createElement("td");
                 const { text, className } = cellText(r, c);
                 td.textContent = text;
+                if (merge) {
+                    td.rowSpan = merge.end.row - r + 1;
+                    td.colSpan = merge.end.col - c + 1;
+                }
+                applyCellStyle(td, sheet().cells[addressOf(r, c)]?.s);
                 td.title = text.length > 12 ? text : "";
                 const inRange =
                     r >= range.start.row && r <= range.end.row && c >= range.start.col && c <= range.end.col;
@@ -157,7 +218,7 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
             }
             fragment.append(tr);
         }
-        if (last < rows - 1) fragment.append(spacer((rows - 1 - last) * ROW_HEIGHT));
+        if (last < rows - 1) fragment.append(spacer(rowTops[rows] - rowTops[last + 1]));
         tbody.replaceChildren(fragment);
     };
 
@@ -171,6 +232,7 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
                     onclick: () => {
                         commitEditor();
                         sheetIndex = index;
+                        layoutDirty = true;
                         anchor = focus = { row: 0, col: 0 };
                         renderAll();
                     },
@@ -209,6 +271,7 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
                 : `${addressOf(range.start.row, range.start.col)}:${addressOf(range.end.row, range.end.col)}`;
         const cell = sheet().cells[address];
         formulaInput.value = cellInputText(cell);
+        toolbar.update(cell?.s);
         formatMenu.value = cell?.z ?? "General";
         if (formatMenu.value !== (cell?.z ?? "General")) {
             formatMenu.append(option({ value: cell?.z ?? "", textContent: cell?.z ?? "" }));
@@ -237,7 +300,8 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
     // ---------------------------------------------------------- selection and editing
 
     const scrollIntoView = (at: CellAddress) => {
-        const top = at.row * ROW_HEIGHT;
+        layoutRows();
+        const top = rowTops[at.row] ?? at.row * ROW_HEIGHT;
         const headerHeight = ROW_HEIGHT;
         if (top < scroller.scrollTop) scroller.scrollTop = top;
         else if (top + ROW_HEIGHT * 2 + headerHeight > scroller.scrollTop + scroller.clientHeight) {
@@ -253,6 +317,8 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
 
     function selectRange(from: CellAddress, to: CellAddress = from): void {
         commitEditor();
+        if (window.document.activeElement === formulaInput) commitFormula();
+        assist.hide();
         anchor = from;
         focus = to;
         scrollIntoView(to);
@@ -263,13 +329,16 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
     const setCell = (address: string, text: string) => {
         const cells = sheet().cells;
         const next = cellFromInput(text, cells[address]?.z);
-        if (next === undefined) delete cells[address];
-        else cells[address] = next;
+        const formatting = cells[address]?.s;
+        if (next === undefined && formatting === undefined) delete cells[address];
+        else cells[address] = { ...next, ...(formatting ? { s: formatting } : {}) };
     };
 
     function commitEditor(): void {
         if (editor === undefined) return;
         const box = editor;
+        disposeEditorAssist?.();
+        disposeEditorAssist = undefined;
         editor = undefined;
         const address = box.dataset["address"] ?? "";
         const value = box.value;
@@ -284,6 +353,8 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
     }
 
     const cancelEditor = () => {
+        disposeEditorAssist?.();
+        disposeEditorAssist = undefined;
         editor?.remove();
         editor = undefined;
         scroller.focus();
@@ -298,6 +369,8 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
         const address = addressOf(focus.row, focus.col);
         const original = cellInputText(sheet().cells[address]);
         const box = input({ className: style.cellEditor, spellcheck: false });
+        box.setAttribute("aria-label", `Edit ${address}`);
+        disposeEditorAssist = assist.bind(box);
         box.dataset["address"] = address;
         box.dataset["original"] = original;
         box.value = initial ?? original;
@@ -306,6 +379,7 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
         box.style.width = `${Math.max(td.offsetWidth, 120)}px`;
         box.style.height = `${td.offsetHeight}px`;
         box.addEventListener("keydown", (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") return;
             e.stopPropagation();
             if (e.key === "Enter" || e.key === "Tab") {
                 e.preventDefault();
@@ -326,6 +400,8 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
         editor = box;
         box.focus();
         if (initial === undefined) box.select();
+        else box.setSelectionRange(box.value.length, box.value.length);
+        assist.refresh(box);
     };
 
     const move = (dRow: number, dCol: number, extend: boolean) => {
@@ -343,8 +419,7 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
                 const address = addressOf(r, c);
                 const cell = cells[address];
                 if (cell === undefined || (cell.v === undefined && cell.f === undefined)) continue;
-                if (cell.z === undefined) delete cells[address];
-                else cells[address] = { z: cell.z };
+                setCell(address, "");
                 changedAny = true;
             }
         }
@@ -407,6 +482,7 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
             window.removeEventListener("mouseup", onUp);
             markDirty();
             renderColumns();
+            renderRows();
         };
         window.addEventListener("mousemove", onMove);
         window.addEventListener("mouseup", onUp);
@@ -428,12 +504,14 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
         const at = { row: Number(td.dataset["row"]), col: Number(td.dataset["col"]) };
         if (e.shiftKey) selectRange(anchor, at);
         else selectRange(at);
+        scroller.focus();
     });
     scroller.addEventListener("dblclick", (e) => {
         if ((e.target as HTMLElement).closest("td") !== null) openEditor();
     });
     scroller.addEventListener("keydown", (e) => {
         if (editor !== undefined || !loaded) return;
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") return;
         e.stopPropagation();
         const arrows: Record<string, [number, number]> = {
             ArrowUp: [-1, 0],
@@ -471,7 +549,20 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
         paste(text);
     });
 
+    const commitFormula = () => {
+        if (!loaded) return;
+        const address = addressOf(focus.row, focus.col);
+        if (formulaInput.value !== cellInputText(sheet().cells[address])) {
+            setCell(address, formulaInput.value);
+            markDirty();
+            renderRows();
+        }
+        assist.hide();
+    };
+    formulaInput.addEventListener("blur", commitFormula);
     formulaInput.addEventListener("keydown", (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") return;
+        e.stopPropagation();
         if (e.key === "Enter") {
             e.preventDefault();
             const address = addressOf(focus.row, focus.col);
@@ -487,6 +578,8 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
         }
     });
     cellName.addEventListener("keydown", (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") return;
+        e.stopPropagation();
         if (e.key !== "Enter") return;
         e.preventDefault();
         const [a, b] = cellName.value.split(":");
@@ -505,7 +598,12 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
                 const cell = { ...(cells[address] ?? {}) };
                 if (code === "General") delete cell.z;
                 else cell.z = code;
-                if (cell.v === undefined && cell.f === undefined && cell.z === undefined)
+                if (
+                    cell.v === undefined &&
+                    cell.f === undefined &&
+                    cell.z === undefined &&
+                    cell.s === undefined
+                )
                     delete cells[address];
                 else cells[address] = cell;
             }
@@ -515,6 +613,78 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
         scroller.focus();
     });
 
+    function eachSelected(action: (address: string) => void): void {
+        const range = normalizeRange(anchor, focus);
+        for (let r = range.start.row; r <= range.end.row; r++) {
+            for (let c = range.start.col; c <= range.end.col; c++) action(addressOf(r, c));
+        }
+    }
+    function applyStyle(update: (style: CellStyle) => CellStyle): void {
+        commitEditor();
+        if (window.document.activeElement === formulaInput) commitFormula();
+        eachSelected((address) => {
+            const cell = sheet().cells[address] ?? {};
+            sheet().cells[address] = { ...cell, s: update(cell.s ?? {}) };
+        });
+        markDirty();
+        renderRows();
+        renderFormulaBar();
+        scroller.focus();
+    }
+    function clearFormat(): void {
+        commitEditor();
+        if (window.document.activeElement === formulaInput) commitFormula();
+        eachSelected((address) => {
+            const cell = sheet().cells[address];
+            if (cell) {
+                delete cell.s;
+                delete cell.z;
+            }
+        });
+        markDirty();
+        renderRows();
+        renderFormulaBar();
+        scroller.focus();
+    }
+    function mergeSelection(): void {
+        commitEditor();
+        const range = normalizeRange(anchor, focus);
+        const intersects = (text: string) => {
+            const m = parseRange(text);
+            return (
+                m &&
+                m.start.row <= range.end.row &&
+                m.end.row >= range.start.row &&
+                m.start.col <= range.end.col &&
+                m.end.col >= range.start.col
+            );
+        };
+        const merges = sheet().merges ?? [];
+        if (merges.some(intersects)) sheet().merges = merges.filter((m) => !intersects(m));
+        else {
+            if (range.start.row === range.end.row && range.start.col === range.end.col) return;
+            const master = addressOf(range.start.row, range.start.col);
+            const values: string[] = [];
+            eachSelected((address) => {
+                if (address !== master && cellInputText(sheet().cells[address]) !== "") values.push(address);
+            });
+            if (
+                values.length &&
+                !window.confirm("Merging keeps only the upper-left value. Merge these cells?")
+            )
+                return;
+            values.forEach((address) => {
+                setCell(address, "");
+            });
+            sheet().merges = [...merges, rangeText(range)];
+            anchor = focus = range.start;
+        }
+        markDirty();
+        renderRows();
+        renderFormulaBar();
+        scroller.focus();
+    }
+
     // ---------------------------------------------------------- loading and saving
 
     const message = div({ className: style.message, textContent: new Localize("documents.loading") });
@@ -522,6 +692,8 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
 
     const load = async () => {
         loaded = false;
+        layoutDirty = true;
+        assist.hide();
         if (format === "xls") {
             gridHost.replaceChildren(
                 div({ className: style.message, textContent: new Localize("documents.sheet.xlsNotice") }),
@@ -551,6 +723,8 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
         label: `documents.export.${target}`,
         extension: `.${target}`,
         produce: async () => {
+            commitEditor();
+            commitFormula();
             const bytes = await writeWorkbook(workbook, target);
             if (!bytes.isOk) throw new Error(bytes.error);
             return bytes.value;
@@ -560,19 +734,15 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
     return {
         element: div(
             { className: style.body },
-            div(
-                { className: style.formulaBar },
-                cellName,
-                span({ textContent: "fx" }),
-                formulaInput,
-                formatMenu,
-            ),
+            toolbar.element,
+            div({ className: style.formulaBar }, cellName, span({ textContent: "fx" }), formulaInput),
             notice,
             gridHost,
         ),
         isDirty: () => dirty,
         save: async () => {
             commitEditor();
+            commitFormula();
             if (!isWorkbookFormat(format)) return;
             const bytes = await writeWorkbook(workbook, format);
             if (!bytes.isOk) throw new Error(bytes.error);
@@ -589,6 +759,7 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
         },
         dispose: () => {
             cancelAnimationFrame(frame);
+            assist.dispose();
             editor?.remove();
         },
     };

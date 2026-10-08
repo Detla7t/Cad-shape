@@ -11,102 +11,132 @@
             "step": 1,
             "action": "Create an isolated Part Studio",
             "onshape": "verified: bottom + > Create Part Studio",
-            "chili3d": "pending"
+            "chili3d": "different: Create > Document works, but bottom + menu has no Create Part Studio. Used the default Part Studio 1 in a new local document."
         },
         {
             "step": 2,
             "action": "Select Top plane and start Sketch",
             "onshape": "verified: Top tree row > Sketch toolbar",
-            "chili3d": "pending"
+            "chili3d": "verified: select Top tree row > New Sketch toolbar; normal view is automatic"
         },
         {
             "step": 3,
             "action": "Orient camera normal to sketch plane",
             "onshape": "verified: viewport context menu > View normal to sketch plane",
-            "chili3d": "pending"
+            "chili3d": "verified: viewport right click > View normal to sketch plane"
         },
         {
             "step": 4,
             "action": "Draw center point circle at origin",
             "onshape": "verified: C, origin click, radius click; center coincident with origin",
-            "chili3d": "pending"
+            "chili3d": "verified: C, click origin, click radius; circle preview and origin snap present. Separate floating command badge differs visually from Onshape."
         },
         {
             "step": 5,
             "action": "Dimension circle diameter to 40 mm",
             "onshape": "verified: D, circumference click, label placement, 40 mm, Enter, Escape",
-            "chili3d": "pending"
+            "chili3d": "verified: D, click circumference, place label, enter 40 mm, Enter, Escape; diameter reads \u00d840.00 and sketch is fully constrained"
         },
         {
             "step": 6,
             "action": "Confirm sketch",
             "onshape": "verified: green check",
-            "chili3d": "pending"
+            "chili3d": "verified: green Finish sketch check"
         },
         {
             "step": 7,
             "action": "Create offset plane from Top by 50 mm",
             "onshape": "verified: Top tree selection, Search tools > Plane, Offset, 50 mm, green check",
-            "chili3d": "pending"
+            "chili3d": "verified with differences: select Top > Search tools > Plane. Search is a centered modal rather than toolbar dropdown; Plane panel uses a reference dropdown and numeric Offset (mm) field. Entered 50 (input type=number does not support the Onshape 50 mm expression). Preview updates; green Create plane check works. Extra floating Plane badge; viewport display label overlaps panel header."
         },
         {
             "step": 8,
             "action": "Start sketch on offset plane",
             "onshape": "verified: Sketch > Plane 1 tree row; waiting for plane creation to finish was required before preselection",
-            "chili3d": "pending"
+            "chili3d": "different: New Sketch opens a plane picker, but clicking Plane1 in the feature tree did not choose it or enter sketch mode. Clicking the Plane1 button inside the picker works. Extra click/workflow differs from Onshape."
         },
         {
             "step": 9,
             "action": "Draw square profile using Corner rectangle",
             "onshape": "verified: Search tools > Corner rectangle, diagonal corners; square drawn but exact side dimension not yet verified",
-            "chili3d": "pending"
+            "chili3d": "different: searching Corner rectangle returns no tool, even in Sketch mode. Searching Rectangle finds it. Two diagonal clicks and live rectangle preview work. Unlike Onshape, no transient width/height numbers are shown next to the preview."
         },
         {
             "step": 10,
             "action": "Confirm square sketch",
             "onshape": "verified: sketch persisted when the shared tab reconnected",
-            "chili3d": "pending"
+            "chili3d": "verified: green Finish sketch check; Sketch2 remains in history"
         },
         {
             "step": 11,
             "action": "Switch to isometric view and open Loft",
             "onshape": "verified: new tab restored isometric view; Search tools > Loft",
-            "chili3d": "pending"
+            "chili3d": "verified with appearance difference: confirming sketch restores isometric view; Search tools > Loft available through centered modal"
         },
         {
             "step": 12,
             "action": "Select circle region then square region",
             "onshape": "verified: click Sketch 1 then Sketch 2 in feature tree; each expands to Face of Sketch 1/2",
-            "chili3d": "pending; source inspection shows legacy command accepts vertex/wire/edge and creates a frozen shape"
+            "chili3d": "FAILED same sequence: clicking Sketch1 then Sketch2 in feature tree does not add Loft profiles. No ordered profile list appears and no preview is generated. Clicking the visible filled circle and square regions also does not select sections."
         },
         {
             "step": 13,
             "action": "Inspect solid preview, profile order, and matching",
             "onshape": "verified: Solid and New are default; second sketch immediately produces a capped circle-to-square solid preview",
-            "chili3d": "pending"
+            "chili3d": "FAILED same workflow: horizontal legacy Loft panel, Solid unchecked, Ruled unchecked, Continuity c0, Delete Objects checked. No solid preview after sketch/face selection. Onshape defaults Solid/New and immediately previews both selected sketch regions."
         },
         {
             "step": 14,
             "action": "Confirm Loft and inspect feature history",
-            "onshape": "pending",
-            "chili3d": "pending"
+            "onshape": "verified: green check creates Loft 1 and Part 1; sketches remain in feature history",
+            "chili3d": "FAILED before fix: edge-only workaround selected circle and one square edge, kernel reports Failed to loft. Confirm remained enabled, added a failed EditableShapeNode and deleted Sketch1. Undo restored both sketches. Guard fix now prevents confirmation/commit when preview is invalid; regression test passes."
         },
         {
             "step": 15,
             "action": "Edit Loft selections and parameters with rollback; cancel restores original",
-            "onshape": "pending",
-            "chili3d": "pending"
+            "onshape": "partially verified: double-click Loft 1 reopens its ordered profile selection and full parameter panel. No downstream feature existed, so downstream rollback not verified. Cancel returned to the saved Loft/Part 1.",
+            "chili3d": "FAILED before fix: double-clicking the failed loft row does not reopen editable Loft controls. It is an EditableShapeNode, with no parametric feature payload. Undo removed it and restored the circle."
         },
         {
             "step": 16,
             "action": "Edit upstream profile/plane; verify Loft rebuilds",
             "onshape": "pending",
-            "chili3d": "pending"
+            "chili3d": "blocked by missing parametric Loft; the same inputs cannot produce an editable loft using this UI workflow"
         }
     ],
     "notes": [
         "Native browser only for Onshape interaction; source inspection is not marked as UI verification.",
         "All comparison steps must be run in Chili3D; unresolved steps stay pending or blocked.",
-        "An attempted rectangle dimension did not open an input; its value has not been changed or verified."
-    ]
+        "An attempted rectangle dimension did not open an input; its value has not been changed or verified.",
+        "Search tool modal Escape initially clears its search input instead of closing the modal; used its X button to close.",
+        "Square profiles are cursor-drawn approximations, not numerically equal test fixtures; no exact shape/volume parity claim is made from these UI runs.",
+        "Read-only app inspection confirmed zero Loft sections after tree/region picks, two sections and Failed to loft after edge picks, and the failed EditableShapeNode after confirmation. Geometry creation remained through UI clicks."
+    ],
+    "chili3d": {
+        "document": "Loft comparison \u2014 circle to square",
+        "partStudio": "Part Studio 1",
+        "url": "http://localhost:8097/",
+        "method": "visible UI clicks and key presses; no geometry seeded through APIs"
+    },
+    "evidence": [
+        "chili-circle-preview.png",
+        "chili-plane-panel.png",
+        "chili-sketch-plane-picker.png",
+        "chili-square-preview.png",
+        "chili-loft-tree-selection.png",
+        "chili-loft-face-selection.png",
+        "chili-loft-edge-failure.png",
+        "chili-loft-invalid-confirm.png",
+        "chili-loft-history.png",
+        "onshape-loft-preview.png",
+        "chili-trim-hover.png"
+    ],
+    "validation": {
+        "tests": "681 tests passed across 42 files (sketch suite, Loft command, document saving, thumbnail projection)",
+        "typecheck": "npx tsc --noEmit passed",
+        "build": "npm run build passed; 207 cached assets verified",
+        "loftGuardBrowser": "After rebuilding and reopening the saved fixture, Confirm with zero selected sections reports Select at least two loft sections and keeps the command open without changing the sketches. Failed two-section commit preservation is covered by regression tests; the shared browser host disconnected before a second post-fix UI run of that case.",
+        "trimBrowser": "UI: draw origin-centered \u00d840 circle, add horizontal midpoint diameter line snapped to circumference, Trim hovered upper half. Only half highlighted, click produced retained lower arc without circle-type error. Ctrl+Z/Ctrl+Shift+Z restore circle/arc. Cancel sketch restored original Loft fixture.",
+        "limits": "Full Loft UI / FeatureScript equivalence has not been implemented or established. Guides, paths, thin Loft, connection matching and downstream rollback not tested in this UI comparison."
+    }
 }

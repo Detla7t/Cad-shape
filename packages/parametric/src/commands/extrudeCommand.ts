@@ -189,6 +189,7 @@ export class SelectSketchProfilesStep implements IStep {
 
 @command({ key: "feature.extrude", icon: "icon-prism" })
 export class ExtrudeFeatureCommand extends MultistepCommand {
+    featureName = "Extrude";
     private panel?: ExtrudePanel;
 
     protected override async executeAsync(): Promise<void> {
@@ -568,6 +569,7 @@ export class ExtrudeFeatureCommand extends MultistepCommand {
         return {
             id: Id.generate(),
             type: "extrude",
+            ...(this.featureName === "Extrude" ? {} : { name: this.featureName }),
             depth,
             ...(this.symmetric ? { symmetric: true } : {}),
             ...(this.startOffset !== 0 ? { startOffset: this.startOffset } : {}),

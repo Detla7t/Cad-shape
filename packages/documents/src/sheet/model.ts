@@ -7,7 +7,11 @@
  * into the parsing worker), cells keyed by A1 address.
  */
 
+import type { Style } from "exceljs";
+
 export type CellValue = number | string | boolean;
+/** Excel's serializable style data; ExcelJS remains a lazy runtime dependency. */
+export type CellStyle = Partial<Omit<Style, "numFmt">>;
 
 export interface CellData {
     /** The literal value, or a formula's cached result. */
@@ -18,6 +22,7 @@ export interface CellData {
     z?: string;
     /** The cell holds an error value (`v` is its code, e.g. "#N/A"). */
     e?: boolean;
+    s?: CellStyle;
 }
 
 export interface SheetData {
@@ -26,6 +31,8 @@ export interface SheetData {
     cells: Record<string, CellData>;
     /** Column widths in pixels by column index (absent: default width). */
     cols?: (number | null)[];
+    /** Row heights in pixels, keyed by zero-based row index. */
+    rows?: Record<number, number>;
     /** Merged ranges, e.g. "A1:C1". */
     merges?: string[];
 }
@@ -113,15 +120,27 @@ export function rangeText(range: CellRange): string {
 }
 
 /** Rows and columns up to the last non-empty cell. */
-export function usedSize(sheet: SheetData): { rows: number; cols: number } {
+export function usedSize(sheet: SheetData, includeFormatting = false): { rows: number; cols: number } {
     let rows = 0;
     let cols = 0;
     for (const [key, cell] of Object.entries(sheet.cells)) {
-        if (cell.v === undefined && cell.f === undefined) continue;
+        if (
+            cell.v === undefined &&
+            cell.f === undefined &&
+            (!includeFormatting || (cell.s === undefined && cell.z === undefined))
+        )
+            continue;
         const at = parseAddress(key);
         if (at === undefined) continue;
         rows = Math.max(rows, at.row + 1);
         cols = Math.max(cols, at.col + 1);
+    }
+    for (const merge of includeFormatting ? (sheet.merges ?? []) : []) {
+        const range = parseRange(merge);
+        if (range) {
+            rows = Math.max(rows, range.end.row + 1);
+            cols = Math.max(cols, range.end.col + 1);
+        }
     }
     return { rows, cols };
 }
@@ -132,14 +151,7 @@ export function emptyWorkbook(sheetName = "Sheet1"): WorkbookData {
 
 /** A deep copy (the editor's draft). */
 export function cloneWorkbook(workbook: WorkbookData): WorkbookData {
-    return {
-        sheets: workbook.sheets.map((sheet) => ({
-            name: sheet.name,
-            cells: Object.fromEntries(Object.entries(sheet.cells).map(([key, cell]) => [key, { ...cell }])),
-            ...(sheet.cols === undefined ? {} : { cols: [...sheet.cols] }),
-            ...(sheet.merges === undefined ? {} : { merges: [...sheet.merges] }),
-        })),
-    };
+    return structuredClone(workbook);
 }
 
 /**

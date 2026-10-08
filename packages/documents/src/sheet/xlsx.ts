@@ -2,7 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import type * as ExcelJS from "exceljs";
-import { addressOf, type CellData, type SheetData, type WorkbookData } from "./model";
+import type { CellData, SheetData, WorkbookData } from "./model";
 
 /**
  * Excel workbooks (.xlsx) through ExcelJS (MIT), loaded on first use: values, formulas
@@ -42,12 +42,14 @@ function cellOf(cell: ExcelJS.Cell): CellData | undefined {
         typeof cell.numFmt === "string" && cell.numFmt !== "" && cell.numFmt !== "General"
             ? cell.numFmt
             : undefined;
-    const format = z === undefined ? {} : { z };
-    if (value === null || value === undefined) return z === undefined ? undefined : { z };
+    const { numFmt: _numFmt, ...style } = cell.style;
+    const hasStyle = Object.values(style).some((part) => part && Object.keys(part).length > 0);
+    const format = { ...(z === undefined ? {} : { z }), ...(hasStyle ? { s: structuredClone(style) } : {}) };
+    if (value === null || value === undefined) return Object.keys(format).length === 0 ? undefined : format;
     if (typeof value === "number" || typeof value === "string" || typeof value === "boolean") {
         return { v: value, ...format };
     }
-    if (value instanceof Date) return { v: serial(value), z: z ?? "yyyy-mm-dd" };
+    if (value instanceof Date) return { v: serial(value), ...format, z: z ?? "yyyy-mm-dd" };
     if ("formula" in value || "sharedFormula" in value) {
         const formula = cell.formula ?? ("formula" in value ? value.formula : undefined);
         if (formula === undefined || formula === "") return { ...resultOf(value.result), ...format };
@@ -65,14 +67,21 @@ export async function readXlsx(bytes: Uint8Array): Promise<WorkbookData> {
     await book.xlsx.load(bytes.slice().buffer as unknown as Parameters<typeof book.xlsx.load>[0]);
     const sheets: SheetData[] = book.worksheets.map((worksheet) => {
         const cells: Record<string, CellData> = {};
-        worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
-            row.eachCell({ includeEmpty: false }, (cell, colNumber) => {
-                // A merged range's other cells repeat the master's value: keep it once.
-                if (cell.isMerged && cell.master.address !== cell.address) return;
+        const rows: Record<number, number> = {};
+        // Iterate stored rows/cells rather than materializing the gaps in sparse workbooks.
+        const model = worksheet.model as typeof worksheet.model & {
+            rows: { number: number; cells: { address: string }[] }[];
+        };
+        for (const stored of model.rows) {
+            const row = worksheet.getRow(stored.number);
+            if (row.height) rows[stored.number - 1] = (row.height * 4) / 3;
+            for (const entry of stored.cells) {
+                const cell = worksheet.getCell(entry.address);
+                if (cell.isMerged && cell.master.address !== cell.address) continue;
                 const data = cellOf(cell);
-                if (data !== undefined) cells[addressOf(rowNumber - 1, colNumber - 1)] = data;
-            });
-        });
+                if (data !== undefined) cells[cell.address] = data;
+            }
+        }
         const cols = (worksheet.columns ?? []).map((column) =>
             typeof column.width === "number" ? charsToPx(column.width) : null,
         );
@@ -82,6 +91,7 @@ export async function readXlsx(bytes: Uint8Array): Promise<WorkbookData> {
         return {
             name: worksheet.name,
             cells,
+            ...(Object.keys(rows).length ? { rows } : {}),
             ...(cols.some((width) => width !== null) ? { cols } : {}),
             ...(merges.length > 0 ? { merges } : {}),
         };
@@ -107,11 +117,15 @@ export async function writeXlsx(workbook: WorkbookData): Promise<Uint8Array> {
             } else if (cell.v !== undefined) {
                 target.value = cell.e ? error : cell.v;
             }
+            if (cell.s !== undefined) target.style = structuredClone(cell.s);
             if (cell.z !== undefined) target.numFmt = cell.z;
         }
         (sheet.cols ?? []).forEach((width, index) => {
             if (width !== null) worksheet.getColumn(index + 1).width = pxToChars(width);
         });
+        for (const [row, height] of Object.entries(sheet.rows ?? {})) {
+            worksheet.getRow(Number(row) + 1).height = (height * 3) / 4;
+        }
         for (const range of sheet.merges ?? []) worksheet.mergeCells(range);
     }
     return new Uint8Array(await book.xlsx.writeBuffer());

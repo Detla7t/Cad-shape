@@ -1,6 +1,11 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
+import { generalNumberText } from "./generalNumber";
+
+export { generalNumberText } from "./generalNumber";
+
+import { FUNCTION_INFO } from "./functionInfo";
 import {
     addressOf,
     type CellData,
@@ -9,6 +14,7 @@ import {
     parseAddress,
     type WorkbookData,
 } from "./model";
+import { formatCellValue } from "./numberFormat";
 
 /**
  * A spreadsheet formula engine for the grid editor and `readDocumentTable`: Excel
@@ -297,14 +303,6 @@ function toNumber(value: Scalar): number | FormulaError {
     return text.endsWith("%") ? number / 100 : number;
 }
 
-/** A number as Excel's General format shows it in text (`&`, TEXT-less concatenation). */
-export function generalNumberText(value: number): string {
-    if (Number.isInteger(value) && Math.abs(value) < 1e15) return String(value);
-    const precise = Number.parseFloat(value.toPrecision(15));
-    const text = String(precise);
-    return text.includes("e") ? precise.toExponential().replace("e+", "E+").replace("e-", "E-") : text;
-}
-
 function toText(value: Scalar): string | FormulaError {
     if (value === null) return "";
     if (isError(value)) return value;
@@ -583,6 +581,160 @@ const FUNCTIONS: Record<string, Fn> = {
     },
     SUMIF: (args) => conditional(args, "sum"),
     COUNTIF: (args) => conditional(args, "count"),
+    AVERAGEIF: (args) => conditionalMany([args[2] ?? args[0], args[0], args[1]], "average"),
+    SUMIFS: (args) => conditionalMany(args, "sum"),
+    COUNTIFS: (args) => conditionalMany([args[0], ...args], "count"),
+    AVERAGEIFS: (args) => conditionalMany(args, "average"),
+    MINIFS: (args) => conditionalMany(args, "min"),
+    MAXIFS: (args) => conditionalMany(args, "max"),
+    SUMPRODUCT: (args) => {
+        if (!args.length) return ERR("#VALUE!");
+        const arrays = args.map(matrix);
+        if (!arrays.every((a) => sameSize(a, arrays[0]))) return ERR("#VALUE!");
+        let sum = 0;
+        for (let r = 0; r < arrays[0].length; r++) {
+            for (let c = 0; c < arrays[0][r].length; c++) {
+                let product = 1;
+                for (const array of arrays) {
+                    const value = array[r][c];
+                    if (isError(value)) return value;
+                    product *= typeof value === "number" ? value : 0;
+                }
+                sum += product;
+            }
+        }
+        return sum;
+    },
+    IFNA: (_args, raw, context) => {
+        if (raw.length !== 2) return ERR("#VALUE!");
+        const value = context.evaluate(raw[0]);
+        const first = scalar(value);
+        return isError(first) && first.code === "#N/A" ? context.evaluate(raw[1]) : value;
+    },
+    IFS: (_args, raw, context) => {
+        if (!raw.length || raw.length % 2) return ERR("#VALUE!");
+        for (let i = 0; i < raw.length; i += 2) {
+            const condition = toBoolean(scalar(context.evaluate(raw[i])));
+            if (isError(condition)) return condition;
+            if (condition) return context.evaluate(raw[i + 1]);
+        }
+        return ERR("#N/A");
+    },
+    ISNUMBER: (args) => typeof scalar(args[0] ?? null) === "number",
+    ISTEXT: (args) => typeof scalar(args[0] ?? null) === "string",
+    ISBLANK: (args) => scalar(args[0] ?? null) === null,
+    ISERROR: (args) => isError(scalar(args[0] ?? null)),
+    ISNA: (args) => {
+        const value = scalar(args[0] ?? null);
+        return isError(value) && value.code === "#N/A";
+    },
+    TRUE: () => true,
+    FALSE: () => false,
+    NA: () => ERR("#N/A"),
+    TRUNC: (args) => roundFn(args, "down"),
+    CLEAN: (args) => mapText(args, (text) => [...text].filter((char) => char.charCodeAt(0) >= 32).join("")),
+    PROPER: (args) =>
+        mapText(args, (text) =>
+            text
+                .toLowerCase()
+                .replace(
+                    /(^|[^a-z])([a-z])/g,
+                    (_, before: string, char: string) => before + char.toUpperCase(),
+                ),
+        ),
+    EXACT: (args) => textArgs(args, (a, b) => a === b),
+    TEXT: (args) => {
+        const value = scalar(args[0] ?? null);
+        const format = toText(scalar(args[1] ?? null));
+        if (isError(value)) return value;
+        return isError(format) ? format : formatCellValue(value, format);
+    },
+    VALUE: (args) => {
+        const text = toText(scalar(args[0] ?? null));
+        if (isError(text)) return text;
+        const cleaned = text.trim().replace(/[$£€]/g, "").replace(/,/g, "");
+        const percent = cleaned.endsWith("%");
+        const n = Number(percent ? cleaned.slice(0, -1) : cleaned);
+        return cleaned && Number.isFinite(n) ? n / (percent ? 100 : 1) : ERR("#VALUE!");
+    },
+    TEXTJOIN: (args) => {
+        const separator = toText(scalar(args[0] ?? null));
+        const ignore = toBoolean(scalar(args[1] ?? null));
+        if (isError(separator)) return separator;
+        if (isError(ignore)) return ignore;
+        const parts: string[] = [];
+        for (const value of flatten(args.slice(2))) {
+            const text = toText(value);
+            if (isError(text)) return text;
+            if (!ignore || text !== "") parts.push(text);
+        }
+        return parts.join(separator);
+    },
+    SUBSTITUTE: (args) => {
+        const texts = args.slice(0, 3).map((a) => toText(scalar(a)));
+        const error = texts.find(isError);
+        if (error) return error;
+        const [text, old, replacement] = texts as string[];
+        if (!old) return text;
+        const nth = args.length > 3 ? toNumber(scalar(args[3])) : 0;
+        if (isError(nth)) return nth;
+        if (args.length > 3 && nth < 1) return ERR("#VALUE!");
+        const parts = text.split(old);
+        if (!nth) return parts.join(replacement);
+        const i = Math.trunc(nth);
+        return i >= parts.length
+            ? text
+            : parts.slice(0, i).join(old) + replacement + parts.slice(i).join(old);
+    },
+    REPT: (args) => {
+        const text = toText(scalar(args[0] ?? null));
+        const count = toNumber(scalar(args[1] ?? null));
+        if (isError(text)) return text;
+        if (isError(count)) return count;
+        return count < 0 || text.length * count > 32767 ? ERR("#VALUE!") : text.repeat(Math.trunc(count));
+    },
+    FIND: (args) => findText(args, false),
+    SEARCH: (args) => findText(args, true),
+    DATE: (args) => {
+        const list = args.map((a) => toNumber(scalar(a)));
+        const error = list.find(isError);
+        if (error) return error;
+        let [year, month, day] = (list as number[]).map(Math.trunc);
+        if (year >= 0 && year < 1900) year += 1900;
+        if (year < 1900 || year > 9999) return ERR("#NUM!");
+        // Use serial arithmetic for days so Excel's fictitious 1900-02-29 is retained.
+        const start = Date.UTC(year, month - 1, 1);
+        return excelSerial(start) + day - 1;
+    },
+    TIME: (args) => {
+        const list = args.map((a) => toNumber(scalar(a)));
+        const error = list.find(isError);
+        if (error) return error;
+        const [h, m, sec] = (list as number[]).map(Math.trunc);
+        const seconds = h * 3600 + m * 60 + sec;
+        return seconds < 0 ? ERR("#NUM!") : (seconds % 86400) / 86400;
+    },
+    YEAR: (args) => datePart(args, (d) => d.getUTCFullYear()),
+    MONTH: (args) => datePart(args, (d) => d.getUTCMonth() + 1),
+    DAY: (args) => (scalar(args[0] ?? null) === 60 ? 29 : datePart(args, (d) => d.getUTCDate())),
+    HOUR: (args) => datePart(args, (d) => d.getUTCHours()),
+    MINUTE: (args) => datePart(args, (d) => d.getUTCMinutes()),
+    SECOND: (args) => datePart(args, (d) => d.getUTCSeconds()),
+    TODAY: () => Math.floor(localNowSerial()),
+    NOW: () => localNowSerial(),
+    EDATE: (args) => shiftMonth(args, false),
+    EOMONTH: (args) => shiftMonth(args, true),
+    DAYS: (args) => {
+        const end = toNumber(scalar(args[0] ?? null));
+        const start = toNumber(scalar(args[1] ?? null));
+        return isError(end) ? end : isError(start) ? start : Math.floor(end) - Math.floor(start);
+    },
+    HLOOKUP: (args, raw, context) => {
+        const a = matrix(args[1] ?? null);
+        const transposed = (a[0] ?? []).map((_, c) => a.map((row) => row[c]));
+        return FUNCTIONS["VLOOKUP"]([args[0], transposed, ...args.slice(2)], raw, context);
+    },
+    XLOOKUP: (args) => xlookup(args),
 };
 
 function roundFn(args: Value[], mode: "half" | "up" | "down"): Value {
@@ -628,6 +780,10 @@ function matchesCriterion(value: Scalar, criterion: Scalar): boolean {
             return op === "=" ? operand === "" && value === null : !(operand === "" && value === null);
         }
         if (typeof operand === "number" && typeof value !== "number") return op === "<>";
+        if (typeof operand === "string" && typeof value === "string" && (op === "=" || op === "<>")) {
+            const match = wildcard(operand).test(value);
+            return op === "=" ? match : !match;
+        }
         const c = compare(value, operand);
         return op === "="
             ? c === 0
@@ -661,6 +817,136 @@ function conditional(args: Value[], mode: "sum" | "count"): Value {
         }
     }
     return total;
+}
+
+const matrix = (value: Value): Scalar[][] => (Array.isArray(value) ? value : [[value]]);
+const sameSize = (a: Scalar[][], b: Scalar[][]) =>
+    a.length === b.length && a.every((row, i) => row.length === b[i].length);
+
+function wildcard(text: string): RegExp {
+    let pattern = "";
+    const escapeRegex = (c: string) => c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    for (let i = 0; i < text.length; i++) {
+        const c = text[i];
+        if (c === "~" && i + 1 < text.length) pattern += escapeRegex(text[++i]);
+        else pattern += c === "*" ? ".*" : c === "?" ? "." : escapeRegex(c);
+    }
+    return new RegExp(`^${pattern}$`, "i");
+}
+
+function conditionalMany(args: Value[], mode: "sum" | "count" | "average" | "min" | "max"): Value {
+    if (args.length < 3 || args.length % 2 !== 1) return ERR("#VALUE!");
+    const target = matrix(args[0]);
+    const ranges: Scalar[][][] = [];
+    const criteria: Scalar[] = [];
+    for (let i = 1; i < args.length; i += 2) {
+        const range = matrix(args[i]);
+        const criterion = scalar(args[i + 1]);
+        if (isError(criterion)) return criterion;
+        if (!sameSize(target, range)) return ERR("#VALUE!");
+        ranges.push(range);
+        criteria.push(criterion);
+    }
+    const values: number[] = [];
+    let count = 0;
+    for (let r = 0; r < target.length; r++) {
+        for (let c = 0; c < target[r].length; c++) {
+            if (!ranges.every((range, i) => matchesCriterion(range[r][c], criteria[i]))) continue;
+            count++;
+            const value = target[r][c];
+            if (mode !== "count" && isError(value)) return value;
+            if (typeof value === "number") values.push(value);
+        }
+    }
+    if (mode === "count") return count;
+    if (mode === "min" || mode === "max") return values.length ? Math[mode](...values) : 0;
+    if (mode === "average" && !values.length) return ERR("#DIV/0!");
+    const total = values.reduce((a, b) => a + b, 0);
+    return mode === "average" ? total / values.length : total;
+}
+
+function textArgs(args: Value[], fn: (a: string, b: string) => Value): Value {
+    const a = toText(scalar(args[0] ?? null));
+    const b = toText(scalar(args[1] ?? null));
+    return isError(a) ? a : isError(b) ? b : fn(a, b);
+}
+
+function findText(args: Value[], insensitive: boolean): Value {
+    return textArgs(args, (needle, haystack) => {
+        const start = args.length > 2 ? toNumber(scalar(args[2])) : 1;
+        if (isError(start)) return start;
+        if (start < 1 || start > haystack.length) return ERR("#VALUE!");
+        const index = insensitive
+            ? (new RegExp(wildcard(needle).source.slice(1, -1), "i").exec(
+                  haystack.slice(Math.trunc(start) - 1),
+              )?.index ?? -1)
+            : haystack.slice(Math.trunc(start) - 1).indexOf(needle);
+        return index < 0 ? ERR("#VALUE!") : index + Math.trunc(start);
+    });
+}
+
+const DAY_MS = 86400000;
+function excelSerial(ms: number): number {
+    const n = (ms - Date.UTC(1899, 11, 31)) / DAY_MS;
+    return n >= 60 ? n + 1 : n;
+}
+function serialDate(n: number): Date {
+    return new Date(Date.UTC(1899, 11, 31) + (n >= 60 ? n - 1 : n) * DAY_MS);
+}
+function localNowSerial(): number {
+    const now = new Date();
+    return excelSerial(now.getTime() - now.getTimezoneOffset() * 60000);
+}
+function datePart(args: Value[], get: (d: Date) => number): Value {
+    const n = toNumber(scalar(args[0] ?? null));
+    if (isError(n)) return n;
+    return n < 0 || n > 2958465 ? ERR("#NUM!") : get(serialDate(n));
+}
+function shiftMonth(args: Value[], end: boolean): Value {
+    const n = toNumber(scalar(args[0] ?? null));
+    const months = toNumber(scalar(args[1] ?? null));
+    if (isError(n)) return n;
+    if (isError(months)) return months;
+    if (n < 0) return ERR("#NUM!");
+    const d = serialDate(n);
+    const last = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + Math.trunc(months) + 1, 0));
+    if (!end) last.setUTCDate(Math.min(d.getUTCDate(), last.getUTCDate()));
+    const value = excelSerial(last.getTime());
+    return Number.isFinite(value) && value >= 0 && value <= 2958465 ? value : ERR("#NUM!");
+}
+
+function xlookup(args: Value[]): Value {
+    const key = scalar(args[0] ?? null);
+    if (isError(key)) return key;
+    const a = matrix(args[1] ?? null);
+    const b = matrix(args[2] ?? null);
+    if (!sameSize(a, b) || (a.length > 1 && a[0].length > 1)) return ERR("#VALUE!");
+    const lookup = flatten([a]);
+    const result = flatten([b]);
+    const mode = args.length > 4 ? toNumber(scalar(args[4])) : 0;
+    const order = args.length > 5 ? toNumber(scalar(args[5])) : 1;
+    if (isError(mode)) return mode;
+    if (isError(order)) return order;
+    if (![0, -1, 1, 2].includes(mode) || ![1, -1, 2, -2].includes(order)) return ERR("#VALUE!");
+    let best = -1;
+    const indices = lookup.map((_, i) => i);
+    if (order < 0) indices.reverse();
+    for (const i of indices) {
+        const item = lookup[i];
+        if (isError(item)) return item;
+        const c = compare(item, key);
+        if (
+            mode === 2 && typeof key === "string" && typeof item === "string"
+                ? wildcard(key).test(item)
+                : c === 0
+        )
+            return result[i] ?? 0;
+        if ((mode === -1 && c < 0) || (mode === 1 && c > 0)) {
+            if (best < 0 || (mode === -1 ? compare(item, lookup[best]) > 0 : compare(item, lookup[best]) < 0))
+                best = i;
+        }
+    }
+    return best >= 0 ? (result[best] ?? 0) : args.length > 3 ? args[3] : ERR("#N/A");
 }
 
 // ------------------------------------------------------------------ Evaluation
@@ -817,10 +1103,13 @@ export class WorkbookEvaluator {
                     scalar(this.evaluate(ast.right, sheet)),
                 );
             case "call": {
-                const fn = FUNCTIONS[ast.name];
+                const fn = FUNCTIONS[ast.name.replace(/^_xlfn\./i, "")];
                 if (fn === undefined) return ERR("#NAME?");
+                const info = FUNCTION_INFO[ast.name.replace(/^_xlfn\./i, "")];
+                if (info && (ast.args.length < info[2] || ast.args.length > (info[3] ?? Infinity)))
+                    return ERR("#VALUE!");
                 const context: EvalContext = { evaluate: (node) => this.evaluate(node, sheet) };
-                const lazy = ast.name === "IF" || ast.name === "IFERROR";
+                const lazy = ["IF", "IFERROR", "IFNA", "IFS"].includes(ast.name.replace(/^_xlfn\./i, ""));
                 const args = lazy ? [] : ast.args.map((arg) => this.evaluate(arg, sheet));
                 return fn(args, ast.args, context);
             }

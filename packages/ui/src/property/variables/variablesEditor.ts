@@ -12,6 +12,7 @@ import {
     PubSub,
     unitSpecOfType,
     type VariableData,
+    VariableStudioNode,
     type VariableType,
 } from "@chili3d/core";
 import { button, div, input, option, select, span, svg } from "@chili3d/element";
@@ -25,6 +26,8 @@ const TYPES: readonly { value: VariableType; label: I18nKeys }[] = [
 ];
 
 const COLUMNS: readonly I18nKeys[] = ["common.name", "variable.type", "variable.value"];
+const foldedTables = new WeakMap<VariablesDataContent["source"], boolean>();
+let nextTableId = 0;
 
 /**
  * The parameters table: one row per document parameter — Name / Type / Value, where the
@@ -39,6 +42,11 @@ const COLUMNS: readonly I18nKeys[] = ["common.name", "variable.type", "variable.
  * clicked arrow on move), so repeated clicks and keyboard users never lose their place.
  */
 export class VariablesEditor extends HTMLElement {
+    private readonly sectionToggle = document.createElement("button");
+    private readonly sectionTitle = document.createElement("span");
+    private readonly chevron = document.createElement("span");
+    private readonly tableId = `variables-table-${++nextTableId}`;
+    private collapsed: boolean;
     private readonly valueCells = new Map<string, HTMLInputElement>();
     private readonly rows = new Map<string, HTMLElement>();
     /** The open description editor, when one is up (see `editDescription`). */
@@ -49,6 +57,18 @@ export class VariablesEditor extends HTMLElement {
     constructor(private readonly content: VariablesDataContent) {
         super();
         this.className = style.root;
+        this.collapsed = foldedTables.get(content.source) ?? false;
+        this.sectionToggle.type = "button";
+        this.sectionToggle.className = style.sectionToggle;
+        this.sectionToggle.setAttribute("aria-controls", this.tableId);
+        this.chevron.className = style.chevron;
+        this.chevron.setAttribute("aria-hidden", "true");
+        this.sectionToggle.append(this.chevron, this.sectionTitle);
+        this.sectionToggle.onclick = () => {
+            this.collapsed = !this.collapsed;
+            foldedTables.set(this.content.source, this.collapsed);
+            this.updateSection();
+        };
         this.render();
         this.listen();
     }
@@ -100,6 +120,10 @@ export class VariablesEditor extends HTMLElement {
      * Studio edit can change what a table row — or a later studio's row — resolves to.
      */
     private readonly handleVariablesChanged = (property: string, source: unknown) => {
+        if (property === "name" && source === this.content.source) {
+            this.updateSection();
+            return;
+        }
         if (property === "scope") {
             this.refreshValues();
             return;
@@ -114,17 +138,14 @@ export class VariablesEditor extends HTMLElement {
         this.valueCells.clear();
         this.rows.clear();
         this.replaceChildren(
+            this.sectionToggle,
             div(
-                { className: style.table },
+                { className: style.table, id: this.tableId },
                 div(
                     { className: style.header },
                     ...COLUMNS.map((column) =>
                         span({ className: style.cell, textContent: new Localize(column) }),
                     ),
-                    // The actions column's header, deliberately empty: its buttons are icons
-                    // with tooltips, and a label would cost width to say nothing. The span
-                    // itself is load-bearing — one cell short and every column shifts left.
-                    span(),
                 ),
                 div(
                     { className: style.rows },
@@ -133,7 +154,19 @@ export class VariablesEditor extends HTMLElement {
                 ),
             ),
         );
+        this.updateSection();
         this.refreshValues();
+    }
+
+    private updateSection() {
+        this.sectionTitle.textContent =
+            this.content.source instanceof VariableStudioNode
+                ? this.content.source.name
+                : I18n.translate("elements.partStudio{0}", 1);
+        this.chevron.textContent = this.collapsed ? "▸" : "▾";
+        this.sectionToggle.setAttribute("aria-expanded", String(!this.collapsed));
+        const table = this.querySelector<HTMLElement>(`#${this.tableId}`);
+        if (table) table.hidden = this.collapsed;
     }
 
     /**
@@ -221,7 +254,7 @@ export class VariablesEditor extends HTMLElement {
     private nameCell(item: VariableData) {
         const marker = span({
             className: item.description ? `${style.marker} ${style.hasNote}` : style.marker,
-            textContent: "•",
+            textContent: "ⓘ",
             title: item.description ?? new Localize("variable.addDescription"),
             onclick: (e: MouseEvent) => {
                 e.stopPropagation();

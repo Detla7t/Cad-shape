@@ -9,6 +9,7 @@ import { createOnshapeIcon } from "./onshapeIcon";
 
 /** Original 20 px CAD symbols: neutral geometry, blue editable handles. */
 const paths: Record<string, string> = {
+    rename: "M3 13 13 3l4 4L7 17l-5 1Z M11 5l4 4 M3 13l4 4",
     line: "M4 16 16 4",
     rectangle: "M3 5H17V15H3Z",
     circle: "M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z M9 10h2 M10 9v2",

@@ -4,6 +4,7 @@
 export * from "./cadIcon";
 export * from "./collection";
 export * from "./converters";
+export * from "./editableTitle";
 export * from "./elements";
 export * from "./expander";
 export * from "./htmlProps";

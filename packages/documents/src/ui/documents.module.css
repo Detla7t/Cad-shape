@@ -281,7 +281,9 @@
     min-height: 0;
     overflow: auto;
     outline: none;
-    background-color: var(--control-background-color);
+    /* Workbook colors retain their Excel meaning independently of the app theme. */
+    background-color: #fff;
+    color: #202124;
 }
 
 .grid {

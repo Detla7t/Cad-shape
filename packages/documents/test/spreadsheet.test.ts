@@ -241,11 +241,11 @@ describe("workbook files (XLSX through ExcelJS, ODS)", () => {
         expect(back.isOk).toBe(true);
         const [dims, other] = back.value.sheets;
         expect(back.value.sheets.map((sheet) => sheet.name)).toEqual(["Dims", "Other sheet"]);
-        expect(dims.cells["B1"]).toEqual({ v: 120, z: "0.00" });
+        expect(dims.cells["B1"]).toMatchObject({ v: 120, z: "0.00" });
         // Formulas come back with the evaluated result cached, for readers that do not recalculate.
-        expect(dims.cells["B3"]).toEqual({ f: "B1*B2", v: 9600, z: "#,##0" });
+        expect(dims.cells["B3"]).toMatchObject({ f: "B1*B2", v: 9600, z: "#,##0" });
         expect(dims.cells["B4"]).toMatchObject({ f: "B1/B2", v: 1.5 });
-        expect(dims.cells["B5"]).toEqual({ v: true });
+        expect(dims.cells["B5"]).toMatchObject({ v: true });
         expect(other.cells["A1"]).toMatchObject({ f: "Dims!B3/100", v: 96 });
         expect(dims.cols?.[0]).toBe(140);
         expect(dims.cols?.[2]).toBe(60);

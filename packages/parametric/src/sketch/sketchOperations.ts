@@ -335,6 +335,15 @@ function retargetCurveConstraint(
                   );
               })
             : parts[0];
+        // An existing attachment at a cut becomes an attachment to the new endpoint.
+        // Incidence with the supporting circle alone leaves the endpoint free to slide.
+        const endpoint = part && uv && [0, 1].find((t) => distance(uv, pointAt(part, t)) < EPS);
+        if (part && typeof endpoint === "number")
+            return {
+                ...structuredClone(constraint),
+                kind: ConstraintKind.P2PCoincident,
+                refs: [point, { entityId: part.id, pointIndex: endpoint + 1 }],
+            };
         return part
             ? {
                   ...structuredClone(constraint),

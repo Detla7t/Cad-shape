@@ -5,7 +5,7 @@ import type { IViewGizmo, Plane } from "@chili3d/core";
 import { Matrix4, Quaternion, Vector3 } from "three";
 import type { CameraController } from "./cameraController";
 import type { ThreeView } from "./threeView";
-import { createCubeRegions } from "./viewCubeGeometry";
+import { createCubeRegions, roundedCubePatch, visibleCubeAxis } from "./viewCubeGeometry";
 import style from "./viewGizmo.module.css";
 import { ViewMenu } from "./viewMenu";
 
@@ -18,19 +18,20 @@ function svg<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string,
 export class ViewGizmo extends HTMLElement implements IViewGizmo {
     readonly cameraController: CameraController;
     private readonly drawing = svg("svg", { viewBox: "0 0 150 160", "aria-label": "View cube" });
-    private readonly cube = svg("g");
-    private readonly axes = svg("g", { class: style.axes });
+    private readonly cube = svg("g", { "data-role": "view-cube" });
+    private readonly axes = svg("g", { class: style.axes, "data-role": "cube-axes" });
     private readonly regions = createCubeRegions().map((region) => {
         const group = svg("g", { class: style.region, "data-kind": region.kind });
-        const polygon = svg("polygon");
+        const polygon = svg("polygon", { class: style.hitTarget });
+        const surface = svg("path", { class: style.surface });
         const label = svg("text", { "text-anchor": "middle", "dominant-baseline": "central" });
         label.textContent = region.kind === "face" ? region.name : "";
-        group.append(polygon, label);
+        group.append(polygon, surface, label);
         this.button(group, `${region.name} view`, () => this.orient(region.normal));
-        return { ...region, group, polygon, label };
+        return { ...region, group, polygon, surface, label };
     });
     private readonly axisLines = ["#e85b57", "#55ba65", "#608be9"].map((color, i) => {
-        const line = svg("line", { stroke: color });
+        const line = svg("path", { stroke: color, fill: "none", "data-axis": "XYZ"[i] });
         const label = svg("text", { fill: color });
         label.textContent = "XYZ"[i];
         this.axes.append(line, label);
@@ -46,7 +47,9 @@ export class ViewGizmo extends HTMLElement implements IViewGizmo {
         this.cameraController = view.cameraController;
         this.menu = new ViewMenu(view, (direction) => this.orient(direction));
         this.className = style.root;
-        this.drawing.append(this.axes, this.cube);
+        const orientation = svg("g", { "data-role": "orientation-object" });
+        orientation.append(this.cube, this.axes);
+        this.drawing.append(orientation);
         this.append(this.drawing);
         this.addControls();
         this.update();
@@ -241,10 +244,8 @@ export class ViewGizmo extends HTMLElement implements IViewGizmo {
         if (this.lastRotation?.equals(rotation)) return;
         this.lastRotation = rotation.clone();
         const inverse = rotation.clone().invert();
-        const project = (point: Vector3) => {
-            const p = point.clone().applyQuaternion(inverse);
-            return { x: 75 + p.x * 28, y: 77 - p.y * 28, z: p.z };
-        };
+        const screen = (p: Vector3) => ({ x: 75 + p.x * 28, y: 77 - p.y * 28 });
+        const project = (point: Vector3) => screen(point.clone().applyQuaternion(inverse));
         const regions = this.regions
             .map((region) => ({ region, normal: region.normal.clone().applyQuaternion(inverse) }))
             .sort((a, b) => a.normal.z - b.normal.z);
@@ -254,15 +255,9 @@ export class ViewGizmo extends HTMLElement implements IViewGizmo {
             region.group.setAttribute("tabindex", visible ? "0" : "-1");
             region.group.setAttribute("aria-hidden", String(!visible));
             if (visible) {
-                region.polygon.setAttribute(
-                    "points",
-                    region.vertices
-                        .map((v) => {
-                            const p = project(v);
-                            return `${p.x},${p.y}`;
-                        })
-                        .join(" "),
-                );
+                const points = region.vertices.map(project);
+                region.polygon.setAttribute("points", points.map((p) => `${p.x},${p.y}`).join(" "));
+                region.surface.setAttribute("d", roundedCubePatch(points, region.kind === "face" ? 5 : 1.5));
                 if (region.up) {
                     const right = region.up.clone().cross(region.normal).applyQuaternion(inverse);
                     const up = region.up.clone().applyQuaternion(inverse);
@@ -275,17 +270,35 @@ export class ViewGizmo extends HTMLElement implements IViewGizmo {
             }
             this.cube.append(region.group);
         }
-        // A small world-axis triad stays below the cube and follows the same camera rotation.
+        // The triad starts at the cube's negative XYZ corner, just outside its rounded shell.
+        // Both endpoints use the cube's projection, so the corner and axes orbit as one object.
+        const corner = new Vector3(-1.12, -1.12, -1.12);
+        const start = corner.clone().applyQuaternion(inverse);
+        const faces = regions
+            .filter(({ normal }) => normal.z > 0.001)
+            .map(({ region }) => region.vertices.map((v) => v.clone().applyQuaternion(inverse)));
         for (let i = 0; i < 3; i++) {
             const axis = new Vector3().setComponent(i, 1).applyQuaternion(inverse);
-            const x = 36 + axis.x * 24;
-            const y = 116 - axis.y * 24;
+            const end = corner.clone().setComponent(i, 1.12).applyQuaternion(inverse);
+            const { x, y } = screen(end);
+            const segments = visibleCubeAxis(start, end, faces);
             const { line, label } = this.axisLines[i];
-            for (const [key, value] of Object.entries({ x1: 36, y1: 116, x2: x, y2: y }))
-                line.setAttribute(key, String(value));
+            // Draw only unoccluded segments above the cube; a foreground axis must never be
+            // hidden merely because an SVG face was appended later in DOM order.
+            line.setAttribute(
+                "d",
+                segments
+                    .map(([a, b]) => {
+                        const p = screen(a),
+                            q = screen(b);
+                        return `M${p.x},${p.y} L${q.x},${q.y}`;
+                    })
+                    .join(" "),
+            );
             label.setAttribute("x", String(x + axis.x * 7 - 3));
             label.setAttribute("y", String(y - axis.y * 7 + 3));
-            label.style.display = Math.hypot(axis.x, axis.y) < 0.15 ? "none" : "";
+            const endVisible = segments.some(([, b]) => b.distanceToSquared(end) < 1e-10);
+            label.style.display = Math.hypot(axis.x, axis.y) < 0.15 || !endVisible ? "none" : "";
         }
     }
 }

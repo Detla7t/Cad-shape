@@ -1,0 +1,59 @@
+.title {
+    display: flex;
+    flex: 1 1 0;
+    min-width: 0;
+    align-items: center;
+    height: 28px;
+    gap: 3px;
+    color: inherit;
+}
+.title strong {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: inherit;
+}
+.title .pencil {
+    opacity: 0;
+    flex: 0 0 27px;
+    width: 27px;
+    height: 27px;
+    padding: 4px;
+    border: none;
+    border-radius: 0;
+    color: inherit;
+    background: transparent;
+    cursor: pointer;
+}
+.title:hover .pencil,
+.title:focus-within .pencil {
+    opacity: 1;
+}
+.title .pencil:hover {
+    background: var(--hover-background-color, #eee);
+}
+.title .pencil svg {
+    width: 18px;
+    height: 18px;
+}
+.title .input {
+    width: 100%;
+    min-width: 0;
+    height: 26px;
+    box-sizing: border-box;
+    padding: 2px 4px;
+    border: 1px solid var(--primary-color, #1651b0);
+    background: var(--input-background-color, white);
+    color: var(--input-text-color, inherit);
+    font: inherit;
+}
+.title [hidden] {
+    display: none;
+}
+@media (hover: none) {
+    .title .pencil {
+        opacity: 1;
+    }
+}

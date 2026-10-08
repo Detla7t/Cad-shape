@@ -6,6 +6,7 @@ export const I18N_KEYS = [
     "sidebar.inspection",
     "sidebar.appearance",
     "body.referencePlane",
+    "body.origin",
     "command.plane.create",
     "plane.offset",
     "plane.size",
