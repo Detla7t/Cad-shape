@@ -95,6 +95,8 @@ export interface FeatureItem {
  * node or feature types.
  */
 export interface IFeatureListNode {
+    readonly rollbackIndex?: number;
+    setRollbackIndex?(index: number | undefined): boolean;
     featureItems(): readonly FeatureItem[];
     setFeatureParameter(featureId: string, key: string, value: number | string | boolean): void;
     /** `true`/`false`, or a `configure(…)` value over a list or checkbox input (configured suppression). */

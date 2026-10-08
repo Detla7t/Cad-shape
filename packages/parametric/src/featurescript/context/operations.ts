@@ -11,6 +11,7 @@ import {
     Matrix4,
     Plane,
     type Result,
+    ShapeTypes,
     type TrackedShape,
     XYZ,
 } from "@chili3d/core";
@@ -562,26 +563,54 @@ function installSweeps(std: StdBuilder): void {
     });
     std.fn("opSweep", (args) => {
         const [ctx, id, definition] = definitionOf(args, "opSweep");
+        rejectSweepOptions(ctx, definition);
         const profiles = resolveQuery(ctx, definition.field("profiles"));
-        // The pipe shell sweeps wires (a face or a bare edge aborts it): a face's outer loop, or the edges.
-        const faces = facesOf(profiles).map((entry) => ctx.track(entry.face.outerWire()) as IShape);
-        const sections = faces.length > 0 ? faces : [wireOf(ctx, edgeRefsOf(profiles), "opSweep profile")];
         const path = wireOf(ctx, edgeRefsOf(resolveQuery(ctx, definition.field("path"))), "opSweep path");
-        ctx.addBody(
-            kernel(
-                shapeFactory.sweep(sections, path, definition.field("keepProfileOrientation") === true),
-                "opSweep",
-            ),
-            id,
+        if (!shapeFactory.sweepProfile) fail("opSweep needs the profile sweep kernel binding");
+        const keepOrientation =
+            definition.field("keepProfileOrientation") === true ||
+            optionalEnum(
+                definition.field("profileControl"),
+                "ProfileControlMode",
+                "profileControl",
+                "NONE",
+            ) === "KEEP_ORIENTATION";
+        const sweep = (wire: IWire, solid: boolean) =>
+            ctx.track(kernel(shapeFactory.sweepProfile!(wire, path, solid, keepOrientation), "opSweep"));
+        const results: IShape[] = [];
+        // Each region is a separate sweep, not a section of one varying-profile pipe.
+        // Sweep and subtract every inner loop so annular profiles retain their holes.
+        for (const { face } of facesOf(profiles)) {
+            const outer = ctx.track(face.outerWire());
+            let shape = sweep(outer, true);
+            const loops = face.findSubShapes(ShapeTypes.wire).map((wire) => ctx.track(wire) as IWire);
+            const holes = loops.filter((wire) => !wire.isSame(outer)).map((wire) => sweep(wire, true));
+            if (holes.length) shape = ctx.track(kernel(shapeFactory.booleanCut([shape], holes), "opSweep"));
+            results.push(shape);
+        }
+        const edges = profiles.filter(
+            (ref) => ref.kind === "EDGE" || (ref.kind === "BODY" && ref.body.kind === "WIRE"),
         );
+        if (edges.length) results.push(sweep(wireOf(ctx, edgeRefsOf(edges), "opSweep profile"), false));
+        if (!results.length) fail("opSweep needs face or edge profiles");
+        // Publish only after all profiles succeed.
+        for (const shape of results) ctx.addBody(shape, id);
         return undefined;
     });
     std.fn("opLoft", (args) => {
         const [ctx, id, definition] = definitionOf(args, "opLoft");
+        for (const field of ["guideSubqueries", "connections", "derivativeInfo"]) {
+            const value = definition.field(field);
+            if (value !== undefined && (!(value instanceof FsArray) || value.size > 0))
+                fail(`opLoft: ${field} is not supported yet`);
+        }
+        for (const field of ["makePeriodic", "addSections", "trimProfiles", "trimGuidesByProfiles"])
+            if (definition.field(field) === true) fail(`opLoft: ${field} is not supported yet`);
         const subqueries = expectArray(definition.field("profileSubqueries"), "profileSubqueries").items;
         if (subqueries.length < 2) fail("opLoft needs at least two profiles");
         const sections = subqueries.map((sub, i) => loftSection(ctx, resolveQuery(ctx, sub), i));
         const bodyType = optionalEnum(definition.field("bodyType"), "ToolBodyType", "bodyType", "SOLID");
+        if (bodyType !== "SOLID" && bodyType !== "SURFACE") fail(`opLoft: unsupported bodyType ${bodyType}`);
         ctx.addBody(
             kernel(
                 shapeFactory.loft(sections, bodyType === "SOLID", definition.field("ruled") === true, "c2"),
@@ -595,7 +624,8 @@ function installSweeps(std: StdBuilder): void {
         const [ctx, id, definition] = definitionOf(args, "opThicken");
         const t1 = optionalLengthMm(definition.field("thickness1"), "thickness1");
         const t2 = optionalLengthMm(definition.field("thickness2"), "thickness2");
-        if (t1 + t2 <= 0) fail("opThicken needs a positive total thickness");
+        if (t1 < 0 || t2 < 0 || t1 + t2 <= 0)
+            fail("opThicken needs nonnegative thicknesses and a positive total thickness");
         const slab = (face: IFace, thickness: number): IShape => {
             const shape = ctx.track(
                 kernel(shapeFactory.makeThickSolidBySimple(face, thickness), "opThicken"),
@@ -605,7 +635,10 @@ function installSweeps(std: StdBuilder): void {
             if (shape.volume() < 0) shape.reserve();
             return shape;
         };
-        for (const { face } of facesOf(resolveQuery(ctx, definition.field("entities")))) {
+        const selected = facesOf(resolveQuery(ctx, definition.field("entities")));
+        if (!selected.length) fail("opThicken needs sheet bodies or faces");
+        const results: IShape[] = [];
+        for (const { face } of selected) {
             const parts: IShape[] = [];
             if (t1 > 0) parts.push(slab(face, t1));
             if (t2 > 0) parts.push(slab(face, -t2));
@@ -613,7 +646,21 @@ function installSweeps(std: StdBuilder): void {
                 parts.length === 1
                     ? parts[0]
                     : kernel(shapeFactory.booleanFuse([parts[0]], [parts[1]], true), "opThicken");
-            ctx.addBody(shape, id);
+            results.push(shape);
+        }
+        for (const shape of results) ctx.addBody(shape, id);
+        if (definition.field("keepTools") === false) {
+            for (const body of new Set(selected.map((entry) => entry.body))) {
+                if (body.kind !== "SHEET" || body.flags.sketch) continue;
+                if (
+                    body
+                        .faces()
+                        .every((face) =>
+                            selected.some((entry) => entry.body === body && entry.face.isSame(face)),
+                        )
+                )
+                    ctx.removeBody(body);
+            }
         }
         return undefined;
     });
@@ -654,8 +701,30 @@ function loftSection(ctx: FsContext, refs: EntityRef[], index: number): IVertex 
     const vertex = refs.find((ref) => ref.kind === "VERTEX");
     if (vertex !== undefined && refs.length === 1) return vertex.body.vertices()[vertex.index];
     const faces = facesOf(refs);
-    if (faces.length > 0) return ctx.track(faces[0].face.outerWire());
+    if (faces.length > 0) {
+        if (faces.length !== 1) fail(`opLoft profile ${index}: multiple regions are not supported yet`);
+        const loops = faces[0].face.findSubShapes(ShapeTypes.wire).map((wire) => ctx.track(wire));
+        if (loops.length !== 1) fail(`opLoft profile ${index}: profiles with holes are not supported yet`);
+        return ctx.track(faces[0].face.outerWire());
+    }
     return wireOf(ctx, edgeRefsOf(refs), `opLoft profile ${index}`);
+}
+
+function rejectSweepOptions(ctx: FsContext, definition: FsMap): void {
+    for (const field of ["hasTwist", "hasScale"])
+        if (definition.field(field) === true) fail(`opSweep: ${field} is not supported yet`);
+    const control = definition.field("profileControl");
+    if (
+        control !== undefined &&
+        !["NONE", "KEEP_ORIENTATION"].includes(enumName(control, "ProfileControlMode", "profileControl"))
+    )
+        fail(`opSweep: ${enumName(control, "ProfileControlMode", "profileControl")} is not supported yet`);
+    if (definition.field("lockDirection") !== undefined) fail("opSweep: lockDirection is not supported yet");
+    const faces = definition.field("lockFaces");
+    if (faces !== undefined && resolveQuery(ctx, faces).length)
+        fail("opSweep: lockFaces is not supported yet");
+    if (definition.field("extendToFullPath") === false)
+        fail("opSweep: limiting the path at the profile is not supported yet");
 }
 
 /**

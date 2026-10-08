@@ -5,8 +5,8 @@ import {
     AsyncController,
     CurveUtils,
     documentUnit,
+    documentUnits,
     evaluateShapeProperties,
-    formatDocumentValue,
     type IEdge,
     type IFace,
     type INodeVisual,
@@ -20,6 +20,7 @@ import {
     type ShapeType,
     ShapeTypes,
     ShapeTypeUtils,
+    unitSuffix,
     VisualStates,
 } from "@chili3d/core";
 import { action, labeled, panelBody, table, textElement } from "./helpers";
@@ -30,12 +31,17 @@ export class GeometryPanel {
     readonly element: HTMLElement;
     private readonly output = document.createElement("div");
     private readonly density = document.createElement("input");
+    private readonly measureType = document.createElement("select");
+    private readonly lengthUnit = document.createElement("select");
+    private readonly angleUnit = document.createElement("select");
+    private massMode: "part" | "face" = "part";
     private picker?: AsyncController;
     private disposed = false;
     private queued = false;
     constructor(
         private readonly view: IView,
         private readonly kind: GeometryPanelKind,
+        private readonly analysisTool: "geometry" | "interference" = "geometry",
     ) {
         const { root, body } = panelBody(
             kind === "measure"
@@ -45,10 +51,14 @@ export class GeometryPanel {
                   : "Mass and section properties",
         );
         this.element = root;
+        root.classList.add(style.geometryPanel);
         const controls = document.createElement("div");
         controls.className = style.toolbar;
         controls.append(
-            action("Select entities…", () => void this.pick()),
+            action(
+                kind === "measure" ? "Select entities to measure" : "Select entities…",
+                () => void this.pick(),
+            ),
             action("Refresh", this.render),
         );
         if (kind === "analysis") controls.append(action("Section view…", () => view.showSectionView?.()));
@@ -56,13 +66,77 @@ export class GeometryPanel {
             controls,
             textElement(
                 "p",
-                kind === "mass"
-                    ? "Select solids for volume and center of mass, or planar faces for section area and moments. Density is optional and applies uniformly to the selection."
-                    : "Select edges, faces, vertices or model items. Two entities also show their minimum distance.",
+                kind === "analysis"
+                    ? analysisTool === "interference"
+                        ? "Select two solid parts to calculate their common volume. Touching faces or edges have zero interference volume."
+                        : "Numerical geometry inspection. Curvature combs and surface analysis overlays are not yet supported."
+                    : kind === "mass"
+                      ? "Select solids for volume and center of mass, or planar faces for section area and moments. Density is optional and applies uniformly to the selection."
+                      : "Select edges, faces, vertices or model items. Two entities also show their minimum distance.",
                 style.muted,
             ),
         );
+        if (kind === "measure") {
+            this.addSelect(body, "Measure type", this.measureType, [
+                ["all", "Show all"],
+                ["position", "Position"],
+                ["length", "Length"],
+                ["radius", "Radius"],
+                ["diameter", "Diameter"],
+                ["angle", "Angle"],
+                ["distance", "Minimum distance"],
+                ["area", "Area"],
+                ["volume", "Volume"],
+            ]);
+            this.addSelect(body, "Length unit", this.lengthUnit, [
+                ["mm", "Millimeter"],
+                ["cm", "Centimeter"],
+                ["m", "Meter"],
+                ["in", "Inch"],
+                ["ft", "Foot"],
+            ]);
+            this.addSelect(body, "Angle unit", this.angleUnit, [
+                ["deg", "Degree"],
+                ["rad", "Radian"],
+            ]);
+            const units = documentUnits(view.document);
+            this.lengthUnit.value = units.length;
+            this.angleUnit.value = units.angle;
+            body.append(
+                this.unavailable(
+                    "Reference coordinate system",
+                    "Mate connector reference frames are not yet supported by this inspector.",
+                ),
+            );
+        }
         if (kind === "mass") {
+            const tabs = document.createElement("div");
+            tabs.className = style.toolbar;
+            tabs.setAttribute("role", "tablist");
+            tabs.setAttribute("aria-label", "Mass or section properties");
+            for (const mode of ["part", "face"] as const) {
+                const tab = action(mode === "part" ? "Part" : "Face", () => {
+                    this.massMode = mode;
+                    for (const item of tabs.children)
+                        item.setAttribute("aria-selected", String(item === tab));
+                    this.density.disabled = mode === "face";
+                    this.render();
+                });
+                tab.setAttribute("role", "tab");
+                tab.setAttribute("aria-selected", String(mode === this.massMode));
+                tabs.append(tab);
+            }
+            body.prepend(tabs);
+            body.append(
+                this.unavailable(
+                    "Mate connector for reference frame",
+                    "Reference frame selection is not yet supported; results use world-aligned centroid axes.",
+                ),
+                this.unavailable(
+                    "Show calculation variance",
+                    "The current integration provider does not return a certified error bound.",
+                ),
+            );
             this.density.type = "number";
             this.density.min = "0";
             this.density.step = "any";
@@ -79,13 +153,36 @@ export class GeometryPanel {
         this.render();
         root.addEventListener("keydown", (event) => event.stopPropagation());
     }
+    private addSelect(body: HTMLElement, label: string, select: HTMLSelectElement, options: string[][]) {
+        for (const [value, text] of options) select.add(new Option(text, value));
+        select.setAttribute("aria-label", label);
+        select.onchange = this.render;
+        body.append(labeled(label, select));
+    }
+    private unavailable(label: string, reason: string) {
+        const input = document.createElement("input");
+        input.type = "checkbox";
+        input.disabled = true;
+        input.setAttribute("aria-label", label);
+        const row = labeled(label, input);
+        row.title = reason;
+        row.append(textElement("small", reason, style.muted));
+        return row;
+    }
     private async pick() {
         this.picker?.cancel();
         const controller = new AsyncController();
         this.picker = controller;
         try {
             const picks = await this.view.document.picker.pickShape("prompt.select.shape", controller, {
-                shapeType: (ShapeTypes.edge | ShapeTypes.face | ShapeTypes.vertex) as ShapeType,
+                shapeType:
+                    this.kind === "analysis" && this.analysisTool === "interference"
+                        ? ShapeTypes.solid
+                        : this.kind === "mass"
+                          ? this.massMode === "part"
+                              ? ShapeTypes.solid
+                              : ShapeTypes.face
+                          : ((ShapeTypes.edge | ShapeTypes.face | ShapeTypes.vertex) as ShapeType),
                 multi: true,
             });
             if (!this.disposed && picks.length) {
@@ -110,21 +207,35 @@ export class GeometryPanel {
             this.render();
         });
     };
-    private collect(): IShape[] {
-        const doc = this.view.document,
-            picks = doc.selection.getSelectedShapes();
-        if (picks.length) return picks.map((pick) => pick.shape.transformedMul(pick.transform));
-        return doc.selection.getSelectedNodes().flatMap((node) => {
-            if (!(node instanceof ShapeNode) || !node.shape.isOk) return [];
+    private collect(shapes: IShape[]): void {
+        const doc = this.view.document;
+        const picks = doc.selection.getSelectedShapes();
+        const requireValid = (node: unknown) => {
+            if (node instanceof ShapeNode && (node.evaluationError || !node.shape.isOk))
+                throw new Error(
+                    "Cannot measure a model with a failed rebuild. Resolve its feature errors first.",
+                );
+        };
+        if (picks.length) {
+            for (const pick of picks) {
+                requireValid(pick.owner.node);
+                shapes.push(pick.shape.transformedMul(pick.transform));
+            }
+            return;
+        }
+        for (const node of doc.selection.getSelectedNodes()) {
+            if (!(node instanceof ShapeNode)) continue;
+            requireValid(node);
+            if (!node.shape.isOk) continue;
             const visual = doc.visual.context.getVisual(node) as INodeVisual | undefined;
-            return [node.shape.value.transformedMul(visual?.worldTransform() ?? Matrix4.identity())];
-        });
+            shapes.push(node.shape.value.transformedMul(visual?.worldTransform() ?? Matrix4.identity()));
+        }
     }
     private readonly render = () => {
         if (this.disposed) return;
         const shapes: IShape[] = [];
         try {
-            shapes.push(...this.collect());
+            this.collect(shapes);
             if (!shapes.length) {
                 this.output.replaceChildren(
                     textElement("p", "Select geometry to see its properties.", style.muted),
@@ -133,14 +244,92 @@ export class GeometryPanel {
             }
             const doc = this.view.document,
                 unit = documentUnit(doc, LENGTH_UNITS);
-            const length = (v: number) => formatDocumentValue(v, doc, LENGTH_UNITS);
+            if (this.kind === "measure") {
+                unit.suffix = this.lengthUnit.value;
+                unit.factor = unitSuffix(unit.suffix)?.factor ?? 1;
+            }
+            const length = (v: number) => `${(v / unit.factor).toFixed(unit.precision)} ${unit.suffix}`;
             const power = (v: number, n: number) =>
                 `${(v / unit.factor ** n).toFixed(unit.precision)} ${unit.suffix}${n === 2 ? "²" : n === 3 ? "³" : n === 4 ? "⁴" : n === 5 ? "⁵" : ""}`;
             const rows: string[][] = [
                 ["Property", "Value"],
                 ["Selected entities", String(shapes.length)],
             ];
+            if (this.kind === "analysis" && this.analysisTool === "interference") {
+                if (shapes.length !== 2 || shapes.some((shape) => shape.shapeType !== ShapeTypes.solid)) {
+                    this.output.replaceChildren(
+                        textElement("p", "Select exactly two solid parts.", style.muted),
+                    );
+                    return;
+                }
+                if (shapes.some((shape) => !shape.checkShape()))
+                    throw new Error("Cannot analyze invalid solid geometry.");
+                const common = shapeFactory.booleanCommon([shapes[0]], [shapes[1]]);
+                if (!common.isOk) throw new Error(common.error);
+                try {
+                    const volume = Math.abs(common.value.volume());
+                    rows.push(["Common volume", power(volume, 3)]);
+                    rows.push([
+                        "Result",
+                        volume > 1e-9 ? "Interference detected" : "No volumetric interference",
+                    ]);
+                    this.output.replaceChildren(table(rows));
+                } finally {
+                    common.value.dispose();
+                }
+                return;
+            }
             if (this.kind === "mass") {
+                const validSelection = shapes.every((shape) =>
+                    this.massMode === "face"
+                        ? shape.shapeType === ShapeTypes.face
+                        : shape.shapeType === ShapeTypes.solid ||
+                          shape.shapeType === ShapeTypes.compoundSolid,
+                );
+                if (!validSelection) {
+                    this.output.replaceChildren(
+                        textElement(
+                            "p",
+                            this.massMode === "face"
+                                ? "Select planar faces for section properties."
+                                : "Select solid parts for mass properties.",
+                            style.muted,
+                        ),
+                    );
+                    return;
+                }
+                if (this.massMode === "face") {
+                    let reference: ReturnType<IFace["normal"]> | undefined;
+                    for (const shape of shapes) {
+                        const face = shape as IFace;
+                        const surface = face.surface();
+                        try {
+                            const bounds = surface.bounds();
+                            const current = face.normal(
+                                (bounds.u1 + bounds.u2) / 2,
+                                (bounds.v1 + bounds.v2) / 2,
+                            );
+                            if (
+                                !surface.isPlanar() ||
+                                (reference &&
+                                    (reference[1].cross(current[1]).length() > 1e-7 ||
+                                        Math.abs(current[0].sub(reference[0]).dot(reference[1])) > 1e-7))
+                            ) {
+                                this.output.replaceChildren(
+                                    textElement(
+                                        "p",
+                                        "Section properties require coplanar planar faces.",
+                                        style.error,
+                                    ),
+                                );
+                                return;
+                            }
+                            reference = current;
+                        } finally {
+                            surface.dispose();
+                        }
+                    }
+                }
                 const result = evaluateShapeProperties(shapes);
                 if (!result.isOk) {
                     this.output.replaceChildren(textElement("p", result.error, style.error));
@@ -163,18 +352,45 @@ export class GeometryPanel {
                 const density = this.density.valueAsNumber;
                 if (props.dimension === 3 && Number.isFinite(density) && density > 0)
                     rows.push(["Mass", `${((props.measure * density) / 1e6).toFixed(6)} kg`]);
+                else if (props.dimension === 3)
+                    rows.push(["Mass", "Enter a density; material densities are not assigned."]);
+                let surfaceArea = 0;
+                let perimeter = 0;
+                for (const shape of shapes) {
+                    const faces =
+                        shape.shapeType === ShapeTypes.face
+                            ? [shape as IFace]
+                            : (shape.findSubShapes(ShapeTypes.face) as IFace[]);
+                    try {
+                        surfaceArea += faces.reduce((sum, face) => sum + face.area(), 0);
+                    } finally {
+                        for (const face of faces) if (face !== shape) face.dispose();
+                    }
+                    if (this.massMode === "face") {
+                        const edges = shape.findSubShapes(ShapeTypes.edge) as IEdge[];
+                        try {
+                            perimeter += edges.reduce((sum, edge) => sum + edge.length(), 0);
+                        } finally {
+                            for (const edge of edges) edge.dispose();
+                        }
+                    }
+                }
+                if (this.massMode === "part") rows.push(["Surface area", power(surfaceArea, 2)]);
+                else rows.push(["Perimeter (sum of face boundaries)", length(perimeter)]);
                 for (let i = 0; i < 3; i++)
-                    for (let j = i; j < 3; j++)
+                    for (let j = 0; j < 3; j++)
                         rows.push([
                             `I${"xyz"[i]}${"xyz"[j]} (centroid)`,
-                            power(props.inertia[i][j], props.dimension + 2),
+                            props.dimension === 3 && Number.isFinite(density) && density > 0
+                                ? `${((props.inertia[i][j] * density) / 1e6 / unit.factor ** 2).toFixed(unit.precision)} kg·${unit.suffix}²`
+                                : power(props.inertia[i][j], props.dimension + 2),
                         ]);
                 this.output.replaceChildren(
                     table(rows),
                     textElement(
                         "p",
                         props.dimension === 3
-                            ? "Geometric moments are per unit density about world-aligned centroid axes. Mass uses the density entered above."
+                            ? "Without density, moments are geometric (per unit density). With density, they are mass moments. Axes are world-aligned through the centroid. Overrides are not yet supported."
                             : "Section/surface moments use world-aligned centroid axes. Select a planar face for a planar section.",
                         style.muted,
                     ),
@@ -250,13 +466,58 @@ export class GeometryPanel {
             if (volumeSum) rows.push(["Volume", power(volumeSum, 3)]);
             if (shapes.length === 2)
                 rows.push(["Minimum distance", length(shapes[0].extremaDistance(shapes[1]))]);
-            this.output.replaceChildren(table(rows));
+            if (shapes.length === 2 && shapes.every((shape) => shape.shapeType === ShapeTypes.edge)) {
+                const curves = shapes.map((shape) => (shape as IEdge).curve);
+                try {
+                    const bases = curves.map((curve) => curve.basisCurve);
+                    try {
+                        if (bases.every((curve) => CurveUtils.isLine(curve))) {
+                            const a = curves[0].d1(curves[0].firstParameter()).vec;
+                            const b = curves[1].d1(curves[1].firstParameter()).vec;
+                            const radians = Math.acos(
+                                Math.max(-1, Math.min(1, a.dot(b) / (a.length() * b.length()))),
+                            );
+                            rows.push([
+                                "Angle",
+                                this.angleUnit.value === "rad"
+                                    ? `${radians.toFixed(6)} rad`
+                                    : `${((radians * 180) / Math.PI).toFixed(3)}°`,
+                            ]);
+                        }
+                    } finally {
+                        for (const curve of bases) curve.dispose();
+                    }
+                } finally {
+                    for (const curve of curves) curve.dispose();
+                }
+            }
+            const filters: Record<string, RegExp> = {
+                position: /^Point /,
+                length: /length/i,
+                radius: /^Radius$/,
+                diameter: /^Diameter$/,
+                angle: /^Angle$/,
+                distance: /distance/i,
+                area: /area/i,
+                volume: /^Volume$/,
+            };
+            const filter = this.kind === "measure" ? filters[this.measureType.value] : undefined;
+            const visible = filter ? [rows[0], ...rows.slice(1).filter(([name]) => filter.test(name))] : rows;
+            this.output.replaceChildren(
+                visible.length > 1
+                    ? table(visible)
+                    : textElement(
+                          "p",
+                          "This measurement does not apply to the selected entities.",
+                          style.muted,
+                      ),
+            );
         } catch (error) {
             this.output.replaceChildren(
                 textElement("p", error instanceof Error ? error.message : String(error), style.error),
             );
         } finally {
-            shapes.forEach((shape) => shape.dispose());
+            for (const shape of shapes) shape.dispose();
         }
     };
     dispose() {

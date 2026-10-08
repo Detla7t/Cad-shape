@@ -9,6 +9,7 @@ export interface IEventHandler extends IDisposable {
     isEnabled: boolean;
     /** Maps shared toolbar/shortcut actions into the active editing context. */
     resolveCommand?(command: CommandKeys): CommandKeys;
+    contextMenu?(view: IView, event: PointerEvent): boolean;
     pointerMove(view: IView, event: PointerEvent): void;
     pointerDown(view: IView, event: PointerEvent): void;
     pointerUp(view: IView, event: PointerEvent): void;

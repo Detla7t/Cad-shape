@@ -19,7 +19,6 @@ import style from "./editor.module.css";
 import { ElementWorkspace } from "./elements";
 import { FloatPanel } from "./floatPanel";
 import { ModelSidebar } from "./project/modelSidebar";
-import { PropertyView } from "./property";
 import { showConfigurationPanel } from "./property/configuration";
 import { FeatureListProperty } from "./property/featureListProperty";
 import { MaterialDataContent, MaterialEditor } from "./property/material";
@@ -79,7 +78,6 @@ export class Editor extends HTMLElement {
                 style: `width: ${this._sidebarWidth}px;`,
             },
             new ModelSidebar(this.app),
-            new PropertyView({ className: style.sidebarItem }),
             div({
                 className: style.sidebarResizer,
                 onpointerdown: (e: PointerEvent) => this._startSidebarResize(e),

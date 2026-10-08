@@ -30,3 +30,5 @@ import "./modelParameters";
 import "./contextActions";
 
 import "./planeContextActions";
+
+export { appendSketch } from "./sketchClipboard";

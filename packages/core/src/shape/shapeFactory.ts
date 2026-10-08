@@ -101,6 +101,8 @@ export interface IShapeFactory {
     pushPull(shape: IShape, face: IShape, vec: XYZ): Result<IShape>;
     fuse(bottom: IShape, top: IShape): Result<IShape>;
     sweep(profile: IShape[], path: IWire, isRoundCorner: boolean): Result<IShape>;
+    /** A single swept region boundary. Open/closed edges can produce sheets; fixed orientation uses a constant trihedron. */
+    sweepProfile?(profile: IWire, path: IWire, solid: boolean, keepOrientation: boolean): Result<IShape>;
     revolve(profile: IShape, axis: Line, angle: number): Result<IShape>;
     booleanCommon(shape1: IShape[], shape2: IShape[]): Result<IShape>;
     booleanCut(shape1: IShape[], shape2: IShape[]): Result<IShape>;

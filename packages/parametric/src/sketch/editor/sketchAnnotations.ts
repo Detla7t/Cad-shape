@@ -18,6 +18,7 @@ import {
     entityRadius,
     isDatumEntityId,
     pointRefKey,
+    resolveDatumSource,
     type SketchConstraintData,
     type SketchEntityData,
     type SketchPointRef,
@@ -178,6 +179,12 @@ export class SketchAnnotationManager implements IDisposable {
     private rebuilding = false;
     private suppressSymbols = false;
     private allConstraints = false;
+    private expressions = false;
+    showErrors = true;
+    set showExpressions(value: boolean) {
+        this.expressions = value;
+        this.refresh();
+    }
 
     set showAllConstraints(value: boolean) {
         this.allConstraints = value;
@@ -475,9 +482,15 @@ export class SketchAnnotationManager implements IDisposable {
         if (geometry === undefined) return;
         segments.push(...geometry.segments);
         const prefix = constraint.kind === ConstraintKind.Radius ? "R" : "";
+        const source = constraint.datum ?? 0;
+        const resolved =
+            typeof source === "string" && !this.expressions
+                ? resolveDatumSource(constraint.kind, source, this.view.document.variables.evaluate().scope)
+                : undefined;
+        const datum = resolved?.isOk ? resolved.value : source;
         // An expression reads as written — that is the whole point of naming it.
         this.addBadge(
-            `${prefix}${formatDatum(constraint.kind, constraint.datum ?? 0, this.view.document)}`,
+            `${prefix}${formatDatum(constraint.kind, datum, this.view.document)}`,
             ...geometry.textPosition,
             constraint,
             constraint.refs,
@@ -771,7 +784,7 @@ export class SketchAnnotationManager implements IDisposable {
                     // (`SketchSolver.datumOf`) — this badge is the only place that says so,
                     // so it carries the reason as its tooltip and reads as broken.
                     const datumError = this.solver.datumErrors.get(id);
-                    if (datumError !== undefined) {
+                    if (this.showErrors && datumError !== undefined) {
                         element.classList.add(style.error);
                         element.title = datumError;
                     }

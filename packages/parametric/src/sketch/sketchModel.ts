@@ -22,7 +22,7 @@ export { ConstraintKind };
 /** Screen-pixel line width of sketch geometry (entity edges, in and out of the editor). */
 export const SKETCH_EDGE_LINE_WIDTH = 2;
 
-export type SketchEntityType = "line" | "circle" | "arc";
+export type SketchEntityType = "line" | "circle" | "arc" | "point" | "bezier" | "spline";
 
 /**
  * line: params = [x1, y1, x2, y2]; circle: params = [cx, cy, r];
@@ -61,10 +61,18 @@ export interface SketchPointRef {
 }
 
 /** Addressable points per entity type (the `pointIndex` layout of `SketchPointRef`). */
-const ENTITY_POINT_COUNTS: Record<SketchEntityType, number> = { circle: 1, line: 2, arc: 3 };
+const ENTITY_POINT_COUNTS: Record<SketchEntityType, number> = {
+    circle: 1,
+    line: 2,
+    arc: 3,
+    point: 1,
+    bezier: 4,
+    spline: 3,
+};
 
 /** Number of point refs an entity of `type` exposes (`pointIndex` runs 0..n−1). */
-export function entityPointCount(type: SketchEntityType): number {
+export function entityPointCount(type: SketchEntityType, params?: readonly number[]): number {
+    if ((type === "bezier" || type === "spline") && params) return params.length / 2;
     return ENTITY_POINT_COUNTS[type];
 }
 
@@ -186,7 +194,17 @@ export interface ExternalRefData {
     dangling?: boolean;
 }
 
+export interface SketchImageData {
+    id: string;
+    name: string;
+    dataUrl: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+}
 export interface SketchData {
+    images?: SketchImageData[];
     entities: SketchEntityData[];
     constraints: SketchConstraintData[];
     layers?: SketchLayer[];
@@ -303,7 +321,9 @@ export function profileExternalRefs(data: SketchData): ExternalRefData[] {
  */
 export function shapeEntityIds(data: SketchData): number[] {
     return [
-        ...data.entities.filter((entity) => !entity.construction).map((entity) => entity.id),
+        ...data.entities
+            .filter((entity) => !entity.construction && entity.type !== "point")
+            .map((entity) => entity.id),
         ...profileExternalRefs(data).map((r) => r.entityId),
     ];
 }

@@ -133,11 +133,22 @@ export class ThreeGeometry extends ThreeVisualObject implements IVisualGeometry 
         }
     };
 
+    private referenceImages: Mesh[] = [];
+
     private generateShape() {
         const mesh = this.geometryNode.mesh;
         if (mesh?.vertexs?.position.length) this.initVertexs(mesh.vertexs);
         if (mesh?.faces?.position.length) this.initFaces(mesh.faces);
         if (mesh?.edges?.position.length) this.initEdges(mesh.edges);
+        this.referenceImages = (mesh?.images ?? []).map((data) =>
+            ThreeGeometryFactory.createFaceGeometry(data, {
+                onTextureLoaded: () => this.geometryNode.document.visual.update(),
+            }),
+        );
+        this.referenceImages.forEach((image) => {
+            image.raycast = () => {};
+            this.add(image);
+        });
     }
 
     override dispose() {
@@ -147,6 +158,12 @@ export class ThreeGeometry extends ThreeVisualObject implements IVisualGeometry 
     }
 
     private removeMeshes() {
+        for (const image of this.referenceImages) {
+            this.remove(image);
+            image.geometry.dispose();
+            for (const m of Array.isArray(image.material) ? image.material : [image.material]) m.dispose();
+        }
+        this.referenceImages = [];
         if (this._vertexs) {
             this.disposeOnTopMaterial(this._vertexs);
             this.remove(this._vertexs);

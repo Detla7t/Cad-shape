@@ -4,6 +4,7 @@
 import { createCadIcon } from "@chili3d/element";
 import type { SketchLayer } from "../sketchModel";
 import type { SolveOutcome } from "../solver";
+import { showSketchDiagnostics } from "./sketchDiagnostics";
 import type { SketchEditor } from "./sketchEditor";
 import style from "./sketchPanel.module.css";
 
@@ -146,7 +147,41 @@ export class SketchPanel {
         help.append(element("summary", "Sketch help"), legend, dragHint);
         const footer = element("footer");
         footer.append(this.status, this.detail);
-        this.root.append(header, plane, constructionLabel, constraintsLabel, details, help, footer);
+        const expressionsLabel = element("label"),
+            expressions = element("input");
+        expressions.type = "checkbox";
+        expressions.onchange = () => {
+            this.editor.annotations.showExpressions = expressions.checked;
+        };
+        expressionsLabel.append(expressions, document.createTextNode("Show expressions"));
+        const errorsLabel = element("label"),
+            errors = element("input");
+        errors.type = "checkbox";
+        errors.checked = true;
+        errors.onchange = () => {
+            this.editor.showErrors = errors.checked;
+            this.editor.annotations.showErrors = errors.checked;
+            this.editor.solve(true);
+        };
+        errorsLabel.append(errors, document.createTextNode("Show errors"));
+        const diagnostics = element("details");
+        diagnostics.append(
+            element("summary", "Sketch diagnostics"),
+            this.action("Profile inspector…", () => showSketchDiagnostics(this.editor, "profiles")),
+            this.action("Constraint manager…", () => showSketchDiagnostics(this.editor, "constraints")),
+        );
+        this.root.append(
+            header,
+            plane,
+            constructionLabel,
+            constraintsLabel,
+            expressionsLabel,
+            errorsLabel,
+            details,
+            diagnostics,
+            help,
+            footer,
+        );
         if (editor.view.dom) {
             editor.view.dom.dataset["sketchEditing"] = "true";
             editor.view.dom.append(this.root);

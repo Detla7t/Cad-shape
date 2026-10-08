@@ -71,7 +71,7 @@ export const Chili3dShortcuts: ShortcutMap = {
     "create.line": "l",
     "create.rect": "r",
     "create.circle": "c",
-    "measure.length": "d",
+    "dimension.distance": "d",
 
     // Primitives
     "create.box": "b",

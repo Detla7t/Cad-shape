@@ -19,6 +19,7 @@ import {
     entityRadius,
     pointRefKey,
     type SketchConstraintData,
+    type SketchData,
     type SketchPointRef,
 } from "../sketchModel";
 import type { SketchSolver } from "../solver";
@@ -31,38 +32,107 @@ export class DistanceDimensionCommand extends SketchConstraintCommand {
         this.controller = new AsyncController();
         const first = await editor.pickPointOrEntity("prompt.pickSketchPointOrEntity", this.controller);
         if (!first) return;
-        let p1: SketchPointRef;
-        let p2: SketchPointRef | undefined;
-        if (first.kind === "entity") {
-            if (editor.solver.entity(first.entityId)?.type !== "line") return;
-            p1 = { entityId: first.entityId, pointIndex: 0 };
-            p2 = { entityId: first.entityId, pointIndex: 1 };
-        } else {
-            p1 = first.ref;
+        const firstEntity = first.kind === "entity" ? editor.solver.entity(first.entityId) : undefined;
+        if (
+            firstEntity &&
+            (firstEntity.type === "circle" || firstEntity.type === "arc") &&
+            !editor.solver
+                .toData()
+                .constraints.some(
+                    (c) => c.kind === ConstraintKind.Radius && c.refs[0]?.entityId === firstEntity.id,
+                )
+        ) {
+            this.controller = new AsyncController();
+            await placeRadius(editor, firstEntity.id, this.controller);
+            return;
         }
-        if (!allowsConstraintOnEntity(ConstraintKind.P2PDistance, p1.entityId)) return;
-        const uv1 = editor.solver.pointOf(p1);
+        let p1: SketchPointRef =
+            first.kind === "point" ? first.ref : { entityId: first.entityId, pointIndex: 0 };
+        let p2: SketchPointRef | undefined;
+        const before = editor.solver.toData();
+        let helper = false;
+        if (
+            firstEntity?.type === "line" &&
+            !before.constraints.some(
+                (c) =>
+                    c.kind === ConstraintKind.P2PDistance &&
+                    c.refs.every((r) => r.entityId === firstEntity.id),
+            )
+        ) {
+            p2 = { entityId: firstEntity.id, pointIndex: 1 };
+        }
         if (!p2) {
             this.controller = new AsyncController();
-            p2 = await pickWithPreview(editor, () =>
-                editor.pickPoint(
-                    "prompt.pickSketchPoint",
-                    (uv) =>
-                        editor.annotations.setDimensionPreview(
-                            uv === undefined ? undefined : { kind: "segment", p1: uv1, p2: uv },
-                        ),
-                    this.controller,
-                ),
+            const second = await editor.pickPointOrEntity(
+                "prompt.pickSketchPointOrEntity",
+                this.controller,
+                first,
             );
+            if (!second) return;
+            const secondEntity = second.kind === "entity" ? editor.solver.entity(second.entityId) : undefined;
+            p2 = second.kind === "point" ? second.ref : { entityId: second.entityId, pointIndex: 0 };
+            if (secondEntity?.type === "line") {
+                if (firstEntity?.type === "circle" || firstEntity?.type === "arc") {
+                    const center = editor.solver.pointOf(p1),
+                        p = secondEntity.params;
+                    const foot = pointLineFoot(center, [p[0], p[1]], [p[2], p[3]]) ?? [p[0], p[1]];
+                    p1 = circleEdgePoint(editor, firstEntity.id, foot as [number, number]);
+                    editor.solver.addConstraint({
+                        kind: ConstraintKind.Perpendicular,
+                        refs: [
+                            { entityId: p1.entityId, pointIndex: 0 },
+                            p1,
+                            { entityId: secondEntity.id, pointIndex: 0 },
+                            { entityId: secondEntity.id, pointIndex: 1 },
+                        ],
+                    });
+                    helper = true;
+                }
+                this.controller = new AsyncController();
+                const placed = await placePointLine(
+                    editor,
+                    p1,
+                    secondEntity.id,
+                    this.controller,
+                    helper ? before : undefined,
+                );
+                if (!placed && helper) {
+                    editor.solver.reset(before);
+                    editor.solve(true);
+                }
+                return;
+            }
+            if (firstEntity?.type === "circle" || firstEntity?.type === "arc") {
+                p1 = circleEdgePoint(editor, firstEntity.id, editor.solver.pointOf(p2));
+                editor.solver.addConstraint({
+                    kind: ConstraintKind.PointOnLine,
+                    refs: [p2, { entityId: p1.entityId, pointIndex: 0 }, p1],
+                });
+                helper = true;
+            }
+            if (secondEntity?.type === "circle" || secondEntity?.type === "arc") {
+                p2 = circleEdgePoint(editor, secondEntity.id, editor.solver.pointOf(p1));
+                editor.solver.addConstraint({
+                    kind: ConstraintKind.PointOnLine,
+                    refs: [p1, { entityId: p2.entityId, pointIndex: 0 }, p2],
+                });
+                helper = true;
+            }
         }
         if (p2 === undefined || !allowsConstraintOnEntity(ConstraintKind.P2PDistance, p2.entityId)) return;
-
-        const uv2 = editor.solver.pointOf(p2);
+        const uv1 = editor.solver.pointOf(p1),
+            uv2 = editor.solver.pointOf(p2);
         this.controller = new AsyncController();
         const position = await pickDimensionPosition(editor, this.controller, (uv) =>
             uv === undefined ? undefined : { kind: "distance", p1: uv1, p2: uv2, position: uv },
         );
-        if (position === undefined) return;
+        if (position === undefined) {
+            if (helper) {
+                editor.solver.reset(before);
+                editor.solve(true);
+            }
+            return;
+        }
 
         // anchor the label relative to the segment so it follows the geometry
         const offset = segmentOffset(uv1, uv2, position);
@@ -76,6 +146,7 @@ export class DistanceDimensionCommand extends SketchConstraintCommand {
             },
             { kind: "offset", offset },
             initial,
+            { rollback: helper ? before : undefined },
         );
     }
 }
@@ -92,27 +163,35 @@ export class RadiusDimensionCommand extends SketchConstraintCommand {
         );
         if (entityId === undefined || !allowsConstraintOnEntity(ConstraintKind.Radius, entityId)) return;
 
-        const entity = editor.solver.entity(entityId)!;
-        const center: [number, number] = [entity.params[0], entity.params[1]];
-        const radius = entityRadius(entity);
         this.controller = new AsyncController();
-        const position = await pickDimensionPosition(editor, this.controller, (uv) =>
-            uv === undefined ? undefined : { kind: "radius", center, radius, position: uv },
-        );
-        if (position === undefined) return;
-
-        // anchor the label as a vector from the center so it follows the geometry
-        commitDimension(
-            editor,
-            {
-                kind: ConstraintKind.Radius,
-                refs: [{ entityId, pointIndex: 0 }],
-                datum: radius,
-            },
-            { kind: "vector", dx: position[0] - center[0], dy: position[1] - center[1] },
-            radius,
-        );
+        await placeRadius(editor, entityId, this.controller);
     }
+}
+
+async function placeRadius(
+    editor: SketchEditor,
+    entityId: number,
+    controller: AsyncController,
+): Promise<void> {
+    const entity = editor.solver.entity(entityId)!;
+    const center: [number, number] = [entity.params[0], entity.params[1]];
+    const radius = entityRadius(entity);
+    const position = await pickDimensionPosition(editor, controller, (uv) =>
+        uv === undefined ? undefined : { kind: "radius", center, radius, position: uv },
+    );
+    if (position === undefined) return;
+
+    // anchor the label as a vector from the center so it follows the geometry
+    commitDimension(
+        editor,
+        {
+            kind: ConstraintKind.Radius,
+            refs: [{ entityId, pointIndex: 0 }],
+            datum: radius,
+        },
+        { kind: "vector", dx: position[0] - center[0], dy: position[1] - center[1] },
+        radius,
+    );
 }
 
 /** Runs a pick with a live dimension preview, always clearing the preview afterwards. */
@@ -156,7 +235,11 @@ function commitDimension(
     constraint: Omit<SketchConstraintData, "id">,
     anchor: DimensionAnchor,
     initial: ParameterValue,
-    options?: { apply?: (id: number, value: ParameterValue) => void; positiveOnly?: boolean },
+    options?: {
+        apply?: (id: number, value: ParameterValue) => void;
+        positiveOnly?: boolean;
+        rollback?: SketchData;
+    },
 ): void {
     const id = editor.solver.addConstraint(constraint);
     editor.dimensionAnchors.set(id, anchor);
@@ -166,7 +249,8 @@ function commitDimension(
         (value) => (options?.apply ?? ((cid, v) => editor.solver.setDatumSource(cid, v)))(id, value),
         datumUnitSpec(constraint.kind),
         () => {
-            editor.solver.removeConstraint(id);
+            if (options?.rollback) editor.solver.reset(options.rollback);
+            else editor.solver.removeConstraint(id);
             editor.dimensionAnchors.delete(id);
             editor.solve(true);
         },
@@ -355,4 +439,66 @@ export class HorizontalDistanceCommand extends AxisDistanceCommand {
 @command({ key: "dimension.verticalDistance", icon: "icon-dDimensionV" })
 export class VerticalDistanceCommand extends AxisDistanceCommand {
     protected readonly axis = "v";
+}
+
+/** A construction point carries the measured edge, so a circle edge and its center remain distinct picks. */
+function circleEdgePoint(editor: SketchEditor, id: number, toward: [number, number]): SketchPointRef {
+    const circle = editor.solver.entity(id)!,
+        center = circle.params;
+    const angle = Math.atan2(toward[1] - center[1], toward[0] - center[0]),
+        radius = entityRadius(circle);
+    const pointId = editor.solver.addEntity("line", [
+        center[0],
+        center[1],
+        center[0] + radius * Math.cos(angle),
+        center[1] + radius * Math.sin(angle),
+    ]);
+    editor.solver.setEntityStyle(pointId, { construction: true });
+    const ref = { entityId: pointId, pointIndex: 1 };
+    editor.solver.addConstraint({
+        kind: ConstraintKind.P2PCoincident,
+        refs: [
+            { entityId: pointId, pointIndex: 0 },
+            { entityId: id, pointIndex: 0 },
+        ],
+    });
+    editor.solver.addConstraint({
+        kind: circle.type === "circle" ? ConstraintKind.PointOnCircle : ConstraintKind.PointOnArc,
+        refs:
+            circle.type === "circle"
+                ? [ref, { entityId: id, pointIndex: 0 }]
+                : [ref, { entityId: id, pointIndex: 0 }, { entityId: id, pointIndex: 1 }],
+    });
+    return ref;
+}
+async function placePointLine(
+    editor: SketchEditor,
+    p: SketchPointRef,
+    lineId: number,
+    controller: AsyncController,
+    rollback?: SketchData,
+): Promise<boolean> {
+    const l1 = { entityId: lineId, pointIndex: 0 },
+        l2 = { entityId: lineId, pointIndex: 1 };
+    const uvP = editor.solver.pointOf(p),
+        a = editor.solver.pointOf(l1),
+        b = editor.solver.pointOf(l2);
+    const position = await pickDimensionPosition(editor, controller, (uv) =>
+        uv ? { kind: "pointLine", p: uvP, l1: a, l2: b, position: uv } : undefined,
+    );
+    if (!position) return false;
+    const initial = pointLineSignedDistance(uvP, a, b),
+        foot = pointLineFoot(uvP, a, b) ?? a;
+    commitDimension(
+        editor,
+        {
+            kind: ConstraintKind.P2LDistance,
+            refs: [p, l1, l2],
+            datum: toStorageDatum(ConstraintKind.P2LDistance, initial),
+        },
+        { kind: "offset", offset: segmentOffset(uvP, foot, position) },
+        initial,
+        { positiveOnly: false, rollback },
+    );
+    return true;
 }

@@ -5,7 +5,7 @@
     "sources": {
         "cpp/CMakeLists.txt": "bd94ca9c294d47eac6955aa72ef8f6eddbab8c861f47d5faf58dc64cd2066ef4",
         "cpp/src/converter.cpp": "602c9e5e8f77c91da086d5de2ed9a3041d8bd0c4a3841dd7c78569236665401e",
-        "cpp/src/factory.cpp": "f38fb83071b986861404e5824bb07f1bd21355b549d56dfac98dae9d19a40550",
+        "cpp/src/factory.cpp": "42d57837c54cfb6aefa4515230786879bdc6e2d831132202f85a638f3ecf90b2",
         "cpp/src/geometry.cpp": "7d4a31e206ecbf73f5f18e77bd3480869746e2addc77bbf9fde922d0553932af",
         "cpp/src/helps.cpp": "a2c4cde76a84349a1b54574505d859ffbfeb46a7c7285a5b97c27f90b3e40e42",
         "cpp/src/mesher.cpp": "3b07f0fdaa39a3392a24d0d30b03706f42a2d1d8305e7f7ffea20f09253e4a15",
@@ -19,7 +19,7 @@
     },
     "artifacts": {
         "packages/wasm/lib/chili-wasm.js": "610368c68dc6d414651ca08bfa9288b42360dfcf95c9835d8cdd8787da0f06ba",
-        "packages/wasm/lib/chili-wasm.wasm": "b819e94ed86c15dad1d63db807ac4641541daf203370bc083e7e121290854628",
-        "packages/wasm/lib/chili-wasm.d.ts": "ca20b1d960bffbbc0be576be8bcfd86b4d4067516c755d8230813d03f6cb116e"
+        "packages/wasm/lib/chili-wasm.wasm": "7e1d7270b0f2dc72007d0fed6dc690a5dea2b41ad2a62402b19faacc40a7b9a1",
+        "packages/wasm/lib/chili-wasm.d.ts": "db758b7fdc0eab24a2de252724a879ac048c96c13ca1940232eb33f69357607d"
     }
 }

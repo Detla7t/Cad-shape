@@ -27,10 +27,12 @@ import {
 import { allProfiles, sketchProfiles } from "../features/profileBuilder";
 import { syncNodeWatches } from "../nodeWatch";
 import { ensureVariableSync } from "../variableSync";
+import { curvePoles } from "./curveGeometry";
 import { normalizeSnapshot } from "./entityLayout";
 import { constructionPattern, entityDisplayMesh, patternedPositions } from "./entityMesh";
 import { type ExternalResolveResult, resolveExternalRefs } from "./externalRef";
 import { type PlaneFaceRef, resolveFacePlane } from "./planeRef";
+import { sketchImageMeshes } from "./sketchImages";
 import {
     arcAngles,
     DEFAULT_SKETCH_LAYER,
@@ -209,6 +211,7 @@ export class SketchNode extends ParameterShapeNode {
         if (this._editingSession || this.suppressed)
             return { edges: undefined, faces: undefined, vertexs: undefined };
         const mesh = this.sketchMesh();
+        mesh.images = sketchImageMeshes(this.plane, this.data.images);
         const data = this.data;
         if (
             !data.layers?.length &&
@@ -226,7 +229,9 @@ export class SketchNode extends ParameterShapeNode {
         const positions: number[] = [];
         const colors: number[] = [];
         const ranges: EdgeMeshData["range"] = [];
-        const profileEntities = data.entities.filter((entity) => !entity.construction);
+        const profileEntities = data.entities.filter(
+            (entity) => !entity.construction && entity.type !== "point",
+        );
         const append = (position: Float32Array, color: number) => {
             for (const value of position) positions.push(value);
             for (let i = 0; i < position.length; i += 3)
@@ -253,7 +258,9 @@ export class SketchNode extends ParameterShapeNode {
                     : Number.parseInt(Config.instance.graphics.inactiveColor.slice(1), 16),
             );
         });
-        for (const entity of data.entities.filter((entity) => entity.construction)) {
+        for (const entity of data.entities.filter(
+            (entity) => entity.construction || entity.type === "point",
+        )) {
             const layer = data.layers?.find((item) => item.id === (entity.layer ?? "0"));
             if (layer?.visible === false) continue;
             const layerColor =
@@ -353,7 +360,7 @@ export class SketchNode extends ParameterShapeNode {
     private buildEdges(data: SketchData): Result<IEdge[]> {
         const edges: IEdge[] = [];
         for (const entity of data.entities) {
-            if (entity.construction) continue;
+            if (entity.construction || entity.type === "point") continue;
             const edge = this.entityEdge(entity);
             if (!edge.isOk) return Result.err(edge.error);
             edges.push(edge.value);
@@ -372,6 +379,11 @@ export class SketchNode extends ParameterShapeNode {
     private entityEdge(entity: SketchEntityData): Result<IEdge> {
         const p = entity.params;
         switch (entity.type) {
+            case "point":
+                return Result.err("Points do not define a profile edge");
+            case "bezier":
+            case "spline":
+                return shapeFactory.bezier(curvePoles(entity).map(([u, v]) => toWorld(this.plane, u, v)));
             case "line":
                 return shapeFactory.line(toWorld(this.plane, p[0], p[1]), toWorld(this.plane, p[2], p[3]));
             case "circle":

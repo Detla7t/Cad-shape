@@ -9,6 +9,7 @@
         "build": "rspack build && node scripts/build-plugins.mjs",
         "build:wasm": "cd cpp && cmake --preset release && cmake --build --preset release && node ../scripts/wasm-provenance.mjs",
         "check:wasm": "node scripts/wasm-provenance.mjs --verify",
+        "audit:onshape": "node scripts/audit-onshape-tools.mjs",
         "build:types": "node scripts/generate_types.mjs",
         "check": "biome check --write",
         "check:ci": "biome check --diagnostic-level=error",

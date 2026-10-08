@@ -10,3 +10,7 @@ import "./sketchLine";
 import "./sketchProjectEdges";
 import "./sketchRectangle";
 import "./referencePlaneCommands";
+
+import "./sketchTools";
+
+import "./sketchImage";

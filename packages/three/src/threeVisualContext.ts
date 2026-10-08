@@ -15,6 +15,7 @@ import {
     type IVisualContext,
     type IVisualObject,
     isDisposable,
+    isHistoryHidden,
     type Material,
     type Matrix4,
     MeshDataUtils,
@@ -279,7 +280,12 @@ export class ThreeVisualContext implements IVisualContext {
                     group.add(visible, hidden);
                 }
             } else if (MeshDataUtils.isFaceMesh(data)) {
-                group.add(ThreeGeometryFactory.createFaceGeometry(data, meshOption));
+                group.add(
+                    ThreeGeometryFactory.createFaceGeometry(data, {
+                        ...meshOption,
+                        onTextureLoaded: () => this.visual.update(),
+                    }),
+                );
             }
         });
         this.tempShapes.add(group);
@@ -356,6 +362,7 @@ export class ThreeVisualContext implements IVisualContext {
     }
 
     setVisible(node: INode, visible: boolean): void {
+        visible = visible && !isHistoryHidden(node);
         const shape = this.getVisual(node);
         if (shape === undefined || shape.visible === visible) return;
         shape.visible = visible;

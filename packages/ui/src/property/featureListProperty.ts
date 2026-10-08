@@ -25,6 +25,7 @@ import {
 } from "@chili3d/core";
 import { button, div, input, option, select, span, svg } from "@chili3d/element";
 import { showDialog } from "../dialog";
+import { HistoryBar } from "../project/historyBar";
 import commonStyle from "./common.module.css";
 import { type ConfigureGridKind, showConfigureGrid } from "./configuration/configureGrid";
 import style from "./featureListProperty.module.css";
@@ -93,6 +94,25 @@ export class FeatureListProperty extends HTMLElement {
                 .filter((item) => !this.featureId || item.id === this.featureId)
                 .map((item) => this.featureRow(item)),
         );
+        if (!this.featureId && this.node.setRollbackIndex) {
+            const rows = [...this.children] as HTMLElement[];
+            const bar = new HistoryBar(
+                () => rows,
+                () => this.node.rollbackIndex ?? rows.length,
+                (position) => {
+                    const previous = this.node.rollbackIndex;
+                    if (!this.node.setRollbackIndex!(position === rows.length ? undefined : position)) {
+                        this.node.setRollbackIndex!(previous);
+                        PubSub.default.pub(
+                            "displayError",
+                            "This history position cannot be rebuilt. The previous position was restored.",
+                        );
+                    }
+                },
+            );
+            this.append(bar.element);
+            bar.refresh();
+        }
     }
 
     private isExpanded(item: FeatureItem) {

@@ -100,6 +100,19 @@ type RollbackMap = ReturnType<typeof computeSketchRollback>;
 export class SketchEditor implements IDisposable {
     private panel?: SketchPanel;
     private preselected: SketchPickTarget[] = [];
+    private pickedEntities = new Set<number>();
+    showErrors = true;
+    powerTrim = false;
+
+    highlightEntities(ids: number[]): void {
+        this.eventHandler.highlightConstraintEntities(ids);
+    }
+
+    private rememberPick(target: SketchPickTarget): void {
+        if (this.powerTrim) return;
+        this.pickedEntities.add(target.kind === "point" ? target.ref.entityId : target.entityId);
+        this.eventHandler.highlightPicks([...this.pickedEntities]);
+    }
     lastSolveOutcome: SolveOutcome = { result: "OkUnderconstrained", dofs: 0 };
     fullyConstrainedEntities = new Set<number>();
 
@@ -125,8 +138,19 @@ export class SketchEditor implements IDisposable {
         ];
     }
 
+    clearSelection(): void {
+        this.eventHandler.clearSelection(this.view);
+        this.highlightEntities([]);
+    }
+
+    clearPreselection(): void {
+        this.preselected = [];
+    }
+
     endConstraintSelection(): void {
         this.preselected = [];
+        this.pickedEntities.clear();
+        this.eventHandler.highlightPicks([]);
     }
 
     refreshPanel(): void {
@@ -534,7 +558,10 @@ export class SketchEditor implements IDisposable {
         const selected = this.preselected.findIndex((target) => target.kind === "point");
         if (selected >= 0) {
             const target = this.preselected.splice(selected, 1)[0];
-            if (target.kind === "point") return Promise.resolve(target.ref);
+            if (target.kind === "point") {
+                this.rememberPick(target);
+                return Promise.resolve(target.ref);
+            }
         }
         return this.startPick(
             "point",
@@ -547,12 +574,18 @@ export class SketchEditor implements IDisposable {
         );
     }
 
+    lastPickPosition?: [number, number];
+
     pickPointOrEntity(
         prompt: I18nKeys,
         controller?: AsyncController,
         exclude?: SketchPickTarget,
     ): Promise<SketchPickTarget | undefined> {
-        if (this.preselected.length) return Promise.resolve(this.preselected.shift());
+        if (this.preselected.length) {
+            const target = this.preselected.shift()!;
+            this.rememberPick(target);
+            return Promise.resolve(target);
+        }
         return this.startPick("pointOrEntity", prompt, undefined, true, undefined, controller, exclude);
     }
 
@@ -573,7 +606,10 @@ export class SketchEditor implements IDisposable {
         });
         if (selected >= 0) {
             const target = this.preselected.splice(selected, 1)[0];
-            if (target.kind === "entity") return Promise.resolve(target.entityId);
+            if (target.kind === "entity") {
+                this.rememberPick(target);
+                return Promise.resolve(target.entityId);
+            }
         }
         return this.startPick("entity", prompt, type, options?.datum, undefined, controller);
     }
@@ -606,6 +642,7 @@ export class SketchEditor implements IDisposable {
             return true;
         }
 
+        this.lastPickPosition = this.eventHandler.pointerToUV(view, event);
         let value: unknown;
         if (request.kind === "pointOrEntity") {
             const ref = this.eventHandler.hitTestPoint(view, event, request.exclude);
@@ -624,6 +661,9 @@ export class SketchEditor implements IDisposable {
         }
 
         if (value !== undefined) {
+            if (request.kind === "pointOrEntity") this.rememberPick(value as SketchPickTarget);
+            if (request.kind === "point") this.rememberPick({ kind: "point", ref: value as SketchPointRef });
+            if (request.kind === "entity") this.rememberPick({ kind: "entity", entityId: value as number });
             this.pickRequest = undefined;
             this.annotations.suppressConstraintSymbols = false;
             request.resolve(value);
@@ -906,6 +946,7 @@ export class SketchEditor implements IDisposable {
     dispose(): void {
         if (this.disposed) return;
         this.closeDatum?.();
+        this.view.dom?.querySelector("[data-sketch-diagnostics]")?.remove();
         this.disposed = true;
         this.cancelPick();
         this.document.visual.context.setNodeOnTop([this.node], false);

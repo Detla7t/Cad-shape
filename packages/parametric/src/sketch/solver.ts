@@ -116,6 +116,7 @@ export class SketchSolver implements ExternalEntityHost {
         Partial<Pick<SketchEntityData, "construction" | "layer" | "color" | "dashed">>
     >();
     private layers?: SketchLayer[];
+    private images?: SketchData["images"];
     activeLayer = "0";
     constructionMode = false;
 
@@ -259,6 +260,10 @@ export class SketchSolver implements ExternalEntityHost {
     }
 
     // ------------------------------------------------------------------ Entity and constraint editing
+
+    addEntity(type: SketchEntityType, values: number[]): number {
+        return this.registerEntity(type, this.addEntityParams(type, values));
+    }
 
     addLine(x1: number, y1: number, x2: number, y2: number): number {
         return this.registerEntity("line", this.addEntityParams("line", [x1, y1, x2, y2]));
@@ -548,7 +553,11 @@ export class SketchSolver implements ExternalEntityHost {
             const baseline = probe.dofs();
             for (const entity of candidates) {
                 const pins: number[] = [];
-                for (let pointIndex = 0; pointIndex < entityPointCount(entity.type); pointIndex++) {
+                for (
+                    let pointIndex = 0;
+                    pointIndex < entityPointCount(entity.type, entity.params);
+                    pointIndex++
+                ) {
                     const ref = { entityId: entity.id, pointIndex };
                     pins.push(
                         probe.addConstraint({
@@ -616,6 +625,12 @@ export class SketchSolver implements ExternalEntityHost {
         switch (type) {
             case "line":
                 return [this.pointOf({ entityId, pointIndex: 0 }), this.pointOf({ entityId, pointIndex: 1 })];
+            case "bezier":
+            case "spline":
+                return [
+                    this.pointOf({ entityId, pointIndex: 0 }),
+                    this.pointOf({ entityId, pointIndex: this.entityCache.get(entityId)!.length / 2 - 1 }),
+                ];
             case "arc":
                 return [this.pointOf({ entityId, pointIndex: 1 }), this.pointOf({ entityId, pointIndex: 2 })];
             default:
@@ -713,7 +728,7 @@ export class SketchSolver implements ExternalEntityHost {
         if (!entity || this.fixedEntities.has(entityId) || this.entityLocked(entity))
             return this.solve(false);
         const moved = new Set<string>();
-        for (let pointIndex = 0; pointIndex < entityPointCount(entity.type); pointIndex++) {
+        for (let pointIndex = 0; pointIndex < entityPointCount(entity.type, entity.params); pointIndex++) {
             const ref = { entityId, pointIndex };
             for (const point of this.coincidentGroup(ref)) {
                 const key = pointRefKey(point);
@@ -749,6 +764,7 @@ export class SketchSolver implements ExternalEntityHost {
     toData(): SketchData {
         const constraints = this.constraintsData();
         const result: SketchData = { entities: this.entities(), constraints };
+        if (this.images?.length) result.images = structuredClone(this.images);
         if (this.layers) result.layers = this.sketchLayers();
         if (this.activeLayer !== "0") result.activeLayer = this.activeLayer;
         // external refs live in SketchData, not in the entity list — preserve them
@@ -1293,6 +1309,12 @@ export class SketchSolver implements ExternalEntityHost {
         if (type === "circle" && ref.pointIndex === 0) {
             return [0, 1];
         }
+        if (
+            (type === "point" || type === "bezier" || type === "spline") &&
+            ref.pointIndex >= 0 &&
+            ref.pointIndex * 2 + 1 < (this.entityCache.get(ref.entityId)?.length ?? 0)
+        )
+            return [ref.pointIndex * 2, ref.pointIndex * 2 + 1];
         throw new Error(`Invalid point ref ${ref.entityId}:${ref.pointIndex}`);
     }
 
@@ -1367,6 +1389,7 @@ export class SketchSolver implements ExternalEntityHost {
     }
 
     private loadData(data: SketchData): void {
+        this.images = structuredClone(data.images);
         this.layers = data.layers?.map((layer) => ({ ...layer }));
         this.activeLayer = data.activeLayer ?? "0";
         // The constraints are rebuilt below, so their datum errors are too.
@@ -1400,7 +1423,11 @@ export class SketchSolver implements ExternalEntityHost {
 
     private addEntityParams(type: SketchEntityType, values: number[]): number[] {
         const ids = this.system.add_params(
-            new Uint8Array(ENTITY_PARAM_KINDS[type]),
+            new Uint8Array(
+                type === "bezier" || type === "spline"
+                    ? values.map(() => PARAM_KIND_COORDINATE)
+                    : ENTITY_PARAM_KINDS[type],
+            ),
             new Float64Array(values),
         );
         return Array.from(ids);

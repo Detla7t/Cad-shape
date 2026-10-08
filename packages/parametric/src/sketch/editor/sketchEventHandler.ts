@@ -25,7 +25,9 @@ import {
     snapConstraintKind,
     snapTargetEntityId,
 } from "../autoConstraints";
+import { sampleCurve } from "../curveGeometry";
 import { entityDisplayMesh } from "../entityMesh";
+import { sketchImageMeshes } from "../sketchImages";
 import {
     arcAngles,
     ConstraintKind,
@@ -45,9 +47,11 @@ import {
     toWorld,
     worldPerPixel,
 } from "../sketchModel";
+import { trimPreview } from "../sketchOperations";
 import { constraintTargetEntities } from "../solverEntities";
 import { applyConstraintIcon, type BadgeSymbol, badgeSymbol, isBadgeEventTarget } from "./sketchAnnotations";
 import style from "./sketchAnnotations.module.css";
+import { showSketchContextMenu } from "./sketchContextMenu";
 import type { SketchEditor, SketchEntityTypeFilter, SketchPickTarget } from "./sketchEditor";
 
 const PICK_TOLERANCE_PX = 8;
@@ -73,12 +77,26 @@ export class SketchEventHandler implements IEventHandler {
     resolveCommand(command: CommandKeys): CommandKeys {
         const aliases: Partial<Record<CommandKeys, CommandKeys>> = {
             "create.line": "sketch.line",
+            "modify.trim": "sketch.trim",
+            "create.offset": "sketch.offset",
+            "modify.fillet": "sketch.fillet",
+            "modify.chamfer": "sketch.chamfer",
+            "modify.move": "sketch.transform",
             "create.rect": "sketch.rectangle",
             "create.circle": "sketch.circle",
             "create.arc": "sketch.arc",
             "measure.length": "dimension.distance",
         };
         return aliases[command] ?? command;
+    }
+
+    contextMenu(_view: IView, event: PointerEvent): boolean {
+        if (this.editor.isPicking) {
+            this.editor.cancelPick();
+            return true;
+        }
+        showSketchContextMenu(this.editor, event);
+        return true;
     }
 
     private draggingRef?: SketchPointRef;
@@ -112,6 +130,19 @@ export class SketchEventHandler implements IEventHandler {
     private readonly selectedEntities = new Set<number>();
     private boxSelection?: { x: number; y: number; element: HTMLDivElement };
     private selectionMeshId?: number;
+    private pickMeshId?: number;
+
+    highlightPicks(ids: number[]): void {
+        const context = this.editor.document.visual.context;
+        if (this.pickMeshId !== undefined) context.removeMesh(this.pickMeshId);
+        this.pickMeshId = undefined;
+        const meshes = ids.flatMap((id) => {
+            const entity = this.editor.solver.entity(id);
+            return entity ? [entityDisplayMesh(this.editor.node.plane, entity, 0xffb020)] : [];
+        });
+        if (meshes.length) this.pickMeshId = context.displayMesh(meshes, { onTop: true });
+        this.editor.view.update();
+    }
     private constraintMeshId?: number;
     private datumDisplayId?: number;
     private externalDisplayId?: number;
@@ -211,7 +242,12 @@ export class SketchEventHandler implements IEventHandler {
                 if (this.profileDisplayId !== undefined)
                     view.document.visual.context.removeMesh(this.profileDisplayId);
                 this.profileDisplayId = undefined;
-                const profiles = view.dom ? this.editor.node.editingProfileMeshes() : [];
+                const profiles = view.dom
+                    ? [
+                          ...this.editor.node.editingProfileMeshes(),
+                          ...sketchImageMeshes(this.editor.node.plane, this.editor.solver.toData().images),
+                      ]
+                    : [];
                 if (profiles.length)
                     this.profileDisplayId = view.document.visual.context.displayMesh(profiles, {
                         meshOpacity: VisualConfig.defaultEdgeColor === DefaultDarkEdgeColor ? 0.32 : 0.8,
@@ -283,7 +319,7 @@ export class SketchEventHandler implements IEventHandler {
         let best: SketchPointRef | undefined;
         let bestDistance = PICK_TOLERANCE_PX;
         for (const entity of this.pickableEntities()) {
-            const pointCount = entityPointCount(entity.type);
+            const pointCount = entityPointCount(entity.type, entity.params);
             for (let pointIndex = 0; pointIndex < pointCount; pointIndex++) {
                 if (exclude?.kind === "entity" && exclude.entityId === entity.id) continue;
                 if (
@@ -357,6 +393,10 @@ export class SketchEventHandler implements IEventHandler {
     // ------------------------------------------------------------------ Pointer and keyboard input
 
     pointerMove(view: IView, event: PointerEvent): void {
+        if (this.editor.powerTrim && event.buttons === 1 && this.editor.isPicking) {
+            this.editor.handlePickPointerDown(view, event);
+            return;
+        }
         if (!this.isEnabled) return;
         if (this.boxSelection) {
             const { x, y, element } = this.boxSelection;
@@ -492,7 +532,7 @@ export class SketchEventHandler implements IEventHandler {
                 this.clearHover(view);
                 this.clearPersistentDragGeometry(view);
                 this.editor.solver.beginDrag(
-                    Array.from({ length: entityPointCount(entity.type) }, (_, pointIndex) => ({
+                    Array.from({ length: entityPointCount(entity.type, entity.params) }, (_, pointIndex) => ({
                         entityId: entity.id,
                         pointIndex,
                     })),
@@ -797,6 +837,7 @@ export class SketchEventHandler implements IEventHandler {
     }
 
     dispose(): void {
+        this.highlightPicks([]);
         this.boxSelection?.element.remove();
         this.boxSelection = undefined;
         this.disposed = true;
@@ -853,6 +894,18 @@ export class SketchEventHandler implements IEventHandler {
     }
 
     private computeHoverTarget(view: IView, event: PointerEvent): { key?: string; mesh?: ShapeMeshData } {
+        if (this.editor.powerTrim) {
+            const id = this.hitTestEntity(view, event),
+                uv = this.pointerToUV(view, event);
+            const preview =
+                id === undefined || !uv ? undefined : trimPreview(this.editor.solver.toData(), id, uv);
+            return preview
+                ? {
+                      key: `trim:${id}:${preview.params.map((v) => v.toFixed(6)).join(",")}`,
+                      mesh: { ...entityDisplayMesh(this.editor.node.plane, preview, 0xf29b24), lineWidth: 4 },
+                  }
+                : {};
+        }
         const pick = this.editor.activePick;
 
         if (pick === undefined || pick.kind === "point" || pick.kind === "pointOrEntity") {
@@ -956,7 +1009,7 @@ export class SketchEventHandler implements IEventHandler {
         view.update();
     }
 
-    private clearSelection(view: IView): void {
+    clearSelection(view: IView): void {
         if (this.selectedEntities.size === 0 && this.pointSelection.size === 0) return;
         this.pointSelection.clear();
         this.selectedEntities.clear();
@@ -1079,7 +1132,10 @@ export class SketchEventHandler implements IEventHandler {
 }
 
 function entityColor(editor: SketchEditor, entity: SketchEntityData): number {
-    if (!editor.lastSolveOutcome.result.startsWith("Ok") || editor.solver.datumErrors.size > 0)
+    if (
+        editor.showErrors &&
+        (!editor.lastSolveOutcome.result.startsWith("Ok") || editor.solver.datumErrors.size > 0)
+    )
         return 0xee6262;
     if (editor.lastSolveOutcome.dofs === 0 || editor.fullyConstrainedEntities.has(entity.id))
         return Config.instance.graphics.constrainedColor
@@ -1130,7 +1186,7 @@ function entityPointMeshes(editor: SketchEditor): ShapeMeshData[] {
     for (const entity of constraintTargetEntities(editor.solver).filter((entity) =>
         editor.solver.entityVisible(entity),
     )) {
-        for (let pointIndex = 0; pointIndex < entityPointCount(entity.type); pointIndex++) {
+        for (let pointIndex = 0; pointIndex < entityPointCount(entity.type, entity.params); pointIndex++) {
             const [u, v] = editor.solver.pointOf({ entityId: entity.id, pointIndex });
             meshes.push(
                 MeshDataUtils.createVertexMesh(
@@ -1151,6 +1207,8 @@ export function sketchEntityMesh(
     lineType: "solid" | "dash" = entity.construction || entity.dashed ? "dash" : "solid",
 ): EdgeMeshData {
     const plane = editor.node.plane;
+    if (["point", "bezier", "spline"].includes(entity.type))
+        return entityDisplayMesh(plane, entity, color, lineType === "dash");
     const [x1, y1, x2, y2] = entity.params;
     let mesh: EdgeMeshData;
     if (entity.type === "line") {
@@ -1226,6 +1284,11 @@ function arcSegmentMesh(
 /** uv distance to an entity's curve: segment, arc sweep, or circle circumference. */
 function entityDistance(uv: [number, number], entity: SketchEntityData): number {
     const [x1, y1, x2, y2] = entity.params;
+    if (entity.type === "point") return Math.hypot(uv[0] - x1, uv[1] - y1);
+    if (entity.type === "bezier" || entity.type === "spline") {
+        const p = sampleCurve(entity);
+        return Math.min(...p.slice(1).map((b, i) => pointToSegmentDistance(...uv, ...p[i], ...b)));
+    }
     if (entity.type === "line") return pointToSegmentDistance(uv[0], uv[1], x1, y1, x2, y2);
     if (entity.type === "arc") return pointToArcDistance(uv[0], uv[1], entity.params);
     return Math.abs(Math.hypot(uv[0] - x1, uv[1] - y1) - entity.params[2]);

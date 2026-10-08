@@ -254,13 +254,32 @@ export class ContextToolbar extends HTMLElement {
         this.separator(row);
         if (tab.tabName === "ribbon.tab.sketch") {
             row.append(
-                this.tool("sketch.line"),
-                this.tool("sketch.rectangle"),
+                this.family(["sketch.line", "sketch.midpointLine"], "Line tools"),
+                this.family(
+                    ["sketch.rectangle", "sketch.centerRectangle", "sketch.alignedRectangle"],
+                    "Rectangle tools",
+                ),
                 this.family(["sketch.circle", "sketch.circle3Point"], "Circle tools"),
-                this.tool("sketch.arc"),
+                this.family(["sketch.arc3Point", "sketch.arc"], "Arc tools"),
+                this.family(["sketch.polygon", "sketch.circumscribedPolygon"], "Polygon tools"),
+                this.family(["sketch.spline", "sketch.bezier", "sketch.splinePoint"], "Spline tools"),
+                this.tool("sketch.point"),
+                this.tool("sketch.text"),
             );
             this.separator(row);
-            row.append(this.tool("sketch.construction"), this.tool("sketch.projectEdges"));
+            row.append(
+                this.tool("sketch.construction"),
+                this.family(["sketch.projectEdges", "sketch.intersection"], "Use and intersection"),
+                this.family(["sketch.fillet", "sketch.chamfer"], "Sketch corner tools"),
+                this.family(["sketch.trim", "sketch.extend", "sketch.split"], "Trim tools"),
+                this.family(["sketch.offset", "sketch.slot"], "Offset and slot"),
+                this.tool("sketch.mirror"),
+                this.family(
+                    ["sketch.linearPattern", "sketch.circularPattern", "sketch.transform"],
+                    "Sketch patterns",
+                ),
+                this.family(["sketch.importDrawing", "sketch.insertImage"], "Insert sketch content"),
+            );
             this.separator(row);
             row.append(
                 this.family(

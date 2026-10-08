@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import { Config, type EdgeMeshData, type Plane } from "@chili3d/core";
+import { sampleCurve } from "./curveGeometry";
 import { arcAngles, type SketchEntityData, toWorld } from "./sketchModel";
 
 /** Analytic display geometry; never used as modeling topology. Chord error is below 0.2 screen pixels. */
@@ -18,7 +19,19 @@ export function entityDisplayMesh(
         const world = toWorld(plane, u, v);
         points.push(world.x, world.y, world.z);
     };
-    if (entity.type === "line") {
+    if (entity.type === "point") {
+        const r = pixelSize * 3;
+        add(p[0] - r, p[1]);
+        add(p[0] + r, p[1]);
+        add(p[0], p[1] - r);
+        add(p[0], p[1] + r);
+    } else if (entity.type === "bezier" || entity.type === "spline") {
+        const samples = sampleCurve(entity, pixelSize);
+        for (let i = 1; i < samples.length; i++) {
+            add(...samples[i - 1]);
+            add(...samples[i]);
+        }
+    } else if (entity.type === "line") {
         add(p[0], p[1]);
         add(p[2], p[3]);
     } else {

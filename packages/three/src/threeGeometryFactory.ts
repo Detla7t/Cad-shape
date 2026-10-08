@@ -13,6 +13,8 @@ import {
     MeshLambertMaterial,
     Points,
     PointsMaterial,
+    SRGBColorSpace,
+    TextureLoader,
 } from "three";
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
@@ -83,6 +85,24 @@ export class ThreeGeometryFactory {
     static createFaceGeometry(data: FaceMeshData, meshOption?: MeshOption) {
         const buff = ThreeGeometryFactory.createFaceBufferGeometry(data);
         const material = ThreeGeometryFactory.createMeshMaterial(meshOption);
+        if (data.texture) {
+            let disposed = false;
+            const texture = new TextureLoader().load(data.texture, () => {
+                if (!disposed) meshOption?.onTextureLoaded?.();
+            });
+            texture.colorSpace = SRGBColorSpace;
+            material.map = texture;
+            material.emissiveMap = texture;
+            material.emissive.set(0xffffff);
+            material.color.set(0x000000);
+            material.transparent = true;
+            material.opacity = meshOption?.meshOpacity ?? 0.8;
+            material.depthWrite = false;
+            material.addEventListener("dispose", () => {
+                disposed = true;
+                texture.dispose();
+            });
+        }
         ThreeGeometryFactory.setColor(buff, data, material);
 
         const mesh = new Mesh(buff, material);

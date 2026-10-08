@@ -1,0 +1,703 @@
+{
+    "schemaVersion": 1,
+    "auditedAt": "2026-10-08",
+    "stdVersion": 3083,
+    "reference": "https://cad.onshape.com/FsDoc/library.html",
+    "scope": "Bundled std 3083 and official documentation; no authenticated Onshape differential execution.",
+    "parityCertified": false,
+    "definitions": {
+        "verified-subset": "Positive geometric assertions exist for the stated subset, not all modes or UI parity.",
+        "blocked": "A known required operation/state is missing.",
+        "unverified": "Source/primitives exist, but no positive end-to-end feature proof."
+    },
+    "releaseExitCriteria": [
+        "Positive std-feature fixtures for every option family with exact or tolerance-bound geometry, body kinds/counts and query/history assertions.",
+        "Cold rebuild after upstream parameter edits, failed edit recovery, undo/redo and save/reopen, in multiple configurations.",
+        "Differential fixtures from the matching Onshape version, including metadata, naming and documented expected failures.",
+        "No ignored shape-affecting inputs, no placeholder success, no last-good geometry reported as a successful rebuild.",
+        "Dedicated command/panel integration, selection rules and preview/commit behavior for all requested tools."
+    ],
+    "inspection": {
+        "measure": "Unit/filter controls implemented; mate-connector frames unavailable.",
+        "analysis": "Ten requested menu entries inventoried; advanced overlays unavailable.",
+        "mass": "Part/planar Face modes and full centroid inertia tensor; uniform density only. Material densities, reference frame, overrides and certified variance are not implemented."
+    },
+    "tools": [
+        {
+            "tool": "Sweep",
+            "module": "sweep.fs",
+            "feature": "sweep",
+            "status": "verified-subset",
+            "limits": "Fresh-context annular and disjoint regions, surface profiles and straight/curved paths tested. Twist, scale, locked profiles and partial-path extents rejected. Stable subshape history and all boolean modes still need parity fixtures.",
+            "missingBuiltins": [],
+            "evidence": [
+                "packages/parametric/test/featurescript/stdFeatures.kernel.test.ts",
+                "packages/parametric/test/featurescript/sweepLoftCompatibility.kernel.test.ts"
+            ]
+        },
+        {
+            "tool": "Loft",
+            "module": "loft.fs",
+            "feature": "loft",
+            "status": "verified-subset",
+            "limits": "Simple solid profiles tested at multiple heights. Guides, connections, end constraints, periodicity, path sections and profiles with holes explicitly rejected.",
+            "missingBuiltins": [],
+            "evidence": [
+                "packages/parametric/test/featurescript/stdFeatures.kernel.test.ts",
+                "packages/parametric/test/featurescript/sweepLoftCompatibility.kernel.test.ts"
+            ]
+        },
+        {
+            "tool": "Thicken",
+            "module": "thicken.fs",
+            "feature": "thicken",
+            "status": "verified-subset",
+            "limits": "Simple and symmetric face thickening and whole-sheet keepTools tested. Connected multi-face thickening/junction semantics remain unverified.",
+            "missingBuiltins": [],
+            "evidence": [
+                "packages/parametric/test/featurescript/stdFeatures.kernel.test.ts",
+                "packages/parametric/test/featurescript/sweepLoftCompatibility.kernel.test.ts"
+            ]
+        },
+        {
+            "tool": "Enclose",
+            "module": "enclose.fs",
+            "feature": "enclose",
+            "status": "verified-subset",
+            "limits": "Closed and crossing sheets checked analytically. General curved enclosures and ambiguous/multiple regions need fixtures.",
+            "missingBuiltins": [],
+            "evidence": ["packages/parametric/test/featurescript/stdOperations.kernel.test.ts"]
+        },
+        {
+            "tool": "Face blend",
+            "module": "faceBlend.fs",
+            "feature": "faceBlend",
+            "status": "blocked",
+            "limits": "No host face-blend kernel operation.",
+            "missingBuiltins": ["opFaceBlend"],
+            "evidence": []
+        },
+        {
+            "tool": "3D fillet",
+            "module": "fillet.fs",
+            "feature": "fillet",
+            "status": "verified-subset",
+            "limits": "Constant-radius edges have analytic-volume tests. Variable radius, full round, partial and conic options are not parity-certified.",
+            "missingBuiltins": ["opFullRoundFillet"],
+            "evidence": [
+                "packages/parametric/test/featurescript/onshapeStd.kernel.test.ts",
+                "packages/parametric/test/featurescript/stdFeatures.kernel.test.ts"
+            ]
+        },
+        {
+            "tool": "3D chamfer",
+            "module": "chamfer.fs",
+            "feature": "chamfer",
+            "status": "verified-subset",
+            "limits": "Equal-distance chamfers have volume tests. Unequal distances, distance-angle and sheet-metal cases need fixtures.",
+            "missingBuiltins": [],
+            "evidence": [
+                "packages/parametric/test/featurescript/onshapeStd.kernel.test.ts",
+                "packages/parametric/test/featurescript/stdFeatures.kernel.test.ts"
+            ]
+        },
+        {
+            "tool": "Draft",
+            "module": "draft.fs",
+            "feature": "draft",
+            "status": "blocked",
+            "limits": "No draft kernel operation.",
+            "missingBuiltins": ["opDraft"],
+            "evidence": []
+        },
+        {
+            "tool": "Body draft",
+            "module": "bodyDraft.fs",
+            "feature": "bodyDraft",
+            "status": "blocked",
+            "limits": "No body-draft kernel operation.",
+            "missingBuiltins": ["opBodyDraft"],
+            "evidence": []
+        },
+        {
+            "tool": "Rib",
+            "module": "rib.fs",
+            "feature": "rib",
+            "status": "blocked",
+            "limits": "Std rib relies on unimplemented draft and profile-extension paths; no positive end-to-end rib fixture.",
+            "missingBuiltins": ["opDraft", "opFitSpline"],
+            "evidence": []
+        },
+        {
+            "tool": "Shell",
+            "module": "shell.fs",
+            "feature": "shell",
+            "status": "verified-subset",
+            "limits": "Open box shell and thickness direction tested. Closed-shell, multi-face and curved-wall cases need broader fixtures.",
+            "missingBuiltins": [],
+            "evidence": [
+                "packages/parametric/test/featurescript/onshapeStd.kernel.test.ts",
+                "packages/parametric/test/featurescript/stdFeatures.kernel.test.ts"
+            ]
+        },
+        {
+            "tool": "Hole",
+            "module": "hole.fs",
+            "feature": null,
+            "status": "verified-subset",
+            "limits": "Blind, counterbore, countersink, through-hole, slanted entry and face/profile query fixtures. Thread, standard table and all termination combinations are unverified.",
+            "missingBuiltins": [],
+            "evidence": ["packages/parametric/test/featurescript/stdOperations.kernel.test.ts"]
+        },
+        {
+            "tool": "External thread",
+            "module": "externalThread.fs",
+            "feature": "externalThread",
+            "status": "unverified",
+            "limits": "Std source is available; thread attributes, undercut, chamfer and display semantics have no positive feature fixture. Curved face offsets are restricted.",
+            "missingBuiltins": [],
+            "evidence": []
+        },
+        {
+            "tool": "3D linear pattern",
+            "module": "linearPattern.fs",
+            "feature": "linearPattern",
+            "status": "verified-subset",
+            "limits": "Part-copy geometry tested. Face patterns are unsupported and feature reapply/boolean modes need positive fixtures.",
+            "missingBuiltins": ["opBooleanedPattern"],
+            "evidence": [
+                "packages/parametric/test/featurescript/onshapeStd.kernel.test.ts",
+                "packages/parametric/test/featurescript/stdFeatures.kernel.test.ts"
+            ]
+        },
+        {
+            "tool": "3D circular pattern",
+            "module": "circularPattern.fs",
+            "feature": "circularPattern",
+            "status": "verified-subset",
+            "limits": "Part-copy geometry tested. Face patterns are unsupported and feature reapply/boolean modes need positive fixtures.",
+            "missingBuiltins": ["opBooleanedPattern"],
+            "evidence": [
+                "packages/parametric/test/featurescript/onshapeStd.kernel.test.ts",
+                "packages/parametric/test/featurescript/stdFeatures.kernel.test.ts"
+            ]
+        },
+        {
+            "tool": "3D mirror",
+            "module": "mirror.fs",
+            "feature": "mirror",
+            "status": "verified-subset",
+            "limits": "Part-copy geometry tested. Face patterns are unsupported and feature reapply/boolean modes need positive fixtures.",
+            "missingBuiltins": ["opBooleanedPattern"],
+            "evidence": [
+                "packages/parametric/test/featurescript/onshapeStd.kernel.test.ts",
+                "packages/parametric/test/featurescript/stdFeatures.kernel.test.ts"
+            ]
+        },
+        {
+            "tool": "3D curve pattern",
+            "module": "curvePattern.fs",
+            "feature": "curvePattern",
+            "status": "blocked",
+            "limits": "Path transform generation is missing.",
+            "missingBuiltins": ["computeCurvePatternTransforms", "constructPaths"],
+            "evidence": []
+        },
+        {
+            "tool": "Boolean",
+            "module": "boolean.fs",
+            "feature": "booleanBodies",
+            "status": "verified-subset",
+            "limits": "Solid union/subtract/intersect volumes tested. Sheet unions, groups and keep-tool combinations need full parity coverage.",
+            "missingBuiltins": [],
+            "evidence": [
+                "packages/parametric/test/featurescript/onshapeStd.kernel.test.ts",
+                "packages/parametric/test/featurescript/stdFeatures.kernel.test.ts",
+                "packages/parametric/test/featurescript/stdOperations.kernel.test.ts"
+            ]
+        },
+        {
+            "tool": "Split",
+            "module": "splitpart.fs",
+            "feature": "splitPart",
+            "status": "verified-subset",
+            "limits": "Part/face/edge splitting with planes and sketch tools tested. Full query/history and keep-side combinations remain incomplete.",
+            "missingBuiltins": [],
+            "evidence": ["packages/parametric/test/featurescript/stdOperations.kernel.test.ts"]
+        },
+        {
+            "tool": "Transform",
+            "module": "transformCopy.fs",
+            "feature": "copyPart",
+            "status": "verified-subset",
+            "limits": "Translation, rotation, uniform scaling and copying tested. Mate-connector, nonuniform scale and pattern interactions need fixtures.",
+            "missingBuiltins": [],
+            "evidence": ["packages/parametric/test/featurescript/stdFeatures.kernel.test.ts"]
+        },
+        {
+            "tool": "Wrap",
+            "module": "wrap.fs",
+            "feature": "wrap",
+            "status": "blocked",
+            "limits": "No wrap kernel operation.",
+            "missingBuiltins": ["opWrap"],
+            "evidence": []
+        },
+        {
+            "tool": "Decal",
+            "module": "decal.fs",
+            "feature": "decal",
+            "status": "unverified",
+            "limits": "Std image/decal attributes do not establish texture placement, rendering or serialized asset portability. No positive visual fixture.",
+            "missingBuiltins": [],
+            "evidence": []
+        },
+        {
+            "tool": "Delete part",
+            "module": "deleteBodies.fs",
+            "feature": "deleteBodies",
+            "status": "verified-subset",
+            "limits": "Body deletion and composite consumption tested. Every composite/sketch/linked-part combination is not covered.",
+            "missingBuiltins": [],
+            "evidence": [
+                "packages/parametric/test/featurescript/stdFeatures.kernel.test.ts",
+                "packages/parametric/test/featurescript/stdOperations.kernel.test.ts"
+            ]
+        },
+        {
+            "tool": "Modify fillet",
+            "module": "modifyFillet.fs",
+            "feature": "modifyFillet",
+            "status": "verified-subset",
+            "limits": "Remove and change radius of a two-face fillet tested; other fillet geometries are restricted.",
+            "missingBuiltins": [],
+            "evidence": ["packages/parametric/test/featurescript/stdOperations.kernel.test.ts"]
+        },
+        {
+            "tool": "Delete face",
+            "module": "deleteFace.fs",
+            "feature": "deleteFace",
+            "status": "verified-subset",
+            "limits": "Boss/hole/fillet healing, planar caps and open void tested. Curved caps and general healing are not equivalent.",
+            "missingBuiltins": [],
+            "evidence": ["packages/parametric/test/featurescript/stdOperations.kernel.test.ts"]
+        },
+        {
+            "tool": "Move face",
+            "module": "moveFace.fs",
+            "feature": "moveFace",
+            "status": "verified-subset",
+            "limits": "Planar normal translation/offset tested. Rotation and general curved-face editing are rejected.",
+            "missingBuiltins": [],
+            "evidence": ["packages/parametric/test/featurescript/stdOperations.kernel.test.ts"]
+        },
+        {
+            "tool": "Replace face",
+            "module": "replaceFace.fs",
+            "feature": "replaceFace",
+            "status": "verified-subset",
+            "limits": "Parallel planar replacement tested. Nonparallel/curved templates are rejected.",
+            "missingBuiltins": [],
+            "evidence": ["packages/parametric/test/featurescript/stdOperations.kernel.test.ts"]
+        },
+        {
+            "tool": "Plane",
+            "module": "cplane.fs",
+            "feature": "cPlane",
+            "status": "verified-subset",
+            "limits": "Mid-plane and basic plane geometry tested; all construction modes and selection identities need fixtures.",
+            "missingBuiltins": [],
+            "evidence": [
+                "packages/parametric/test/featurescript/stdFeatures.kernel.test.ts",
+                "packages/parametric/test/featurescript/stdOperations.kernel.test.ts"
+            ]
+        },
+        {
+            "tool": "Offset surface",
+            "module": "offsetSurface.fs",
+            "feature": "offsetSurface",
+            "status": "verified-subset",
+            "limits": "Surface extraction and planar offsets tested at operation level. Curved offsets are rejected; full feature behavior is not certified.",
+            "missingBuiltins": [],
+            "evidence": ["packages/parametric/test/featurescript/stdOperations.kernel.test.ts"]
+        },
+        {
+            "tool": "Boundary surface",
+            "module": "bsurf.fs",
+            "feature": "boundarySurface",
+            "status": "blocked",
+            "limits": "Required host surface operation is missing.",
+            "missingBuiltins": ["opBoundarySurface"],
+            "evidence": []
+        },
+        {
+            "tool": "Fill",
+            "module": "fillSurface.fs",
+            "feature": "fill",
+            "status": "blocked",
+            "limits": "Required host surface operation is missing.",
+            "missingBuiltins": ["opFillSurface"],
+            "evidence": []
+        },
+        {
+            "tool": "Move boundary",
+            "module": "extend.fs",
+            "feature": "extendSurface",
+            "status": "blocked",
+            "limits": "Required host surface operation is missing.",
+            "missingBuiltins": ["opExtendSheetBody"],
+            "evidence": []
+        },
+        {
+            "tool": "Ruled surface",
+            "module": "ruledSurface.fs",
+            "feature": "ruledSurface",
+            "status": "blocked",
+            "limits": "Required host surface operation is missing.",
+            "missingBuiltins": ["opRuledSurface"],
+            "evidence": []
+        },
+        {
+            "tool": "Constrained surface",
+            "module": "constrainedSurface.fs",
+            "feature": "constrainedSurface",
+            "status": "blocked",
+            "limits": "Required host surface operation is missing.",
+            "missingBuiltins": ["opConstrainedSurface"],
+            "evidence": []
+        },
+        {
+            "tool": "Mutual trim",
+            "module": "mutualTrim.fs",
+            "feature": "mutualTrim",
+            "status": "unverified",
+            "limits": "Split/delete operations exist; trimming and merging two sheets has no positive feature fixture and sheet boolean behavior needs verification.",
+            "missingBuiltins": [],
+            "evidence": []
+        },
+        {
+            "tool": "Helix",
+            "module": "helix.fs",
+            "feature": "helix",
+            "status": "verified-subset",
+            "limits": "Pitch/turn helix length and cylinder-based std feature tested. Conical/spiral variants need fixtures.",
+            "missingBuiltins": [],
+            "evidence": ["packages/parametric/test/featurescript/stdFeatures.kernel.test.ts"]
+        },
+        {
+            "tool": "3D fit spline",
+            "module": "fitSpline.fs",
+            "feature": "fitSpline",
+            "status": "blocked",
+            "limits": "Required host curve operation is missing.",
+            "missingBuiltins": ["opFitSpline"],
+            "evidence": []
+        },
+        {
+            "tool": "Projected curve",
+            "module": "projectCurves.fs",
+            "feature": "projectCurves",
+            "status": "blocked",
+            "limits": "Required host curve operation is missing.",
+            "missingBuiltins": ["opDropCurve", "opCreateCurvesOnFace"],
+            "evidence": []
+        },
+        {
+            "tool": "Trim curve",
+            "module": "moveCurveBoundary.fs",
+            "feature": "trimCurve",
+            "status": "blocked",
+            "limits": "Required host curve operation is missing.",
+            "missingBuiltins": ["opMoveCurveBoundary"],
+            "evidence": []
+        },
+        {
+            "tool": "Isocline",
+            "module": "isocline.fs",
+            "feature": "isocline",
+            "status": "blocked",
+            "limits": "Required host curve operation is missing.",
+            "missingBuiltins": ["opCreateIsocline"],
+            "evidence": []
+        },
+        {
+            "tool": "Offset curve",
+            "module": "offsetCurveOnFace.fs",
+            "feature": "offsetCurveOnFace",
+            "status": "blocked",
+            "limits": "Required host curve operation is missing.",
+            "missingBuiltins": ["opOffsetCurveOnFace", "opOffsetWire"],
+            "evidence": []
+        },
+        {
+            "tool": "Edit curve",
+            "module": "editCurve.fs",
+            "feature": "editCurve",
+            "status": "blocked",
+            "limits": "Required host curve operation is missing.",
+            "missingBuiltins": ["opEditCurve"],
+            "evidence": []
+        },
+        {
+            "tool": "Bridging curve",
+            "module": "bridgingCurve.fs",
+            "feature": "bridgingCurve",
+            "status": "verified-subset",
+            "limits": "Straight bridge between two points and rational B-spline primitives tested. Tangency/curvature matching and higher-degree bridges need fixtures.",
+            "missingBuiltins": [],
+            "evidence": ["packages/parametric/test/featurescript/stdOperations.kernel.test.ts"]
+        },
+        {
+            "tool": "Composite curve",
+            "module": "compositeCurve.fs",
+            "feature": "compositeCurve",
+            "status": "unverified",
+            "limits": "Wire extraction/chaining exists; feature-level approximate/reapproximate modes lack positive fixtures.",
+            "missingBuiltins": ["opSplineThroughEdges"],
+            "evidence": []
+        },
+        {
+            "tool": "Intersection curve",
+            "module": "faceIntersection.fs",
+            "feature": "intersectionCurve",
+            "status": "verified-subset",
+            "limits": "Intersection of faces has a geometric fixture. Complex multi-surface intersections need coverage.",
+            "missingBuiltins": [],
+            "evidence": ["packages/parametric/test/featurescript/stdOperations.kernel.test.ts"]
+        },
+        {
+            "tool": "Isoparametric curve",
+            "module": "isoparametricCurve.fs",
+            "feature": "isoparametricCurve",
+            "status": "blocked",
+            "limits": "Surface curve creation binding is missing.",
+            "missingBuiltins": ["opCreateCurvesOnFace"],
+            "evidence": []
+        },
+        {
+            "tool": "Routing curve",
+            "module": "routingCurve.fs",
+            "feature": "routingCurve",
+            "status": "blocked",
+            "limits": "Spline generation and routing edits are not end-to-end tested.",
+            "missingBuiltins": ["opFitSpline"],
+            "evidence": []
+        },
+        {
+            "tool": "Derived",
+            "module": "importDerived.fs",
+            "feature": "importDerived",
+            "status": "unverified",
+            "limits": "Context merge is tested; importing a real Onshape document/configuration and preserving identities is not. Chili3D cross-document links are a separate implementation.",
+            "missingBuiltins": [],
+            "evidence": ["packages/parametric/test/featurescript/stdOperations.kernel.test.ts"]
+        },
+        {
+            "tool": "Query variable",
+            "module": "queryVariable.fs",
+            "feature": "queryVariable",
+            "status": "unverified",
+            "limits": "Queries and variable storage are implemented, but this feature needs positive selection-mode, naming, downstream use and rebuild fixtures.",
+            "missingBuiltins": [],
+            "evidence": []
+        },
+        {
+            "tool": "Composite part",
+            "module": "compositePart.fs",
+            "feature": "compositePart",
+            "status": "verified-subset",
+            "limits": "Open/closed composites, constituents, modification and queries tested. Serialization and cross-app metadata round trips need fixtures.",
+            "missingBuiltins": [],
+            "evidence": ["packages/parametric/test/featurescript/stdOperations.kernel.test.ts"]
+        },
+        {
+            "tool": "Tag",
+            "module": "tag.fs",
+            "feature": "tag",
+            "status": "unverified",
+            "limits": "Generic attributes are implemented. Frame-profile tags, alignment points, custom columns and downstream frame use lack end-to-end fixtures.",
+            "missingBuiltins": [],
+            "evidence": []
+        },
+        {
+            "tool": "Frame",
+            "module": "frame.fs",
+            "feature": "frame",
+            "status": "blocked",
+            "limits": "Profile import, path construction, corners, trimming and identity behavior are not complete.",
+            "missingBuiltins": ["constructPaths", "opFitSpline"],
+            "evidence": []
+        },
+        {
+            "tool": "Frame trim",
+            "module": "frameTrim.fs",
+            "feature": "frameTrim",
+            "status": "unverified",
+            "limits": "Split and boolean primitives exist; frame-group trim and retained metadata need positive frame fixtures.",
+            "missingBuiltins": [],
+            "evidence": []
+        },
+        {
+            "tool": "Gusset",
+            "module": "gusset.fs",
+            "feature": "gusset",
+            "status": "unverified",
+            "limits": "Requires frame semantics and geometry fixtures; source presence does not verify production gussets.",
+            "missingBuiltins": [],
+            "evidence": []
+        },
+        {
+            "tool": "End cap",
+            "module": "endcap.fs",
+            "feature": "endcap",
+            "status": "blocked",
+            "limits": "Filling the profile boundary is unavailable; offsets are restricted to planar faces.",
+            "missingBuiltins": ["opFillSurface"],
+            "evidence": []
+        },
+        {
+            "tool": "Cut list",
+            "module": "cutlist.fs",
+            "feature": "cutlist",
+            "status": "unverified",
+            "limits": "Custom-table infrastructure exists; actual frame grouping, length/angle, overrides and persistence need fixtures.",
+            "missingBuiltins": [],
+            "evidence": []
+        },
+        {
+            "tool": "Sheet metal model",
+            "module": "sheetMetalStart.fs",
+            "feature": null,
+            "status": "blocked",
+            "limits": "Onshape kernel sheet-metal state and folded/flat associations are absent. Chili3D flat-first sheet metal is separate and is not a compatible substitute.",
+            "missingBuiltins": ["updateSheetMetalGeometry"],
+            "evidence": []
+        },
+        {
+            "tool": "Flange",
+            "module": "sheetMetalFlange.fs",
+            "feature": null,
+            "status": "blocked",
+            "limits": "Onshape kernel sheet-metal state and folded/flat associations are absent. Chili3D flat-first sheet metal is separate and is not a compatible substitute.",
+            "missingBuiltins": ["updateSheetMetalGeometry"],
+            "evidence": []
+        },
+        {
+            "tool": "Hem",
+            "module": "sheetMetalHem.fs",
+            "feature": null,
+            "status": "blocked",
+            "limits": "Onshape kernel sheet-metal state and folded/flat associations are absent. Chili3D flat-first sheet metal is separate and is not a compatible substitute.",
+            "missingBuiltins": ["updateSheetMetalGeometry"],
+            "evidence": []
+        },
+        {
+            "tool": "Tab",
+            "module": "sheetMetalTab.fs",
+            "feature": null,
+            "status": "blocked",
+            "limits": "Onshape kernel sheet-metal state and folded/flat associations are absent. Chili3D flat-first sheet metal is separate and is not a compatible substitute.",
+            "missingBuiltins": ["updateSheetMetalGeometry"],
+            "evidence": []
+        },
+        {
+            "tool": "Bend",
+            "module": "sheetMetalBend.fs",
+            "feature": null,
+            "status": "blocked",
+            "limits": "Onshape kernel sheet-metal state and folded/flat associations are absent. Chili3D flat-first sheet metal is separate and is not a compatible substitute.",
+            "missingBuiltins": ["updateSheetMetalGeometry"],
+            "evidence": []
+        },
+        {
+            "tool": "Jog",
+            "module": "sheetMetalJog.fs",
+            "feature": null,
+            "status": "blocked",
+            "limits": "Onshape kernel sheet-metal state and folded/flat associations are absent. Chili3D flat-first sheet metal is separate and is not a compatible substitute.",
+            "missingBuiltins": ["updateSheetMetalGeometry"],
+            "evidence": []
+        },
+        {
+            "tool": "Form",
+            "module": "sheetMetalFormed.fs",
+            "feature": null,
+            "status": "blocked",
+            "limits": "Onshape kernel sheet-metal state and folded/flat associations are absent. Chili3D flat-first sheet metal is separate and is not a compatible substitute.",
+            "missingBuiltins": ["updateSheetMetalGeometry"],
+            "evidence": []
+        },
+        {
+            "tool": "Sheet metal loft",
+            "module": "sheetMetalLoft.fs",
+            "feature": null,
+            "status": "blocked",
+            "limits": "Onshape kernel sheet-metal state and folded/flat associations are absent. Chili3D flat-first sheet metal is separate and is not a compatible substitute.",
+            "missingBuiltins": ["updateSheetMetalGeometry"],
+            "evidence": []
+        },
+        {
+            "tool": "Make joint",
+            "module": "sheetMetalMakeJoint.fs",
+            "feature": null,
+            "status": "blocked",
+            "limits": "Onshape kernel sheet-metal state and folded/flat associations are absent. Chili3D flat-first sheet metal is separate and is not a compatible substitute.",
+            "missingBuiltins": ["updateSheetMetalGeometry"],
+            "evidence": []
+        },
+        {
+            "tool": "Corner",
+            "module": "sheetMetalCorner.fs",
+            "feature": null,
+            "status": "blocked",
+            "limits": "Onshape kernel sheet-metal state and folded/flat associations are absent. Chili3D flat-first sheet metal is separate and is not a compatible substitute.",
+            "missingBuiltins": ["updateSheetMetalGeometry"],
+            "evidence": []
+        },
+        {
+            "tool": "Bend relief",
+            "module": "sheetMetalBendRelief.fs",
+            "feature": null,
+            "status": "blocked",
+            "limits": "Onshape kernel sheet-metal state and folded/flat associations are absent. Chili3D flat-first sheet metal is separate and is not a compatible substitute.",
+            "missingBuiltins": ["updateSheetMetalGeometry"],
+            "evidence": []
+        },
+        {
+            "tool": "Corner break",
+            "module": "sheetMetalCornerBreak.fs",
+            "feature": null,
+            "status": "blocked",
+            "limits": "Onshape kernel sheet-metal state and folded/flat associations are absent. Chili3D flat-first sheet metal is separate and is not a compatible substitute.",
+            "missingBuiltins": ["updateSheetMetalGeometry"],
+            "evidence": []
+        },
+        {
+            "tool": "Finish sheet metal model",
+            "module": "sheetMetalEnd.fs",
+            "feature": null,
+            "status": "blocked",
+            "limits": "Onshape kernel sheet-metal state and folded/flat associations are absent. Chili3D flat-first sheet metal is separate and is not a compatible substitute.",
+            "missingBuiltins": ["updateSheetMetalGeometry"],
+            "evidence": []
+        },
+        {
+            "tool": "Flex PCB model",
+            "module": "pcbStart.fs",
+            "feature": null,
+            "status": "blocked",
+            "limits": "Onshape kernel sheet-metal state and folded/flat associations are absent. Chili3D flat-first sheet metal is separate and is not a compatible substitute.",
+            "missingBuiltins": ["updateSheetMetalGeometry"],
+            "evidence": []
+        },
+        {
+            "tool": "Finish flex PCB model",
+            "module": "pcbEnd.fs",
+            "feature": null,
+            "status": "blocked",
+            "limits": "Onshape kernel sheet-metal state and folded/flat associations are absent. Chili3D flat-first sheet metal is separate and is not a compatible substitute.",
+            "missingBuiltins": ["updateSheetMetalGeometry"],
+            "evidence": []
+        }
+    ]
+}

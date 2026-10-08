@@ -9,6 +9,7 @@ import type { EdgeMeshData, MeshLike, ShapeMeshData } from "../shape";
 import type { IVisualObject } from "./visualObject";
 
 export type MeshOption = {
+    onTextureLoaded?: () => void;
     meshOpacity?: number;
     lineOpacity?: number;
     vertexOpacity?: number;

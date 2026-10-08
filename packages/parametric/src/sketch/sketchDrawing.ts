@@ -8,6 +8,7 @@ import {
     degreesOf,
     normalizeDegrees,
 } from "../drawing/drawing";
+import { sampleCurve } from "./curveGeometry";
 import type { SketchData, SketchEntityType } from "./sketchModel";
 
 /**
@@ -30,6 +31,7 @@ function entityOf(
     params: readonly number[],
     layer: string,
 ): DrawingEntity | undefined {
+    if (["point", "bezier", "spline"].includes(type)) return undefined;
     if (type === "line") {
         const [x1, y1, x2, y2] = params;
         if (Math.hypot(x2 - x1, y2 - y1) < 1e-12) return undefined;
@@ -95,6 +97,11 @@ export function sketchDrawing(data: SketchData, options: SketchDrawingOptions = 
                     aci: colorIndex(color),
                     dashed: entity.construction || entity.dashed || layer?.dashed,
                 });
+        }
+        if (entity.type === "bezier" || entity.type === "spline") {
+            const p = sampleCurve(entity, 0.01);
+            for (let i = 1; i < p.length; i++)
+                entities.push({ kind: "line", layer: name, a: p[i - 1], b: p[i] });
         }
         const drawn = entityOf(entity.type, entity.params, name);
         if (drawn !== undefined) entities.push(drawn);

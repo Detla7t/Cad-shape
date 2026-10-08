@@ -11,10 +11,13 @@ import {
     NodeSelectionHandler,
     NodeUtils,
     PubSub,
+    ReferencePlaneNode,
     ShapeSelectionHandler,
     ShapeTypes,
+    setHistoryHidden,
     Transaction,
 } from "@chili3d/core";
+import { HistoryBar } from "../historyBar";
 import { showNodeContextMenu } from "../nodeContextMenu";
 import style from "./tree.module.css";
 import { TreeItem } from "./treeItem";
@@ -29,6 +32,27 @@ export class Tree extends HTMLElement {
     private lastClicked: INode | undefined;
     private lastSelected: INode[] | undefined;
     private filterText = "";
+    private historyPosition?: number;
+    private historyBar?: HistoryBar;
+    private historyRows(): TreeItem[] {
+        const root = this.nodeMap.get(this.document.modelManager.rootNode);
+        const parent = root instanceof TreeGroup ? root.items : this;
+        return [...parent.children].filter(
+            (e): e is TreeItem => e instanceof TreeItem && !(e.node instanceof ReferencePlaneNode),
+        );
+    }
+    private refreshHistory(): void {
+        this.historyBar ??= new HistoryBar(
+            () => this.historyRows(),
+            () => this.historyPosition ?? this.historyRows().length,
+            (position) => {
+                const rows = this.historyRows();
+                this.historyPosition = position === rows.length ? undefined : position;
+                rows.forEach((row, i) => setHistoryHidden(this.document, row.node, i >= position));
+            },
+        );
+        this.historyBar.refresh();
+    }
 
     constructor(private document: IDocument) {
         super();
@@ -39,6 +63,7 @@ export class Tree extends HTMLElement {
     private initializeTree(document: IDocument) {
         this.addAllNodes(document, this, document.modelManager.rootNode);
         this.addEvents(this);
+        this.refreshHistory();
     }
 
     connectedCallback() {
@@ -94,7 +119,10 @@ export class Tree extends HTMLElement {
         this.lastClicked = undefined;
         this.dragging = undefined;
         this.highlightedGroup = undefined;
-        this.nodeMap.forEach((x) => x.dispose());
+        this.nodeMap.forEach((x) => {
+            setHistoryHidden(this.document, x.node, false);
+            x.dispose();
+        });
         this.nodeMap.clear();
         this.selectedNodes.clear();
         this.removeEvents(this);
@@ -124,6 +152,7 @@ export class Tree extends HTMLElement {
             this.refreshGroupExpander(record.oldParent);
         });
         this.filter(this.filterText);
+        this.refreshHistory();
     };
 
     private refreshGroupExpander(parent: INodeLinkedList | undefined) {

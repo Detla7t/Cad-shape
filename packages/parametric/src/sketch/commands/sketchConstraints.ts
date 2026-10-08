@@ -359,7 +359,11 @@ export class FixConstraintCommand extends SketchConstraintCommand {
             for (const id of selected) {
                 const entity = editor.solver.entity(id);
                 if (!entity || !allowsConstraintOnEntity(ConstraintKind.Fix, id)) continue;
-                for (let pointIndex = 0; pointIndex < entityPointCount(entity.type); pointIndex++) {
+                for (
+                    let pointIndex = 0;
+                    pointIndex < entityPointCount(entity.type, entity.params);
+                    pointIndex++
+                ) {
                     const ref = { entityId: id, pointIndex };
                     if (!hasDuplicate(editor.solver, ConstraintKind.Fix, [ref]))
                         editor.solver.addConstraint({

@@ -9,6 +9,7 @@ export * from "./featureList";
 export * from "./folderNode";
 export * from "./geometryNode";
 export * from "./groupNode";
+export * from "./historyPreview";
 export * from "./meshNode";
 export * from "./node";
 export * from "./nodeIcon";

@@ -1,8 +1,9 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { FolderNode, type IDocument, type INodeLinkedList } from "@chili3d/core";
+import { FolderNode, type IDocument, type INodeLinkedList, isFeatureListNode } from "@chili3d/core";
 import { div, setSVGIcon, svg } from "@chili3d/element";
+import { FeatureListProperty } from "../../property/featureListProperty";
 import { TreeItem } from "./treeItem";
 import style from "./treeItemGroup.module.css";
 
@@ -25,6 +26,7 @@ export class TreeGroup extends TreeItem {
             this.warningBadge,
         );
         super.append(this.createRootContainer());
+        if (isFeatureListNode(node)) this.items.append(new FeatureListProperty(document, node));
         this.refreshExpander();
     }
 
@@ -49,7 +51,9 @@ export class TreeGroup extends TreeItem {
     /** Folders always show the expander; a body shows it only with tools inside. */
     refreshExpander() {
         const hide =
-            !(this.node instanceof FolderNode) && (this.node as INodeLinkedList).firstChild === undefined;
+            !(this.node instanceof FolderNode) &&
+            !isFeatureListNode(this.node) &&
+            (this.node as INodeLinkedList).firstChild === undefined;
         this.expanderIcon.classList.toggle(style.hide, hide);
     }
 

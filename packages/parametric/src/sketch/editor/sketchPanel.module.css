@@ -142,3 +142,35 @@
     white-space: nowrap;
     margin-right: 6px;
 }
+.contextMenu {
+    position: fixed;
+    z-index: 10000;
+    min-width: 215px;
+    padding: 4px 0;
+    border: 1px solid var(--border-color);
+    background: var(--panel-background-color);
+    color: var(--foreground-color);
+    box-shadow: 0 3px 8px #0004;
+    font-size: 12px;
+}
+.contextMenu button {
+    display: block;
+    text-align: left;
+    width: 100%;
+    border: 0;
+    padding: 6px 16px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+}
+.contextMenu button:hover {
+    background: var(--hover-background-color, #dff0f9);
+}
+.contextMenu button:disabled {
+    opacity: 0.45;
+}
+.contextMenu hr {
+    border: 0;
+    border-top: 1px solid var(--border-color);
+    margin: 3px 0;
+}

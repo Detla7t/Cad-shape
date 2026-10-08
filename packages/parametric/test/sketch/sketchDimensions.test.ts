@@ -800,3 +800,59 @@ test("distance dimensions accept a whole line followed by label placement", asyn
         restoreFactory();
     }
 });
+
+test("D on an unsized circle starts sizing it and selects the current radius", async () => {
+    const { app, doc, view, dialog, restorePub, restoreFactory } = setup();
+    try {
+        const editor = SketchEditor.enter(new SketchNode({ document: doc, plane: Plane.XY }));
+        const circle = editor.solver.addCircle(0, 0, 50);
+        editor.solve(true);
+        const handler = doc.visual.eventHandler as SketchEventHandler,
+            run = new DistanceDimensionCommand().execute(app);
+        handler.pointerDown(view, pointerEvent(450, 300));
+        await tick();
+        expect(editor.activePick?.kind).toBe("position");
+        handler.pointerDown(view, pointerEvent(470, 250));
+        await run;
+        expect(Number(dialogInput(dialog).value)).toBe(50);
+        expect(confirmDialog(dialog, "30")).toBe(true);
+        expect(editor.solver.entity(circle)?.params[2]).toBeCloseTo(30);
+    } finally {
+        SketchEditor.exit();
+        restorePub();
+        restoreFactory();
+    }
+});
+
+test("D distinguishes a sized circle edge from its center and cancels helper geometry cleanly", async () => {
+    const { app, doc, view, dialog, restorePub, restoreFactory } = setup();
+    try {
+        const editor = SketchEditor.enter(new SketchNode({ document: doc, plane: Plane.XY }));
+        const circle = editor.solver.addCircle(0, 0, 50);
+        editor.solver.addConstraint({
+            kind: ConstraintKind.Radius,
+            refs: [{ entityId: circle, pointIndex: 0 }],
+            datum: 50,
+        });
+        editor.solver.addLine(100, -40, 100, 40);
+        editor.solve(true);
+        const before = editor.solver.toData();
+        const handler = doc.visual.eventHandler as SketchEventHandler,
+            run = new DistanceDimensionCommand().execute(app);
+        handler.pointerDown(view, pointerEvent(450, 300));
+        await tick();
+        expect(editor.activePick?.kind).toBe("pointOrEntity");
+        handler.pointerDown(view, pointerEvent(500, 300));
+        await tick();
+        expect(editor.activePick?.kind).toBe("position");
+        handler.pointerDown(view, pointerEvent(475, 245));
+        await run;
+        expect(Math.abs(Number(dialogInput(dialog).value))).toBeCloseTo(50);
+        cancelDialog(dialog);
+        expect(editor.solver.toData()).toEqual(before);
+    } finally {
+        SketchEditor.exit();
+        restorePub();
+        restoreFactory();
+    }
+});

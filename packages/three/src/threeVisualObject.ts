@@ -8,6 +8,7 @@ import {
     type IShape,
     type ISubShape,
     type IVisualObject,
+    isHistoryHidden,
     type Matrix4,
     type MeshNode,
     type ShapeMeshRange,
@@ -98,7 +99,7 @@ export abstract class ThreeVisualObject extends Object3D implements IVisualObjec
         super();
         this._node = node;
         this.matrixAutoUpdate = false;
-        this.visible = node.visible && node.parentVisible;
+        this.visible = node.visible && node.parentVisible && !isHistoryHidden(node);
         this.transform = node.transform;
         node.onPropertyChanged(this.handlePropertyChanged);
     }

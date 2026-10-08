@@ -19,6 +19,9 @@ export const PARAM_KIND_LENGTH = 1;
 
 /** garlic param kinds per entity type: line = 2 points, circle = center + radius, arc = 3 points. */
 export const ENTITY_PARAM_KINDS: Record<SketchEntityType, number[]> = {
+    point: [0, 0],
+    bezier: [],
+    spline: [],
     line: [PARAM_KIND_COORDINATE, PARAM_KIND_COORDINATE, PARAM_KIND_COORDINATE, PARAM_KIND_COORDINATE],
     circle: [PARAM_KIND_COORDINATE, PARAM_KIND_COORDINATE, PARAM_KIND_LENGTH],
     arc: [
@@ -39,6 +42,7 @@ export const ENTITY_PARAM_KINDS: Record<SketchEntityType, number[]> = {
  * types and already-matching lengths pass through unchanged (same array identity).
  */
 export function normalizeSnapshot(type: SketchEntityType, snapshot: number[]): number[] {
+    if (type === "bezier" || type === "spline") return snapshot;
     const count = ENTITY_PARAM_KINDS[type]?.length;
     if (count === undefined || snapshot.length === count) return snapshot;
     return Array.from({ length: count }, (_, index) => snapshot[index] ?? 0);

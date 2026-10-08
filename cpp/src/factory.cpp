@@ -8,6 +8,7 @@
 #include "utils.hpp"
 #include <BOPAlgo_BuilderFace.hxx>
 #include <BOPAlgo_Splitter.hxx>
+#include <BRepAdaptor_CompCurve.hxx>
 #include <BRepAlgoAPI_BooleanOperation.hxx>
 #include <BRepAlgoAPI_Common.hxx>
 #include <BRepAlgoAPI_Cut.hxx>
@@ -724,6 +725,28 @@ public:
         if (!pipe.IsDone()) {
             return ShapeResult { TopoDS_Shape(), false, "Failed to sweep profile" };
         }
+        return ShapeResult { pipe.Shape(), true, "" };
+    }
+
+    static ShapeResult sweepProfile(const TopoDS_Wire& profile, const TopoDS_Wire& path, bool solid, bool keepOrientation)
+    {
+        BRepOffsetAPI_MakePipeShell pipe(path);
+        if (keepOrientation) {
+            BRepAdaptor_CompCurve curve(path);
+            gp_Pnt point;
+            gp_Vec tangent;
+            curve.D1(curve.FirstParameter(), point, tangent);
+            if (tangent.SquareMagnitude() <= Precision::SquareConfusion())
+                return ShapeResult { TopoDS_Shape(), false, "Sweep path has no initial tangent" };
+            pipe.SetMode(gp_Ax2(point, gp_Dir(tangent)));
+        }
+        pipe.SetTransitionMode(BRepBuilderAPI_RightCorner);
+        pipe.Add(profile);
+        pipe.Build();
+        if (!pipe.IsDone())
+            return ShapeResult { TopoDS_Shape(), false, "Failed to sweep profile" };
+        if (solid && !pipe.MakeSolid())
+            return ShapeResult { TopoDS_Shape(), false, "Sweep profile does not enclose a solid" };
         return ShapeResult { pipe.Shape(), true, "" };
     }
 
@@ -1874,6 +1897,7 @@ EMSCRIPTEN_BINDINGS(ShapeFactory)
         .class_function("cylinder", &ShapeFactory::cylinder)
         .class_function("pyramid", &ShapeFactory::pyramid)
         .class_function("sweep", &ShapeFactory::sweep)
+        .class_function("sweepProfile", &ShapeFactory::sweepProfile)
         .class_function("revolve", &ShapeFactory::revolve)
         .class_function("prism", &ShapeFactory::prism)
         .class_function("pushPull", &ShapeFactory::pushPull)

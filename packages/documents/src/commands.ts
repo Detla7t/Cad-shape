@@ -188,3 +188,5 @@ export class ExportProjectionCommand extends MultistepCommand {
         }
     }
 }
+
+import "./sketchImport";

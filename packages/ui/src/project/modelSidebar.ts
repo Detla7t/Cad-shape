@@ -5,6 +5,7 @@ import { type IApplication, type IDocument, type IView, PubSub } from "@chili3d/
 import { createCadIcon } from "@chili3d/element";
 import { ConfigurationBar } from "../property/configuration/configurationBar";
 import { showConfigurationVisibility } from "../property/configuration/visibilityEditor";
+import { PropertyView } from "../property/propertyView";
 import style from "./modelSidebar.module.css";
 import { PartsList } from "./partsList";
 import { ProjectView } from "./projectView";
@@ -27,6 +28,12 @@ export class ModelSidebar extends HTMLElement {
                 { id: "configurations", title: "Configurations", content: this.configuration, weight: 0.15 },
                 { id: "features", title: "Features", content: this.project, weight: 0.6 },
                 { id: "parts", title: "Parts", content: this.parts, weight: 0.25 },
+                {
+                    id: "properties",
+                    title: "Properties",
+                    content: new PropertyView({ className: "", showHeader: false }),
+                    weight: 0.25,
+                },
             ],
             "chili.modelSidebar.v1",
         );

@@ -644,6 +644,13 @@ export class ShapeFactory implements IShapeFactory {
             "Sweep Error",
         );
     }
+    sweepProfile(profile: IWire, path: IWire, solid: boolean, keepOrientation: boolean): Result<IShape> {
+        return convertShapeResult(
+            wasm.ShapeFactory.sweepProfile,
+            [ensureOccShape(profile)[0], ensureOccShape(path)[0], solid, keepOrientation],
+            "Sweep Error",
+        );
+    }
     revolve(profile: IShape, axis: Line, angle: number): Result<IShape> {
         const invalid = invalidRevolveAngle(angle);
         if (invalid !== undefined) return Result.err(invalid);

@@ -260,6 +260,16 @@ export const shapeCapabilities: ShapeCapability[] = [
         ],
     },
     {
+        method: "sweepProfile",
+        returnKind: "shape",
+        params: [
+            { name: "profile", kind: "ref" },
+            { name: "path", kind: "ref" },
+            { name: "solid", kind: "boolean" },
+            { name: "keepOrientation", kind: "boolean" },
+        ],
+    },
+    {
         method: "revolve",
         returnKind: "shape",
         params: [
@@ -1966,6 +1976,7 @@ export const capabilitiesSource = `Available modeling capabilities (from IShapeF
   prism(shape: ref, vec: xyz) -> shape
   pushPull(shape: ref, face: ref, vec: xyz) -> shape
   sweep(profile: refArray, path: ref, isRoundCorner: boolean) -> shape
+  sweepProfile(profile: ref, path: ref, solid: boolean, keepOrientation: boolean) -> shape
   revolve(profile: ref, axis: line, angle: number) -> shape
   booleanCommon(shape1: refArray, shape2: refArray) -> shape
   booleanCut(shape1: refArray, shape2: refArray) -> shape

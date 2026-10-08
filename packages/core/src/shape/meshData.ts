@@ -92,6 +92,8 @@ export class Mesh {
 }
 
 export interface IShapeMeshData {
+    /** Non-topological reference images; excluded from shape picking and export. */
+    images?: FaceMeshData[];
     edges: EdgeMeshData | undefined;
     faces: FaceMeshData | undefined;
     vertexs: VertexMeshData | undefined;
@@ -220,6 +222,7 @@ export function concatTypedArrays<T extends Float32Array | Uint32Array>(arrays: 
 }
 
 export interface FaceMeshData extends ShapeMeshData {
+    texture?: string;
     index: Uint32Array;
     normal: Float32Array;
     uv: Float32Array;

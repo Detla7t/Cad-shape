@@ -51,8 +51,8 @@ export interface AutoConstraintOptions {
  * line endpoints, circle center, arc center/start/end. The centers snap like any
  * other point, so a circle drawn onto a center is concentric by constraint.
  */
-function snappablePointIndices(type: SketchEntityType): number[] {
-    return Array.from({ length: entityPointCount(type) }, (_, pointIndex) => pointIndex);
+function snappablePointIndices(type: SketchEntityType, params?: number[]): number[] {
+    return Array.from({ length: entityPointCount(type, params) }, (_, pointIndex) => pointIndex);
 }
 
 /**
@@ -84,7 +84,7 @@ export function applyAutoConstraints(
     const entity = solver.entities().find((x) => x.id === entityId);
     if (entity === undefined) return added;
 
-    const refs: SketchPointRef[] = snappablePointIndices(entity.type).map((pointIndex) => ({
+    const refs: SketchPointRef[] = snappablePointIndices(entity.type, entity.params).map((pointIndex) => ({
         entityId,
         pointIndex,
     }));
@@ -422,7 +422,7 @@ function nearestCurveSnap(
 ): DragSnap | undefined {
     let nearest: { distance: number; snap: DragSnap } | undefined;
     for (const entity of entities) {
-        if (excludeEntityIds?.has(entity.id) || entity.type === "line") continue;
+        if (excludeEntityIds?.has(entity.id) || (entity.type !== "circle" && entity.type !== "arc")) continue;
         const projection = projectOntoEntity(entity, probe);
         if (projection === undefined || projection.distance >= tolerance) continue;
         if (nearest !== undefined && projection.distance >= nearest.distance) continue;
@@ -474,7 +474,7 @@ function snapCandidates(
     const candidates: SnapCandidate[] = entities
         .filter((e) => excludeEntityId === undefined || e.id !== excludeEntityId)
         .flatMap((e) =>
-            snappablePointIndices(e.type).map((pointIndex) => {
+            snappablePointIndices(e.type, e.params).map((pointIndex) => {
                 const ref = { entityId: e.id, pointIndex };
                 return { ref, position: solver.pointOf(ref) };
             }),
@@ -501,7 +501,7 @@ function nearestPointSnap(
     const candidates: SnapCandidate[] = [];
     for (const entity of entities) {
         if (excludeEntityIds?.has(entity.id)) continue;
-        for (const pointIndex of snappablePointIndices(entity.type)) {
+        for (const pointIndex of snappablePointIndices(entity.type, entity.params)) {
             const candidateRef = { entityId: entity.id, pointIndex };
             if (excluded.has(pointRefKey(candidateRef))) continue;
             candidates.push({ ref: candidateRef, position: solver.pointOf(candidateRef) });
@@ -724,6 +724,8 @@ function tangencyCandidates(solver: SketchSolver, entity: SketchEntityData): Ske
  * centers), where the relation says nothing.
  */
 function tangencyGap(a: SketchEntityData, b: SketchEntityData, tolerance: number): number | undefined {
+    if (!["line", "circle", "arc"].includes(a.type) || !["line", "circle", "arc"].includes(b.type))
+        return undefined;
     if (a.type === "line") return b.type === "line" ? undefined : lineRoundGap(a, b);
     if (b.type === "line") return lineRoundGap(b, a);
     return roundRoundGap(a, b, tolerance);

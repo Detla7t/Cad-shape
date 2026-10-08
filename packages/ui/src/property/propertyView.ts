@@ -24,9 +24,10 @@ import style from "./propertyView.module.css";
 export class PropertyView extends HTMLElement {
     private readonly panel = div({ className: style.panel });
 
-    constructor(props: { className: string }) {
+    constructor(props: { className: string; showHeader?: boolean }) {
         super();
-        this.classList.add(props.className, style.root);
+        this.classList.add(style.root);
+        if (props.className) this.classList.add(props.className);
         this.dataset["empty"] = "true";
         this.append(
             label({
@@ -35,6 +36,7 @@ export class PropertyView extends HTMLElement {
             }),
             this.panel,
         );
+        if (props.showHeader === false) this.querySelector(`.${style.header}`)?.remove();
         PubSub.default.sub("showProperties", this.handleShowProperties);
         PubSub.default.sub("activeViewChanged", this.handleActiveViewChanged);
     }

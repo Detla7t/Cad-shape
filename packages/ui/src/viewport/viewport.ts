@@ -402,8 +402,8 @@ export class Viewport extends HTMLElement {
             if (visual.viewHandler.isEnabled) visual.viewHandler.pointerUp(this.view, event);
             if (!gesture.moved && visual.eventHandler.isEnabled) {
                 if (
-                    visual.eventHandler === visual.defaultEventHandler &&
-                    this.openContextMenu(gesture.down)
+                    visual.eventHandler.contextMenu?.(this.view, gesture.down) ||
+                    (visual.eventHandler === visual.defaultEventHandler && this.openContextMenu(gesture.down))
                 ) {
                     event.preventDefault();
                 } else {

@@ -166,3 +166,40 @@
 .error {
     color: #b42318;
 }
+.analysisMenu {
+    display: flex;
+    flex-direction: column;
+    padding: 6px;
+    font-size: 12px;
+}
+.geometryPanel .body > label {
+    display: grid;
+    grid-template-columns: 108px minmax(0, 1fr);
+}
+.geometryPanel label small {
+    grid-column: 1 / -1;
+}
+.analysisMenu button {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    padding: 6px 8px;
+    text-align: left;
+    cursor: pointer;
+}
+.analysisMenu button:hover:not(:disabled) {
+    background: var(--hover-background-color);
+}
+.analysisMenu button:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+.analysisMenu small {
+    font-size: 10px;
+}
+.toolbar [role="tab"][aria-selected="true"] {
+    border-bottom: 2px solid var(--primary-color, #1651b0);
+}
