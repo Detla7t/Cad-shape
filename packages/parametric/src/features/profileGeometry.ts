@@ -174,10 +174,12 @@ function isVertexContact(aPoints: [XYZ, XYZ], bPoints: [XYZ, XYZ], point: XYZ): 
     return nearEndpoint(aPoints, point) && nearEndpoint(bPoints, point);
 }
 
+// Tangential Bezier intersections can drift a few kernel tolerances from their
+// shared endpoint. Use the same incidence tolerance as the endpoint-on-curve probe.
 function nearEndpoint(edgePoints: [XYZ, XYZ], point: XYZ): boolean {
     return (
-        point.distanceTo(edgePoints[0]) < Precision.Distance ||
-        point.distanceTo(edgePoints[1]) < Precision.Distance
+        point.distanceTo(edgePoints[0]) < INCIDENCE_TOLERANCE ||
+        point.distanceTo(edgePoints[1]) < INCIDENCE_TOLERANCE
     );
 }
 

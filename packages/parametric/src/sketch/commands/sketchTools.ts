@@ -17,6 +17,7 @@ import type { SketchEditor } from "../editor/sketchEditor";
 import { entityDisplayMesh } from "../entityMesh";
 import { captureExternalRef } from "../externalRef";
 import { ConstraintKind, type SketchData, type SketchEntityData } from "../sketchModel";
+import { offsetSketchEntities } from "../sketchOffset";
 import {
     appendEntity,
     copyEntities,
@@ -25,6 +26,7 @@ import {
     transformedConstraint,
     trimOrSplit,
 } from "../sketchOperations";
+import { tangentConstraintFor } from "../solverEntities";
 import { appendText } from "../textGeometry";
 import { SketchConstraintCommand } from "./sketchConstraints";
 import { sketchToolInput } from "./sketchToolInput";
@@ -322,29 +324,7 @@ for (const [operation, title] of Object.entries(registrations)) {
                     const v = await input({ "Offset (mm)": 5 });
                     if (!v) return;
                     const offset = Number(v["Offset (mm)"]);
-                    editSketch(editor, (d) => {
-                        for (const e of d.entities.filter((e) => ids.includes(e.id))) {
-                            const p = e.params;
-                            if (e.type === "line") {
-                                const len = Math.hypot(p[2] - p[0], p[3] - p[1]);
-                                if (len < 1e-8) continue;
-                                appendEntity(
-                                    d,
-                                    "line",
-                                    [
-                                        p[0] - ((p[3] - p[1]) * offset) / len,
-                                        p[1] + ((p[2] - p[0]) * offset) / len,
-                                        p[2] - ((p[3] - p[1]) * offset) / len,
-                                        p[3] + ((p[2] - p[0]) * offset) / len,
-                                    ],
-                                    e,
-                                );
-                            } else if (e.type === "circle") {
-                                if (p[2] + offset <= 0) throw new Error("Offset collapses the circle.");
-                                appendEntity(d, "circle", [p[0], p[1], p[2] + offset], e);
-                            } else throw new Error("Select lines or circles for offset.");
-                        }
-                    });
+                    editSketch(editor, (d) => offsetSketchEntities(d, ids, offset, editor.node.plane));
                     return;
                 }
                 if (operation === "mirror") {
@@ -485,15 +465,54 @@ export function roundCorner(data: SketchData, a: number, b: number, amount: numb
     p[ai + 1] = x[1];
     q[bi] = y[0];
     q[bi + 1] = y[1];
+    const directionKinds = [
+        ConstraintKind.Horizontal,
+        ConstraintKind.Vertical,
+        ConstraintKind.Parallel,
+        ConstraintKind.Perpendicular,
+        ConstraintKind.Angle,
+    ];
     data.constraints = data.constraints.filter(
-        (k) => !k.refs.some((r) => r.entityId === a || r.entityId === b),
+        (k) =>
+            directionKinds.includes(k.kind) ||
+            !k.refs.some(
+                (r) =>
+                    (r.entityId === a && r.pointIndex === ai / 2) ||
+                    (r.entityId === b && r.pointIndex === bi / 2),
+            ),
     );
-    if (!fillet) appendEntity(data, "line", [...x, ...y]);
-    else {
+    const add = (kind: ConstraintKind, refs: import("../sketchModel").SketchPointRef[], datum?: number) => {
+        data.constraints.push({
+            id: Math.max(0, ...data.constraints.map((c) => c.id)) + 1,
+            kind,
+            refs,
+            datum,
+        });
+    };
+    const join = (id: number, ap: number, bp: number) => {
+        add(ConstraintKind.P2PCoincident, [
+            { entityId: a, pointIndex: ai / 2 },
+            { entityId: id, pointIndex: ap },
+        ]);
+        add(ConstraintKind.P2PCoincident, [
+            { entityId: b, pointIndex: bi / 2 },
+            { entityId: id, pointIndex: bp },
+        ]);
+    };
+    if (!fillet) {
+        const id = appendEntity(data, "line", [...x, ...y]);
+        join(id, 0, 1);
+    } else {
         const k = amount / Math.sin(angle / 2),
             bl = Math.hypot(u[0] + v[0], u[1] + v[1]),
             center: UV = [c[0] + ((u[0] + v[0]) / bl) * k, c[1] + ((u[1] + v[1]) / bl) * k];
         const cross = (x[0] - center[0]) * (y[1] - center[1]) - (x[1] - center[1]) * (y[0] - center[0]);
-        appendEntity(data, "arc", [...center, ...(cross > 0 ? x : y), ...(cross > 0 ? y : x)]);
+        const id = appendEntity(data, "arc", [...center, ...(cross > 0 ? x : y), ...(cross > 0 ? y : x)]);
+        join(id, cross > 0 ? 1 : 2, cross > 0 ? 2 : 1);
+        for (const line of [a, b]) {
+            const tangent = tangentConstraintFor("line", line, "arc", id)!;
+            add(tangent.kind, tangent.refs);
+        }
+        add(ConstraintKind.Radius, [{ entityId: id, pointIndex: 0 }], amount);
     }
 }

@@ -19,7 +19,7 @@
     ],
     "inspection": {
         "measure": "Unit/filter controls implemented; mate-connector frames unavailable.",
-        "analysis": "Ten requested menu entries inventoried; advanced overlays unavailable.",
+        "analysis": "Ten requested menu entries inventoried; numerical geometry inspection and two-solid interference work. Eight advanced analyses/overlays remain unavailable.",
         "mass": "Part/planar Face modes and full centroid inertia tensor; uniform density only. Material densities, reference frame, overrides and certified variance are not implemented."
     },
     "tools": [
@@ -28,7 +28,7 @@
             "module": "sweep.fs",
             "feature": "sweep",
             "status": "verified-subset",
-            "limits": "Fresh-context annular and disjoint regions, surface profiles and straight/curved paths tested. Twist, scale, locked profiles and partial-path extents rejected. Stable subshape history and all boolean modes still need parity fixtures.",
+            "limits": "Fresh-context annular and disjoint regions, surface profiles, straight/curved paths and fixed versus path-normal orientation tested. Twist, scale, locked profiles and partial-path extents rejected. Stable subshape history and all boolean modes still need parity fixtures.",
             "missingBuiltins": [],
             "evidence": [
                 "packages/parametric/test/featurescript/stdFeatures.kernel.test.ts",
@@ -52,7 +52,7 @@
             "module": "thicken.fs",
             "feature": "thicken",
             "status": "verified-subset",
-            "limits": "Simple and symmetric face thickening and whole-sheet keepTools tested. Connected multi-face thickening/junction semantics remain unverified.",
+            "limits": "Simple and symmetric face thickening and whole-sheet keepTools tested. Multi-face bodies are explicitly rejected until joined offset/junction semantics are implemented.",
             "missingBuiltins": [],
             "evidence": [
                 "packages/parametric/test/featurescript/stdFeatures.kernel.test.ts",
@@ -699,5 +699,10 @@
             "missingBuiltins": ["updateSheetMetalGeometry"],
             "evidence": []
         }
+    ],
+    "testCaveats": [
+        "onshapeStdLayers.kernel.test.ts allows an exact known-missing-builtin list and accepts domain failures; its success is not behavioral parity.",
+        "stdFeatures.kernel.test.ts retains an expected failure for evDistance from a point to a part. A green suite does not establish full evDistance compatibility.",
+        "Subset tests assert analytic geometry against local OCCT. They are not differential executions inside Onshape."
     ]
 }

@@ -27,11 +27,11 @@ import {
 import { allProfiles, sketchProfiles } from "../features/profileBuilder";
 import { syncNodeWatches } from "../nodeWatch";
 import { ensureVariableSync } from "../variableSync";
-import { curvePoles } from "./curveGeometry";
 import { normalizeSnapshot } from "./entityLayout";
 import { constructionPattern, entityDisplayMesh, patternedPositions } from "./entityMesh";
 import { type ExternalResolveResult, resolveExternalRefs } from "./externalRef";
 import { type PlaneFaceRef, resolveFacePlane } from "./planeRef";
+import { sketchEntityEdge } from "./sketchEntityEdge";
 import { sketchImageMeshes } from "./sketchImages";
 import {
     arcAngles,
@@ -361,7 +361,7 @@ export class SketchNode extends ParameterShapeNode {
         const edges: IEdge[] = [];
         for (const entity of data.entities) {
             if (entity.construction || entity.type === "point") continue;
-            const edge = this.entityEdge(entity);
+            const edge = sketchEntityEdge(this.plane, entity);
             if (!edge.isOk) return Result.err(edge.error);
             edges.push(edge.value);
         }
@@ -369,51 +369,15 @@ export class SketchNode extends ParameterShapeNode {
         // own entities — shapeEntityIds(data) maps edge indexes back to entity ids on
         // the crossing path. Reference-role externals never enter shape building.
         for (const ref of profileExternalRefs(data)) {
-            const edge = this.entityEdge({ id: ref.entityId, type: ref.type, params: ref.snapshot });
+            const edge = sketchEntityEdge(this.plane, {
+                id: ref.entityId,
+                type: ref.type,
+                params: ref.snapshot,
+            });
             if (!edge.isOk) return Result.err(edge.error);
             edges.push(edge.value);
         }
         return Result.ok(edges);
-    }
-
-    private entityEdge(entity: SketchEntityData): Result<IEdge> {
-        const p = entity.params;
-        switch (entity.type) {
-            case "point":
-                return Result.err("Points do not define a profile edge");
-            case "bezier":
-            case "spline":
-                return shapeFactory.bezier(curvePoles(entity).map(([u, v]) => toWorld(this.plane, u, v)));
-            case "line":
-                return shapeFactory.line(toWorld(this.plane, p[0], p[1]), toWorld(this.plane, p[2], p[3]));
-            case "circle":
-                return shapeFactory.circle(this.plane.normal, toWorld(this.plane, p[0], p[1]), p[2]);
-            case "arc":
-                return this.arcEdge(p as [number, number, number, number, number, number]);
-        }
-    }
-
-    /** arc params = [cx, cy, sx, sy, ex, ey]; the end point only fixes the sweep angle. */
-    private arcEdge(params: [number, number, number, number, number, number]): Result<IEdge> {
-        const [cx, cy, sx, sy] = params;
-        if (Math.hypot(sx - cx, sy - cy) < Precision.Distance) {
-            return Result.err("Arc radius is too small");
-        }
-        // Only a raw sweep of [0, Precision.Angle] is degenerate (start and end on
-        // the same ray, within angular tolerance). A small NEGATIVE raw sweep is a
-        // legitimate near-full-circle arc — arcAngles normalizes it to just under
-        // 2π — and must build.
-        const rawSweep = rawArcSweep(params);
-        if (rawSweep >= 0 && rawSweep <= Precision.Angle) {
-            return Result.err("Arc is degenerate (zero sweep)");
-        }
-        const [, sweep] = arcAngles(params);
-        return shapeFactory.arc(
-            this.plane.normal,
-            toWorld(this.plane, cx, cy),
-            toWorld(this.plane, sx, sy),
-            (sweep * 180) / Math.PI,
-        );
     }
 
     /** Watches the node the plane reference points at; unresolved ids are retried next evaluation. */

@@ -107,6 +107,29 @@ describe("Onshape sweep / loft compatibility and cold parameter rebuilds", () =>
         );
         expect(result).toMatchObject({ errors: [], valid: true, solids: 0, sheets: 1, volume: 0 });
     });
+    test.each([false, true])("curved sweep respects keepProfileOrientation=%s", (keep) => {
+        const endX = 10 * (1 - Math.SQRT1_2);
+        const endZ = 20 + 10 * Math.SQRT1_2;
+        const curvedPath = sketch(
+            "path",
+            "plane(vector(0, 0, 0) * millimeter, vector(0, -1, 0), vector(1, 0, 0))",
+            `
+            skLineSegment(s, "line", { "start" : vector(0, 0) * millimeter, "end" : vector(0, 20) * millimeter });
+            skArc(s, "arc", { "start" : vector(0, 20) * millimeter,
+                "mid" : vector(${10 * (1 - Math.cos(Math.PI / 8))}, ${20 + 10 * Math.sin(Math.PI / 8)}) * millimeter,
+                "end" : vector(${endX}, ${endZ}) * millimeter });`,
+        );
+        const result = rebuild(
+            sketch("profile", atZ(0), circle("circle", 2)) +
+                curvedPath +
+                sweep(`, "keepProfileOrientation" : ${keep}`),
+        );
+        expect(result.errors).toEqual([]);
+        expect(result.valid).toBe(true);
+        expect(result.solids).toBe(1);
+        // A fixed XY section integrates area * dz; a normal section integrates area * arc length.
+        expect(result.volume).toBeCloseTo(4 * Math.PI * (keep ? endZ : 20 + 2.5 * Math.PI), 2);
+    });
     test.each([5, 12, 30])("loft cold-rebuilds a conical frustum at height %i", (height) => {
         const result = rebuild(
             sketch("a", atZ(0), circle("circle", 5)) + sketch("b", atZ(height), circle("circle", 2)) + loft(),
@@ -170,5 +193,21 @@ describe("Onshape sweep / loft compatibility and cold parameter rebuilds", () =>
                 `opThicken(context, id + "thicken", { "entities" : qNothing(), "thickness1" : 2 * millimeter });`,
             ),
         ).toThrow("needs sheet bodies or faces");
+    });
+    test("thicken refuses multi-face bodies instead of returning overlapping independent slabs", () => {
+        expect(() =>
+            rebuild(`
+            fCuboid(context, id + "box", { "corner1" : vector(0,0,0) * millimeter, "corner2" : vector(10,10,10) * millimeter });
+            opThicken(context, id + "thicken", { "entities" : qCreatedBy(id + "box", EntityType.FACE), "thickness1" : 1 * millimeter });
+        `),
+        ).toThrow("multiple faces of one body");
+    });
+    test("std sweep reports unsupported twist as a failed feature with no output solid", () => {
+        const result = rebuild(`${sketch("profile", atZ(0), circle("circle", 3)) + sweepPath(12)}
+            sweep(context, id + "sweep", { "profiles" : ${region("profile")},
+                "path" : qCreatedBy(id + "path", EntityType.EDGE), "hasTwist" : true,
+                "twistType" : SweepTwistType.TURNS, "turns" : 1, "ccw" : false });`);
+        expect(result.solids).toBe(0);
+        expect(result.errors.some((message) => message.includes("hasTwist is not supported yet"))).toBe(true);
     });
 });

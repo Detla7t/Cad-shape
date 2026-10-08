@@ -8,14 +8,18 @@ export function editSketch(editor: SketchEditor, run: (data: SketchData) => void
     const before = editor.solver.toData(),
         data = structuredClone(before);
     run(data);
-    editor.solver.reset(data);
-    const solved = editor.solve(true);
-    if (!solved.result.startsWith("Ok")) {
+    try {
+        editor.solver.reset(data);
+        const solved = editor.solve(true);
+        if (!solved.result.startsWith("Ok")) {
+            throw new Error(
+                "This edit conflicts with existing dimensions or constraints. Remove the conflicting constraint first.",
+            );
+        }
+    } catch (error) {
         editor.solver.reset(before);
         editor.solve(true);
-        throw new Error(
-            "This edit conflicts with existing dimensions or constraints. Remove the conflicting constraint first.",
-        );
+        throw error;
     }
     editor.commit();
 }

@@ -124,6 +124,17 @@ describe("Picker", () => {
             expect(document.visual.eventHandler).toBe(oldEventHandler);
         });
 
+        test("does not restore a stale sketch handler after the session ends during a pick", async () => {
+            const controller = new AsyncController(),
+                handler = createMockHandler();
+            const promise = picker.pickAsync(handler, "common.confirm", controller, false);
+            const restored = createMockHandler();
+            visual.eventHandler = restored;
+            controller.cancel();
+            await promise;
+            expect(visual.eventHandler).toBe(restored);
+        });
+
         test("should publish viewCursor event", async () => {
             const controller = new AsyncController();
             const handler = createMockHandler();

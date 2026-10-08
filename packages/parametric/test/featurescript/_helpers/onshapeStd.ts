@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { gunzipSync } from "node:zlib";
+import "../../sketch/setup";
 import { type OnshapeStdBundle, onshapeStdFromBundle } from "../../../src/featurescript/onshape/stdBundle";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));

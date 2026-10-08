@@ -637,6 +637,10 @@ function installSweeps(std: StdBuilder): void {
         };
         const selected = facesOf(resolveQuery(ctx, definition.field("entities")));
         if (!selected.length) fail("opThicken needs sheet bodies or faces");
+        for (const body of new Set(selected.map((entry) => entry.body))) {
+            if (selected.filter((entry) => entry.body === body).length > 1)
+                fail("opThicken: multiple faces of one body are not supported yet");
+        }
         const results: IShape[] = [];
         for (const { face } of selected) {
             const parts: IShape[] = [];
@@ -645,7 +649,7 @@ function installSweeps(std: StdBuilder): void {
             const shape =
                 parts.length === 1
                     ? parts[0]
-                    : kernel(shapeFactory.booleanFuse([parts[0]], [parts[1]], true), "opThicken");
+                    : ctx.track(kernel(shapeFactory.booleanFuse([parts[0]], [parts[1]], true), "opThicken"));
             results.push(shape);
         }
         for (const shape of results) ctx.addBody(shape, id);

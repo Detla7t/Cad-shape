@@ -222,3 +222,17 @@ test("trim preview highlights only the interval that the cut removes", () => {
     expect(kept.params[4]).toBeCloseTo(preview.params[2]);
     expect(kept.params[5]).toBeCloseTo(preview.params[3]);
 });
+
+test("pasting an arc installs its structural constraint only once", () => {
+    const source = blank(),
+        target = blank();
+    appendEntity(source, "arc", [0, 0, 10, 0, 0, 10]);
+    appendSketch(target, source);
+    expect(target.constraints).toHaveLength(1);
+    const solver = new SketchSolver(Plane.XY, target);
+    try {
+        expect(solver.solve(true).result.startsWith("Ok")).toBe(true);
+    } finally {
+        solver.dispose();
+    }
+});

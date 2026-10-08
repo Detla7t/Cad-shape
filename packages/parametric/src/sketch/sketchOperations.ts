@@ -52,7 +52,12 @@ export function pointAt(e: SketchEntityData, t: number): UV {
     return [c[0] + r * Math.cos(s + w * t), c[1] + r * Math.sin(s + w * t)];
 }
 /** Exact intersections of lines and circular curves, clipped to their finite domains. */
-export function intersections(a: SketchEntityData, b: SketchEntityData, extendA = false): UV[] {
+export function intersections(
+    a: SketchEntityData,
+    b: SketchEntityData,
+    extendA = false,
+    extendB = false,
+): UV[] {
     if (!["line", "circle", "arc"].includes(a.type) || !["line", "circle", "arc"].includes(b.type)) return [];
     let points: UV[] = [];
     if (a.type === "line" && b.type === "line") {
@@ -102,7 +107,7 @@ export function intersections(a: SketchEntityData, b: SketchEntityData, extendA 
     }
     const inside = (e: SketchEntityData, p: UV) =>
         e.type === "circle" || (parameterAt(e, p) >= -EPS && parameterAt(e, p) <= 1 + EPS);
-    return points.filter((p) => (extendA || inside(a, p)) && inside(b, p));
+    return points.filter((p) => (extendA || inside(a, p)) && (extendB || inside(b, p)));
 }
 function piece(e: SketchEntityData, a: number, b: number): Pick<SketchEntityData, "type" | "params"> {
     if (e.type === "line") return { type: "line", params: [...pointAt(e, a), ...pointAt(e, b)] };
@@ -175,16 +180,85 @@ export function trimOrSplit(data: SketchData, id: number, pick: UV, mode: "trim"
             if (right < 1 - EPS) intervals.push([right, 1]);
         }
     }
+    const originalConstraints = data.constraints.filter((c) => c.refs.some((r) => r.entityId === id));
+    const oldMax = Math.max(0, ...data.constraints.map((c) => c.id));
     data.constraints = data.constraints.filter((c) => !c.refs.some((r) => r.entityId === id));
     data.entities = data.entities.filter((x) => x.id !== id);
+    const parts: { entity: SketchEntityData; start: number; end: number }[] = [];
     intervals.forEach(([a, b], i) => {
         if (b - a <= EPS) return;
-        const part = piece(e, a, b);
-        if (i === 0) {
-            data.entities.push({ ...e, ...part });
-            if (part.type === "arc") ensureArcConstraint(data, e.id);
-        } else appendEntity(data, part.type, part.params, e);
+        const part = piece(e, a, b),
+            partId = i === 0 ? id : appendEntity(data, part.type, part.params, e);
+        if (i === 0) data.entities.push({ ...e, ...part });
+        const entity = data.entities.find((x) => x.id === partId)!;
+        parts.push({ entity, start: a, end: b });
     });
+    data.constraints = data.constraints.filter(
+        (c) =>
+            !parts.some(
+                (p) =>
+                    p.entity.type === "arc" &&
+                    c.kind === ConstraintKind.PointOnArc &&
+                    c.refs.every((r) => r.entityId === p.entity.id),
+            ),
+    );
+    // Restore constraints on surviving endpoints and circle centers. Cutting a line
+    // removes its old length dimension, while its orientation and end attachments survive.
+    const directionKinds = [
+        ConstraintKind.Horizontal,
+        ConstraintKind.Vertical,
+        ConstraintKind.Parallel,
+        ConstraintKind.Perpendicular,
+        ConstraintKind.Angle,
+    ];
+    const mapPoint = (index: number) => {
+        if (e.type !== "line" && index === 0 && parts.length)
+            return { entityId: parts[0].entity.id, pointIndex: 0 };
+        const t = e.type === "line" ? index : index - 1;
+        for (const part of parts) {
+            if (Math.abs(part.start - t) < EPS)
+                return { entityId: part.entity.id, pointIndex: e.type === "line" ? 0 : 1 };
+            if (Math.abs(part.end - t) < EPS)
+                return { entityId: part.entity.id, pointIndex: e.type === "line" ? 1 : 2 };
+        }
+        return undefined;
+    };
+    let nextId = Math.max(oldMax, ...data.constraints.map((c) => c.id)) + 1;
+    for (const constraint of originalConstraints) {
+        if (directionKinds.includes(constraint.kind) && e.type === "line") {
+            parts.forEach((part, i) =>
+                data.constraints.push({
+                    ...structuredClone(constraint),
+                    id: i === 0 ? constraint.id : nextId++,
+                    refs: constraint.refs.map((r) =>
+                        r.entityId === id ? { ...r, entityId: part.entity.id } : r,
+                    ),
+                }),
+            );
+            continue;
+        }
+        if (constraint.kind === ConstraintKind.PointOnArc && constraint.refs.every((r) => r.entityId === id))
+            continue;
+        if (constraint.kind === ConstraintKind.P2PDistance && constraint.refs.every((r) => r.entityId === id))
+            continue;
+        const refs = constraint.refs.map((r) => (r.entityId === id ? mapPoint(r.pointIndex) : r));
+        if (refs.every((r) => r !== undefined))
+            data.constraints.push({ ...structuredClone(constraint), refs });
+    }
+    // Structural constraints are generated after restored ids, preventing collisions.
+    for (const part of parts) if (part.entity.type === "arc") ensureArcConstraint(data, part.entity.id);
+    if (mode === "split" && parts.length === 2) {
+        const first = parts[0].entity,
+            second = parts[1].entity;
+        data.constraints.push({
+            id: Math.max(0, ...data.constraints.map((c) => c.id)) + 1,
+            kind: ConstraintKind.P2PCoincident,
+            refs: [
+                { entityId: first.id, pointIndex: first.type === "line" ? 1 : 2 },
+                { entityId: second.id, pointIndex: second.type === "line" ? 0 : 1 },
+            ],
+        });
+    }
 }
 export function transformEntity(
     e: SketchEntityData,

@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import type { SketchData } from "./sketchModel";
+import { ConstraintKind, type SketchData } from "./sketchModel";
 import { appendEntity } from "./sketchOperations";
 
 const KEY = "chili.sketchClipboard.v1";
@@ -38,6 +38,9 @@ export function appendSketch(target: SketchData, source: SketchData): void {
     const ids = new Map(source.entities.map((e) => [e.id, appendEntity(target, e.type, [...e.params], e)]));
     let next = Math.max(0, ...target.constraints.map((c) => c.id)) + 1;
     for (const c of source.constraints) {
+        // appendEntity installs the arc's equal-radius structural relation.
+        if (c.kind === ConstraintKind.PointOnArc && c.refs.every((r) => r.entityId === c.refs[0].entityId))
+            continue;
         if (c.refs.every((r) => ids.has(r.entityId)))
             target.constraints.push({
                 ...structuredClone(c),

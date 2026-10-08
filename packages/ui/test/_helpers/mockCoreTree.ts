@@ -24,6 +24,7 @@ export function getPubSubPubs() {
 
 rs.mock("@chili3d/core", () => {
     const actual = rs.hoisted(() => require("@chili3d/core"));
+    const { setHistoryHidden } = rs.hoisted(() => require("../../../core/src/model/historyPreview"));
     const {
         BindingMock,
         TransactionMock,
@@ -34,6 +35,7 @@ rs.mock("@chili3d/core", () => {
         isNodeWarningMock,
     } = rs.hoisted(() => require("./coreMocks"));
     class VisualNode {}
+    class ReferencePlaneNode extends VisualNode {}
     class Annotation {}
     class NodeSelectionHandler {}
     class ShapeSelectionHandler {
@@ -58,10 +60,12 @@ rs.mock("@chili3d/core", () => {
         isNodeSceneless: isNodeScenelessMock,
         isNodeWarning: isNodeWarningMock,
         VisualNode,
+        ReferencePlaneNode,
         Annotation,
         FolderNode,
         NodeSelectionHandler,
         ShapeSelectionHandler,
+        setHistoryHidden,
         NodeUtils: {
             isLinkedListNode: (node: { isGroup?: boolean }) => node.isGroup === true,
             getNodesBetween: () => [],

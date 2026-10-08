@@ -88,7 +88,9 @@ export class Picker implements IPicker {
         } finally {
             if (showControl) PubSub.default.pub("clearSelectionControl");
             PubSub.default.pub("clearStatusBarTip");
-            this.document.visual.eventHandler = oldHandler;
+            if (this.document.visual.eventHandler === handler) {
+                this.document.visual.eventHandler = oldHandler;
+            }
             PubSub.default.pub("viewCursor", "default");
         }
     }

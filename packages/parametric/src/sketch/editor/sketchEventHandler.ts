@@ -899,12 +899,10 @@ export class SketchEventHandler implements IEventHandler {
                 uv = this.pointerToUV(view, event);
             const preview =
                 id === undefined || !uv ? undefined : trimPreview(this.editor.solver.toData(), id, uv);
-            return preview
-                ? {
-                      key: `trim:${id}:${preview.params.map((v) => v.toFixed(6)).join(",")}`,
-                      mesh: { ...entityDisplayMesh(this.editor.node.plane, preview, 0xf29b24), lineWidth: 4 },
-                  }
-                : {};
+            if (!preview) return {};
+            const mesh = entityDisplayMesh(this.editor.node.plane, preview, 0xf29b24);
+            mesh.lineWidth = 4;
+            return { key: `trim:${id}:${preview.params.map((v) => v.toFixed(6)).join(",")}`, mesh };
         }
         const pick = this.editor.activePick;
 

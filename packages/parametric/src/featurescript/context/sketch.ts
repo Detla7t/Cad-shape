@@ -36,14 +36,13 @@ import { arg, type StdBuilder } from "../std/registry";
 import { type FsBody, FsContext, MM_PER_METER, toKernelPlane } from "./fsContext";
 import { recordSketchRegions } from "./history";
 import { facePlane, resolveQuery } from "./queries";
+import { solveSketchConstraints } from "./sketchConstraints";
 
 /**
- * In-feature sketches (`newSketch` ... `skSolve`). Entities are explicit geometry — the
- * constraint calls (`skConstraint`) are accepted and ignored, since ported code always
- * passes the solved positions as initial guesses anyway. `skSolve` turns the entities
- * into two sketch bodies: the edges (a wire body, each edge tagged with its entity id
- * for `sketchEntityQuery`) and the enclosed regions (a sheet body, for
- * `qSketchRegion` / `qCreatedBy(sketchId, EntityType.FACE)`).
+ * In-feature sketches (`newSketch` ... `skSolve`). Explicit entities and supported
+ * constraints are solved by the same solver used by the interactive sketch editor.
+ * Solved edges retain their FeatureScript entity ids; closed loops become queryable
+ * sketch regions. Unsupported constraints report an error instead of being ignored.
  */
 
 interface SketchEntity {
@@ -54,6 +53,8 @@ interface SketchEntity {
 
 export class FsSketch {
     readonly entities: SketchEntity[] = [];
+    readonly initialGuesses = new Map<string, number[]>();
+    readonly constraints: { id: string; definition: FsMap }[] = [];
     readonly points: { id: string; position: Vec3 }[] = [];
     solved = false;
     readonly value: FsOpaque;
@@ -306,10 +307,25 @@ export function installSketch(std: StdBuilder): void {
         sketch.points.push({ id, position: planeToWorld(sketch.plane, position[0], position[1]) });
         return undefined;
     });
-    // Explicit geometry is already "solved"; constraints and guesses are accepted for
-    // compatibility with ported code.
-    std.fn("skConstraint", () => undefined);
-    std.fn("skSetInitialGuess", () => undefined);
+    std.fn("skConstraint", (args) => {
+        const [sketch, id, definition] = sketchArgs(args, "skConstraint");
+        if (sketch.solved) fail("Cannot constrain an already solved sketch");
+        if (sketch.constraints.some((c) => c.id === id)) fail(`Sketch constraint id "${id}" is already used`);
+        sketch.constraints.push({ id, definition });
+        return undefined;
+    });
+    std.fn("skSetInitialGuess", (args) => {
+        const sketch = FsSketch.of(arg(args, 0, "skSetInitialGuess"));
+        if (sketch.solved) fail("Cannot seed an already solved sketch");
+        const guesses = expectMap(arg(args, 1, "skSetInitialGuess"), "initial guesses");
+        for (const [key, value] of guesses.pairs()) {
+            sketch.initialGuesses.set(
+                expectString(key, "entity id"),
+                expectArray(value, "initial guess").items.map((v) => expectNumber(v, "initial guess")),
+            );
+        }
+        return undefined;
+    });
     std.fn("skSolve", (args) => {
         solveSketch(FsSketch.of(arg(args, 0, "skSolve")));
         return undefined;
@@ -350,6 +366,7 @@ export function planeOfQuery(ctx: FsContext, value: FsValue): PlaneData {
 
 function solveSketch(sketch: FsSketch): void {
     if (sketch.solved) return;
+    solveSketchConstraints(sketch);
     sketch.solved = true;
     const ctx = sketch.context;
     ctx.openSketches.delete(sketch.id);

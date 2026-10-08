@@ -154,7 +154,12 @@ export class GeometryPanel {
         root.addEventListener("keydown", (event) => event.stopPropagation());
     }
     private addSelect(body: HTMLElement, label: string, select: HTMLSelectElement, options: string[][]) {
-        for (const [value, text] of options) select.add(new Option(text, value));
+        for (const [value, text] of options) {
+            const option = textElement("option", text);
+            option.value = value;
+            select.add(option);
+        }
+        select.value = options[0][0];
         select.setAttribute("aria-label", label);
         select.onchange = this.render;
         body.append(labeled(label, select));
@@ -439,22 +444,14 @@ export class GeometryPanel {
                         }
                     }
                     if (ShapeTypeUtils.hasEdge(shape.shapeType)) {
-                        const curve = (shape as IEdge).curve;
-                        try {
-                            const basis = curve.basisCurve;
-                            try {
-                                rows.push([`Edge ${index + 1} curve`, basis.curveType]);
-                                if (CurveUtils.isCircle(basis))
-                                    rows.push(
-                                        ["Radius", length(basis.radius)],
-                                        ["Diameter", length(2 * basis.radius)],
-                                    );
-                            } finally {
-                                basis.dispose();
-                            }
-                        } finally {
-                            curve.dispose();
-                        }
+                        // Edge.curve and its basis are borrowed, cached values owned by the edge.
+                        const basis = (shape as IEdge).curve.basisCurve;
+                        rows.push([`Edge ${index + 1} curve`, basis.curveType]);
+                        if (CurveUtils.isCircle(basis))
+                            rows.push(
+                                ["Radius", length(basis.radius)],
+                                ["Diameter", length(2 * basis.radius)],
+                            );
                     }
                 } finally {
                     for (const edge of edges) if (edge !== shape) edge.dispose();
@@ -468,27 +465,18 @@ export class GeometryPanel {
                 rows.push(["Minimum distance", length(shapes[0].extremaDistance(shapes[1]))]);
             if (shapes.length === 2 && shapes.every((shape) => shape.shapeType === ShapeTypes.edge)) {
                 const curves = shapes.map((shape) => (shape as IEdge).curve);
-                try {
-                    const bases = curves.map((curve) => curve.basisCurve);
-                    try {
-                        if (bases.every((curve) => CurveUtils.isLine(curve))) {
-                            const a = curves[0].d1(curves[0].firstParameter()).vec;
-                            const b = curves[1].d1(curves[1].firstParameter()).vec;
-                            const radians = Math.acos(
-                                Math.max(-1, Math.min(1, a.dot(b) / (a.length() * b.length()))),
-                            );
-                            rows.push([
-                                "Angle",
-                                this.angleUnit.value === "rad"
-                                    ? `${radians.toFixed(6)} rad`
-                                    : `${((radians * 180) / Math.PI).toFixed(3)}°`,
-                            ]);
-                        }
-                    } finally {
-                        for (const curve of bases) curve.dispose();
-                    }
-                } finally {
-                    for (const curve of curves) curve.dispose();
+                if (curves.every((curve) => CurveUtils.isLine(curve.basisCurve))) {
+                    const a = curves[0].d1(curves[0].firstParameter()).vec;
+                    const b = curves[1].d1(curves[1].firstParameter()).vec;
+                    const radians = Math.acos(
+                        Math.max(-1, Math.min(1, a.dot(b) / (a.length() * b.length()))),
+                    );
+                    rows.push([
+                        "Angle",
+                        this.angleUnit.value === "rad"
+                            ? `${radians.toFixed(6)} rad`
+                            : `${((radians * 180) / Math.PI).toFixed(3)}°`,
+                    ]);
                 }
             }
             const filters: Record<string, RegExp> = {
