@@ -4,7 +4,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { execAsync } from "./common.mjs";
+import { compilerArguments, runCompiler } from "./typescript-compiler.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..");
@@ -13,7 +13,14 @@ const typesDir = path.join(rootDir, "types");
 
 async function generateDeclarations() {
     console.log("Generating TypeScript declarations...");
-    await execAsync("npx tsc -d --emitDeclarationOnly --skipLibCheck --outDir types");
+    const { compiler, args } = compilerArguments(process.argv.slice(2));
+    const result = await runCompiler(
+        ["-d", "--emitDeclarationOnly", "--noEmitOnError", "--skipLibCheck", "--outDir", typesDir, ...args],
+        { compiler },
+    );
+    process.stdout.write(result.stdout);
+    process.stderr.write(result.stderr);
+    if (result.status !== 0) throw new Error(`Declaration generation failed with ${result.backend}.`);
     console.log("Declarations generated.");
 }
 

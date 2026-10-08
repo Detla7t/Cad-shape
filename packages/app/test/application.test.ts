@@ -2,7 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import type { ICommand, IDocument, IView, IVisualFactory, Serialized } from "@chili3d/core";
-import { Logger, ObservableCollection, PubSub } from "@chili3d/core";
+import { documentUnits, Logger, ObservableCollection, PubSub } from "@chili3d/core";
 import { createMockView, createMockVisualWithDocument } from "@chili3d/core/test-utils";
 import { afterEach, beforeEach, describe, expect, rs, test } from "@rstest/core";
 import { Application } from "../src/application";
@@ -276,6 +276,18 @@ describe("Application", () => {
             expect(doc.name).toBe("TestDoc");
             expect(doc.id).not.toBeNull();
             expect(doc.id.length).toBeGreaterThan(0);
+        });
+
+        test("sets explicitly chosen units on a new document before its first save", async () => {
+            const units = {
+                length: "in" as const,
+                angle: "rad" as const,
+                lengthPrecision: 4,
+                anglePrecision: 3,
+            };
+            const doc = await sharedApp.newDocument("Imperial", units);
+            expect(documentUnits(doc)).toEqual(units);
+            expect(doc.userData?.["displayUnits"]).not.toBe(units);
         });
 
         test("should add document to documents set", async () => {

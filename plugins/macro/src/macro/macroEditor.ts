@@ -1,8 +1,11 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-//@ts-expect-error
-import ace from "https://cdn.jsdelivr.net/npm/ace-builds@1.44.0/+esm";
+import type * as Ace from "ace-builds";
+import "ace-builds";
+import "ace-builds/src-noconflict/mode-javascript";
+import "ace-builds/src-noconflict/theme-dracula";
+import "ace-builds/src-noconflict/theme-xcode";
 import {
     Config,
     type DialogButton,
@@ -13,9 +16,15 @@ import {
     PubSub,
 } from "@chili3d/core";
 import { div, input, label } from "@chili3d/element";
+import workerSource from "ace-builds/src-min-noconflict/worker-javascript.js?raw";
 import style from "./macro.module.css";
 import { runMacro } from "./macroRunner";
 import type { MacroDefinition, MacroStorage } from "./macroStorage";
+
+// Ace's UMD files reference the global `ace`. An ESM binding with that name
+// shadows it in a flattened plugin bundle, so access the installed global explicitly.
+const aceEditor = (globalThis as unknown as { ace: typeof Ace }).ace;
+let workerUrl: string | undefined;
 
 const DefaultCode = `// Available variables:
 // app - IApplication instance
@@ -78,8 +87,9 @@ export class MacroEditor extends HTMLElement {
     }
 
     private embeddingEditor() {
-        ace.config.set("basePath", "https://cdn.jsdelivr.net/npm/ace-builds@1.44.0/src-min-noconflict");
-        this.editor = ace.edit(this.codeTextarea!, {
+        workerUrl ??= URL.createObjectURL(new Blob([workerSource], { type: "text/javascript" }));
+        aceEditor.config.setModuleUrl("ace/mode/javascript_worker", workerUrl);
+        this.editor = aceEditor.edit(this.codeTextarea!, {
             mode: "ace/mode/javascript",
             selectionStyle: "text",
         });

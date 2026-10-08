@@ -2,9 +2,10 @@
 // See LICENSE file in the project root for full license information.
 
 import { MultistepCommand, PubSub } from "@chili3d/core";
-import { applyAutoConstraints } from "../autoConstraints";
+import { applyAutoConstraints, sketchSnapOptions } from "../autoConstraints";
 import { SketchEditor } from "../editor/sketchEditor";
 import { toUV } from "../sketchModel";
+import type { SketchPointSnapResult } from "./sketchPointSnapEventHandler";
 
 /**
  * Base class for in-sketch step commands: requires an active sketch editing session.
@@ -24,7 +25,14 @@ export abstract class SketchMultistepCommand extends MultistepCommand {
 
     /** Applies auto-constraints to a freshly added entity, then solves and commits. */
     protected commitNewEntity(entityId: number): void {
-        applyAutoConstraints(this.editor.solver, entityId, { pointTolerance: this.editor.screenTolerance() });
+        applyAutoConstraints(
+            this.editor.solver,
+            entityId,
+            sketchSnapOptions(
+                this.editor.screenTolerance(),
+                this.stepDatas.some((step) => (step as SketchPointSnapResult).suppressInference),
+            ),
+        );
         this.editor.solve(true);
         this.editor.commit();
     }

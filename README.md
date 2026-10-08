@@ -156,6 +156,40 @@ Build the application:
 npm run build
 ```
 
+### TypeScript compiler selection
+
+Type checking and declaration generation prefer [ts-rust](https://github.com/pingdotgg/ts-rust)
+(`tsc-rs` 0.1.0). Automatic failover tries Go TypeScript, then the retained TypeScript 6 compiler
+if a compiler is unavailable, crashes, or exceeds the two-minute timeout. TypeScript diagnostics
+fail the check immediately; automatic failover never hides type errors. Each run logs its compiler
+and any fallback reason. Rspack/SWC continues to bundle and emit browser JavaScript.
+
+```bash
+npm run typecheck          # Rust → Go → TypeScript 6, on compiler failure only
+npm run typecheck:rust     # Require Rust, no fallback
+npm run typecheck:go       # Require Go, no fallback
+npm run typecheck:legacy   # Require the previous TypeScript 6 compiler
+npm run typecheck:offline  # Default selection with external networking disabled
+npm run build:types -- --compiler go # Select the declaration compiler explicitly
+CHILI_TS_COMPILER=legacy npm run dev # Use the retained checker during development
+CHILI_TS_COMPILER=go npm run build   # Use Go for application and plugin builds
+```
+
+`CHILI_TS_COMPILER=auto|rust|go|legacy` applies to checking, dev, builds, and declarations;
+the `--compiler` flag overrides it for `typecheck` and `build:types`. Use `npm run dev` for watched
+checking. The build waits for type checking and displays errors in Rspack's diagnostics/overlay.
+The watcher also tracks checked files outside the browser's module graph, such as tests.
+CI checks with all three compilers explicitly.
+
+Rust currently ships Linux x64 and macOS arm64 binaries; other platforms automatically try Go.
+The Go package is installed under the `typescript-go` alias, pinned to
+`7.1.0-dev.20260929.1`, the upstream snapshot recommended by ts-rust. `typescript` remains at
+version 6 for the legacy compiler and tools using its compiler API. Use the scripts above instead
+of a bare `tsc`, since both TypeScript packages export that bin name. Updating ts-rust should include
+reviewing its recommended Go version and rerunning all three checks and compiler tests.
+Native executables are stored in npm platform packages; no runtime download or Rust/Go toolchain
+is needed. `offline:prepare` caches them and tests each supported compiler after a fresh offline install.
+
 ### WASM Build (Optional)
 
 The prebuilt WASM module is included in the repository. If you want to build it from source:
@@ -180,6 +214,44 @@ npm run testc   # Tests with coverage
 npm run check   # Biome lint + auto-fix
 npm run format  # Biome + clang-format across all files
 ```
+
+### Offline development and testing
+
+The app ships its assets locally: OCCT and Rust WASM, Onshape std 3083, icons, fonts,
+PDF character maps/fonts/decoders, thumbnail images, and the macro editor including its worker.
+PDF support files and thumbnails are checked in with source URLs, licenses and SHA-256 hashes
+in `public/vendor/assets.lock.json`. `npm run assets:check` verifies them without downloading.
+After intentionally upgrading PDF.js/Ace or replacing the thumbnail sources, run
+`npm run assets:refresh` while connected and review the changed assets and manifest.
+
+With Node 24 and dependencies installed, prepare a reusable npm cache once:
+
+```bash
+npm run offline:prepare   # Cache locked dependencies in .offline/npm-cache; verify a fresh offline install
+npm run offline:verify    # Repeat the fresh-install check using only the stored cache
+npm run test:offline      # Full suite with external networking disabled
+npm run test:onshape:offline # Replay the captured Onshape reference cases locally
+npm run build:offline     # Build the app and plugins without external networking
+npm run preview:offline   # Serve dist on 127.0.0.1:8096; browser CSP blocks external asset/API loads
+```
+
+The strict offline commands use Linux `unshare` and `ip`, with an isolated network namespace
+that retains only loopback for local-server tests. They fail if isolation is unavailable;
+the host network and other developers' sessions are unaffected. Keep `.offline/npm-cache`
+alongside the checkout to reinstall dependencies with
+`npm ci --offline --ignore-scripts --cache .offline/npm-cache`. The cache is specific to the
+prepared platform and lockfile; run preparation again after dependency changes. Node and
+native build toolchains must already be installed. Normal application tests use checked-in WASM.
+For native Rust tests, with Cargo, rustc and a C linker installed, run
+`npm run offline:prepare:rust` once to store locked crate sources in `.offline/rust-vendor`
+and verify them, then use `npm run test:rust:offline`. Keep `.offline/rust-config.toml`
+with that directory; Cargo verifies the vendored crates against their upstream checksums.
+
+Captured Onshape results and their source hashes are stored under
+`packages/parametric/test/featurescript/fixtures/conformance/`; replay needs no Onshape login.
+Generating new Onshape reference results, following external video links, and refreshing
+user-configured remote data sources still require their services. Saved data snapshots remain
+available offline. The offline preview deliberately disables browser caching to test a cold load.
 
 ### Docker
 

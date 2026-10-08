@@ -35,8 +35,15 @@ jobs:
             - name: Verify checked-in native artifacts
               run: npm run check:wasm
 
-            - name: Typecheck application and tests
-              run: npm run typecheck
+            # Explicit modes cannot silently pass by falling back from a broken native compiler.
+            - name: Typecheck with Rust
+              run: npm run typecheck:rust
+
+            - name: Verify Go fallback
+              run: npm run typecheck:go
+
+            - name: Verify retained TypeScript fallback
+              run: npm run typecheck:legacy
 
             - name: Run unit tests
               run: npm run test

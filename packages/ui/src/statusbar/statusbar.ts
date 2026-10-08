@@ -4,7 +4,6 @@
 import { Config, I18n, type I18nKeys, Navigation3D, PubSub } from "@chili3d/core";
 import { div, label } from "@chili3d/element";
 import { DocumentUnitsControl } from "./documentUnits";
-import { SnapConfig } from "./snapConfig";
 import style from "./statusbar.module.css";
 
 export class Statusbar extends HTMLElement {
@@ -34,22 +33,20 @@ export class Statusbar extends HTMLElement {
     };
 
     private render() {
-        this.append(
-            div({ className: style.left }, this.tip),
-            div({ className: style.right }, new SnapConfig()),
-            new DocumentUnitsControl(),
-        );
+        this.append(div({ className: style.left }, this.tip), new DocumentUnitsControl());
     }
 
     private readonly statusBarTip = (tip: I18nKeys) => {
         this._isDefaultTip = false;
         I18n.set(this.tip, "textContent", tip);
+        this.tip.title = this.tip.textContent ?? "";
     };
 
     private readonly setDefaultTip = () => {
         this._isDefaultTip = true;
         const { pan, rotate } = Navigation3D.navigationKeyMap();
         I18n.set(this.tip, "textContent", "prompt.default{0}{1}", pan, rotate);
+        this.tip.title = this.tip.textContent ?? "";
     };
 }
 

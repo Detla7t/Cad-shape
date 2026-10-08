@@ -5,6 +5,7 @@ import type { CommandKeys, ICommand } from "./command";
 import type { IDataExchange } from "./dataExchange";
 import type { IDocument } from "./document";
 import type { IPropertyChanged, IStorage, ObservableCollection, Result } from "./foundation";
+import type { DocumentUnits } from "./parameters/documentUnits";
 import type { IPluginManager } from "./plugin";
 import type { Serialized } from "./serialize";
 import type { IService } from "./service";
@@ -25,7 +26,7 @@ export interface IApplication extends IPropertyChanged {
     lastCommand: CommandKeys | undefined;
     executingCommand: ICommand | undefined;
     activeView: IView | undefined;
-    newDocument(name: string): Promise<IDocument>;
+    newDocument(name: string, units?: DocumentUnits): Promise<IDocument>;
     openDocument(id: string): Promise<IDocument | undefined>;
     /** A portable copy of an open or saved document, without switching the active view. */
     exportDocument?(id: string): Promise<Result<Uint8Array>>;

@@ -2639,7 +2639,7 @@ describe("external references as snap targets", () => {
     test("a drawn endpoint near an external line mid-span snaps onto it with point-on-line", () => {
         const solver = new SketchSolver(Plane.XY, dataWith(EXT_LINE));
         try {
-            const id = solver.addLine(5, 0.2, 15, 5);
+            const id = solver.addLine(6, 0.2, 15, 5);
 
             const added = applyAutoConstraints(solver, id, { pointTolerance: 0.5 });
             solver.solve(true);
@@ -2655,7 +2655,7 @@ describe("external references as snap targets", () => {
                 },
             ]);
             const [u, v] = solver.pointOf({ entityId: id, pointIndex: 0 });
-            expect(u).toBeCloseTo(5, 6);
+            expect(u).toBeCloseTo(6, 6);
             expect(v).toBeCloseTo(0, 6);
         } finally {
             solver.dispose();

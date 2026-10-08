@@ -550,8 +550,8 @@ test("Alt-drag preserves a vertical line's origin attachment without adding snap
         editor.solve(true);
         const handler = doc.visual.eventHandler as SketchEventHandler;
         handler.pointerDown(view, { ...pointerEvent(400, 150), altKey: true } as PointerEvent);
-        handler.pointerMove(view, pointerEvent(430, 110));
-        handler.pointerUp(view, pointerEvent(430, 110));
+        handler.pointerMove(view, { ...pointerEvent(430, 110), altKey: true } as PointerEvent);
+        handler.pointerUp(view, { ...pointerEvent(430, 110), altKey: true } as PointerEvent);
         const line = editor.solver.entity(id)!.params;
         expect(line.slice(0, 3)).toEqual([0, 0, 0]);
         expect(line[3]).toBeCloseTo(190);

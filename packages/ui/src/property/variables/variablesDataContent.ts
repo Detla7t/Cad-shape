@@ -2,11 +2,13 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    documentParameterInput,
     type EvaluatedVariables,
     type IDocument,
     Id,
     type IVariableSource,
     Transaction,
+    unitSpecOfType,
     type VariableData,
     type VariableType,
 } from "@chili3d/core";
@@ -87,6 +89,22 @@ export class VariablesDataContent {
     }
 
     setField(id: string, key: VariableField, value: string): void {
+        const item = this.items.find((item) => item.id === id);
+        if (key === "expression" && item) {
+            const parsed = documentParameterInput(
+                value,
+                this.document,
+                unitSpecOfType(item.type),
+                this.evaluate().scope,
+            );
+            // Preserve invalid expressions for the table's inline diagnostics. Explicit
+            // units on new numeric inputs keep their size stable when preferences change.
+            if (parsed.isOk)
+                value =
+                    typeof parsed.value === "number" && item.type !== "unitless"
+                        ? `${parsed.value} ${item.type === "length" ? "mm" : "deg"}`
+                        : String(parsed.value);
+        }
         const next = this.items.map((x) => (x.id === id ? { ...x, [key]: value } : x));
         this.write(next);
     }

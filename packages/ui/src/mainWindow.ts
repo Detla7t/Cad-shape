@@ -18,6 +18,7 @@ import { showDialog } from "./dialog";
 import { Editor } from "./editor";
 import { showFloatPanel } from "./floatPanel";
 import { Home } from "./home";
+import { showNewDocumentDialog } from "./home/newDocumentDialog";
 import { Permanent } from "./permanent";
 import { Toast } from "./toast";
 
@@ -93,6 +94,11 @@ export class MainWindow extends HTMLElement implements IWindow {
         PubSub.default.sub("showPermanent", Permanent.show);
         PubSub.default.sub("activeViewChanged", (view) => displayHome(app, view === undefined));
         PubSub.default.sub("displayHome", (show) => displayHome(app, show));
+        PubSub.default.sub("openNewDocument", () => {
+            void showNewDocumentDialog(app).catch((error: unknown) =>
+                PubSub.default.pub("displayError", error instanceof Error ? error.message : String(error)),
+            );
+        });
 
         Config.instance.onPropertyChanged(this.handleConfigChanged);
         window.matchMedia?.("(prefers-color-scheme: dark)").addEventListener("change", () => {

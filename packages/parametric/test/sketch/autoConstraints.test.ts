@@ -543,7 +543,7 @@ describe("point-on-line snapping", () => {
         const solver = new SketchSolver(Plane.XY);
         solver.addLine(0, 0, 10, 0);
         solver.solve(true);
-        const id = solver.addCircle(5, 0.3, 1);
+        const id = solver.addCircle(6, 0.3, 1);
 
         const added = applyAutoConstraints(solver, id, { pointTolerance: 0.5 });
 

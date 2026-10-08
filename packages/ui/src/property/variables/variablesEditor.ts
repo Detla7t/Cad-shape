@@ -2,10 +2,15 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    documentUnit,
     type EvaluatedVariables,
+    formatDocumentValue,
     I18n,
     type I18nKeys,
+    type IDocument,
     Localize,
+    PubSub,
+    unitSpecOfType,
     type VariableData,
     type VariableType,
 } from "@chili3d/core";
@@ -65,6 +70,7 @@ export class VariablesEditor extends HTMLElement {
         this.listening = false;
         this.content.source.removePropertyChanged(this.handleVariablesChanged);
         this.content.document.variables.removePropertyChanged(this.handleVariablesChanged);
+        PubSub.default.remove("documentUnitsChanged", this.unitsChanged);
         this.popup?.remove();
         this.popup = undefined;
     }
@@ -74,7 +80,12 @@ export class VariablesEditor extends HTMLElement {
         this.listening = true;
         this.content.source.onPropertyChanged(this.handleVariablesChanged);
         this.content.document.variables.onPropertyChanged(this.handleVariablesChanged);
+        PubSub.default.sub("documentUnitsChanged", this.unitsChanged);
     }
+
+    private readonly unitsChanged = (document: IDocument) => {
+        if (document === this.content.document) this.refreshValues();
+    };
 
     /**
      * The edited list changed behind the panel's back — an undo, a redo, or a second panel on
@@ -168,17 +179,24 @@ export class VariablesEditor extends HTMLElement {
      * because a parameter's expression and its value are the same thing seen twice.
      */
     private valueCell(item: VariableData) {
+        let editingText = item.expression;
         return input({
             className: `${style.cell} ${style.field} ${style.value}`,
             value: item.expression,
             onfocus: (e: FocusEvent) => {
                 const box = e.target as HTMLInputElement;
-                box.value = this.current(item.id)?.expression ?? "";
+                const current = this.current(item.id);
+                editingText = current?.expression ?? "";
+                if (current && editingText.trim() && Number.isFinite(Number(editingText))) {
+                    const unit = documentUnit(this.content.document, unitSpecOfType(current.type));
+                    editingText = `${Number(editingText) / unit.factor}${unit.suffix ? ` ${unit.suffix}` : ""}`;
+                }
+                box.value = editingText;
                 box.select();
             },
             onblur: (e: FocusEvent) => {
                 const box = e.target as HTMLInputElement;
-                if (box.value !== (this.current(item.id)?.expression ?? "")) {
+                if (box.value !== editingText) {
                     this.content.setField(item.id, "expression", box.value);
                 }
                 this.refreshValues();
@@ -361,7 +379,13 @@ export class VariablesEditor extends HTMLElement {
             const error = evaluated.errors.get(item.id);
             const warning = evaluated.warnings.get(item.id);
             const value = evaluated.values.get(item.id)?.value;
-            cell.value = error ?? (value === undefined ? "" : this.formatValue(value));
+            cell.value =
+                error ??
+                (value === undefined
+                    ? ""
+                    : item.type === "unitless"
+                      ? String(Math.round(value * 1e8) / 1e8)
+                      : formatDocumentValue(value, this.content.document, unitSpecOfType(item.type)));
             cell.className =
                 error === undefined
                     ? `${style.cell} ${style.field} ${style.value}`
@@ -373,15 +397,6 @@ export class VariablesEditor extends HTMLElement {
             else if (warning !== undefined) row.className = `${style.row} ${style.warningRow}`;
             else row.className = style.row;
         }
-    }
-
-    /**
-     * Just the number: the app has no unit system to name one from. A length and an angle are
-     * both plain numbers here — the type says how a value is checked, not what it is called.
-     */
-    private formatValue(value: number): string {
-        // Four decimals is enough to judge a parameter without burying the number in noise.
-        return String(Math.round(value * 1e4) / 1e4);
     }
 }
 

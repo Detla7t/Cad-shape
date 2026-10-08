@@ -14,5 +14,8 @@
         "plugin",
         "macro"
     ],
-    "author": "Chili3D Team"
+    "author": "Chili3D Team",
+    "dependencies": {
+        "ace-builds": "1.44.0"
+    }
 }

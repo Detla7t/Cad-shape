@@ -2,23 +2,24 @@
 // See LICENSE file in the project root for full license information.
 
 import { VisualConfig, type VisualItemConfig } from "@chili3d/core";
-import { DoubleSide, MeshLambertMaterial, PointsMaterial } from "three";
+import { DoubleSide, MeshLambertMaterial } from "three";
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
+import { RoundPointsMaterial } from "./roundPointsMaterial";
 import { ThreeHelper } from "./threeHelper";
 
-export const defaultVertexMaterial = new PointsMaterial({
+export const defaultVertexMaterial = new RoundPointsMaterial({
     color: ThreeHelper.fromColor(VisualConfig.defaultEdgeColor),
     sizeAttenuation: false,
     size: 3,
 });
 
-export const highlightVertexMaterial = new PointsMaterial({
+export const highlightVertexMaterial = new RoundPointsMaterial({
     color: ThreeHelper.fromColor(VisualConfig.highlightEdgeColor),
     sizeAttenuation: false,
     size: 5,
 });
 
-export const selectedVertexMaterial = new PointsMaterial({
+export const selectedVertexMaterial = new RoundPointsMaterial({
     color: ThreeHelper.fromColor(VisualConfig.selectedEdgeColor),
     sizeAttenuation: false,
     size: 5,

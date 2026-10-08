@@ -20,6 +20,8 @@ import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js";
 
+import { RoundPointsMaterial } from "./roundPointsMaterial";
+
 export const TopRenderOrder = 999;
 
 export class ThreeGeometryFactory {
@@ -36,7 +38,7 @@ export class ThreeGeometryFactory {
     }
 
     static createVertexMaterial(data: VertexMeshData, meshOption?: MeshOption) {
-        const material = new PointsMaterial({
+        const material = new RoundPointsMaterial({
             size: data.size,
             sizeAttenuation: false,
         });

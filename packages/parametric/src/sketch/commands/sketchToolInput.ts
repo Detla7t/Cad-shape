@@ -18,6 +18,7 @@ export function sketchToolInput(
     title: string,
     fields: Record<string, string | number>,
     controller?: AsyncController,
+    preview?: (values: Record<string, string> | undefined) => void,
 ): Promise<Record<string, string> | undefined> {
     return new Promise((resolve) => {
         const form = document.createElement("form");
@@ -78,12 +79,12 @@ export function sketchToolInput(
             resolve(result);
         };
         no.onclick = () => finish();
-        form.onsubmit = (e) => {
-            e.preventDefault();
+        const readValues = (report: boolean): Record<string, string> | undefined => {
             const values: Record<string, string> = {};
             for (const [key, input] of Object.entries(inputs)) {
                 const unit = units.get(key);
                 if (!unit) {
+                    if (input.type === "number" && !Number.isFinite(input.valueAsNumber)) return undefined;
                     values[key] = input.value;
                     continue;
                 }
@@ -95,14 +96,22 @@ export function sketchToolInput(
                     parsed = documentParameterInput(input.value, view.document, unit, scope),
                     result = parsed.isOk ? resolveUnitSpec(parsed.value, scope, unit) : parsed;
                 if (!result.isOk) {
-                    input.setCustomValidity(result.error);
-                    input.reportValidity();
-                    return;
+                    if (report) {
+                        input.setCustomValidity(result.error);
+                        input.reportValidity();
+                    }
+                    return undefined;
                 }
                 values[key] = String(result.value);
             }
-            if (form.reportValidity()) finish(values);
+            return values;
         };
+        form.onsubmit = (e) => {
+            e.preventDefault();
+            const values = readValues(true);
+            if (values && form.reportValidity()) finish(values);
+        };
+        form.addEventListener("input", () => preview?.(readValues(false)));
         for (const event of ["pointerdown", "pointermove", "wheel"])
             form.addEventListener(event, (e) => e.stopPropagation());
         form.onkeydown = (e) => {
@@ -113,5 +122,6 @@ export function sketchToolInput(
         view.dom?.append(form);
         Object.values(inputs)[0]?.focus();
         Object.values(inputs)[0]?.select();
+        preview?.(readValues(false));
     });
 }

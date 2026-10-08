@@ -403,7 +403,8 @@ export class SketchSolver implements ExternalEntityHost {
         return [...this.constraints.values()].some(
             (c) =>
                 kinds.includes(c.kind) &&
-                c.refs.some((r) => pointRefKey(r) === key) &&
+                c.refs[0] !== undefined &&
+                pointRefKey(c.refs[0]) === key &&
                 c.refs.some((r) => r.entityId !== ref.entityId),
         );
     }

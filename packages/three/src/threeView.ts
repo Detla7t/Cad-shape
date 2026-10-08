@@ -541,7 +541,7 @@ export class ThreeView extends Observable implements IView {
             if (nodeFilter !== undefined && !nodeFilter.allow(node)) {
                 continue;
             }
-            visual.push(threeObject);
+            if (!visual.includes(threeObject)) visual.push(threeObject);
         }
         return visual;
     }

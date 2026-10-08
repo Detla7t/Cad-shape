@@ -11,7 +11,7 @@
     color: inherit;
     background: var(--panel-background-color);
     border: 1px solid var(--border-color);
-    border-radius: 2px;
+    border-radius: 0;
     padding: 5px;
     min-width: 0;
 }
@@ -40,17 +40,22 @@
 .table th,
 .table td {
     border: 1px solid var(--border-color);
-    padding: 5px;
+    padding: 0;
+    height: 30px;
     text-align: left;
     white-space: nowrap;
 }
 .table th {
+    padding: 6px 8px;
     background: var(--title-background);
     font-weight: 600;
 }
 .table input {
-    width: 100px;
-    border: 0;
+    width: 120px;
+    padding: 6px 8px;
+    box-sizing: border-box;
+    border: 1px solid transparent;
+    background: transparent;
 }
 .table tr[data-active="true"] > td:first-child {
     border-left: 3px solid var(--primary-color);
@@ -165,4 +170,14 @@
 .inputMenu button:hover,
 .inputMenu button:focus-visible {
     background: var(--hover-background-color);
+}
+
+.table tbody tr:hover,
+.table tr:focus-within {
+    background: color-mix(in srgb, var(--primary-color) 10%, var(--panel-background-color));
+}
+.table input:focus {
+    border-color: var(--primary-color);
+    outline: 1px solid var(--primary-color);
+    outline-offset: -1px;
 }

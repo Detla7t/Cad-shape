@@ -1,7 +1,14 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type Plane as CadPlane, Config, type XYZLike } from "@chili3d/core";
+import {
+    type Plane as CadPlane,
+    Config,
+    I18n,
+    ObjectSnapTypes,
+    ObjectSnapTypeUtils,
+    type XYZLike,
+} from "@chili3d/core";
 import { Plane, Vector3 } from "three";
 import { GraphicsPanel } from "./graphicsPanel";
 import type { ThreeView } from "./threeView";
@@ -74,6 +81,7 @@ export class ViewMenu {
                     Config.instance.orientNormalOnSketchEdit = !Config.instance.orientNormalOnSketchEdit;
                 },
             },
+            { name: "Snapping", children: snappingMenuItems() },
             "separator",
             {
                 name: display.translucent
@@ -331,4 +339,48 @@ export class ViewMenu {
         this.done(dialog);
         apply();
     }
+}
+
+export function snappingMenuItems(): MenuItem[] {
+    return [
+        {
+            name: "Enable snapping",
+            checked: Config.instance.enableSnap,
+            keepOpen: true,
+            action: () => {
+                Config.instance.enableSnap = !Config.instance.enableSnap;
+            },
+        },
+        "separator",
+        ...(
+            [
+                [ObjectSnapTypes.endPoint, "snap.end"],
+                [ObjectSnapTypes.midPoint, "snap.mid"],
+                [ObjectSnapTypes.center, "snap.center"],
+                [ObjectSnapTypes.perpendicular, "snap.perpendicular"],
+                [ObjectSnapTypes.intersection, "snap.intersection"],
+                [ObjectSnapTypes.tangent, "snap.tangent"],
+                [ObjectSnapTypes.onCurve, "snap.nearCurve"],
+                [ObjectSnapTypes.onSurface, "snap.onSurface"],
+            ] as const
+        ).map(([type, label]) => ({
+            name: I18n.translate(label),
+            checked: ObjectSnapTypeUtils.hasType(Config.instance.snapType, type),
+            keepOpen: true,
+            action: () => {
+                Config.instance.snapType = ObjectSnapTypeUtils.hasType(Config.instance.snapType, type)
+                    ? ObjectSnapTypeUtils.removeType(Config.instance.snapType, type)
+                    : ObjectSnapTypeUtils.addType(Config.instance.snapType, type);
+            },
+        })),
+        "separator",
+        {
+            name: "Automatic sketch inferences",
+            checked: Config.instance.enableSnapTracking,
+            keepOpen: true,
+            action: () => {
+                Config.instance.enableSnapTracking = !Config.instance.enableSnapTracking;
+            },
+        },
+    ];
 }

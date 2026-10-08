@@ -22,6 +22,7 @@ import {
     applyDragAutoConstraints,
     type DragSnap,
     dragSnapPosition,
+    sketchSnapOptions,
     snapConstraintKind,
     snapTargetEntityId,
 } from "../autoConstraints";
@@ -190,11 +191,9 @@ export class SketchEventHandler implements IEventHandler {
                     DATUM_Y_AXIS_COLOR,
                     "dash",
                 ),
-                MeshDataUtils.createVertexMesh(
-                    toWorld(plane, 0, 0),
-                    VisualConfig.editVertexSize,
-                    DATUM_X_AXIS_COLOR,
-                ),
+                MeshDataUtils.createVertexMesh(toWorld(plane, 0, 0), 9, 0x444444),
+                MeshDataUtils.createVertexMesh(toWorld(plane, 0, 0), 6, 0xffffff),
+                MeshDataUtils.createVertexMesh(toWorld(plane, 0, 0), 3, 0x444444),
             ],
             { onTop: true, lineOpacity: 0.25 },
         );
@@ -478,12 +477,13 @@ export class SketchEventHandler implements IEventHandler {
             const uv = this.pointerToUV(view, event);
             if (uv !== undefined) {
                 const tolerance = this.editor.screenTolerance();
-                const { position, snap } = this.dragWithoutSnapping
-                    ? { position: uv, snap: undefined }
-                    : dragSnapPosition(this.editor.solver, this.draggingRef, uv, {
-                          pointTolerance: tolerance,
-                          lineTolerance: tolerance,
-                      });
+                this.dragWithoutSnapping = event.shiftKey || event.altKey;
+                const { position, snap } = dragSnapPosition(
+                    this.editor.solver,
+                    this.draggingRef,
+                    uv,
+                    sketchSnapOptions(tolerance, this.dragWithoutSnapping),
+                );
                 this.editor.solver.dragTo(this.draggingRef, position[0], position[1]);
                 this.updateDragPreview(view);
                 this.showSnapFeedback(view, snap);
@@ -519,7 +519,7 @@ export class SketchEventHandler implements IEventHandler {
             }
             this.dragStart = [event.offsetX, event.offsetY];
             this.dragMoved = false;
-            this.dragWithoutSnapping = event.altKey;
+            this.dragWithoutSnapping = event.altKey || event.shiftKey;
             this.beginPointDrag(view, ref);
             return;
         }
@@ -697,10 +697,7 @@ export class SketchEventHandler implements IEventHandler {
         // satisfies a snap condition
         const tolerance = this.editor.screenTolerance();
         if (!this.dragWithoutSnapping) {
-            applyDragAutoConstraints(this.editor.solver, ref, {
-                pointTolerance: tolerance,
-                lineTolerance: tolerance,
-            });
+            applyDragAutoConstraints(this.editor.solver, ref, sketchSnapOptions(tolerance));
         }
         this.syncAnnotationHighlights();
         const result = this.editor.solve(true);
@@ -1093,11 +1090,11 @@ export class SketchEventHandler implements IEventHandler {
     }
 
     /** Highlights the live snap target and shows a floating hint while a drag is snapping onto it. */
-    private showSnapFeedback(view: IView, snap: DragSnap | undefined): void {
+    showSnapFeedback(view: IView, snap: DragSnap | undefined, hint = true): void {
         this.clearSnapFeedback();
         if (snap === undefined) return;
         this.snapTargetMeshId = this.displaySnapTarget(view, snap);
-        this.snapHintItem = this.displaySnapHint(view, snap);
+        if (hint) this.snapHintItem = this.displaySnapHint(view, snap);
     }
 
     /** Displays the highlighted snap target (a point marker or a curve highlight); returns its mesh id. */
@@ -1139,7 +1136,7 @@ export class SketchEventHandler implements IEventHandler {
         });
     }
 
-    private clearSnapFeedback(): void {
+    clearSnapFeedback(): void {
         const view = this.editor.view;
         if (this.snapTargetMeshId !== undefined && !view.isClosed) {
             view.document.visual.context.removeMesh(this.snapTargetMeshId);
@@ -1198,6 +1195,22 @@ export function sketchEntityMeshes(editor: SketchEditor): ShapeMeshData[] {
         .map((entity) => sketchEntityMesh(editor, entity));
 }
 
+/** An origin-attached center stays fixed even when its circle still has a free radius. */
+function pointColor(editor: SketchEditor, entity: SketchEntityData, ref: SketchPointRef): number {
+    const color = entityColor(editor, entity);
+    if (!editor.lastSolveOutcome.result.startsWith("Ok") || editor.solver.datumErrors.size) return color;
+    const pinned = editor.solver
+        .coincidentGroup(ref)
+        .some(
+            (point) =>
+                editor.solver.isFixed(point.entityId) ||
+                editor.solver.constraintKindsOnPoint(point).includes(ConstraintKind.Fix),
+        );
+    return pinned
+        ? Number.parseInt((Config.instance.graphics.constrainedColor || "#000000").slice(1), 16)
+        : color;
+}
+
 /** Vertex meshes at every entity point of the constraint targets — see `showEntityPoints`. */
 function entityPointMeshes(editor: SketchEditor): ShapeMeshData[] {
     const plane = editor.node.plane;
@@ -1211,7 +1224,7 @@ function entityPointMeshes(editor: SketchEditor): ShapeMeshData[] {
                 MeshDataUtils.createVertexMesh(
                     toWorld(plane, u, v),
                     VisualConfig.editVertexSize,
-                    entityColor(editor, entity),
+                    pointColor(editor, entity, { entityId: entity.id, pointIndex }),
                 ),
             );
         }

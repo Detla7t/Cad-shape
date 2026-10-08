@@ -15,6 +15,7 @@ import {
 import { createCadIcon } from "@chili3d/element";
 import style from "./home.module.css";
 import { button, el, homeForm, iconButton } from "./homeControls";
+import { showNewDocumentDialog } from "./newDocumentDialog";
 
 type Filter = "owned" | "recent" | "created" | "shared" | "public" | "trash";
 const sections: { id: Filter; name: string; icon: string }[] = [
@@ -591,15 +592,13 @@ export class Home extends HTMLElement {
         input.select();
     }
     private createDocument() {
-        this.nameForm(
-            "Create document",
-            async (name) => {
-                const document = await this.app.newDocument(name);
-                await this.saveImported(document);
-                PubSub.default.pub("displayHome", false);
-            },
-            "Untitled document",
-        );
+        this.run(async () => {
+            this.dialog?.remove();
+            await showNewDocumentDialog(this.app, {
+                folderId: this.folder,
+                labels: this.label ? [this.label] : [],
+            });
+        });
     }
     private createFolder() {
         this.nameForm("Create folder", async (name) => {

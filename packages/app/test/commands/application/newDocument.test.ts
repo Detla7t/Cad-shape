@@ -1,6 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
+import { PubSub } from "@chili3d/core";
 import { createMockApplication } from "@chili3d/core/test-utils";
 import { describe, expect, test } from "@rstest/core";
 import { NewDocument } from "../../../src/commands/application/newDocument";
@@ -18,20 +19,24 @@ describe("NewDocument", () => {
         expect(data.isApplicationCommand).toBe(true);
     });
 
-    test("should call app.newDocument with incrementing name", async () => {
+    test("requests the new document form without creating an unconfigured document", async () => {
         const app = createMockApplication();
-        let newDocName = "";
-        app.newDocument = async (name: string) => {
-            newDocName = name;
+        let requested = 0;
+        let created = 0;
+        app.newDocument = async () => {
+            created++;
             return {} as any;
         };
-
-        const cmd = new NewDocument();
-        await cmd.execute(app);
-        const first = newDocName;
-        await cmd.execute(app);
-
-        expect(first).toMatch(/^Document \d+$/);
-        expect(Number(newDocName.split(" ")[1])).toBe(Number(first.split(" ")[1]) + 1);
+        const onRequest = () => {
+            requested++;
+        };
+        PubSub.default.sub("openNewDocument", onRequest);
+        try {
+            await new NewDocument().execute(app);
+            expect(requested).toBe(1);
+            expect(created).toBe(0);
+        } finally {
+            PubSub.default.remove("openNewDocument", onRequest);
+        }
     });
 });

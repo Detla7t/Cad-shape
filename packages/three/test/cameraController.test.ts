@@ -83,11 +83,11 @@ test("previous view restores orientation, projection and scale after window zoom
 // ============================================================================
 
 describe("CameraController — construction", () => {
-    test("creates with perspective camera by default", () => {
+    test("creates with orthographic camera by default", () => {
         const view = createFakeView();
         const cc = new CameraController(view);
-        expect(cc.cameraType).toBe("perspective");
-        expect(cc.camera).toBeInstanceOf(PerspectiveCamera);
+        expect(cc.cameraType).toBe("orthographic");
+        expect(cc.camera).toBeInstanceOf(OrthographicCamera);
     });
 
     test("camera starts at default position", () => {
@@ -141,8 +141,8 @@ describe("CameraController — cameraType", () => {
         const view = createFakeView();
         const cc = new CameraController(view);
         const camera = cc.camera;
-        cc.cameraType = "perspective"; // same as current
-        expect(cc.cameraType).toBe("perspective");
+        cc.cameraType = "orthographic"; // same as current
+        expect(cc.cameraType).toBe("orthographic");
         expect(cc.camera).toBe(camera);
     });
 });
@@ -179,6 +179,7 @@ describe("CameraController — setSize", () => {
     test("setSize updates aspect ratio for perspective camera", () => {
         const view = createFakeView();
         const cc = new CameraController(view);
+        cc.cameraType = "perspective";
         cc.setSize(800, 600);
         const cam = cc.camera as PerspectiveCamera;
         expect(cam.aspect).toBeCloseTo(800 / 600);

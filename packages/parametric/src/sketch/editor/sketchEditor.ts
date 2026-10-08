@@ -22,6 +22,7 @@ import {
     type XYZ,
 } from "@chili3d/core";
 import type { ParametricBodyNode } from "../../parametricBodyNode";
+import { type DragSnap, SKETCH_SNAP_PIXELS } from "../autoConstraints";
 import {
     ConstraintKind,
     datumUnitSpec,
@@ -538,6 +539,10 @@ export class SketchEditor implements IDisposable {
 
     readonly view: IView;
 
+    showDrawingSnap(snap?: DragSnap): void {
+        this.eventHandler.showSnapFeedback(this.view, snap, false);
+    }
+
     // ------------------------------------------------------------------ Picking — the surface the sketch commands drive
 
     get isPicking(): boolean {
@@ -700,7 +705,7 @@ export class SketchEditor implements IDisposable {
         const view = this.document.application.activeView;
         if (view === undefined) return 0;
         const size = worldPerPixel(view, this.node.plane, view.width / 2, view.height / 2);
-        return size === undefined ? 0 : size * 8;
+        return size === undefined ? 0 : size * SKETCH_SNAP_PIXELS;
     }
 
     /** Deletes constraints (and their datum anchors), then commits (undoable). */

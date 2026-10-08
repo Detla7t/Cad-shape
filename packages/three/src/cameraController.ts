@@ -82,7 +82,7 @@ export class CameraController extends Observable implements ICameraController {
     }
 
     get cameraType(): CameraType {
-        return this.getPrivateValue("cameraType", "perspective");
+        return this.getPrivateValue("cameraType", "orthographic");
     }
     set cameraType(value: CameraType) {
         if (this.setProperty("cameraType", value)) {

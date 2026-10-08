@@ -9,6 +9,7 @@ export type ViewMenuItem =
           name: string;
           action?: () => void;
           checked?: boolean;
+          keepOpen?: boolean;
           disabled?: boolean;
           icon?: string;
           children?: ViewMenuItem[];
@@ -77,8 +78,13 @@ export function openViewMenu(anchor: Element, items: ViewMenuItem[], onClose: ()
             button.onclick = () => {
                 if (item.children) expand(true);
                 else {
-                    close();
+                    if (!item.keepOpen) close();
                     item.action?.();
+                    if (item.keepOpen && item.checked !== undefined) {
+                        item.checked = !item.checked;
+                        button.setAttribute("aria-checked", String(item.checked));
+                        mark.textContent = item.checked ? "✓" : "";
+                    }
                 }
             };
             menu.append(button);

@@ -6,6 +6,7 @@ import {
     type CommandKeys,
     Config,
     DocumentLibrary,
+    type DocumentUnits,
     DocumentVersionControl,
     I18n,
     type IApplication,
@@ -243,9 +244,10 @@ export class Application extends Observable implements IApplication {
         }
     }
 
-    async newDocument(name: string): Promise<IDocument> {
+    async newDocument(name: string, units?: DocumentUnits): Promise<IDocument> {
         const document = new Document(this, name);
         initializeDocumentPreferences(document);
+        if (units) document.userData = { ...document.userData, displayUnits: { ...units } };
         const lightGray = new Material({ document, name: "LightGray", color: 0xdedede });
         const deepGray = new Material({ document, name: "DeepGray", color: 0x898989 });
         document.modelManager.materials.push(lightGray, deepGray);

@@ -10,10 +10,11 @@ import {
     PubSub,
     type XYZ,
 } from "@chili3d/core";
-import { applyPointAutoConstraints } from "../autoConstraints";
+import { applyPointAutoConstraints, sketchSnapOptions } from "../autoConstraints";
 import { ConstraintKind, toUV, toWorld } from "../sketchModel";
 import type { SketchSolver } from "../solver";
 import { SketchMultistepCommand } from "./sketchMultistepCommand";
+import type { SketchPointSnapResult } from "./sketchPointSnapEventHandler";
 import { SketchPointStep } from "./sketchPointStep";
 
 /** Axis-aligned rectangle from two diagonal corners: 4 lines + coincident/H/V constraints. */
@@ -46,7 +47,10 @@ export class SketchRectangleCommand extends SketchMultistepCommand {
                 { entityId: top, pointIndex: 1 },
             ],
             [top, right, bottom, left],
-            { pointTolerance: this.editor.screenTolerance() },
+            sketchSnapOptions(
+                this.editor.screenTolerance(),
+                this.stepDatas.some((step) => (step as SketchPointSnapResult).suppressInference),
+            ),
         );
         this.editor.solve(true);
         this.editor.commit();

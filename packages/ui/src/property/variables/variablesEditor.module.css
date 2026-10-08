@@ -9,7 +9,7 @@
     display: flex;
     flex-direction: column;
     border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border-radius: 0;
     overflow: hidden;
 }
 
@@ -24,10 +24,11 @@
 .newRow,
 .header {
     display: grid;
-    grid-template-columns: 140px 100px minmax(160px, 1fr) 84px;
-    gap: 6px;
-    align-items: center;
-    padding: 3px 8px;
+    grid-template-columns: minmax(100px, 1fr) 88px minmax(120px, 1fr) 72px;
+    gap: 0;
+    align-items: stretch;
+    padding: 0;
+    min-height: 30px;
 }
 
 /* The name and its description marker share one column. */
@@ -68,24 +69,24 @@
     padding: 4px;
     background-color: var(--panel-background-color);
     border: 1px solid var(--border-color);
-    border-radius: 4px;
+    border-radius: 0;
     box-shadow: 0 2px 8px rgb(0 0 0 / 25%);
 }
 
 .noteInput {
     width: 220px;
-    padding: 4px 6px;
+    padding: 5px 7px;
     font-size: 0.95em;
     color: var(--foreground-color);
     background-color: var(--input-background-color);
     border: 1px solid var(--primary-color);
-    border-radius: 4px;
+    border-radius: 0;
     outline: none;
 }
 
 .header {
-    padding-top: 8px;
-    padding-bottom: 8px;
+    padding-top: 0;
+    padding-bottom: 0;
     font-size: 0.85em;
     font-weight: 600;
     color: var(--foreground-secondary-color);
@@ -94,7 +95,8 @@
 
     /* Line the labels up with the text inside the quiet cells below (6px padding + 1px border). */
     .cell {
-        padding: 0 7px;
+        padding: 7px;
+        border-right: 1px solid var(--border-color);
     }
 }
 
@@ -122,11 +124,11 @@
 .field {
     width: 100%;
     box-sizing: border-box;
-    padding: 4px 6px;
+    padding: 5px 7px;
     font-size: 0.95em;
     background-color: transparent;
     border: 1px solid transparent;
-    border-radius: 4px;
+    border-radius: 0;
 
     &:hover {
         border-color: var(--border-color);
@@ -182,13 +184,13 @@ select.field {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 26px;
-    height: 26px;
+    width: 23px;
+    height: 28px;
     padding: 0;
     color: var(--foreground-secondary-color);
     background: none;
     border: none;
-    border-radius: 4px;
+    border-radius: 0;
     cursor: pointer;
 
     svg {
@@ -215,12 +217,31 @@ select.field {
 .root[data-docked] .newRow,
 .root[data-docked] .header {
     grid-template-columns: minmax(80px, 1fr) 76px minmax(100px, 1fr) 72px;
-    gap: 3px;
-    padding: 3px;
+    gap: 0;
+    padding: 0;
 }
 .root[data-docked] .table {
     border-radius: 0;
 }
 .root[data-docked] .rows {
     max-height: none;
+}
+
+.row > .nameCell,
+.row > select,
+.row > .value {
+    border-right: 1px solid var(--border-color);
+}
+.row .actions {
+    visibility: hidden;
+}
+.row:hover .actions,
+.row:focus-within .actions {
+    visibility: visible;
+}
+.row:focus-within {
+    background: color-mix(in srgb, var(--primary-color) 12%, var(--panel-background-color));
+}
+.field:focus {
+    box-shadow: inset 0 0 0 1px var(--primary-color);
 }

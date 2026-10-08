@@ -3,6 +3,7 @@
 
 import {
     AsyncController,
+    documentParameterInput,
     formatDocumentValue,
     type IDocument,
     type INode,
@@ -148,7 +149,20 @@ export function editMeasuredVariable(
         expression.value = draft.expression ?? "0 mm";
         expression.setAttribute("aria-label", "Assigned expression");
         expression.oninput = () => {
-            draft = { ...draft, expression: expression.value };
+            const parsed = documentParameterInput(
+                expression.value,
+                model,
+                LENGTH_UNITS,
+                model.variables.scope,
+            );
+            draft = {
+                ...draft,
+                expression: parsed.isOk
+                    ? typeof parsed.value === "number"
+                        ? `${parsed.value} mm`
+                        : parsed.value
+                    : expression.value,
+            };
             update();
         };
         const entities = document.createElement("div");

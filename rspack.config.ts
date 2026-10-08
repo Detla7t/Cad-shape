@@ -1,8 +1,8 @@
 import { resolve } from "node:path";
 import { defineConfig } from "@rspack/cli";
 import rspack from "@rspack/core";
-import { TsCheckerRspackPlugin } from "ts-checker-rspack-plugin";
 import packages from "./package.json" with { type: "json" };
+import { TypecheckPlugin } from "./scripts/typecheck-plugin.mjs";
 
 const isProduction = process.env.NODE_ENV === "production";
 const configDir = import.meta.dirname;
@@ -69,7 +69,7 @@ export default defineConfig({
         fallback: { module: false },
     },
     plugins: [
-        new TsCheckerRspackPlugin(),
+        new TypecheckPlugin(configDir),
         new rspack.CircularDependencyRspackPlugin({
             failOnError: true,
             exclude: /node_modules/,
@@ -79,8 +79,14 @@ export default defineConfig({
                 {
                     from: resolve(configDir, "public"),
                     globOptions: {
-                        ignore: ["**/**/index.html"],
+                        ignore: ["**/**/index.html", "**/vendor/**"],
                     },
+                },
+                {
+                    from: resolve(configDir, "public/vendor"),
+                    to: "vendor",
+                    // Preserve upstream decoder bytes and license notices exactly as cached.
+                    info: { minimized: true },
                 },
             ],
         }),

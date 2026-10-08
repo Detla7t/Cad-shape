@@ -38,3 +38,30 @@ test("accepting a rounded default retains the exact geometric value", async () =
     document.querySelector("form")!.dispatchEvent(new Event("submit", { cancelable: true }));
     expect(await pending).toEqual({ "Offset (mm)": "5" });
 });
+
+test("parameter previews update in model units before confirmation and cancellation applies nothing", async () => {
+    const model = new TestDocument();
+    model.userData = { displayUnits: { length: "in", lengthPrecision: 3 } };
+    const values: (Record<string, string> | undefined)[] = [];
+    const pending = sketchToolInput(
+        createMockView({ document: model, dom: document.body }),
+        "Fillet",
+        { "Radius (mm)": 25.4 },
+        undefined,
+        (value) => values.push(value),
+    );
+    expect(values).toEqual([{ "Radius (mm)": "25.4" }]);
+    const input = document.querySelector<HTMLInputElement>('[aria-label="Radius (in)"]');
+    expect(input).not.toBeNull();
+    input!.value = "2";
+    input!.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(values.at(-1)).toEqual({ "Radius (mm)": "50.8" });
+    input!.value = "invalid(";
+    input!.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(values.at(-1)).toBeUndefined();
+    const cancel = document.querySelector<HTMLButtonElement>('[aria-label="Cancel Fillet"]');
+    expect(cancel).not.toBeNull();
+    cancel!.click();
+    expect(await pending).toBeUndefined();
+    expect(model.history.undoCount()).toBe(0);
+});

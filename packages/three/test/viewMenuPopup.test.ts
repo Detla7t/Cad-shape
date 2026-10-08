@@ -1,6 +1,8 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
+import { Config } from "@chili3d/core";
+import { snappingMenuItems } from "../src/viewMenu";
 import { openViewMenu } from "../src/viewMenuPopup";
 
 test("view choices open adjacent flyouts and keyboard selection closes both menus", () => {
@@ -52,5 +54,34 @@ test("view choices open adjacent flyouts and keyboard selection closes both menu
     } finally {
         close();
         anchor.remove();
+    }
+});
+
+test("snapping options update configuration and remain open for additional changes", () => {
+    const anchor = document.createElement("button");
+    document.body.append(anchor);
+    const before = Config.instance.enableSnap;
+    const beforeTracking = Config.instance.enableSnapTracking;
+    const close = openViewMenu(anchor, snappingMenuItems(), () => {});
+    try {
+        const toggle = document.querySelector<HTMLButtonElement>('[aria-label="Enable snapping"]');
+        expect(toggle).not.toBeNull();
+        toggle!.click();
+        expect(Config.instance.enableSnap).toBe(!before);
+        expect(toggle!.getAttribute("aria-checked")).toBe(String(!before));
+        expect(toggle!.isConnected).toBe(true);
+        const tracking = document.querySelector<HTMLButtonElement>(
+            '[aria-label="Automatic sketch inferences"]',
+        );
+        expect(tracking).not.toBeNull();
+        tracking!.click();
+        expect(Config.instance.enableSnapTracking).toBe(!beforeTracking);
+        toggle!.click();
+        expect(Config.instance.enableSnap).toBe(before);
+    } finally {
+        close();
+        anchor.remove();
+        Config.instance.enableSnap = before;
+        Config.instance.enableSnapTracking = beforeTracking;
     }
 });

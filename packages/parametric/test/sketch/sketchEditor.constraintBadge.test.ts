@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type ICameraController, Plane, Result, VisualConfig, XYZ } from "@chili3d/core";
+import { AsyncController, type ICameraController, Plane, Result, VisualConfig, XYZ } from "@chili3d/core";
 import {
     createMockApplication,
     createMockView,
@@ -9,6 +9,7 @@ import {
     TestDocument,
 } from "@chili3d/core/test-utils";
 import { rs } from "@rstest/core";
+import { SketchPointSnapEventHandler } from "../../src/sketch/commands/sketchPointSnapEventHandler";
 import { SketchEditor } from "../../src/sketch/editor/sketchEditor";
 import type { SketchEventHandler } from "../../src/sketch/editor/sketchEventHandler";
 import { ConstraintKind } from "../../src/sketch/sketchModel";
@@ -743,4 +744,57 @@ describe("SketchEditor dimension preview", () => {
             restoreFactory();
         }
     });
+});
+
+test("drawing point input previews the rim, accepts that same point, and suppresses inference with Shift", () => {
+    const { doc, view, displayed, restoreFactory } = setup();
+    const editor = SketchEditor.enter(new SketchNode({ document: doc, plane: Plane.XY }));
+    const controller = new AsyncController();
+    const preview = rs.fn((_point: XYZ | undefined) => []);
+    const handler = new SketchPointSnapEventHandler(doc, controller, {
+        plane: () => Plane.XY,
+        preview,
+        tentative: (p) => ({ type: "line", params: [0, 0, ...p] }),
+    });
+    try {
+        editor.solver.addCircle(0, 0, 80);
+        const before = editor.solver.toData();
+        handler.pointerMove(view, { ...pointerEvent(403, 221), pointerType: "mouse" } as PointerEvent);
+        expect(handler.snaped?.point).toEqual(new XYZ({ x: 0, y: 80, z: 0 }));
+        expect(preview.mock.calls.at(-1)?.[0]).toEqual(new XYZ({ x: 0, y: 80, z: 0 }));
+        expect(displayed.some((mesh) => mesh.colors.includes(0xff9800))).toBe(true);
+        expect(editor.solver.toData()).toEqual(before);
+        handler.pointerMove(view, {
+            ...pointerEvent(403, 221),
+            shiftKey: true,
+            pointerType: "mouse",
+        } as PointerEvent);
+        expect(handler.snaped?.point).toEqual(new XYZ({ x: 3, y: 79, z: 0 }));
+        handler.pointerDown(view, { ...pointerEvent(403, 221), pointerType: "mouse" } as PointerEvent);
+        expect(controller.result?.status).toBe("success");
+        expect(handler.snaped?.point).toEqual(new XYZ({ x: 0, y: 80, z: 0 }));
+    } finally {
+        handler.dispose();
+        controller.dispose();
+        editor.exit();
+        restoreFactory();
+    }
+});
+
+test("the initial point click snaps to an existing midpoint without a preceding pointer move", () => {
+    const { doc, view, restoreFactory } = setup();
+    const editor = SketchEditor.enter(new SketchNode({ document: doc, plane: Plane.XY }));
+    const controller = new AsyncController();
+    const handler = new SketchPointSnapEventHandler(doc, controller, { plane: () => Plane.XY });
+    try {
+        editor.solver.addLine(20, 30, 100, 30);
+        handler.pointerDown(view, { ...pointerEvent(462, 267), pointerType: "mouse" } as PointerEvent);
+        expect(controller.result?.status).toBe("success");
+        expect(handler.snaped?.point).toEqual(new XYZ({ x: 60, y: 30, z: 0 }));
+    } finally {
+        handler.dispose();
+        controller.dispose();
+        editor.exit();
+        restoreFactory();
+    }
 });

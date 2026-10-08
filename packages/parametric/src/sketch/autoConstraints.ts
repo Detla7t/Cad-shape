@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { Precision } from "@chili3d/core";
+import { Config, type ObjectSnapType, ObjectSnapTypes, Precision } from "@chili3d/core";
 import {
     arcAngles,
     axisLineRefs,
@@ -35,6 +35,7 @@ const INCIDENCE_KINDS: readonly ConstraintKind[] = [
     ConstraintKind.PointOnLine,
     ConstraintKind.PointOnCircle,
     ConstraintKind.PointOnArc,
+    ConstraintKind.Midpoint,
 ];
 
 export interface AutoConstraintOptions {
@@ -44,6 +45,27 @@ export interface AutoConstraintOptions {
     lineTolerance?: number;
     /** A line within this angle of an axis gets a Horizontal/Vertical constraint. */
     angleToleranceDeg?: number;
+    snapTypes?: ObjectSnapType;
+    inferAxes?: boolean;
+    excludeEntityIds?: number[];
+    /** Points explicitly placed by the tool; derived/mirrored points do not get extra incidence constraints. */
+    pointIndices?: number[];
+}
+
+/** A CSS-pixel aperture, independent of model units, zoom and display pixel ratio. */
+export const SKETCH_SNAP_PIXELS = 8;
+export function sketchSnapOptions(tolerance: number, suppressed = false): AutoConstraintOptions {
+    const enabled = Config.instance.enableSnap && !suppressed;
+    return {
+        pointTolerance: enabled ? tolerance : 0,
+        lineTolerance: enabled ? tolerance : 0,
+        snapTypes: enabled ? Config.instance.snapType : ObjectSnapTypes.none,
+        inferAxes: enabled && Config.instance.enableSnapTracking,
+        angleToleranceDeg: enabled && Config.instance.enableSnapTracking ? 5 : 0,
+    };
+}
+function allows(options: AutoConstraintOptions, type: number): boolean {
+    return options.snapTypes === undefined || (options.snapTypes & type) !== 0;
 }
 
 /**
@@ -84,24 +106,53 @@ export function applyAutoConstraints(
     const entity = solver.entities().find((x) => x.id === entityId);
     if (entity === undefined) return added;
 
-    const refs: SketchPointRef[] = snappablePointIndices(entity.type, entity.params).map((pointIndex) => ({
+    const allRefs: SketchPointRef[] = snappablePointIndices(entity.type, entity.params).map((pointIndex) => ({
         entityId,
         pointIndex,
     }));
 
+    const refs = allRefs.filter(
+        (ref) => !options.pointIndices || options.pointIndices.includes(ref.pointIndex),
+    );
     const curveTolerance = options.lineTolerance ?? options.pointTolerance;
-    snapToExistingPoints(solver, refs, options.pointTolerance, added);
-    snapToExistingLines(solver, refs, curveTolerance, added);
-    snapToExistingCurves(solver, refs, curveTolerance, added);
-    if (entity.type === "line") {
+    snapToExistingPoints(solver, refs, options.pointTolerance, added, options);
+    if (allows(options, ObjectSnapTypes.midPoint)) {
+        for (const ref of refs) {
+            if (
+                solver.constraintKindsOnPoint(ref).includes(ConstraintKind.P2PCoincident) ||
+                hasIncidence(solver, ref)
+            )
+                continue;
+            const snap = nearestMidpointSnap(
+                solver,
+                constraintTargetEntities(solver),
+                new Set([entityId, ...(options.excludeEntityIds ?? [])]),
+                solver.pointOf(ref),
+                options.pointTolerance,
+            );
+            if (!snap) continue;
+            solver.setPointPosition(ref, ...snap.position);
+            const constraint = snapConstraint(ref, snap);
+            solver.addConstraint(constraint);
+            added.push(constraint);
+        }
+    }
+    // A visible curve must win over a datum axis. Otherwise the Y axis masks
+    // the circle exactly where a vertical radius needs to end.
+    if (allows(options, ObjectSnapTypes.onCurve))
+        snapToExistingCurves(solver, refs, curveTolerance, added, options);
+    snapToExistingLines(solver, refs, curveTolerance, added, options);
+    if (entity.type === "line" && options.inferAxes !== false) {
         alignToAxis(
             solver,
-            refs as [SketchPointRef, SketchPointRef],
+            allRefs as [SketchPointRef, SketchPointRef],
             options.angleToleranceDeg ?? DEFAULT_ANGLE_TOLERANCE_DEG,
             added,
+            options.inferAxes === true ? curveTolerance : undefined,
         );
     }
-    snapToTangency(solver, entityId, options.pointTolerance, added);
+    if (allows(options, ObjectSnapTypes.tangent))
+        snapToTangency(solver, entityId, options.pointTolerance, added);
     return added;
 }
 
@@ -112,6 +163,7 @@ export function applyAutoConstraints(
 export type DragSnap =
     | { kind: "point"; point: SketchPointRef; position: [number, number] }
     | { kind: "line"; lineRefs: [SketchPointRef, SketchPointRef]; position: [number, number] }
+    | { kind: "midpoint"; lineRefs: [SketchPointRef, SketchPointRef]; position: [number, number] }
     | { kind: "circle"; circleRef: SketchPointRef; position: [number, number] }
     | { kind: "arc"; arcRefs: [SketchPointRef, SketchPointRef]; position: [number, number] };
 
@@ -125,6 +177,7 @@ export interface DragSnapResult {
      * place of the snap's, see `snapPosition`.
      */
     tangentKind?: ConstraintKind;
+    alignmentKind?: ConstraintKind;
 }
 
 /** The constraint a snapped point would add, refs in garlic's layout. */
@@ -134,6 +187,7 @@ export function snapConstraint(ref: SketchPointRef, snap: DragSnap): Omit<Sketch
         case "point":
             return { kind, refs: [ref, snap.point] };
         case "line":
+        case "midpoint":
             return { kind, refs: [ref, ...snap.lineRefs] };
         case "circle":
             return { kind, refs: [ref, snap.circleRef] };
@@ -150,6 +204,7 @@ export function snapConstraintKind(snap: DragSnap): ConstraintKind {
 const SNAP_KINDS: Record<DragSnap["kind"], ConstraintKind> = {
     point: ConstraintKind.P2PCoincident,
     line: ConstraintKind.PointOnLine,
+    midpoint: ConstraintKind.Midpoint,
     circle: ConstraintKind.PointOnCircle,
     arc: ConstraintKind.PointOnArc,
 };
@@ -163,6 +218,7 @@ export function snapTargetEntityId(snap: DragSnap): number | undefined {
         case "point":
             return undefined;
         case "line":
+        case "midpoint":
             return snap.lineRefs[0].entityId;
         case "circle":
             return snap.circleRef.entityId;
@@ -184,7 +240,12 @@ export function dragSnapPosition(
     target: [number, number],
     options: AutoConstraintOptions,
 ): DragSnapResult {
-    const snap = findDragSnap(solver, ref, target, options);
+    let snap = findDragSnap(solver, ref, target, options);
+    const entity = solver.entity(ref.entityId);
+    if (snap && entity?.type === "line") {
+        const other = solver.pointOf({ entityId: ref.entityId, pointIndex: ref.pointIndex === 0 ? 1 : 0 });
+        snap = alignCurveSnap(solver, snap, target, other, options);
+    }
     return snap === undefined ? { position: target } : { position: snap.position, snap };
 }
 
@@ -215,25 +276,59 @@ export function snapPosition(
     const entities = constraintTargetEntities(solver);
     let snap: DragSnap | undefined;
     if (options.pointTolerance > 0) {
-        const nearest = nearestCandidate(snapCandidates(solver, entities), probe, options.pointTolerance);
+        const nearest = nearestCandidate(
+            snapCandidates(solver, entities, undefined, options),
+            probe,
+            options.pointTolerance,
+        );
         if (nearest !== undefined) snap = { kind: "point", point: nearest.ref, position: nearest.position };
     }
 
+    if (!snap && allows(options, ObjectSnapTypes.midPoint))
+        snap = nearestMidpointSnap(solver, entities, undefined, probe, options.pointTolerance);
     const lineTolerance = options.lineTolerance ?? options.pointTolerance;
     if (snap === undefined && lineTolerance > 0) {
-        const nearest = nearestLineOrAxisSnap(solver, entities, undefined, probe, lineTolerance);
+        snap = allows(options, ObjectSnapTypes.onCurve)
+            ? nearestCurveSnap(entities, undefined, probe, lineTolerance)
+            : undefined;
+        const nearest = snap
+            ? undefined
+            : nearestLineOrAxisSnap(solver, entities, undefined, probe, lineTolerance, options);
         if (nearest !== undefined)
             snap = { kind: "line", lineRefs: nearest.lineRefs, position: nearest.position };
-        else snap = nearestCurveSnap(entities, undefined, probe, lineTolerance);
     }
 
-    const position = snap === undefined ? probe : snap.position;
+    const candidate = tentative?.(probe);
+    const anchor: [number, number] =
+        candidate?.type === "line" ? [candidate.params[0], candidate.params[1]] : [0, 0];
+    if (snap) snap = alignCurveSnap(solver, snap, probe, anchor, options);
+
+    let position = snap === undefined ? probe : snap.position;
+    let alignmentKind: ConstraintKind | undefined;
+    if (candidate?.type === "line" && options.inferAxes !== false) {
+        const dx = position[0] - anchor[0],
+            dy = position[1] - anchor[1];
+        const length = Math.hypot(dx, dy);
+        const aperture = Math.min(
+            lineTolerance,
+            length * Math.sin(((options.angleToleranceDeg ?? 5) * Math.PI) / 180),
+        );
+        if (Math.abs(dx) <= aperture && length > Precision.Distance) {
+            if (!snap) position = [anchor[0], position[1]];
+            if (Math.abs(position[0] - anchor[0]) < Precision.Distance)
+                alignmentKind = ConstraintKind.Vertical;
+        } else if (Math.abs(dy) <= aperture && length > Precision.Distance) {
+            if (!snap) position = [position[0], anchor[1]];
+            if (Math.abs(position[1] - anchor[1]) < Precision.Distance)
+                alignmentKind = ConstraintKind.Horizontal;
+        }
+    }
     const entity = tentative?.(position);
     const tangentKind =
-        entity === undefined
+        entity === undefined || !allows(options, ObjectSnapTypes.tangent)
             ? undefined
             : nearestTangency(solver, { id: TENTATIVE_ENTITY_ID, ...entity }, options.pointTolerance)?.kind;
-    return { position, snap, tangentKind };
+    return { position, snap, tangentKind, alignmentKind };
 }
 
 /**
@@ -278,6 +373,7 @@ export function applyPointAutoConstraints(
         }
 
         const constraint = snapConstraint(ref, snap);
+        if (solver.hasConstraint(constraint.kind, constraint.refs)) continue;
         solver.setPointPosition(ref, snap.position[0], snap.position[1]);
         solver.addConstraint(constraint);
         added.push(constraint);
@@ -297,7 +393,7 @@ function findDragSnap(
 
 /**
  * Nearest snap for a point, excluding `excludeEntityIds`, or undefined. Points win
- * over curves, real lines and axes over circles and arcs — the same precedence the
+ * over midpoints and curves, and visible curves over datum axes — the same precedence the
  * drawing feedback shows.
  */
 function findPointSnap(
@@ -311,15 +407,39 @@ function findPointSnap(
     // below only read the table, and positions are read live via solver.pointOf
     const entities = constraintTargetEntities(solver);
     if (options.pointTolerance > 0) {
-        const snap = nearestPointSnap(solver, entities, ref, probe, excludeEntityIds, options.pointTolerance);
+        const snap = nearestPointSnap(
+            solver,
+            entities,
+            ref,
+            probe,
+            excludeEntityIds,
+            options.pointTolerance,
+            options,
+        );
         if (snap !== undefined) return { kind: "point", point: snap.ref, position: snap.position };
     }
 
     const curveTolerance = options.lineTolerance ?? options.pointTolerance;
-    if (curveTolerance <= 0 || hasIncidence(solver, ref)) return undefined;
-    const line = nearestLineOrAxisSnap(solver, entities, excludeEntityIds, probe, curveTolerance);
+    if (allows(options, ObjectSnapTypes.midPoint) && !hasIncidence(solver, ref)) {
+        const midpoint = nearestMidpointSnap(
+            solver,
+            entities,
+            excludeEntityIds,
+            probe,
+            options.pointTolerance,
+        );
+        if (midpoint) return midpoint;
+    }
+    if (curveTolerance <= 0) return undefined;
+    const curve = allows(options, ObjectSnapTypes.onCurve)
+        ? nearestCurveSnap(entities, excludeEntityIds, probe, curveTolerance)
+        : undefined;
+    if (curve && !solver.hasConstraint(snapConstraintKind(curve), snapConstraint(ref, curve).refs))
+        return curve;
+    if (hasIncidence(solver, ref)) return undefined;
+    const line = nearestLineOrAxisSnap(solver, entities, excludeEntityIds, probe, curveTolerance, options);
     if (line !== undefined) return { kind: "line", lineRefs: line.lineRefs, position: line.position };
-    return nearestCurveSnap(entities, excludeEntityIds, probe, curveTolerance);
+    return undefined;
 }
 
 interface SnapCandidate {
@@ -332,9 +452,15 @@ function snapToExistingPoints(
     refs: SketchPointRef[],
     tolerance: number,
     added: Omit<SketchConstraintData, "id">[],
+    options: AutoConstraintOptions,
 ): void {
     if (tolerance <= 0) return;
-    const candidates = snapCandidates(solver, constraintTargetEntities(solver), refs[0].entityId);
+    const candidates = snapCandidates(
+        solver,
+        constraintTargetEntities(solver).filter((e) => !options.excludeEntityIds?.includes(e.id)),
+        refs[0].entityId,
+        options,
+    );
 
     for (const ref of refs) {
         const nearest = nearestCandidate(candidates, solver.pointOf(ref), tolerance);
@@ -342,6 +468,7 @@ function snapToExistingPoints(
 
         solver.setPointPosition(ref, nearest.position[0], nearest.position[1]);
         const constraint = { kind: ConstraintKind.P2PCoincident, refs: [ref, nearest.ref] };
+        if (solver.hasConstraint(constraint.kind, constraint.refs)) continue;
         solver.addConstraint(constraint);
         added.push(constraint);
     }
@@ -352,6 +479,7 @@ function snapToExistingLines(
     refs: SketchPointRef[],
     tolerance: number,
     added: Omit<SketchConstraintData, "id">[],
+    options: AutoConstraintOptions,
 ): void {
     if (tolerance <= 0) return;
     // the entity set cannot change inside the loop (only point positions move,
@@ -368,9 +496,10 @@ function snapToExistingLines(
         const snap = nearestLineOrAxisSnap(
             solver,
             entities,
-            new Set([ref.entityId]),
+            new Set([ref.entityId, ...(options.excludeEntityIds ?? [])]),
             solver.pointOf(ref),
             tolerance,
+            options,
         );
         if (snap === undefined) continue;
 
@@ -387,6 +516,7 @@ function snapToExistingCurves(
     refs: SketchPointRef[],
     tolerance: number,
     added: Omit<SketchConstraintData, "id">[],
+    options: AutoConstraintOptions,
 ): void {
     if (tolerance <= 0) return;
     const entities = constraintTargetEntities(solver);
@@ -398,7 +528,12 @@ function snapToExistingCurves(
         ) {
             continue;
         }
-        const snap = nearestCurveSnap(entities, new Set([ref.entityId]), solver.pointOf(ref), tolerance);
+        const snap = nearestCurveSnap(
+            entities,
+            new Set([ref.entityId, ...(options.excludeEntityIds ?? [])]),
+            solver.pointOf(ref),
+            tolerance,
+        );
         // a point landing where a sibling point already sits would collapse the entity
         if (snap === undefined || collapsesOntoSibling(solver, refs, ref, snap.position)) continue;
 
@@ -438,6 +573,40 @@ function curveSnap(entity: SketchEntityData, position: [number, number]): DragSn
         : { kind: "arc", arcRefs: [centerRef(entity.id), arcStartRef(entity.id)], position };
 }
 
+/** Keep the visible circle contact AND an axis inference, rather than projecting off the curve. */
+function alignCurveSnap(
+    solver: SketchSolver,
+    snap: DragSnap,
+    probe: [number, number],
+    anchor: [number, number],
+    options: AutoConstraintOptions,
+): DragSnap {
+    if (options.inferAxes === false || (snap.kind !== "circle" && snap.kind !== "arc")) return snap;
+    const entity = solver.entity(snap.kind === "circle" ? snap.circleRef.entityId : snap.arcRefs[0].entityId);
+    if (!entity) return snap;
+    const [cx, cy] = entity.params,
+        radius = entityRadius(entity);
+    const tolerance = options.lineTolerance ?? options.pointTolerance;
+    const candidates: [number, number][] = [];
+    if (Math.abs(probe[0] - anchor[0]) < tolerance && Math.abs(anchor[0] - cx) <= radius) {
+        const height = Math.sqrt(Math.max(0, radius * radius - (anchor[0] - cx) ** 2));
+        candidates.push([anchor[0], cy + height], [anchor[0], cy - height]);
+    }
+    if (Math.abs(probe[1] - anchor[1]) < tolerance && Math.abs(anchor[1] - cy) <= radius) {
+        const width = Math.sqrt(Math.max(0, radius * radius - (anchor[1] - cy) ** 2));
+        candidates.push([cx + width, anchor[1]], [cx - width, anchor[1]]);
+    }
+    const nearest = candidates
+        .filter((p) => contactVisible(entity, p))
+        .map((position) => ({
+            position,
+            distance: Math.hypot(position[0] - probe[0], position[1] - probe[1]),
+        }))
+        .filter((p) => p.distance < tolerance)
+        .sort((a, b) => a.distance - b.distance)[0];
+    return nearest ? { ...snap, position: nearest.position } : snap;
+}
+
 /**
  * Nearest point of a circle/arc entity's curve to the probe — the radial
  * projection, undefined at the center (no radial direction) and off an arc's
@@ -470,16 +639,26 @@ function snapCandidates(
     solver: SketchSolver,
     entities: SketchEntityData[],
     excludeEntityId?: number,
+    options: AutoConstraintOptions = { pointTolerance: 0 },
 ): SnapCandidate[] {
     const candidates: SnapCandidate[] = entities
         .filter((e) => excludeEntityId === undefined || e.id !== excludeEntityId)
         .flatMap((e) =>
-            snappablePointIndices(e.type, e.params).map((pointIndex) => {
-                const ref = { entityId: e.id, pointIndex };
-                return { ref, position: solver.pointOf(ref) };
-            }),
+            snappablePointIndices(e.type, e.params)
+                .filter((index) =>
+                    allows(
+                        options,
+                        (e.type === "circle" || e.type === "arc") && index === 0
+                            ? ObjectSnapTypes.center
+                            : ObjectSnapTypes.endPoint,
+                    ),
+                )
+                .map((pointIndex) => {
+                    const ref = { entityId: e.id, pointIndex };
+                    return { ref, position: solver.pointOf(ref) };
+                }),
         );
-    candidates.push({ ref: originRef(), position: [0, 0] });
+    if (allows(options, ObjectSnapTypes.endPoint)) candidates.push({ ref: originRef(), position: [0, 0] });
     return candidates;
 }
 
@@ -494,6 +673,7 @@ function nearestPointSnap(
     target: [number, number],
     excludeEntityIds: ReadonlySet<number> | undefined,
     tolerance: number,
+    options: AutoConstraintOptions,
 ): SnapCandidate | undefined {
     const excluded = new Set(solver.coincidentGroup(ref).map(pointRefKey));
     excluded.add(pointRefKey(ref));
@@ -502,12 +682,21 @@ function nearestPointSnap(
     for (const entity of entities) {
         if (excludeEntityIds?.has(entity.id)) continue;
         for (const pointIndex of snappablePointIndices(entity.type, entity.params)) {
+            if (
+                !allows(
+                    options,
+                    (entity.type === "circle" || entity.type === "arc") && pointIndex === 0
+                        ? ObjectSnapTypes.center
+                        : ObjectSnapTypes.endPoint,
+                )
+            )
+                continue;
             const candidateRef = { entityId: entity.id, pointIndex };
             if (excluded.has(pointRefKey(candidateRef))) continue;
             candidates.push({ ref: candidateRef, position: solver.pointOf(candidateRef) });
         }
     }
-    candidates.push({ ref: originRef(), position: [0, 0] });
+    if (allows(options, ObjectSnapTypes.endPoint)) candidates.push({ ref: originRef(), position: [0, 0] });
     return nearestCandidate(candidates, target, tolerance);
 }
 
@@ -517,6 +706,32 @@ interface LineSnap {
     distance: number;
 }
 
+function nearestMidpointSnap(
+    solver: SketchSolver,
+    entities: SketchEntityData[],
+    excluded: ReadonlySet<number> | undefined,
+    probe: [number, number],
+    tolerance: number,
+): DragSnap | undefined {
+    let nearest: DragSnap | undefined;
+    for (const entity of entities) {
+        if (entity.type !== "line" || excluded?.has(entity.id)) continue;
+        const refs: [SketchPointRef, SketchPointRef] = [
+            { entityId: entity.id, pointIndex: 0 },
+            { entityId: entity.id, pointIndex: 1 },
+        ];
+        const a = solver.pointOf(refs[0]),
+            b = solver.pointOf(refs[1]);
+        const position: [number, number] = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+        const distance = Math.hypot(position[0] - probe[0], position[1] - probe[1]);
+        if (distance < tolerance) {
+            tolerance = distance;
+            nearest = { kind: "midpoint", lineRefs: refs, position };
+        }
+    }
+    return nearest;
+}
+
 /** Closest line or datum axis within `tolerance` of the probe, real lines winning ties. */
 function nearestLineOrAxisSnap(
     solver: SketchSolver,
@@ -524,9 +739,12 @@ function nearestLineOrAxisSnap(
     excludeEntityIds: ReadonlySet<number> | undefined,
     probe: [number, number],
     tolerance: number,
+    options: AutoConstraintOptions,
 ): LineSnap | undefined {
-    const line = nearestLineSnap(solver, entities, excludeEntityIds, probe, tolerance);
-    const axis = nearestAxisSnap(probe, tolerance);
+    const line = allows(options, ObjectSnapTypes.onCurve)
+        ? nearestLineSnap(solver, entities, excludeEntityIds, probe, tolerance)
+        : undefined;
+    const axis = options.inferAxes === false ? undefined : nearestAxisSnap(probe, tolerance);
     if (axis === undefined) return line;
     if (line === undefined) return axis;
     return line.distance <= axis.distance ? line : axis;
@@ -625,7 +843,9 @@ function alignToAxis(
     [p1, p2]: [SketchPointRef, SketchPointRef],
     angleToleranceDeg: number,
     added: Omit<SketchConstraintData, "id">[],
+    pixelAperture = Number.POSITIVE_INFINITY,
 ): void {
+    if (angleToleranceDeg <= 0) return;
     const kinds = solver.constraintKindsOn(p1.entityId);
     if (kinds.includes(ConstraintKind.Horizontal) || kinds.includes(ConstraintKind.Vertical)) return;
 
@@ -637,10 +857,11 @@ function alignToAxis(
     if (length < Precision.Distance) return;
 
     const sine = Math.sin((angleToleranceDeg * Math.PI) / 180);
+    const aperture = Math.min(pixelAperture, length * sine);
     const kind =
-        Math.abs(dy) <= length * sine
+        Math.abs(dy) <= aperture
             ? ConstraintKind.Horizontal
-            : Math.abs(dx) <= length * sine
+            : Math.abs(dx) <= aperture
               ? ConstraintKind.Vertical
               : undefined;
     if (kind === undefined) return;

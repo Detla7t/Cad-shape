@@ -24,7 +24,19 @@ export async function loadPdf(bytes: Uint8Array): Promise<LoadedPdf> {
         pdfjs.GlobalWorkerOptions.workerPort = createPdfWorker();
         workerReady = true;
     }
-    const task = pdfjs.getDocument({ data: bytes.slice(), enableXfa: false });
+    // These support files are vendored alongside the app. Resolve against the page,
+    // not the worker chunk, so deployments under a subdirectory also work offline.
+    const assets = new URL("vendor/pdfjs/", document.baseURI).href;
+    const task = pdfjs.getDocument({
+        data: bytes.slice(),
+        enableXfa: false,
+        cMapUrl: `${assets}cmaps/`,
+        cMapPacked: true,
+        standardFontDataUrl: `${assets}standard_fonts/`,
+        wasmUrl: `${assets}wasm/`,
+        iccUrl: `${assets}iccs/`,
+        useSystemFonts: false,
+    });
     return { pdf: await task.promise, destroy: () => task.destroy() };
 }
 

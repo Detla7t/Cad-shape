@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import type { RspackOptions } from "@rspack/core";
 import rspack from "@rspack/core";
-import { TsCheckerRspackPlugin } from "ts-checker-rspack-plugin";
+import { TypecheckPlugin } from "../scripts/typecheck-plugin.mjs";
 
 const __dirname = import.meta.dirname;
 const rootDir = resolve(__dirname, "..");
@@ -33,6 +33,7 @@ export function commonRspackOptions(overrides?: RspackOptions): RspackOptions {
                 },
             },
             rules: [
+                { resourceQuery: /raw$/, type: "asset/source" },
                 {
                     test: /\.css$/,
                     type: "css/auto",
@@ -51,6 +52,7 @@ export function commonRspackOptions(overrides?: RspackOptions): RspackOptions {
                 },
                 {
                     test: /\.(j|t)s$/,
+                    resourceQuery: { not: [/raw$/] },
                     loader: "builtin:swc-loader",
                     options: {
                         jsc: {
@@ -87,11 +89,7 @@ export function commonRspackOptions(overrides?: RspackOptions): RspackOptions {
             workerChunkLoading: "import",
         },
         plugins: [
-            new TsCheckerRspackPlugin({
-                typescript: {
-                    configFile: tsconfigPath,
-                },
-            }),
+            new TypecheckPlugin(rootDir),
             new rspack.CircularDependencyRspackPlugin({
                 failOnError: true,
                 exclude: /node_modules/,

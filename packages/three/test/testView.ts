@@ -83,8 +83,7 @@ export class TestView extends ThreeView {
         if (options?.setDom !== false) {
             this.setDom(container);
         }
-        this.camera.position.set(0, 0, 100);
-        this.camera.lookAt(0, 0, 0);
+        this.cameraController.lookAt({ x: 0, y: 0, z: 100 }, { x: 0, y: 0, z: 0 }, { x: 0, y: 1, z: 0 });
     }
 
     protected override renderEffects() {}

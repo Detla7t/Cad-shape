@@ -5,17 +5,23 @@ import {
     type AsyncController,
     type IDocument,
     type IView,
+    MeshDataUtils,
     type MessageType,
     PointSnapEventHandler,
     type ShapeType,
     type SnapResult,
 } from "@chili3d/core";
-import { type DragSnap, snapConstraintKind, snapPosition } from "../autoConstraints";
+import { type DragSnap, sketchSnapOptions, snapConstraintKind, snapPosition } from "../autoConstraints";
 import { applyConstraintIcon, badgeSymbol } from "../editor/sketchAnnotations";
 import style from "../editor/sketchAnnotations.module.css";
 import { SketchEditor } from "../editor/sketchEditor";
 import { type ConstraintKind, toUV, toWorld } from "../sketchModel";
 import type { SketchPointSnapData } from "./sketchPointStep";
+
+export interface SketchPointSnapResult extends SnapResult {
+    sketchSnap?: DragSnap;
+    suppressInference?: boolean;
+}
 
 /**
  * Point-snap handler for sketch drawing: snaps the cursor onto sketch targets
@@ -29,6 +35,7 @@ export class SketchPointSnapEventHandler extends PointSnapEventHandler {
     private sketchSnap?: DragSnap;
     /** Tangency the probe's entity would get: shown in place of the snap's own icon. */
     private sketchTangentKind?: ConstraintKind;
+    private guide?: number;
 
     constructor(
         document: IDocument,
@@ -40,6 +47,9 @@ export class SketchPointSnapEventHandler extends PointSnapEventHandler {
 
     protected override findSnapPoint(shapeType: ShapeType, view: IView, event: PointerEvent): void {
         const editor = SketchEditor.getActive();
+        this.clearGuide();
+        editor?.showDrawingSnap();
+        this.sketchSnap = undefined;
         const hit = editor?.node.plane.intersectRay(view.rayAt(event.offsetX, event.offsetY));
         if (editor === undefined || hit === undefined) {
             this.sketchTangentKind = undefined;
@@ -49,31 +59,65 @@ export class SketchPointSnapEventHandler extends PointSnapEventHandler {
 
         const probe = toUV(editor.node.plane, hit);
         const tolerance = editor.screenTolerance();
-        const { position, snap, tangentKind } = snapPosition(
+        const { position, snap, tangentKind, alignmentKind } = snapPosition(
             editor.solver,
             probe,
-            { pointTolerance: tolerance, lineTolerance: tolerance },
+            sketchSnapOptions(tolerance, event.shiftKey),
             (snapped) => this.sketchData.tentative?.(snapped),
         );
-        // no snap under the cursor is still worth a tangency hint: the core snap
-        // carries the prompt, and the entity comes out tangent all the same
-        if (snap === undefined) {
-            this.sketchTangentKind = tangentKind;
-            this.fallbackToCoreSnap(shapeType, view, event);
-            return;
-        }
-
         const point = toWorld(editor.node.plane, position[0], position[1]);
         // honour the step's validator (e.g. a circle radius point must not land on its center)
         if (this.data.validator !== undefined && !this.data.validator(point)) {
             this.sketchTangentKind = undefined;
-            this.fallbackToCoreSnap(shapeType, view, event);
+            this._snaped = undefined;
             return;
         }
 
         this.sketchSnap = snap;
-        this.sketchTangentKind = tangentKind;
-        this._snaped = { view, point, info: "", shapes: [], type: "feature" };
+        this.sketchTangentKind = tangentKind ?? alignmentKind;
+        const result: SketchPointSnapResult = {
+            view,
+            point,
+            info: "",
+            shapes: [],
+            type: "feature",
+            sketchSnap: snap,
+            suppressInference: event.shiftKey,
+        };
+        this._snaped = result;
+        editor.showDrawingSnap(snap);
+        this.clearGuide();
+        const tentative = this.sketchData.tentative?.(position);
+        if (alignmentKind && tentative?.type === "line") {
+            this.guide = this.document.visual.context.displayMesh(
+                [
+                    MeshDataUtils.createEdgeMesh(
+                        toWorld(editor.node.plane, tentative.params[0], tentative.params[1]),
+                        point,
+                        0xff9800,
+                        "dash",
+                    ),
+                ],
+                { onTop: true },
+            );
+        }
+    }
+
+    override pointerDown(view: IView, event: PointerEvent): void {
+        // A click can arrive without a preceding move (touch, or a newly activated tool).
+        this.findSnapPoint(0 as ShapeType, view, event);
+        super.pointerDown(view, event);
+    }
+
+    override dispose(): void {
+        SketchEditor.getActive()?.showDrawingSnap();
+        this.clearGuide();
+        super.dispose();
+    }
+
+    private clearGuide() {
+        if (this.guide !== undefined) this.document.visual.context.removeMesh(this.guide);
+        this.guide = undefined;
     }
 
     private fallbackToCoreSnap(shapeType: ShapeType, view: IView, event: PointerEvent): void {

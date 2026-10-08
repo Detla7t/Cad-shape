@@ -82,7 +82,7 @@ describe("Statusbar", () => {
             const bar = new Statusbar("test-bar");
             const left = mustQuery(bar, ".sb-left");
             expect(left.contains(bar.tip)).toBe(true);
-            mustQuery(bar, ".sb-right");
+            expect(bar.querySelector("chili-snap-config")).toBeNull();
         });
 
         test("should subscribe to statusBarTip and clearStatusBarTip", () => {

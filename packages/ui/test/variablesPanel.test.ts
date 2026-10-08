@@ -1,7 +1,13 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type FloatPanelOptions, PubSub, type VariableData, type VariableType } from "@chili3d/core";
+import {
+    type FloatPanelOptions,
+    PubSub,
+    setDocumentUnits,
+    type VariableData,
+    type VariableType,
+} from "@chili3d/core";
 import { TestDocument } from "@chili3d/core/test-utils";
 import { afterEach, describe, expect, rs, test } from "@rstest/core";
 import { mustQuery } from "./_helpers/domHelpers";
@@ -155,15 +161,15 @@ describe("showVariablesPanel", () => {
         const width = mustQuery<HTMLInputElement>(rows[0], ".v-value");
         const height = mustQuery<HTMLInputElement>(rows[1], ".v-value");
         const angle = mustQuery<HTMLInputElement>(rows[2], ".v-value");
-        expect(width.value).toBe("50");
-        expect(height.value).toBe("25");
-        expect(angle.value).toBe("45");
+        expect(width.value).toBe("50.00 mm");
+        expect(height.value).toBe("25.00 mm");
+        expect(angle.value).toBe("45.0°");
         // The cell shows what the expression came to; hovering reveals the expression itself.
         expect(height.title).toBe("w / 2");
 
         // Focused, the same box shows what to edit rather than what it came to.
         (width as any)._onfocus({ target: width });
-        expect(width.value).toBe("50");
+        expect(width.value).toBe("50 mm");
     });
 
     test("re-focusing a value offers the current expression, not the row's snapshot", () => {
@@ -180,6 +186,28 @@ describe("showVariablesPanel", () => {
         (box as any)._onfocus({ target: box });
 
         expect(box.value).toBe("w * 2");
+    });
+
+    test("unit changes convert values and precision without altering expressions or geometry", () => {
+        const model = documentWith([
+            variable("v1", "width", "25.4 mm"),
+            variable("v2", "angle", "180 deg", "angle"),
+            variable("v3", "count", "3", "unitless"),
+        ]);
+        const { editor } = open(model);
+        const values = [...editor.querySelectorAll<HTMLInputElement>(".v-value")];
+        expect(values.map((c) => c.value)).toEqual(["25.40 mm", "180.0°", "3"]);
+        setDocumentUnits(model, { length: "in", angle: "rad", lengthPrecision: 3, anglePrecision: 4 });
+        expect(values.map((c) => c.value)).toEqual(["1.000 in", "3.1416 rad", "3"]);
+        expect(model.variables.items.map((v) => v.expression)).toEqual(["25.4 mm", "180 deg", "3"]);
+        (values[0] as any)._onfocus({ target: values[0] });
+        values[0].value = "2";
+        (values[0] as any)._onblur({ target: values[0] });
+        expect(model.variables.evaluate().values.get("v1")?.value).toBeCloseTo(50.8, 8);
+        expect(values[0].value).toBe("2.000 in");
+        setDocumentUnits(model, { length: "mm", angle: "deg", lengthPrecision: 1, anglePrecision: 1 });
+        expect(values[0].value).toBe("50.8 mm");
+        editor.dispose();
     });
 
     test("an undo behind the panel's back rebuilds the rows from the table", async () => {

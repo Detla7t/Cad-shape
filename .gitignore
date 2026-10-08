@@ -9,3 +9,5 @@ CMakeUserPresets.json
 types
 # Rust build output (the wasm module is checked in under packages/rs/lib)
 rust/target/
+# Reusable offline dependency cache (platform-specific; do not commit npm tarballs).
+.offline/

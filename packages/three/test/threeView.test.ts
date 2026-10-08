@@ -27,7 +27,7 @@ import {
     type Mesh,
     MeshBasicMaterial,
     OrthographicCamera,
-    PerspectiveCamera,
+    type PerspectiveCamera,
     Raycaster,
     Scene,
 } from "three";
@@ -88,9 +88,9 @@ describe("ThreeView — construction", () => {
         expect(view.mode).toBe("solidAndWireframe");
     });
 
-    test("camera is PerspectiveCamera by default", () => {
+    test("camera is OrthographicCamera by default", () => {
         const { view } = createTestView();
-        expect(view.camera).toBeInstanceOf(PerspectiveCamera);
+        expect(view.camera).toBeInstanceOf(OrthographicCamera);
     });
 
     test("name property getter returns constructor value", () => {
@@ -246,6 +246,7 @@ describe("ThreeView — screenToCameraRect", () => {
 describe("ThreeView — worldToScreen / screenToWorld", () => {
     test("screenToWorld of the viewport center lies on the view axis", () => {
         const { view } = createTestView();
+        view.cameraController.cameraType = "perspective";
         // The renderer never runs in tests, so flush the camera transform manually
         view.camera.updateMatrixWorld();
         const world = view.screenToWorld(50, 50);
@@ -342,6 +343,7 @@ describe("ThreeView — update", () => {
 describe("ThreeView — resize", () => {
     test("resize with near-zero height returns early without touching the camera", () => {
         const { view } = createTestView();
+        view.cameraController.cameraType = "perspective";
         view.resize(800, 600);
         const cam = view.camera as PerspectiveCamera;
         expect(cam.aspect).toBeCloseTo(800 / 600);
@@ -352,6 +354,7 @@ describe("ThreeView — resize", () => {
 
     test("resize with valid dimensions updates the camera aspect", () => {
         const { view } = createTestView();
+        view.cameraController.cameraType = "perspective";
         view.resize(800, 600);
         const cam = view.camera as PerspectiveCamera;
         expect(cam.aspect).toBeCloseTo(800 / 600);
@@ -363,7 +366,7 @@ describe("ThreeView — resize", () => {
         view.resize(1024, 768);
 
         const cam = view.camera as OrthographicCamera;
-        const halfHeight = Math.sqrt(3 * 1500 * 1500) * Math.tan((22.5 * Math.PI) / 180);
+        const halfHeight = 100 * Math.tan((22.5 * Math.PI) / 180);
         expect(cam.top).toBeCloseTo(halfHeight);
         expect(cam.bottom).toBeCloseTo(-halfHeight);
         expect(cam.right / cam.top).toBeCloseTo(1024 / 768);
@@ -935,6 +938,7 @@ describe("ThreeView — resize edge cases", () => {
 
     test("resize with large dimensions", () => {
         const { view } = createTestView();
+        view.cameraController.cameraType = "perspective";
         view.resize(3840, 2160);
         const cam = view.camera as PerspectiveCamera;
         expect(cam.aspect).toBeCloseTo(3840 / 2160);
@@ -942,6 +946,7 @@ describe("ThreeView — resize edge cases", () => {
 
     test("multiple resizes update camera correctly", () => {
         const { view } = createTestView();
+        view.cameraController.cameraType = "perspective";
         view.resize(800, 600);
         let cam = view.camera as PerspectiveCamera;
         expect(cam.aspect).toBeCloseTo(800 / 600);
@@ -1246,6 +1251,7 @@ describe("ThreeView — resize with orthographic camera", () => {
 
     test("resize with negative height returns early without touching the camera", () => {
         const { view } = createTestView();
+        view.cameraController.cameraType = "perspective";
         view.resize(800, 600);
         const cam = view.camera as PerspectiveCamera;
         expect(cam.aspect).toBeCloseTo(800 / 600);

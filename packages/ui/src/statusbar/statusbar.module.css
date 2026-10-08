@@ -5,15 +5,25 @@
     flex-direction: row;
     align-items: center;
     padding: 0 8px;
+    min-width: 0;
+    overflow: hidden;
+    height: 26px;
+    flex-shrink: 0;
 }
 
 .left {
     flex: 1;
+    min-width: 0;
+    overflow: hidden;
 
     .tip {
         font-size: 12px;
         margin: 4px 8px;
         color: var(--statusbar-foreground-color);
+        display: block;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 }
 

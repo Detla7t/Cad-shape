@@ -462,7 +462,7 @@ describe("ThreeView detect — rectangle selection", () => {
         const atEmpty = view.detectVisualRect(empty.x - 5, empty.y - 5, empty.x + 5, empty.y + 5);
         expect(atEmpty.length).toBe(0);
 
-        const filtered = view.detectVisualRect(center.x - 10, center.y - 10, center.x + 10, center.y + 10, {
+        const filtered = view.detectVisualRect(center.x - 12, center.y - 12, center.x + 12, center.y + 12, {
             allow: (node) => node !== near,
         });
         expect(filtered.length).toBe(1);
@@ -495,7 +495,7 @@ describe("ThreeView detect — rectangle selection", () => {
 
     test("detectShapesRect applies shapeFilter and nodeFilter on the whole-shape path", () => {
         const { view, near, far, center } = createSceneWithPanels();
-        const rect = [center.x - 10, center.y - 10, center.x + 10, center.y + 10] as const;
+        const rect = [center.x - 12, center.y - 12, center.x + 12, center.y + 12] as const;
 
         const shapeFiltered = view.detectShapesRect(ShapeTypes.shape, ...rect, {
             allow: (shape) => shape !== near.panel,

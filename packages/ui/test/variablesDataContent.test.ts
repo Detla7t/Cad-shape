@@ -25,7 +25,7 @@ describe("VariablesDataContent", () => {
 
         content.setField("v1", "expression", "60");
 
-        expect(document.variables.items[0].expression).toBe("60");
+        expect(document.variables.items[0].expression).toBe("60 mm");
         expect(document.history.undoCount()).toBe(1);
         expect(onApplied).toHaveBeenCalledTimes(1);
     });
@@ -123,7 +123,7 @@ describe("VariablesDataContent bound to a Variable Studio", () => {
 
         content.setField("s1", "expression", "50");
 
-        expect(studio.items[0].expression).toBe("50");
+        expect(studio.items[0].expression).toBe("50 mm");
         expect(document.variables.items).toEqual([]);
         expect(document.history.undoCount()).toBe(undoBefore + 1);
         expect(onApplied).toHaveBeenCalledTimes(1);

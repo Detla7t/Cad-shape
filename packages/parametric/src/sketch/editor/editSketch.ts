@@ -2,14 +2,20 @@
 // See LICENSE file in the project root for full license information.
 
 import type { SketchData } from "../sketchModel";
+import type { SketchSolver } from "../solver";
 import type { SketchEditor } from "./sketchEditor";
 
-export function editSketch(editor: SketchEditor, run: (data: SketchData) => void) {
+export function editSketch(
+    editor: SketchEditor,
+    run: (data: SketchData) => void,
+    constrain?: (solver: SketchSolver) => void,
+) {
     const before = editor.solver.toData(),
         data = structuredClone(before);
     run(data);
     try {
         editor.solver.reset(data);
+        constrain?.(editor.solver);
         const solved = editor.solve(true);
         if (!solved.result.startsWith("Ok")) {
             throw new Error(

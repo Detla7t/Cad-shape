@@ -5,18 +5,20 @@ import {
     AsyncController,
     type CommandKeys,
     command,
+    Dimensions,
     type IEdge,
     PubSub,
     ShapeNode,
     ShapeTypes,
 } from "@chili3d/core";
 import { arcThroughPoints } from "../../drawing/drawing";
+import { type AutoConstraintOptions, applyAutoConstraints, sketchSnapOptions } from "../autoConstraints";
 import type { UV } from "../curveGeometry";
 import { editSketch } from "../editor/editSketch";
 import type { SketchEditor } from "../editor/sketchEditor";
 import { entityDisplayMesh } from "../entityMesh";
 import { captureExternalRef } from "../externalRef";
-import { ConstraintKind, type SketchData, type SketchEntityData } from "../sketchModel";
+import { ConstraintKind, type SketchData, type SketchEntityData, toUV } from "../sketchModel";
 import { offsetSketchEntities } from "../sketchOffset";
 import {
     appendEntity,
@@ -26,9 +28,12 @@ import {
     transformedConstraint,
     trimOrSplit,
 } from "../sketchOperations";
+import type { SketchSolver } from "../solver";
 import { tangentConstraintFor } from "../solverEntities";
 import { appendText } from "../textGeometry";
 import { SketchConstraintCommand } from "./sketchConstraints";
+import type { SketchPointSnapResult } from "./sketchPointSnapEventHandler";
+import { type SketchPointSnapData, SketchPointStep } from "./sketchPointStep";
 import { sketchToolInput } from "./sketchToolInput";
 
 function connectedLoop(data: SketchData, points: UV[]) {
@@ -74,41 +79,66 @@ for (const [operation, title] of Object.entries(registrations)) {
     class Tool extends SketchConstraintCommand {
         protected async executeWithEditor(editor: SketchEditor): Promise<void> {
             this.controller = new AsyncController();
-            const input = (fields: Record<string, string | number>) =>
-                sketchToolInput(editor.view, title, fields, this.controller);
+            const input = (
+                fields: Record<string, string | number>,
+                update?: (data: SketchData, values: Record<string, string>) => void,
+            ) =>
+                sketchToolInput(
+                    editor.view,
+                    title,
+                    fields,
+                    this.controller,
+                    update
+                        ? (values) => {
+                              clear();
+                              if (!values) return;
+                              const data = editor.solver.toData();
+                              const before = new Map(data.entities.map((e) => [e.id, JSON.stringify(e)]));
+                              try {
+                                  update(data, values);
+                                  const meshes = data.entities
+                                      .filter((e) => before.get(e.id) !== JSON.stringify(e))
+                                      .map((e) => entityDisplayMesh(editor.node.plane, e, 0xff9800));
+                                  if (meshes.length)
+                                      preview = editor.document.visual.context.displayMesh(meshes, {
+                                          onTop: true,
+                                      });
+                              } catch {
+                                  /* Invalid parameter combinations have no preview. The apply path reports errors. */
+                              }
+                              editor.view.update();
+                          }
+                        : undefined,
+                );
             let preview: number | undefined;
             const clear = () => {
                 if (preview !== undefined) editor.document.visual.context.removeMesh(preview);
                 preview = undefined;
             };
+            let suppressInference = false;
+            let sides = 6,
+                width = 10;
             const point = async (points: UV[] = []): Promise<UV | undefined> => {
                 this.controller = new AsyncController();
-                return editor.pickPosition(
+                const result = (await new SketchPointStep(
                     "prompt.pickSketchPoint",
-                    (uv) => {
-                        clear();
-                        if (!uv || !points.length) return;
-                        const meshes = points
-                            .slice(1)
-                            .map((p, i) =>
-                                entityDisplayMesh(
-                                    editor.node.plane,
-                                    { id: 0, type: "line", params: [...points[i], ...p] },
-                                    0xffbd35,
-                                ),
+                    (): SketchPointSnapData => ({
+                        dimension: Dimensions.D1D2D3,
+                        plane: () => editor.node.plane,
+                        tentative: (probe) =>
+                            operation === "midpointLine" && points.length
+                                ? { type: "line", params: [...points[0], ...probe] }
+                                : undefined,
+                        preview: (world) => {
+                            const uv = world ? toUV(editor.node.plane, world) : undefined;
+                            return primitivePreview(operation, points, uv, sides, width).map((e) =>
+                                entityDisplayMesh(editor.node.plane, e, 0xff9800),
                             );
-                        meshes.push(
-                            entityDisplayMesh(
-                                editor.node.plane,
-                                { id: 0, type: "line", params: [...points[points.length - 1], ...uv] },
-                                0xffbd35,
-                            ),
-                        );
-                        preview = editor.document.visual.context.displayMesh(meshes, { onTop: true });
-                        editor.view.update();
-                    },
-                    this.controller,
-                );
+                        },
+                    }),
+                ).execute(editor.document, this.controller)) as SketchPointSnapResult | undefined;
+                suppressInference ||= !!result?.suppressInference;
+                return result?.point ? toUV(editor.node.plane, result.point) : undefined;
             };
             const entity = async (type?: "line" | "circle" | "arc") => {
                 this.controller = new AsyncController();
@@ -211,15 +241,13 @@ for (const [operation, title] of Object.entries(registrations)) {
                     ].includes(operation)
                 ) {
                     let count =
-                            operation === "point"
-                                ? 1
-                                : operation === "bezier"
-                                  ? 4
-                                  : ["alignedRectangle", "arc3Point"].includes(operation)
-                                    ? 3
-                                    : 2,
-                        sides = 6,
-                        width = 10;
+                        operation === "point"
+                            ? 1
+                            : operation === "bezier"
+                              ? 4
+                              : ["alignedRectangle", "arc3Point"].includes(operation)
+                                ? 3
+                                : 2;
                     if (operation.includes("Polygon") || operation === "polygon") {
                         const v = await input({ Sides: 6 });
                         if (!v) return;
@@ -245,77 +273,23 @@ for (const [operation, title] of Object.entries(registrations)) {
                         points.push(p);
                     }
                     clear();
-                    editSketch(editor, (d) => {
-                        const a = points[0],
-                            b = points[1],
-                            dx = b?.[0] - a[0],
-                            dy = b?.[1] - a[1];
-                        if (operation === "point") appendEntity(d, "point", a, { construction: true });
-                        if (operation === "bezier" || operation === "spline")
-                            appendEntity(d, operation, points.flat());
-                        if (operation === "midpointLine")
-                            appendEntity(d, "line", [a[0] - dx, a[1] - dy, ...b]);
-                        if (operation === "centerRectangle")
-                            connectedLoop(d, [
-                                [a[0] - dx, a[1] - dy],
-                                [a[0] + dx, a[1] - dy],
-                                b,
-                                [a[0] - dx, a[1] + dy],
-                            ]);
-                        if (operation === "alignedRectangle") {
-                            const len = distance(a, b);
-                            if (len < 1e-8) throw new Error("Pick distinct corners.");
-                            const h =
-                                ((points[2][0] - a[0]) * -dy + (points[2][1] - a[1]) * dx) / (len * len);
-                            connectedLoop(d, [
-                                a,
-                                b,
-                                [b[0] - dy * h, b[1] + dx * h],
-                                [a[0] - dy * h, a[1] + dx * h],
-                            ]);
-                        }
-                        if (operation === "polygon" || operation === "circumscribedPolygon") {
-                            const r =
-                                    distance(a, b) /
-                                    (operation === "polygon" ? 1 : Math.cos(Math.PI / sides)),
-                                angle = Math.atan2(dy, dx) + (operation === "polygon" ? 0 : Math.PI / sides);
-                            connectedLoop(
-                                d,
-                                Array.from({ length: sides }, (_, i) => [
-                                    a[0] + r * Math.cos(angle + (i * 2 * Math.PI) / sides),
-                                    a[1] + r * Math.sin(angle + (i * 2 * Math.PI) / sides),
-                                ]),
+                    const oldIds = new Set(editor.solver.entities().map((e) => e.id));
+                    editSketch(
+                        editor,
+                        (d) => appendSketchPrimitive(d, operation, points, sides, width),
+                        (solver) => {
+                            const ids = solver
+                                .entities()
+                                .filter((e) => !oldIds.has(e.id))
+                                .map((e) => e.id);
+                            constrainSketchPrimitive(
+                                solver,
+                                operation,
+                                ids,
+                                sketchSnapOptions(editor.screenTolerance(), suppressInference),
                             );
-                        }
-                        if (operation === "arc3Point") {
-                            const arc = arcThroughPoints("0", a, points[1], points[2]);
-                            if (!arc) throw new Error("Arc points are collinear.");
-                            const start = (arc.startAngle * Math.PI) / 180,
-                                end = (arc.endAngle * Math.PI) / 180,
-                                c = arc.center;
-                            appendEntity(d, "arc", [
-                                ...c,
-                                c[0] + arc.radius * Math.cos(start),
-                                c[1] + arc.radius * Math.sin(start),
-                                c[0] + arc.radius * Math.cos(end),
-                                c[1] + arc.radius * Math.sin(end),
-                            ]);
-                        }
-                        if (operation === "slot") {
-                            const len = distance(a, b);
-                            if (len < 1e-8) throw new Error("Pick distinct slot centers.");
-                            const nx = ((-dy / len) * width) / 2,
-                                ny = ((dx / len) * width) / 2,
-                                p: UV = [a[0] + nx, a[1] + ny],
-                                q: UV = [b[0] + nx, b[1] + ny],
-                                r: UV = [b[0] - nx, b[1] - ny],
-                                s: UV = [a[0] - nx, a[1] - ny];
-                            appendEntity(d, "line", [...p, ...q]);
-                            appendEntity(d, "line", [...r, ...s]);
-                            appendEntity(d, "arc", [...b, ...r, ...q]);
-                            appendEntity(d, "arc", [...a, ...p, ...s]);
-                        }
-                    });
+                        },
+                    );
                     return;
                 }
                 if (operation === "splinePoint") {
@@ -342,7 +316,9 @@ for (const [operation, title] of Object.entries(registrations)) {
                 }
                 editor.clearPreselection();
                 if (operation === "offset") {
-                    const v = await input({ "Offset (mm)": 5 });
+                    const v = await input({ "Offset (mm)": 5 }, (d, v) =>
+                        offsetSketchEntities(d, ids, Number(v["Offset (mm)"]), editor.node.plane),
+                    );
                     if (!v) return;
                     const offset = Number(v["Offset (mm)"]);
                     editSketch(editor, (d) => offsetSketchEntities(d, ids, offset, editor.node.plane));
@@ -372,28 +348,32 @@ for (const [operation, title] of Object.entries(registrations)) {
                     return;
                 }
                 if (operation === "linearPattern") {
-                    const v = await input({ Instances: 3, "X spacing (mm)": 20, "Y spacing (mm)": 0 });
-                    if (!v) return;
-                    const n = Math.round(Number(v["Instances"]));
-                    if (n < 2 || n > 200) throw new Error("Choose 2–200 instances.");
-                    editSketch(editor, (d) => {
+                    const update = (d: SketchData, v: Record<string, string>) => {
+                        const n = Math.round(Number(v["Instances"]));
+                        if (n < 2 || n > 200) throw new Error("Choose 2–200 instances.");
                         for (let i = 1; i < n; i++)
                             copyEntities(d, ids, (p) => [
                                 p[0] + i * Number(v["X spacing (mm)"]),
                                 p[1] + i * Number(v["Y spacing (mm)"]),
                             ]);
-                    });
+                    };
+                    const v = await input(
+                        { Instances: 3, "X spacing (mm)": 20, "Y spacing (mm)": 0 },
+                        update,
+                    );
+                    if (!v) return;
+                    const n = Math.round(Number(v["Instances"]));
+                    if (n < 2 || n > 200) throw new Error("Choose 2–200 instances.");
+                    editSketch(editor, (d) => update(d, v));
                     return;
                 }
                 if (operation === "circularPattern") {
                     const center = await point();
                     if (!center) return;
-                    const v = await input({ Instances: 4, "Sweep (deg)": 360 });
-                    if (!v) return;
-                    const n = Math.round(Number(v["Instances"])),
-                        sweep = (Number(v["Sweep (deg)"]) * Math.PI) / 180;
-                    if (n < 2 || n > 200) throw new Error("Choose 2–200 instances.");
-                    editSketch(editor, (d) => {
+                    const update = (d: SketchData, v: Record<string, string>) => {
+                        const n = Math.round(Number(v["Instances"])),
+                            sweep = (Number(v["Sweep (deg)"]) * Math.PI) / 180;
+                        if (n < 2 || n > 200) throw new Error("Choose 2–200 instances.");
                         for (let i = 1; i < n; i++) {
                             const a = (sweep * i) / (Math.abs(sweep - 2 * Math.PI) < 1e-8 ? n : n - 1);
                             copyEntities(d, ids, (p) => [
@@ -405,16 +385,17 @@ for (const [operation, title] of Object.entries(registrations)) {
                                     (p[1] - center[1]) * Math.cos(a),
                             ]);
                         }
-                    });
+                    };
+                    const v = await input({ Instances: 4, "Sweep (deg)": 360 }, update);
+                    if (!v) return;
+                    editSketch(editor, (d) => update(d, v));
                     return;
                 }
                 if (operation === "transform") {
-                    const v = await input({ "X (mm)": 0, "Y (mm)": 0, "Rotation (deg)": 0, Scale: 1 });
-                    if (!v) return;
-                    const s = Number(v["Scale"]),
-                        a = (Number(v["Rotation (deg)"]) * Math.PI) / 180;
-                    if (s <= 0) throw new Error("Scale must be positive.");
-                    editSketch(editor, (d) => {
+                    const update = (d: SketchData, v: Record<string, string>) => {
+                        const s = Number(v["Scale"]),
+                            a = (Number(v["Rotation (deg)"]) * Math.PI) / 180;
+                        if (s <= 0) throw new Error("Scale must be positive.");
                         const transform = (p: UV): UV => [
                             Number(v["X (mm)"]) + s * (p[0] * Math.cos(a) - p[1] * Math.sin(a)),
                             Number(v["Y (mm)"]) + s * (p[0] * Math.sin(a) + p[1] * Math.cos(a)),
@@ -427,14 +408,23 @@ for (const [operation, title] of Object.entries(registrations)) {
                         d.entities = d.entities.map((e) =>
                             ids.includes(e.id) ? transformEntity(e, transform, s) : e,
                         );
-                    });
+                    };
+                    const v = await input(
+                        { "X (mm)": 0, "Y (mm)": 0, "Rotation (deg)": 0, Scale: 1 },
+                        update,
+                    );
+                    if (!v) return;
+                    editSketch(editor, (d) => update(d, v));
                     return;
                 }
                 if (operation === "fillet" || operation === "chamfer") {
                     const a = ids[0],
                         b = ids[1] ?? (await entity("line"));
                     if (b === undefined) return;
-                    const v = await input({ [operation === "fillet" ? "Radius (mm)" : "Distance (mm)"]: 5 });
+                    const v = await input(
+                        { [operation === "fillet" ? "Radius (mm)" : "Distance (mm)"]: 5 },
+                        (d, v) => roundCorner(d, a, b, Number(Object.values(v)[0]), operation === "fillet"),
+                    );
                     if (!v) return;
                     const amount = Number(Object.values(v)[0]);
                     if (amount <= 0) throw new Error("Size must be positive.");
@@ -452,6 +442,23 @@ for (const [operation, title] of Object.entries(registrations)) {
     }
     command({ key: `sketch.${operation}` as CommandKeys, icon: "icon-sketchNew" })(Tool);
 }
+/** Infer only the picked half of a midpoint line: its other end is derived by symmetry. */
+export function constrainSketchPrimitive(
+    solver: SketchSolver,
+    operation: string,
+    ids: number[],
+    options: AutoConstraintOptions,
+): void {
+    for (const id of ids) {
+        applyAutoConstraints(solver, id, {
+            ...options,
+            excludeEntityIds: ids.filter((other) => other !== id),
+            pointIndices:
+                operation === "midpointLine" && solver.entity(id)?.type === "line" ? [1] : undefined,
+        });
+    }
+}
+
 export function roundCorner(data: SketchData, a: number, b: number, amount: number, fillet: boolean) {
     const first = data.entities.find((e) => e.id === a),
         second = data.entities.find((e) => e.id === b);
@@ -537,4 +544,104 @@ export function roundCorner(data: SketchData, a: number, b: number, amount: numb
         }
         add(ConstraintKind.Radius, [{ entityId: id, pointIndex: 0 }], amount);
     }
+}
+
+/** Shared by live previews and commits, so the finished entity follows the same pick order. */
+export function appendSketchPrimitive(
+    d: SketchData,
+    operation: string,
+    points: UV[],
+    sides = 6,
+    width = 10,
+): void {
+    const a = points[0],
+        b = points[1],
+        dx = b?.[0] - a[0],
+        dy = b?.[1] - a[1];
+    if (operation === "point") appendEntity(d, "point", a, { construction: true });
+    if (operation === "bezier" || operation === "spline") appendEntity(d, operation, points.flat());
+    if (operation === "midpointLine") {
+        const line = appendEntity(d, "line", [a[0] - dx, a[1] - dy, ...b]);
+        const center = appendEntity(d, "point", a, { construction: true });
+        d.constraints.push({
+            id: Math.max(0, ...d.constraints.map((c) => c.id)) + 1,
+            kind: ConstraintKind.Midpoint,
+            refs: [
+                { entityId: center, pointIndex: 0 },
+                { entityId: line, pointIndex: 0 },
+                { entityId: line, pointIndex: 1 },
+            ],
+        });
+    }
+    if (operation === "centerRectangle")
+        connectedLoop(d, [[a[0] - dx, a[1] - dy], [a[0] + dx, a[1] - dy], b, [a[0] - dx, a[1] + dy]]);
+    if (operation === "alignedRectangle") {
+        const len = distance(a, b);
+        if (len < 1e-8) throw new Error("Pick distinct corners.");
+        const h = ((points[2][0] - a[0]) * -dy + (points[2][1] - a[1]) * dx) / (len * len);
+        connectedLoop(d, [a, b, [b[0] - dy * h, b[1] + dx * h], [a[0] - dy * h, a[1] + dx * h]]);
+    }
+    if (operation === "polygon" || operation === "circumscribedPolygon") {
+        const r = distance(a, b) / (operation === "polygon" ? 1 : Math.cos(Math.PI / sides)),
+            angle = Math.atan2(dy, dx) + (operation === "polygon" ? 0 : Math.PI / sides);
+        connectedLoop(
+            d,
+            Array.from({ length: sides }, (_, i) => [
+                a[0] + r * Math.cos(angle + (i * 2 * Math.PI) / sides),
+                a[1] + r * Math.sin(angle + (i * 2 * Math.PI) / sides),
+            ]),
+        );
+    }
+    if (operation === "arc3Point") {
+        const arc = arcThroughPoints("0", a, points[2], points[1]);
+        if (!arc) throw new Error("Arc points are collinear.");
+        const start = (arc.startAngle * Math.PI) / 180,
+            end = (arc.endAngle * Math.PI) / 180,
+            c = arc.center;
+        appendEntity(d, "arc", [
+            ...c,
+            c[0] + arc.radius * Math.cos(start),
+            c[1] + arc.radius * Math.sin(start),
+            c[0] + arc.radius * Math.cos(end),
+            c[1] + arc.radius * Math.sin(end),
+        ]);
+    }
+    if (operation === "slot") {
+        const len = distance(a, b);
+        if (len < 1e-8) throw new Error("Pick distinct slot centers.");
+        const nx = ((-dy / len) * width) / 2,
+            ny = ((dx / len) * width) / 2,
+            p: UV = [a[0] + nx, a[1] + ny],
+            q: UV = [b[0] + nx, b[1] + ny],
+            r: UV = [b[0] - nx, b[1] - ny],
+            s: UV = [a[0] - nx, a[1] - ny];
+        appendEntity(d, "line", [...p, ...q]);
+        appendEntity(d, "line", [...r, ...s]);
+        appendEntity(d, "arc", [...b, ...r, ...q]);
+        appendEntity(d, "arc", [...a, ...p, ...s]);
+    }
+}
+
+export function primitivePreview(
+    operation: string,
+    fixed: UV[],
+    cursor: UV | undefined,
+    sides = 6,
+    width = 10,
+): SketchEntityData[] {
+    const points = cursor ? [...fixed, cursor] : fixed;
+    const data: SketchData = { entities: [], constraints: [] };
+    const needed = ["arc3Point", "alignedRectangle"].includes(operation) ? 3 : operation === "point" ? 1 : 2;
+    if (points.length >= needed) {
+        try {
+            appendSketchPrimitive(data, operation, points, sides, width);
+        } catch {
+            /* Collinear/zero length preview. */
+        }
+    }
+    if (!data.entities.length) {
+        for (let i = 1; i < points.length; i++) appendEntity(data, "line", [...points[i - 1], ...points[i]]);
+    }
+    for (const p of fixed) appendEntity(data, "point", p);
+    return data.entities;
 }

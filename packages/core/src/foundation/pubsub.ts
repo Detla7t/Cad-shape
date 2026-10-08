@@ -22,6 +22,7 @@ export interface PubSubEventMap {
     closeCommandContext: () => void;
     displayError: (message: string) => void;
     displayHome: (show: boolean) => void;
+    openNewDocument: () => void;
     documentClosed: (document: IDocument) => void;
     /** A document and its version history were written to storage (links into it may update). */
     documentSaved: (document: IDocument) => void;
