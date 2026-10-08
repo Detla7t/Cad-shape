@@ -74,6 +74,13 @@
 .configuration {
     height: 100%;
     min-height: 0;
+    box-sizing: border-box;
+    > input {
+        margin: 0 6px;
+    }
+    > .configurationSections {
+        padding: 0 6px;
+    }
 }
 .configurationSections {
     flex: 1;

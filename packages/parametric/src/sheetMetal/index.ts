@@ -7,3 +7,4 @@ export * from "./flatPattern";
 export * from "./model";
 export * from "./treatments";
 import "./commands";
+import "./tablePanel";

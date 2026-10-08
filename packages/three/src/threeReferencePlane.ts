@@ -7,6 +7,7 @@ import {
     CanvasTexture,
     DoubleSide,
     Float32BufferAttribute,
+    FrontSide,
     LineBasicMaterial,
     LineLoop,
     Matrix4,
@@ -34,26 +35,29 @@ export class ThreeReferencePlane extends ThreeVisualObject {
         new PlaneGeometry(1, 1),
         new MeshBasicMaterial({
             transparent: true,
-            side: DoubleSide,
+            side: FrontSide,
             depthWrite: false,
             polygonOffset: true,
             polygonOffsetFactor: -1,
             polygonOffsetUnits: -1,
         }),
     );
+    private readonly backLabel = new Mesh(this.label.geometry, this.label.material);
 
     constructor(readonly planeNode: ReferencePlaneNode) {
         super(planeNode);
         this.label.name = "plane-label";
-        this.add(this.fill, this.outline, this.label);
+        this.backLabel.name = "plane-label-back";
+        this.add(this.fill, this.outline, this.label, this.backLabel);
         // Reference planes remain available as sketch supports in every display mode.
-        for (const visual of [this.fill, this.outline, this.label]) {
+        for (const visual of [this.fill, this.outline, this.label, this.backLabel]) {
             visual.layers.enable(Constants.Layers.Solid);
             visual.layers.enable(Constants.Layers.Wireframe);
         }
         this.rebuild();
         planeNode.onPropertyChanged(this.changed);
         this.label.raycast = () => {};
+        this.backLabel.raycast = () => {};
     }
 
     private readonly changed = (property: keyof ReferencePlaneNode) => {
@@ -97,6 +101,12 @@ export class ThreeReferencePlane extends ThreeVisualObject {
             ),
         );
         this.label.scale.set(width, height, 1);
+        // A separate back-facing inscription stays readable from the other side, still coplanar.
+        const back = corners[2].sub(xvec.multiply(inset + width / 2)).sub(yvec.multiply(inset + height / 2));
+        this.backLabel.position.set(back.x, back.y, back.z);
+        this.backLabel.quaternion.copy(this.label.quaternion);
+        this.backLabel.rotateY(Math.PI);
+        this.backLabel.scale.copy(this.label.scale);
     }
 
     highlight() {

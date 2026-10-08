@@ -170,6 +170,7 @@ export class ThreeView extends Observable implements IView {
     }
 
     override disposeInternal(): void {
+        this.display.dispose();
         super.disposeInternal();
         this._gizmo.dispose();
         this._resizeObserver.disconnect();

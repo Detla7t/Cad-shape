@@ -59,6 +59,25 @@ function createFakeView(overrides: Partial<ThreeView> = {}): ThreeView {
     } as unknown as ThreeView;
 }
 
+test("previous view restores orientation, projection and scale after window zoom", () => {
+    const cc = new CameraController(createFakeView());
+    cc.setSize(800, 600);
+    cc.cameraType = "orthographic";
+    cc.lookAt({ x: 0, y: 0, z: 100 }, { x: 0, y: 0, z: 0 }, { x: 0, y: 1, z: 0 });
+    cc.camera.updateMatrixWorld(true);
+    const before = (cc.camera as OrthographicCamera).top;
+    cc.zoomWindow(200, 150, 600, 450);
+    expect(cc.cameraPosition.z).toBeCloseTo(50);
+    expect(cc.cameraTarget.x).toBeCloseTo(0);
+    expect(cc.cameraTarget.y).toBeCloseTo(0);
+    expect((cc.camera as OrthographicCamera).top).toBeCloseTo(before / 2);
+    cc.cameraType = "perspective";
+    cc.restorePreviousView();
+    expect(cc.cameraType).toBe("orthographic");
+    expect(cc.cameraPosition.z).toBeCloseTo(100);
+    expect((cc.camera as OrthographicCamera).top).toBeCloseTo(before);
+});
+
 // ============================================================================
 // CameraController — construction and defaults
 // ============================================================================

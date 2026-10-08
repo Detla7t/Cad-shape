@@ -157,14 +157,27 @@ export class ElementTabStrip extends HTMLElement {
     private openNewMenu(anchor: HTMLElement): void {
         const rect = anchor.getBoundingClientRect();
         showElementMenu(
-            this.workspace.creatableKinds().map((kind) => ({
-                label: `command.${kind.newCommand}` as I18nKeys,
-                icon: kind.icon,
-                cadIcon: kind.kind,
-                onSelect: () => {
-                    if (kind.newCommand !== undefined) PubSub.default.pub("executeCommand", kind.newCommand);
+            [
+                ...this.workspace.creatableKinds().map((kind) => ({
+                    label: `command.${kind.newCommand}` as I18nKeys,
+                    icon: kind.icon,
+                    cadIcon: kind.kind,
+                    onSelect: () => {
+                        if (kind.newCommand !== undefined)
+                            PubSub.default.pub("executeCommand", kind.newCommand);
+                    },
+                })),
+                {
+                    label: "command.create.folder",
+                    cadIcon: "folder",
+                    onSelect: () => PubSub.default.pub("executeCommand", "create.folder"),
                 },
-            })),
+                {
+                    label: "command.file.import",
+                    cadIcon: "file.import",
+                    onSelect: () => PubSub.default.pub("executeCommand", "file.import"),
+                },
+            ],
             { x: rect.left, y: rect.top },
         );
     }

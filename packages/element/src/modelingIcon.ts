@@ -56,6 +56,14 @@ const aliases: Record<string, string> = {
     "documents.newDrawing": "drawing",
     "plane.create": "plane",
     "file.import": "import",
+    "create.revol": "revolve",
+    drawingDocument: "drawing",
+    markdownDocument: "document",
+    richTextDocument: "document",
+    textDocument: "document",
+    spreadsheetDocument: "tables",
+    pdfDocument: "document",
+    fileDocument: "document",
 };
 
 export function createModelingIcon(command: string): SVGSVGElement | undefined {

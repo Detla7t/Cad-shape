@@ -41,6 +41,10 @@ function createGizmo() {
         camera,
         target,
         rotate: rs.fn(),
+        cameraType: "perspective",
+        hasPreviousView: false,
+        rememberView: rs.fn(),
+        fitContent: rs.fn(),
         setRotateCenterToSelected: rs.fn(),
         lookAt: rs.fn((eye: XYZLike, center: XYZLike, up: XYZLike) => {
             camera.position.set(eye.x, eye.y, eye.z);
@@ -48,7 +52,13 @@ function createGizmo() {
             camera.lookAt(center.x, center.y, center.z);
         }),
     };
-    const view = { cameraController: cc, update: rs.fn() } as unknown as ThreeView;
+    const view = {
+        cameraController: cc,
+        update: rs.fn(),
+        mode: "solidAndWireframe",
+        displayOptions: { hiddenEdges: false, tangentEdges: "visible", boundaryEdges: false },
+        renderer: { getPixelRatio: () => 2 },
+    } as unknown as ThreeView;
     const gizmo = new ViewGizmoCtor(view);
     document.body.append(gizmo);
     return { gizmo, cc };
@@ -118,9 +128,12 @@ describe("View cube", () => {
     test("keyboard activation works and back faces are removed from tab order", () => {
         const { gizmo, cc } = createGizmo();
         expect(button(gizmo, "Bottom view").getAttribute("tabindex")).toBe("-1");
-        button(gizmo, "Isometric view").dispatchEvent(
+        button(gizmo, "View options").dispatchEvent(
             new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
         );
+        const menuItem = document.querySelector<HTMLButtonElement>('[role="menu"] [aria-label="Isometric"]');
+        expect(menuItem).not.toBeNull();
+        menuItem!.click();
         expect(
             cc.camera.position
                 .clone()
@@ -166,7 +179,7 @@ describe("View cube", () => {
         const top = button(gizmo, "Top view").querySelector("polygon")!;
         expect(top).not.toBeNull();
         const before = top.getAttribute("points");
-        click(gizmo, "Isometric view");
+        click(gizmo, "Top Front Right view");
         expect(top.getAttribute("points")).not.toBe(before);
         gizmo.dispose();
         expect(document.body.contains(gizmo)).toBe(false);

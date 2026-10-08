@@ -17,7 +17,9 @@ test.each([
     const visual = new ThreeReferencePlane(node);
     try {
         const label = visual.getObjectByName("plane-label");
+        const back = visual.getObjectByName("plane-label-back");
         expect(label).toBeInstanceOf(Mesh);
+        expect(back).toBeInstanceOf(Mesh);
         for (const size of [200, 90]) {
             node.size = size;
             visual.updateMatrixWorld(true);
@@ -39,6 +41,15 @@ test.each([
             expect(right.toArray()).toEqual(
                 [plane.xvec.x, plane.xvec.y, plane.xvec.z].map((v) => expect.closeTo(v, 6)),
             );
+            const backRight = new Vector3(1, 0, 0).applyQuaternion(back!.quaternion);
+            expect(backRight.toArray()).toEqual(
+                [-plane.xvec.x, -plane.xvec.y, -plane.xvec.z].map((v) => expect.closeTo(v, 6)),
+            );
+            const backCorner = back!.localToWorld(new Vector3(-0.5, 0.5, 0));
+            const relative = new XYZ(backCorner.x, backCorner.y, backCorner.z).sub(node.plane.origin);
+            expect(relative.dot(plane.normal)).toBeCloseTo(0, 6);
+            expect(relative.dot(plane.xvec)).toBeCloseTo(size * 0.485, 6);
+            expect(relative.dot(plane.yvec)).toBeCloseTo(size * 0.485, 6);
         }
     } finally {
         visual.dispose();

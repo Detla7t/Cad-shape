@@ -38,7 +38,7 @@ DocumentPanels.register({
     create: (document) => new InspectionPanel(document),
 });
 
-const ORDER: DocumentPanelId[] = ["configuration", "tables", "inspection", "variables"];
+const ORDER: DocumentPanelId[] = ["configuration", "tables", "sheetMetal", "inspection", "variables"];
 
 /** The Part Studio's right-hand rail; one live document panel occupies the dock at a time. */
 export class StudioSidebar extends HTMLElement implements IDocumentPanelHost {

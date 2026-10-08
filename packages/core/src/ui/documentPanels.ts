@@ -5,7 +5,7 @@ import type { IDocument } from "../document";
 import type { IDisposable } from "../foundation";
 import type { I18nKeys } from "../i18n";
 
-export type DocumentPanelId = "configuration" | "tables" | "inspection" | "variables";
+export type DocumentPanelId = "configuration" | "tables" | "sheetMetal" | "inspection" | "variables";
 export interface DocumentPanelContent extends IDisposable {
     readonly element: HTMLElement;
 }

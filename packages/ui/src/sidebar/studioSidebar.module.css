@@ -102,6 +102,12 @@
     cursor: ew-resize;
     touch-action: none;
 }
+.root[data-open="configuration"] .header {
+    display: none;
+}
+.root[data-open="configuration"] .content {
+    padding: 0;
+}
 .resizer:hover,
 .resizer:focus-visible {
     background: #438dca55;
