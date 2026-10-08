@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import type { ConfigurationInputData } from "@chili3d/core";
+import { type ConfigurationInputData, configurationVisible } from "@chili3d/core";
 import { input, option, select } from "@chili3d/element";
 import type { ConfigurationDataContent } from "./configurationDataContent";
 
@@ -11,7 +11,7 @@ import type { ConfigurationDataContent } from "./configurationDataContent";
  * the always-visible configuration bar, so both switch the same way: unrecorded, one rebuild.
  */
 export function activeInputControl(
-    content: ConfigurationDataContent,
+    content: Pick<ConfigurationDataContent, "activeValue" | "setActive" | "inputs" | "active">,
     item: ConfigurationInputData,
     className: string,
 ): HTMLElement {
@@ -23,9 +23,20 @@ export function activeInputControl(
                 title: item.name,
                 onchange: (e: Event) => content.setActive(item.name, (e.target as HTMLSelectElement).value),
             },
-            ...(Array.isArray(item.options) ? item.options : []).map((choice) =>
-                option({ value: choice.name, textContent: choice.name, selected: choice.name === current }),
-            ),
+            ...(Array.isArray(item.options) ? item.options : [])
+                .filter(
+                    (choice) =>
+                        choice.name === current ||
+                        configurationVisible(choice.visibility, content.inputs, content.active),
+                )
+                .map((choice) =>
+                    option({
+                        value: choice.name,
+                        textContent: choice.name,
+                        selected: choice.name === current,
+                        disabled: !configurationVisible(choice.visibility, content.inputs, content.active),
+                    }),
+                ),
         );
     }
     if (item.kind === "checkbox") {

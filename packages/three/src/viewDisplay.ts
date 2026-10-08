@@ -47,6 +47,16 @@ export class ViewDisplay {
         const restore: (() => void)[] = [];
         const seen = new Set<ThreeGeometry>();
         try {
+            // Each camera supplies one headlight, even though the model scene is shared.
+            for (const view of this.view.document.application.views) {
+                if (view.document !== this.view.document || !("dynamicLight" in view)) continue;
+                const light = (view as ThreeView).dynamicLight;
+                const visible = light.visible;
+                light.visible = view === this.view;
+                restore.push(() => {
+                    light.visible = visible;
+                });
+            }
             for (const visual of this.view.content.visuals()) {
                 if (!(visual instanceof ThreeGeometry)) continue;
                 seen.add(visual);

@@ -1,0 +1,134 @@
+.root {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+.accordions {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+    overflow-y: auto;
+}
+.section {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
+}
+.sectionHeader {
+    display: flex;
+    flex: 0 0 28px;
+    align-items: center;
+    min-width: 0;
+    padding: 0 5px;
+    box-sizing: border-box;
+}
+.toggle {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    height: 28px;
+    border: 0;
+    padding: 0 4px;
+    font:
+        600 12px "Segoe UI",
+        sans-serif;
+    text-align: left;
+    color: var(--foreground-color);
+    background: transparent;
+    cursor: pointer;
+}
+.toggle::before {
+    content: "";
+    flex: 0 0 5px;
+    width: 5px;
+    height: 5px;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    transform: rotate(-45deg);
+}
+.toggle[aria-expanded="true"]::before {
+    transform: rotate(45deg) translateY(-2px);
+}
+.toggle:hover,
+.headerActions button:hover {
+    background: var(--hover-background-color);
+}
+.headerActions {
+    display: flex;
+    align-items: center;
+    flex: none;
+}
+.headerActions button {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 26px;
+    padding: 3px;
+    border: 0;
+    color: var(--foreground-color);
+    background: transparent;
+    cursor: pointer;
+}
+.sectionContent {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+}
+.sectionContent[hidden] {
+    display: none;
+}
+.sectionContent > chili-project-view {
+    height: 100%;
+    min-height: 0;
+}
+.divider {
+    flex: 0 0 5px;
+    box-sizing: border-box;
+    border-top: 1px solid var(--border-color);
+    cursor: ns-resize;
+    touch-action: none;
+    user-select: none;
+}
+.divider:hover,
+.divider:focus-visible {
+    background: #438dca55;
+    outline: none;
+}
+.divider[aria-disabled="true"] {
+    cursor: default;
+}
+.parts {
+    display: flex;
+    flex-direction: column;
+    padding: 0 6px;
+}
+.parts > tree-model {
+    min-height: 25px;
+    box-sizing: border-box;
+    cursor: pointer;
+    border-radius: 0;
+}
+.parts > tree-model[data-hidden="true"] {
+    color: var(--foreground-secondary-color);
+}
+.parts > .selected {
+    background: color-mix(in srgb, #71b7e5 40%, var(--panel-background-color));
+}
+.partIcon {
+    flex: 0 0 18px;
+    height: 18px;
+    margin: 0 5px 0 10px;
+}
+.configurationOptions {
+    width: 22px;
+    height: 26px;
+    border: 0;
+    background: transparent;
+    color: var(--foreground-color);
+    cursor: pointer;
+}

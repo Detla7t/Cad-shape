@@ -105,6 +105,9 @@ export abstract class SelectionHandler implements IEventHandler {
         const [x1, y1] = [Math.min(rect.clientX, event.clientX), Math.min(rect.clientY, event.clientY)];
         const [x2, y2] = [Math.max(rect.clientX, event.clientX), Math.max(rect.clientY, event.clientY)];
         Object.assign(rect.element.style, {
+            borderColor: event.clientX < rect.clientX ? "#279653" : "#4a9eff",
+            borderStyle: event.clientX < rect.clientX ? "dashed" : "solid",
+            backgroundColor: event.clientX < rect.clientX ? "rgba(39,150,83,0.18)" : "rgba(74,158,255,0.18)",
             left: `${x1}px`,
             top: `${y1}px`,
             width: `${x2 - x1}px`,
@@ -126,8 +129,8 @@ export abstract class SelectionHandler implements IEventHandler {
 
         if (this.mouse.isDown && event.isPrimary) {
             this.mouse.isDown = false;
-            this.removeRect(view);
             const count = this.select(view, event);
+            this.removeRect(view);
             this.cleanHighlights();
             view.update();
             if (count > 0 && (!this.multiMode || this.canFinishSelection())) this.controller?.success();

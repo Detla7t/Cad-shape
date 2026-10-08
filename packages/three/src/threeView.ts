@@ -13,6 +13,7 @@ import {
     type INodeFilter,
     type IShape,
     type IShapeFilter,
+    type IShapeMeshData,
     type ISubShape,
     type IView,
     type IViewGizmo,
@@ -23,6 +24,7 @@ import {
     type Plane,
     PubSub,
     Ray,
+    SelectionRectangle,
     type ShapeMeshRange,
     ShapeNode,
     type ShapeType,
@@ -46,12 +48,11 @@ import {
     OrthographicCamera,
     PerspectiveCamera,
     Raycaster,
-    type Scene,
+    Scene,
     Vector2,
     Vector3,
     WebGLRenderer,
 } from "three";
-import { SelectionBox } from "three/examples/jsm/interactive/SelectionBox.js";
 import { Line2 } from "three/examples/jsm/lines/Line2.js";
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
 import { CSS2DObject, CSS2DRenderer } from "three/examples/jsm/renderers/CSS2DRenderer.js";
@@ -111,6 +112,7 @@ export class ThreeView extends Observable implements IView {
     private readonly _scene: Scene;
     private readonly _renderer: WebGLRenderer;
     private readonly _cssRenderer: CSS2DRenderer;
+    private readonly labelScene = new Scene();
     private readonly _gizmo: IViewGizmo;
     private readonly _resizeObserver: ResizeObserver;
 
@@ -174,6 +176,13 @@ export class ThreeView extends Observable implements IView {
         super.disposeInternal();
         this._gizmo.dispose();
         this._resizeObserver.disconnect();
+        this._scene.remove(this.dynamicLight);
+        this.dynamicLight.dispose();
+        this._renderer.dispose();
+        this._renderer.forceContextLoss();
+        this._renderer.domElement.remove();
+        this._cssRenderer.domElement.remove();
+        this.labelScene.clear();
     }
 
     close(): void {
@@ -250,13 +259,13 @@ export class ThreeView extends Observable implements IView {
     htmlText(text: string, point: XYZLike, options?: HtmlTextOptions): IDisposable {
         const dispose = () => {
             options?.onDispose?.();
-            this.content.cssObjects.remove(cssObject);
+            this.labelScene.remove(cssObject);
             cssObject.element.remove();
         };
         const cssObject = new CSS2DObject(this.htmlElement(text, dispose, options));
         cssObject.position.set(point.x, point.y, point.z);
         if (options?.center) cssObject.center.set(options.center.x, options.center.y);
-        this.content.cssObjects.add(cssObject);
+        this.labelScene.add(cssObject);
         return { dispose };
     }
 
@@ -323,7 +332,7 @@ export class ThreeView extends Observable implements IView {
         const dir = this.camera.position.clone().sub(this.cameraController.target);
         this.dynamicLight.position.copy(dir);
         this.display.render(() => this._renderer.render(this._scene, this.camera));
-        this._cssRenderer.render(this._scene, this.camera);
+        this._cssRenderer.render(this.labelScene, this.camera);
         this._gizmo?.update();
 
         this._needsUpdate = false;
@@ -481,20 +490,57 @@ export class ThreeView extends Observable implements IView {
         my2: number,
         nodeFilter?: INodeFilter,
     ): IVisualObject[] {
-        const selectionBox = this.initSelectionBox(mx1, my1, mx2, my2);
-        const visual = new Set<IVisualObject>();
-        for (const obj of selectionBox.select()) {
-            const threeObject = obj.parent as ThreeVisualObject;
-            if (!threeObject?.visible) continue;
+        const rect = new SelectionRectangle(mx1, my1, mx2, my2);
+        return this.detectVisualsInRect(rect.minX, rect.minY, rect.maxX, rect.maxY, nodeFilter).filter(
+            (visual) => this.visualInRect(visual, rect),
+        );
+    }
 
-            const node = this.getNodeFromObject(threeObject);
-            if (node === undefined) continue;
-            if (nodeFilter !== undefined && !nodeFilter.allow(node)) {
-                continue;
-            }
-            visual.add(threeObject);
+    private visualInRect(visual: ThreeVisualObject, rect: SelectionRectangle): boolean {
+        if (visual instanceof ThreeGeometry)
+            return this.meshInRect(visual.geometryNode.mesh, visual.worldTransform(), rect);
+        // Other visual types use their actual rendered triangles/segments where available.
+        const box = visual.boundingBox();
+        if (!box) return false;
+        return this.isBoundingBoxInRect(
+            box,
+            visual.worldTransform(),
+            rect.minX,
+            rect.minY,
+            rect.maxX,
+            rect.maxY,
+            !rect.crossing,
+        );
+    }
+
+    private meshInRect(mesh: IShapeMeshData, transform: Matrix4, rect: SelectionRectangle): boolean {
+        const hits: boolean[] = [];
+        const project = (positions: ArrayLike<number>, index: number) =>
+            this.worldToScreen(
+                transform.ofPoint({
+                    x: positions[index * 3],
+                    y: positions[index * 3 + 1],
+                    z: positions[index * 3 + 2],
+                }),
+            );
+        if (mesh.edges) {
+            const positions = mesh.edges.position;
+            for (let i = 0; i + 1 < positions.length / 3; i += 2)
+                hits.push(rect.segment(project(positions, i), project(positions, i + 1)));
         }
-        return Array.from(visual);
+        if (mesh.faces) {
+            const positions = mesh.faces.position,
+                indices = mesh.faces.index;
+            for (let i = 0; i + 2 < indices.length; i += 3)
+                hits.push(
+                    rect.triangle(
+                        project(positions, indices[i]),
+                        project(positions, indices[i + 1]),
+                        project(positions, indices[i + 2]),
+                    ),
+                );
+        }
+        return hits.length > 0 && (rect.crossing ? hits.some(Boolean) : hits.every(Boolean));
     }
 
     private getNodeFromObject(threeObject: Object3D) {
@@ -511,15 +557,6 @@ export class ThreeView extends Observable implements IView {
             node = threeObject.node;
         }
         return node;
-    }
-
-    private initSelectionBox(mx1: number, my1: number, mx2: number, my2: number) {
-        const selectionBox = new SelectionBox(this.camera, this._scene);
-        const start = this.screenToCameraRect(mx1, my1);
-        const end = this.screenToCameraRect(mx2, my2);
-        selectionBox.startPoint.set(start.x, start.y, 0.5);
-        selectionBox.endPoint.set(end.x, end.y, 0.5);
-        return selectionBox;
     }
 
     detectShapesRect(
@@ -539,10 +576,15 @@ export class ThreeView extends Observable implements IView {
         const visuals = this.detectVisualsInRect(minX, minY, maxX, maxY, nodeFilter);
 
         if (ShapeTypeUtils.isWhole(shapeType)) {
-            return this.detectWholeShapesInRect(visuals, shapeFilter);
+            return this.detectWholeShapesInRect(
+                visuals.filter((visual) =>
+                    this.visualInRect(visual, new SelectionRectangle(mx1, my1, mx2, my2)),
+                ),
+                shapeFilter,
+            );
         }
 
-        return this.detectSubShapesInRect(shapeType, visuals, minX, minY, maxX, maxY, shapeFilter);
+        return this.detectSubShapesInRect(shapeType, visuals, minX, minY, maxX, maxY, shapeFilter, mx2 < mx1);
     }
 
     private detectWholeShapesInRect(
@@ -618,6 +660,7 @@ export class ThreeView extends Observable implements IView {
         maxX: number,
         maxY: number,
         shapeFilter?: IShapeFilter,
+        crossing = false,
     ): VisualShapeData[] {
         const result: VisualShapeData[] = [];
 
@@ -629,7 +672,18 @@ export class ThreeView extends Observable implements IView {
             const entries = this.collectSubShapeEntries(shapeType, visual);
 
             for (const entry of entries) {
-                if (!this.isShapeInRect(entry.shape, entry.transform, worldMatrix, minX, minY, maxX, maxY)) {
+                if (
+                    !this.isShapeInRect(
+                        entry.shape,
+                        entry.transform,
+                        worldMatrix,
+                        minX,
+                        minY,
+                        maxX,
+                        maxY,
+                        crossing,
+                    )
+                ) {
                     continue;
                 }
 
@@ -731,6 +785,7 @@ export class ThreeView extends Observable implements IView {
         minY: number,
         maxX: number,
         maxY: number,
+        enclosed = false,
     ): boolean {
         if (!BoundingBox.isValid(box)) return false;
 
@@ -751,6 +806,8 @@ export class ThreeView extends Observable implements IView {
             if (y > screenMaxY) screenMaxY = y;
         }
 
+        if (enclosed)
+            return screenMinX >= minX && screenMaxX <= maxX && screenMinY >= minY && screenMaxY <= maxY;
         return screenMinX <= maxX && screenMaxX >= minX && screenMinY <= maxY && screenMaxY >= minY;
     }
 
@@ -762,15 +819,15 @@ export class ThreeView extends Observable implements IView {
         minY: number,
         maxX: number,
         maxY: number,
+        crossing = false,
     ): boolean {
         const box = shape.boundingBox();
         if (!box) return false;
 
         const composed = localTransform ? worldMatrix.multiply(localTransform) : worldMatrix;
-        const center = BoundingBox.center(box);
-        const { x, y } = this.worldToScreen(composed.ofPoint(center));
-
-        return x <= maxX && x >= minX && y <= maxY && y >= minY;
+        const rect = new SelectionRectangle(crossing ? maxX : minX, minY, crossing ? minX : maxX, maxY);
+        if (shape.mesh) return this.meshInRect(shape.mesh, composed, rect);
+        return this.isBoundingBoxInRect(box, composed, minX, minY, maxX, maxY, !crossing);
     }
 
     detectShapes(

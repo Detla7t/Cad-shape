@@ -9,7 +9,7 @@ import {
     isDisposable,
     type Plane,
 } from "@chili3d/core";
-import { AmbientLight, AxesHelper, Object3D, Scene } from "three";
+import { AmbientLight, Object3D, Scene } from "three";
 import { ThreeMeshExporter } from "./meshExporter";
 import { ThreeHighlighter } from "./threeHighlighter";
 import { ThreeView } from "./threeView";
@@ -44,8 +44,7 @@ export class ThreeVisual implements IVisual {
     initScene() {
         const scene = new Scene();
         const envLight = new AmbientLight(0x888888, 4);
-        const axisHelper = new AxesHelper(250);
-        scene.add(envLight, axisHelper);
+        scene.add(envLight);
         return scene;
     }
 

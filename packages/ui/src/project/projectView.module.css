@@ -1,6 +1,7 @@
 .root {
     display: flex;
     flex-direction: column;
+    min-height: 0;
 }
 
 .headerPanel {
@@ -14,6 +15,7 @@
 .itemsPanel {
     display: flex;
     flex: 1;
+    min-height: 0;
     flex-direction: column;
     overflow-y: auto;
     border-top: 2px solid transparent;

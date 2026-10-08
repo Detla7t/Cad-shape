@@ -1,21 +1,47 @@
 .root {
-    display: flex;
-    flex-direction: row;
-    background: var(--viewport-background-color);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    gap: 3px;
+    background: var(--border-color);
     position: relative;
+    min-width: 0;
+    min-height: 0;
 }
-
-.viewports {
-    width: 100%;
-    height: 100%;
-    position: relative;
+.root[data-layout="columns"],
+.root[data-layout="four"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
 }
-
+.root[data-layout="rows"],
+.root[data-layout="four"] {
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+}
 .viewport {
     width: 100%;
     height: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    background: var(--viewport-background-color);
 }
-
+.root:not([data-layout="single"]) .viewport[data-active="true"] {
+    outline: 2px solid #568bd1;
+    outline-offset: -2px;
+}
 .hidden {
     display: none;
+}
+.layoutSelect {
+    position: absolute;
+    z-index: 40;
+    bottom: 8px;
+    left: 8px;
+    max-width: 180px;
+    height: 26px;
+    font: inherit;
+    font-size: 11px;
+    color: var(--foreground-color);
+    background: var(--panel-background-color);
+    border: 1px solid var(--border-color);
+    border-radius: 2px;
 }

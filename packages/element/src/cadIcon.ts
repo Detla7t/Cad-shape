@@ -5,6 +5,7 @@ import type { CommandIcon } from "@chili3d/core";
 import { createConstraintIcon } from "./constraintIcon";
 import { createIcon } from "./elements";
 import { createModelingIcon } from "./modelingIcon";
+import { createOnshapeIcon } from "./onshapeIcon";
 
 /** Original 20 px CAD symbols: neutral geometry, blue editable handles. */
 const paths: Record<string, string> = {
@@ -98,6 +99,8 @@ const handles: Record<string, number[][]> = {
 };
 
 export function createCadIcon(command: string, fallback?: CommandIcon): Element {
+    const source = createOnshapeIcon(command);
+    if (source) return source;
     const constraint = createConstraintIcon(command);
     if (constraint) return constraint;
     const modeling = createModelingIcon(command);

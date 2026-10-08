@@ -38,7 +38,7 @@ Checked on 8 October 2026 against the user's [Onshape Testing document](https://
 | Area | Onshape | Chili3D now | Remaining difference |
 | --- | --- | --- | --- |
 | Top tools | A 36 px context toolbar below a 40 px document header. Sketch tools replace modeling tools. | Default: 36 px single-row context toolbar below a 40 px header; canvas starts at y = 76. Undo/redo lead, main tools follow, pinned tools and search remain available. Toolsets live in a header menu. | Browser measurements match the top spacing. The older ribbon remains an option in Customize tools and tabs. Available commands and grouping differ; unimplemented Onshape tools are not displayed as placeholders. |
-| Left sidebar | 40 px utility rail plus a 200 px feature tree; canvas begins at x = 246. | A 34 px utility rail plus the existing tree; canvas begins at x = 276 in the latest trial. Name filter preserves ancestors of matches. Empty Properties collapses to its header. | Browser and filter tests. Chili3D still has its own document/body tree; separate Features/Parts sections and rollback presentation are not matched. History is now on the left utility rail. |
+| Left sidebar | 40 px utility rail plus a 200 px feature tree; canvas begins at x = 246. | A 34 px utility rail plus the existing tree; canvas begins at x = 276 in the latest trial. Name filter preserves ancestors of matches. Empty Properties collapses to its header. | Browser and filter tests. Chili3D now separates Features and solid results in Parts, beneath Configurations, with draggable horizontal dividers. The Features tree still follows Chili3D document/body ownership; Onshape's flat feature list and rollback presentation remain different. History is now on the left utility rail. |
 | Sketch panel | About 220 px wide, with sketch-plane field, checkboxes, accept/cancel icons. | 216 px panel: name, green check/red X, plane, construction and constraints; layers and help are collapsed; solver status is in the footer. | Browser screenshots. The Chili3D layer controls and explicit DOF status are deliberate additions. |
 | Selection color | Orange selected strokes in the live trial. | Gold selected strokes with a soft halo. | Intentional user preference; not an exact color match. Browser verified. |
 | Sketch regions | Neutral gray filled closed regions, blue free curves and dark constrained geometry. | Neutral gray closed profiles, adaptive curve segments and separate constraint/selection colors. | Light profile fill was strengthened after screenshot comparison. Overlap and hole behavior are tested; exact visual parity is not claimed. |
@@ -96,7 +96,7 @@ These are native browser captures, preserved without image editing. Their export
 
 1. Match per-point constraint colors and partly constrained line strokes, with independent tests for fixed endpoints and free length.
 2. Add additional plane construction methods and refine the origin marker; bounded named planes are implemented.
-3. Refine the feature tree, separate Features/Parts organization and rollback presentation.
+3. Refine the remaining document/body feature-tree nesting and rollback presentation; separate resizable Features/Parts sections are implemented.
 4. Add the missing sketch tool variants and compare repeated dimension commands, general D-key inference, batch constraints and box selection.
 5. Calibrate navigation sensitivity and pivots; compare remaining Alt, keyboard-arrow, zoom and center-versus-edge drag behavior.
 
@@ -173,3 +173,14 @@ These native screenshots were inspected without editing their pixels. They use a
 - [Named commit with its operation and selected property changes](ui-comparison/chili-history-changes.png)
 
 Validation: **8,055 tests passed across 492 files**, TypeScript passed, and the production build including plugins completed. The additional front/back plane-label assertions also passed after the full run. Existing bundle-size warnings remain. Browser checks confirmed that the saved review document retained Housing and the user's Sketch1; history-preview checks did not apply a revert or rebase to that document.
+
+
+## Resizable left sidebar and Parts
+
+The left sidebar now has independently collapsible **Configurations**, **Features** and **Parts (count)** sections. Drag the horizontal dividers to redistribute height between their open neighbors; each section scrolls separately. The section headers remain reachable at the minimum size. Focused dividers also accept Up/Down (Shift for larger steps) and Home/End. Heights and collapsed states are local layout preferences, retained across documents and reloads without adding model history.
+
+Parts lists the original solid-bearing model nodes, including hidden parts and parts inside folders. Sketches, datum planes, curves, standalone surfaces and boolean tools consumed by another body are excluded. Clicking a Parts row selects the original model node; Ctrl/Command and Shift support multiple selection. Eye controls, existing right-click actions, property edits and undo operate on that same node. Additions, removals, topology changes and document switching update the list and count. A node containing a compound solid result remains one Parts entry; independent naming/hiding of each solid within that single node is not introduced here. The modeling nodes remain in Features so their parameters and feature chains can still be edited.
+
+Native browser checks used a separate **Parts and sidebar sizing · review** document with two solids. Both appeared in Parts (2). Selecting Housing in Parts selected the same Housing in the model. Dragging the first divider increased Configurations from 129 to 182 CSS pixels while Parts stayed at 173 pixels. Dragging the second divider clamped Features at 64 pixels and enlarged Parts to 382 pixels, with all headers visible. Collapse/reopen and reload restored the saved proportions. An initial keyboard trial exposed missing focus on a clicked divider; after fixing that, a native ArrowDown press increased Features by exactly 10 pixels and decreased Parts by 10 pixels. The other section stayed unchanged. Native Parts-eye Hide kept Parts (2), Undo restored the solid, and right-click opened the existing Parts menu.
+
+Validation: the full suite passed **8,062 tests across 494 files**, TypeScript passed, and production/plugin builds passed (existing bundle-size warnings). Focus and collapsed-layout refinements passed the focused sidebar regression tests afterward. [Final sidebar capture](ui-comparison/chili-parts-accordions.png).

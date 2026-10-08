@@ -110,3 +110,16 @@
 .control {
     border-radius: 0;
 }
+
+.bar[data-embedded="true"] {
+    border: 0;
+    padding: 3px 10px 8px;
+    gap: 7px;
+    align-content: flex-start;
+    font-size: 12px;
+}
+.bar[data-embedded="true"] .name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}

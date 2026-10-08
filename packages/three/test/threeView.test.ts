@@ -441,14 +441,14 @@ describe("ThreeView — isolate / unisolate", () => {
 describe("ThreeView — htmlText", () => {
     test("htmlText adds a disposable css object to the scene", () => {
         const { view, context } = createTestView();
-        const before = context.cssObjects.children.length;
+        const before = view["labelScene"].children.length;
 
         const result = view.htmlText("Hello", new XYZ({ x: 0, y: 0, z: 0 }));
-        expect(context.cssObjects.children.length).toBe(before + 1);
+        expect(view["labelScene"].children.length).toBe(before + 1);
         expect(typeof result.dispose).toBe("function");
 
         result.dispose();
-        expect(context.cssObjects.children.length).toBe(before);
+        expect(view["labelScene"].children.length).toBe(before);
     });
 
     test("htmlText with className option applies the class", () => {
@@ -456,7 +456,7 @@ describe("ThreeView — htmlText", () => {
         const result = view.htmlText("Test", new XYZ({ x: 10, y: 20, z: 30 }), {
             className: "custom",
         });
-        const cssObject = context.cssObjects.children.at(-1) as any;
+        const cssObject = view["labelScene"].children.at(-1) as any;
         expect(cssObject.element.classList.contains("custom")).toBe(true);
 
         result.dispose();
@@ -464,13 +464,13 @@ describe("ThreeView — htmlText", () => {
 
     test("htmlText dispose removes the css object", () => {
         const { view, context } = createTestView();
-        const before = context.cssObjects.children.length;
+        const before = view["labelScene"].children.length;
 
         const result = view.htmlText("Disposable", new XYZ({ x: 0, y: 0, z: 0 }));
-        expect(context.cssObjects.children.length).toBe(before + 1);
+        expect(view["labelScene"].children.length).toBe(before + 1);
 
         result.dispose();
-        expect(context.cssObjects.children.length).toBe(before);
+        expect(view["labelScene"].children.length).toBe(before);
     });
 
     test("htmlText with center option sets the css object center", () => {
@@ -478,7 +478,7 @@ describe("ThreeView — htmlText", () => {
         const result = view.htmlText("Centered", new XYZ({ x: 0, y: 0, z: 0 }), {
             center: new XY({ x: 0.5, y: 0.5 }),
         });
-        const cssObject = context.cssObjects.children.at(-1) as any;
+        const cssObject = view["labelScene"].children.at(-1) as any;
         expect(cssObject.center.x).toBe(0.5);
         expect(cssObject.center.y).toBe(0.5);
 
@@ -490,7 +490,7 @@ describe("ThreeView — htmlText", () => {
         const result = view.htmlText("No Delete", new XYZ({ x: 0, y: 0, z: 0 }), {
             hideDelete: true,
         });
-        const cssObject = context.cssObjects.children.at(-1) as any;
+        const cssObject = view["labelScene"].children.at(-1) as any;
         expect(cssObject.element.querySelector("svg")).toBeNull();
 
         result.dispose();
@@ -833,7 +833,7 @@ describe("ThreeView — htmlText advanced", () => {
             hideDelete: true,
             className: "my-custom-class",
         });
-        const cssObject = context.cssObjects.children.at(-1) as any;
+        const cssObject = view["labelScene"].children.at(-1) as any;
         expect(cssObject.element.classList.contains("my-custom-class")).toBe(true);
         expect(cssObject.element.querySelector("svg")).toBeNull();
 
@@ -849,7 +849,7 @@ describe("ThreeView — htmlText advanced", () => {
             onClick: () => events.push("click"),
             onDoubleClick: () => events.push("dblclick"),
         });
-        const cssObject = context.cssObjects.children.at(-1) as any;
+        const cssObject = view["labelScene"].children.at(-1) as any;
         const element = cssObject.element as HTMLElement;
 
         element.dispatchEvent(new MouseEvent("click"));
@@ -861,13 +861,13 @@ describe("ThreeView — htmlText advanced", () => {
 
     test("htmlText dispose is idempotent", () => {
         const { view, context } = createTestView();
-        const before = context.cssObjects.children.length;
+        const before = view["labelScene"].children.length;
 
         const result = view.htmlText("Cleanup", new XYZ({ x: 0, y: 0, z: 0 }));
         result.dispose();
         // Second dispose should not throw
         result.dispose();
-        expect(context.cssObjects.children.length).toBe(before);
+        expect(view["labelScene"].children.length).toBe(before);
     });
 
     test("htmlText with all options combined", () => {
@@ -881,7 +881,7 @@ describe("ThreeView — htmlText advanced", () => {
                 disposed = true;
             },
         });
-        const cssObject = context.cssObjects.children.at(-1) as any;
+        const cssObject = view["labelScene"].children.at(-1) as any;
         expect(cssObject.element.classList.contains("full-custom")).toBe(true);
         expect(cssObject.center.x).toBe(0.5);
         expect(cssObject.center.y).toBe(0);

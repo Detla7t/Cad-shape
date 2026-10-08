@@ -4,6 +4,7 @@
 import type { IDocument } from "../document";
 import { Logger } from "../foundation/logger";
 import type { IPropertyChanged } from "../foundation/observer";
+import type { INode } from "../model/node";
 import type { VariableType } from "./unitSpec";
 
 /** One document-level parameter: a named, typed value usable across the whole document. */
@@ -14,6 +15,18 @@ export interface VariableData {
     readonly type: VariableType;
     readonly expression: string;
     readonly description?: string;
+    /** Derived variables may report a lost measurement without exposing a stale value. */
+    readonly evaluationError?: string;
+}
+
+/** A modeling feature which contributes variables without becoming a Variable Studio tab. */
+export interface IVariableFeatureNode extends INode {
+    readonly variableSource: true;
+    readonly items: readonly VariableData[];
+    readonly variablesJson: string;
+}
+export function isVariableFeatureNode(node: INode): node is IVariableFeatureNode {
+    return (node as Partial<IVariableFeatureNode>).variableSource === true;
 }
 
 /**

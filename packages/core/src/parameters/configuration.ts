@@ -30,9 +30,28 @@ import { isVariableType, UNITLESS, unitSpecOfType, type VariableType } from "./u
 export interface ConfigurationOptionData {
     readonly id: string;
     readonly name: string;
+    readonly visibility?: ConfigurationVisibility;
 }
 
-export interface ConfigurationListInputData {
+export interface ConfigurationVisibilityCondition {
+    readonly inputId: string;
+    readonly operator: "is" | "isNot" | "lt" | "lte" | "gt" | "gte";
+    /** Stable option ids, checkbox states, or a numeric expression in the input's units. */
+    readonly values: readonly (string | boolean)[];
+}
+
+export interface ConfigurationVisibility {
+    readonly match: "all" | "any";
+    readonly conditions: readonly ConfigurationVisibilityCondition[];
+}
+
+interface ConditionalInput {
+    readonly visibility?: ConfigurationVisibility;
+    /** Whether to show a numeric input's range hint. Does not change its allowed range. */
+    readonly rangeVisibility?: ConfigurationVisibility;
+}
+
+export interface ConfigurationListInputData extends ConditionalInput {
     readonly kind: "list";
     readonly id: string;
     readonly name: string;
@@ -41,14 +60,14 @@ export interface ConfigurationListInputData {
     readonly defaultOption?: string;
 }
 
-export interface ConfigurationCheckboxInputData {
+export interface ConfigurationCheckboxInputData extends ConditionalInput {
     readonly kind: "checkbox";
     readonly id: string;
     readonly name: string;
     readonly defaultValue: boolean;
 }
 
-export interface ConfigurationVariableInputData {
+export interface ConfigurationVariableInputData extends ConditionalInput {
     readonly kind: "variable";
     readonly id: string;
     readonly name: string;

@@ -25,7 +25,13 @@ import {
     withScopeContext,
 } from "./expression";
 import { isVariableType, unitSpecOfType } from "./unitSpec";
-import { type IVariableSource, parseVariableItems, type VariableData } from "./variableData";
+import {
+    type IVariableFeatureNode,
+    type IVariableSource,
+    isVariableFeatureNode,
+    parseVariableItems,
+    type VariableData,
+} from "./variableData";
 import { isVariableStudioNode, type VariableStudioNode } from "./variableStudioNode";
 
 const NAME_PATTERN = /^[A-Za-z_]\w*$/;
@@ -189,6 +195,7 @@ function evaluateVariable(
     defined.add(item.name);
     if (!isVariableType(item.type)) return `Unknown variable type: ${String(item.type)}`;
     if (typeof item.expression !== "string") return `Missing expression: ${item.name}`;
+    if (item.evaluationError) return item.evaluationError;
 
     // The declared unit, not the expression's — `w = 5` is a length because the
     // user said so, which is what makes `sin(a)` work when `a` is declared an angle.
@@ -434,8 +441,10 @@ export class VariableTable extends HistoryObservable implements IVariableTable {
     }
 
     /** The Variable Studios in the document, in model-tree order — their layer order. */
-    private studios(): VariableStudioNode[] {
-        return this.document.modelManager.findNodes(isVariableStudioNode).filter(isVariableStudioNode);
+    private studios(): (VariableStudioNode | IVariableFeatureNode)[] {
+        const isSource = (node: INode): node is VariableStudioNode | IVariableFeatureNode =>
+            isVariableStudioNode(node) || isVariableFeatureNode(node);
+        return this.document.modelManager.findNodes(isSource).filter(isSource);
     }
 
     /**
@@ -454,7 +463,10 @@ export class VariableTable extends HistoryObservable implements IVariableTable {
         // A folder may carry studios in or out with it (and a loaded document arrives as
         // one record for its root), so any list node is worth a look.
         const touched = (node: INode) =>
-            isVariableStudioNode(node) || NodeUtils.isLinkedListNode(node) || isDataTableNode(node);
+            isVariableStudioNode(node) ||
+            isVariableFeatureNode(node) ||
+            NodeUtils.isLinkedListNode(node) ||
+            isDataTableNode(node);
         if (records.some((record) => touched(record.node))) this.notifyScopeChanged();
     };
 

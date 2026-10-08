@@ -10,5 +10,6 @@ export * from "./plane";
 export * from "./planeAngle";
 export * from "./quaternion";
 export * from "./ray";
+export * from "./selectionRectangle";
 export * from "./xy";
 export * from "./xyz";

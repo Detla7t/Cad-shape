@@ -32,7 +32,10 @@ export class NodeSelectionHandler extends SelectionHandler {
             .map((x) => view.document.visual.context.getNode(x))
             .filter((x) => x !== undefined);
 
-        return this.document.selection.setSelectedNodes(models, this.toggleSelect(event));
+        const click = Math.hypot(this.mouse.x - event.offsetX, this.mouse.y - event.offsetY) <= 3;
+        const alreadySelected =
+            click && models.length === 1 && this.document.selection.getSelectedNodes().includes(models[0]);
+        return this.document.selection.setSelectedNodes(models, alreadySelected || this.toggleSelect(event));
     }
 
     protected toggleSelect(event: PointerEvent) {

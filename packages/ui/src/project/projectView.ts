@@ -22,32 +22,37 @@ export class ProjectView extends HTMLElement {
         className: style.filter,
     });
 
-    constructor(props: { className: string }) {
+    constructor(props: { className: string; showHeader?: boolean }) {
         super();
-        this.classList.add(style.root, props.className);
+        this.classList.add(style.root);
+        if (props.className) this.classList.add(props.className);
         this.panel = div({
             className: style.itemsPanel,
         });
         PubSub.default.sub("activeViewChanged", this.handleActiveViewChanged);
         PubSub.default.sub("documentClosed", this.handleDocumentClosed);
 
-        this.render();
+        this.render(props.showHeader !== false);
     }
 
-    private render() {
+    private render(showHeader: boolean) {
         this.filter.setAttribute("aria-label", "Filter model tree");
         this.filter.oninput = () => this.activeTree()?.filter(this.filter.value);
         this.filter.onkeydown = (event) => event.stopPropagation();
         this.append(
             this.filter,
-            div(
-                { className: style.headerPanel },
-                span({
-                    className: style.header,
-                    textContent: new Localize("items.header"),
-                }),
-                new ToolBar(this),
-            ),
+            ...(showHeader
+                ? [
+                      div(
+                          { className: style.headerPanel },
+                          span({
+                              className: style.header,
+                              textContent: new Localize("items.header"),
+                          }),
+                          new ToolBar(this),
+                      ),
+                  ]
+                : []),
             this.panel,
         );
     }

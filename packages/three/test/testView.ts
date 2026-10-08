@@ -8,6 +8,8 @@ import { ThreeView } from "../src/threeView";
 import type { ThreeVisualContext } from "../src/threeVisualContext";
 
 class TestWebGLRenderer {
+    dispose() {}
+    forceContextLoss() {}
     constructor(readonly domElement = document.createElement("canvas")) {}
 
     render(scene: THREE.Object3D, camera: THREE.Camera): void {}

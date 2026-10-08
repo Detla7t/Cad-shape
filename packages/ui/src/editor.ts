@@ -15,9 +15,9 @@ import { createCadIcon, div } from "@chili3d/element";
 import style from "./editor.module.css";
 import { ElementWorkspace } from "./elements";
 import { FloatPanel } from "./floatPanel";
-import { ProjectView } from "./project";
+import { ModelSidebar } from "./project/modelSidebar";
 import { PropertyView } from "./property";
-import { ConfigurationBar, showConfigurationPanel } from "./property/configuration";
+import { showConfigurationPanel } from "./property/configuration";
 import { MaterialDataContent, MaterialEditor } from "./property/material";
 import { showVariablesPanel } from "./property/variables";
 import { RibbonUI } from "./ribbon";
@@ -66,8 +66,7 @@ export class Editor extends HTMLElement {
                 className: style.sidebar,
                 style: `width: ${this._sidebarWidth}px;`,
             },
-            new ConfigurationBar(this.app),
-            new ProjectView({ className: style.sidebarItem }),
+            new ModelSidebar(this.app),
             new PropertyView({ className: style.sidebarItem }),
             div({
                 className: style.sidebarResizer,

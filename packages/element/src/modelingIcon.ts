@@ -3,6 +3,7 @@
 
 /** Original SVG artwork based on the shaded, isometric vocabulary in the supplied CAD references. */
 const symbols: Record<string, string> = {
+    part: '<path fill="#d4d7da" d="m2 8 6-2 4 2v-5l6 3v10l-7 3-9-4Z"/><path fill="#fafafa" d="m2 8 5 3 5-2V3l-5 2v6M7 11v6l4 2v-7l7-3"/><path d="m12 8 6 1M11 12l-4-1"/>',
     extrude:
         '<path fill="#eceeef" d="m3 5 9-3 5 3-9 3Z"/><path fill="#c6c9cb" d="M3 5v12l5 2V8Z"/><path fill="#fafafa" d="m8 8 9-3v12l-9 2Z"/><path d="M5 4v11l3 2 7-2V4"/>',
     revolve:

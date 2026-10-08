@@ -1,0 +1,147 @@
+.dialog {
+    width: min(1120px, 94vw);
+    height: min(640px, 88vh);
+    box-sizing: border-box;
+    padding: 0;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--foreground-color);
+    background: var(--panel-background-color);
+    font:
+        13px Arial,
+        sans-serif;
+}
+.dialog[open] {
+    display: flex;
+    flex-direction: column;
+}
+.dialog::backdrop {
+    background: #0006;
+}
+.dialog header,
+.dialog footer {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding: 12px;
+}
+.dialog header {
+    border-bottom: 1px solid var(--border-color);
+}
+.dialog header strong {
+    flex: 1;
+    color: #2461a7;
+    font-size: 17px;
+}
+.dialog footer {
+    border-top: 1px solid var(--border-color);
+}
+.dialog footer span {
+    flex: 1;
+    color: #c44;
+}
+.dialog button,
+.dialog select,
+.dialog input:not([type="checkbox"]),
+.condition > details > summary {
+    padding: 6px 9px;
+    border: 1px solid var(--border-color);
+    border-radius: 2px;
+    color: inherit;
+    background: var(--panel-background-color);
+    font: inherit;
+}
+.dialog button:not(:disabled) {
+    cursor: pointer;
+}
+.dialog button:disabled {
+    opacity: 0.45;
+}
+.body {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+}
+.rules {
+    flex: 1;
+    min-width: 0;
+    overflow: auto;
+    padding: 18px;
+}
+.rules > details {
+    margin-bottom: 14px;
+    border: 1px solid var(--border-color);
+}
+.rules > details > summary {
+    padding: 10px;
+    background: var(--title-background);
+    cursor: pointer;
+}
+.rule {
+    margin: 10px;
+    padding: 10px;
+    border: 1px solid var(--border-color);
+}
+.rule > div:first-child {
+    margin-bottom: 10px;
+}
+.condition {
+    display: flex;
+    align-items: start;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 10px 0;
+}
+.condition > select,
+.condition > input {
+    max-width: 155px;
+}
+.condition > details {
+    min-width: 140px;
+}
+.condition > details label {
+    display: flex;
+    gap: 6px;
+    padding: 5px;
+}
+.preview {
+    width: 260px;
+    flex: none;
+    overflow: auto;
+    padding: 20px;
+    background: var(--title-background);
+    border-left: 1px solid var(--border-color);
+}
+.preview > strong {
+    display: block;
+    margin-bottom: 16px;
+}
+.preview > label {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 14px;
+}
+.preview > label span {
+    flex: 1;
+}
+.preview > label[data-visible="false"] {
+    opacity: 0.5;
+}
+.preview small {
+    flex: 0 0 100%;
+}
+.control {
+    max-width: 130px;
+    min-width: 0;
+}
+@media (max-width: 700px) {
+    .preview {
+        width: 180px;
+        padding: 10px;
+    }
+    .rules {
+        padding: 8px;
+    }
+}

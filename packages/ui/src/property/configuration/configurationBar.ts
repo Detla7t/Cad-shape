@@ -1,7 +1,14 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type IApplication, type IDocument, type IView, Localize, PubSub } from "@chili3d/core";
+import {
+    configurationVisible,
+    type IApplication,
+    type IDocument,
+    type IView,
+    Localize,
+    PubSub,
+} from "@chili3d/core";
 import { button, div, span, svg } from "@chili3d/element";
 import { activeInputControl } from "./activeControls";
 import style from "./configurationBar.module.css";
@@ -17,9 +24,13 @@ export class ConfigurationBar extends HTMLElement {
     private _document: IDocument | undefined;
     private content: ConfigurationDataContent | undefined;
 
-    constructor(private readonly app: IApplication) {
+    constructor(
+        private readonly app: IApplication,
+        private readonly embedded = false,
+    ) {
         super();
         this.className = style.bar;
+        this.dataset["embedded"] = String(embedded);
         this.render();
     }
 
@@ -44,7 +55,13 @@ export class ConfigurationBar extends HTMLElement {
         if (document === this._document) return;
         this._document?.variables.removePropertyChanged(this.handleChanged);
         this._document = document;
-        this.content = document === undefined ? undefined : new ConfigurationDataContent(document);
+        this.content =
+            document === undefined
+                ? undefined
+                : new ConfigurationDataContent(document, () => {
+                      document.visual.update();
+                      this.render();
+                  });
         document?.variables.onPropertyChanged(this.handleChanged);
         this.render();
     }
@@ -67,29 +84,41 @@ export class ConfigurationBar extends HTMLElement {
     render(): void {
         const content = this.content;
         const inputs = content?.inputs.filter((x) => x !== null && typeof x === "object") ?? [];
-        this.style.display = inputs.length === 0 ? "none" : "";
+        this.style.display = !this.embedded && inputs.length === 0 ? "none" : "";
         if (content === undefined || inputs.length === 0) {
             this.replaceChildren();
+            if (this.embedded && content)
+                this.append(div({ className: style.item }, span("Configuration"), span("Default")));
             return;
         }
         this.replaceChildren(
-            svg({ className: style.icon, icon: "icon-layer-group" }),
-            span({ className: style.title, textContent: new Localize("configuration.title") }),
-            ...inputs.map((item) =>
-                div(
-                    { className: style.item },
-                    span({ className: style.name, textContent: item.name }),
-                    activeInputControl(content, item, style.control),
+            ...(this.embedded
+                ? []
+                : [
+                      svg({ className: style.icon, icon: "icon-layer-group" }),
+                      span({ className: style.title, textContent: new Localize("configuration.title") }),
+                  ]),
+            ...inputs
+                .filter((item) => configurationVisible(item.visibility, inputs, content.active))
+                .map((item) =>
+                    div(
+                        { className: style.item },
+                        span({ className: style.name, textContent: item.name }),
+                        activeInputControl(content, item, style.control),
+                    ),
                 ),
-            ),
-            button(
-                {
-                    className: style.edit,
-                    title: new Localize("configuration.edit"),
-                    onclick: () => PubSub.default.pub("editConfiguration", content.document),
-                },
-                svg({ icon: "icon-edit" }),
-            ),
+            ...(this.embedded
+                ? []
+                : [
+                      button(
+                          {
+                              className: style.edit,
+                              title: new Localize("configuration.edit"),
+                              onclick: () => PubSub.default.pub("editConfiguration", content.document),
+                          },
+                          svg({ icon: "icon-edit" }),
+                      ),
+                  ]),
         );
     }
 }

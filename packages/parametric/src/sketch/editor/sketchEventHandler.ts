@@ -13,8 +13,10 @@ import {
     type IView,
     MeshDataUtils,
     Precision,
+    SelectionRectangle,
     type ShapeMeshData,
     VisualConfig,
+    XYZ,
 } from "@chili3d/core";
 import {
     applyDragAutoConstraints,
@@ -107,6 +109,7 @@ export class SketchEventHandler implements IEventHandler {
     private hoverMeshId?: number;
     private hoverKey?: string;
     private readonly selectedEntities = new Set<number>();
+    private boxSelection?: { x: number; y: number; element: HTMLDivElement; additive: boolean };
     private selectionMeshId?: number;
     private constraintMeshId?: number;
     private datumDisplayId?: number;
@@ -353,6 +356,19 @@ export class SketchEventHandler implements IEventHandler {
 
     pointerMove(view: IView, event: PointerEvent): void {
         if (!this.isEnabled) return;
+        if (this.boxSelection) {
+            const { x, y, element } = this.boxSelection;
+            const crossing = event.offsetX < x;
+            Object.assign(element.style, {
+                left: `${Math.min(x, event.offsetX)}px`,
+                top: `${Math.min(y, event.offsetY)}px`,
+                width: `${Math.abs(event.offsetX - x)}px`,
+                height: `${Math.abs(event.offsetY - y)}px`,
+                border: `1px ${crossing ? "dashed #279653" : "solid #4a9eff"}`,
+                background: crossing ? "#2796532e" : "#4a9eff2e",
+            });
+            return;
+        }
         // a dimension label drag is tracked on window by the annotation manager;
         // the viewport must not run its hover/drag logic alongside it
         if (this.editor.annotations.isLabelDragging) return;
@@ -503,7 +519,17 @@ export class SketchEventHandler implements IEventHandler {
         if (entityId === undefined) {
             // blank click drops both the constraint-badge and entity selections
             this.editor.annotations.clearConstraintSelection();
-            this.clearSelection(view);
+            if (!event.shiftKey && !event.ctrlKey && !event.metaKey) this.clearSelection(view);
+            const element = document.createElement("div");
+            element.style.cssText = "position:absolute;pointer-events:none;z-index:50";
+            element.setAttribute("aria-label", "Sketch selection box");
+            view.dom?.append(element);
+            this.boxSelection = {
+                x: event.offsetX,
+                y: event.offsetY,
+                element,
+                additive: event.shiftKey || event.ctrlKey || event.metaKey,
+            };
             return;
         }
         this.selectEntity(view, entityId);
@@ -539,6 +565,39 @@ export class SketchEventHandler implements IEventHandler {
     }
 
     pointerUp(view: IView, event: PointerEvent): void {
+        if (this.boxSelection) {
+            const { x, y, element } = this.boxSelection;
+            element.remove();
+            this.boxSelection = undefined;
+            if (Math.hypot(event.offsetX - x, event.offsetY - y) > 3) {
+                const rect = new SelectionRectangle(x, y, event.offsetX, event.offsetY);
+                for (const entity of this.editor.solver.entities()) {
+                    if (isDatumEntityId(entity.id)) continue;
+                    const positions = entityDisplayMesh(this.editor.node.plane, entity, 0).position;
+                    const hits: boolean[] = [];
+                    for (let i = 0; i + 5 < positions.length; i += 6) {
+                        hits.push(
+                            rect.segment(
+                                view.worldToScreen(
+                                    new XYZ({ x: positions[i], y: positions[i + 1], z: positions[i + 2] }),
+                                ),
+                                view.worldToScreen(
+                                    new XYZ({
+                                        x: positions[i + 3],
+                                        y: positions[i + 4],
+                                        z: positions[i + 5],
+                                    }),
+                                ),
+                            ),
+                        );
+                    }
+                    if (hits.length && (rect.crossing ? hits.some(Boolean) : hits.every(Boolean)))
+                        this.selectedEntities.add(entity.id);
+                }
+                this.updateSelectionHighlight(view);
+            }
+            return;
+        }
         if (this.entityDrag) {
             const id = this.entityDrag.id;
             this.entityDrag = undefined;
@@ -724,6 +783,8 @@ export class SketchEventHandler implements IEventHandler {
     }
 
     dispose(): void {
+        this.boxSelection?.element.remove();
+        this.boxSelection = undefined;
         this.disposed = true;
         this.editor.view.cameraController.removePropertyChanged?.(this.onCameraChanged);
         VisualConfig.removePropertyChanged(this.onCameraChanged);
