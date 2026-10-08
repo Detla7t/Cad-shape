@@ -189,7 +189,7 @@ describe("document version control (kernel)", () => {
             Transaction.execute(doc, name, () => sketch.setDataEmitShapeChanged(data));
             await settle();
             const commit = vc.headCommit();
-            return vc.diff(commit.parents[0], commit.id).nodes.find((n) => n.id === sketch.id)!.changes;
+            return vc.diff(commit.parents[0], vc.head).nodes.find((n) => n.id === sketch.id)!.changes;
         };
         const dimension = await change("edit radius", (data) => {
             data.constraints[0].datum = 12;

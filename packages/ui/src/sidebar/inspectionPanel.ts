@@ -9,6 +9,7 @@ import {
     resolveUnitSpec,
     Transaction,
 } from "@chili3d/core";
+import { option } from "@chili3d/element";
 import style from "./modelTable.module.css";
 
 type Tolerance = { minus: number; plus: number };
@@ -71,8 +72,9 @@ export class InspectionPanel {
             this.watches.add(n);
         }
         const selected = this.select.value;
-        this.select.replaceChildren(new Option("All models", ""));
-        for (const n of nodes) if (n instanceof GeometryNode) this.select.add(new Option(n.name, n.id));
+        this.select.replaceChildren(option({ textContent: "All models", value: "" }));
+        for (const n of nodes)
+            if (n instanceof GeometryNode) this.select.append(option({ textContent: n.name, value: n.id }));
         this.select.value = selected;
         if (this.select.selectedIndex < 0) this.select.selectedIndex = 0;
         const slots = modelParameters(this.doc).filter(

@@ -17,7 +17,14 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { type ConfigurationInputData, type IFace, Plane, ShapeTypes, Transaction } from "@chili3d/core";
+import {
+    type ConfigurationInputData,
+    type IFace,
+    modelParameters,
+    Plane,
+    ShapeTypes,
+    Transaction,
+} from "@chili3d/core";
 import { createMockApplication, createMockVisualWithDocument, TestDocument } from "@chili3d/core/test-utils";
 import { initWasm, ShapeFactory } from "@chili3d/wasm";
 import type { FeatureData, FeatureScriptFeatureData } from "../src/features/feature";
@@ -30,6 +37,7 @@ import { ConstraintKind, type SketchData } from "../src/sketch/sketchModel";
 import { SketchNode } from "../src/sketch/sketchNode";
 import { ONSHAPE_STD } from "./featurescript/_helpers/onshapeStd";
 import "./sketch/setup";
+import "../src/sketch/modelParameters";
 
 const WASM_BINARY = readFileSync(
     path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../wasm/lib/chili-wasm.wasm"),
@@ -113,6 +121,37 @@ function rows(body: ParametricBodyNode) {
 }
 
 describe("configured built-in features", () => {
+    test("table edits preserve dimension labels and expose reversible sketch suppression", () => {
+        const doc = newDoc();
+        const sketch = new SketchNode({
+            document: doc,
+            plane: Plane.XY,
+            data: {
+                entities: [{ id: 1, type: "circle", params: [0, 0, 10] }],
+                constraints: [
+                    { id: 1, kind: ConstraintKind.Radius, refs: [{ entityId: 1, pointIndex: 0 }], datum: 10 },
+                ],
+                anchors: [{ id: 1, anchor: { kind: "vector", dx: 20, dy: 15 } }],
+            },
+        });
+        doc.modelManager.addNode(sketch);
+        const slots = modelParameters(doc);
+        const radius = slots.find((s) => s.id.endsWith(":dimension:1"));
+        expect(radius).not.toBeUndefined();
+        expect(radius!.apply('configure(Size, "S": 12, "L": 30)').isOk).toBe(true);
+        expect(sketch.data.entities[0].params[2]).toBeCloseTo(12);
+        expect(sketch.data.anchors).toEqual([{ id: 1, anchor: { kind: "vector", dx: 20, dy: 15 } }]);
+        const suppression = slots.find((s) => s.label === "Unsuppressed");
+        expect(suppression).toMatchObject({ boolean: true, inverted: true });
+        expect(suppression!.apply("true").isOk).toBe(true);
+        expect(sketch.suppressed).toBe(true);
+        doc.history.undo();
+        expect(sketch.suppressed).toBe(false);
+        expect(sketch.data.entities[0].params[2]).toBeCloseTo(12);
+        activate(doc, { Size: "L" });
+        expect(sketch.data.entities[0].params[2]).toBeCloseTo(30);
+    });
+
     test("configured sketch suppression removes profiles and construction display, then restores them", () => {
         const doc = newDoc();
         const { sketch } = squareSketch(doc, 10);

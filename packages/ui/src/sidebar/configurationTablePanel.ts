@@ -3,6 +3,7 @@
 
 import {
     activeInputValue,
+    type ConfigurationVariableInputData,
     formatConfiguredValue,
     type IDocument,
     type INode,
@@ -11,9 +12,14 @@ import {
     modelParameters,
     parseConfiguredValue,
     selectorOptions,
+    unitSpecEquals,
+    unitSpecOfType,
 } from "@chili3d/core";
+import { option as makeOption } from "@chili3d/element";
+import { activeInputControl } from "../property/configuration/activeControls";
 import { ConfigurationDataContent } from "../property/configuration/configurationDataContent";
 import { ConfigurationEditor } from "../property/configuration/configurationEditor";
+import { ConfigurationInputMenu } from "./configurationInputMenu";
 import style from "./modelTable.module.css";
 
 /** The same live slots as the feature/sketch editors, arranged in configuration rows. */
@@ -28,12 +34,15 @@ export class ConfigurationTablePanel {
     private disposed = false;
     private writing = false;
     private readonly data: ConfigurationDataContent;
+    private readonly tabs = document.createElement("div");
+    private readonly addMenu: ConfigurationInputMenu;
+    private readonly collapsed = new Set<string>();
     constructor(private readonly doc: IDocument) {
-        this.element.className = style.root;
+        this.element.className = `${style.root} ${style.configuration}`;
         this.data = new ConfigurationDataContent(doc);
         this.inputs = new ConfigurationEditor(this.data);
         this.inputs.dataset["docked"] = "true";
-        const tabs = document.createElement("div");
+        const tabs = this.tabs;
         tabs.className = style.tabs;
         for (const [label, showGrid] of [
             ["Configurations", true],
@@ -44,11 +53,7 @@ export class ConfigurationTablePanel {
             button.setAttribute("role", "tab");
             button.setAttribute("aria-selected", String(showGrid));
             button.onclick = () => {
-                this.inputs.hidden = showGrid;
-                this.grid.hidden = !showGrid;
-                this.filter.hidden = !showGrid;
-                for (const child of tabs.children)
-                    child.setAttribute("aria-selected", String(child === button));
+                this.showGrid(showGrid);
             };
             tabs.append(button);
         }
@@ -59,11 +64,85 @@ export class ConfigurationTablePanel {
         this.filter.oninput = () => this.render();
         this.status.className = style.error;
         this.status.setAttribute("role", "status");
-        this.element.append(tabs, this.filter, this.grid, this.inputs, this.status);
+        this.addMenu = new ConfigurationInputMenu((kind) => {
+            const id = this.data.addInput(kind);
+            this.render();
+            this.editInput(id);
+        });
+        this.grid.className = style.configurationSections;
+        this.element.append(tabs, this.filter, this.grid, this.inputs, this.status, this.addMenu.element);
         doc.modelManager.addNodeObserver(this.changed);
         doc.variables.onPropertyChanged(this.changed);
         this.render();
     }
+    private showGrid(show: boolean) {
+        this.inputs.hidden = show;
+        this.grid.hidden = !show;
+        this.filter.hidden = !show;
+        for (const [index, child] of Array.from(this.tabs.children).entries())
+            child.setAttribute("aria-selected", String(show === (index === 0)));
+    }
+
+    private editInput(id: string) {
+        this.showGrid(false);
+        this.inputs.render();
+        this.inputs.focusInput(id);
+    }
+
+    private inputSection(id: string, name: string, kind: string): HTMLDetailsElement {
+        const section = document.createElement("details");
+        section.className = style.inputSection;
+        section.dataset["inputId"] = id;
+        section.open = !this.collapsed.has(id);
+        section.ontoggle = () => {
+            if (section.open) this.collapsed.delete(id);
+            else this.collapsed.add(id);
+        };
+        const summary = document.createElement("summary");
+        summary.textContent = `${name} · ${kind}`;
+        const edit = document.createElement("button");
+        edit.textContent = "⋯";
+        edit.title = `Edit ${name} input`;
+        edit.setAttribute("aria-label", edit.title);
+        edit.onclick = (event) => {
+            event.preventDefault();
+            this.editInput(id);
+        };
+        summary.append(edit);
+        section.append(summary);
+        return section;
+    }
+
+    private variableSection(input: ConfigurationVariableInputData, slots: ModelParameter[]): HTMLElement {
+        const section = this.inputSection(input.id, input.name, "Configuration variable");
+        const controls = document.createElement("div");
+        controls.className = style.toolbar;
+        const value = activeInputControl(this.data, input, style.variableValue);
+        value.setAttribute("aria-label", `${input.name} value`);
+        const choose = document.createElement("select");
+        choose.setAttribute("aria-label", `Use ${input.name} for parameter`);
+        choose.append(makeOption({ textContent: "Choose a dimension or feature parameter…", value: "" }));
+        const eligible = slots.filter(
+            (s) => !s.boolean && unitSpecEquals(s.unit, unitSpecOfType(input.type)),
+        );
+        for (const slot of eligible)
+            choose.append(makeOption({ textContent: `${slot.node.name} / ${slot.label}`, value: slot.id }));
+        const use = document.createElement("button");
+        use.textContent = "Use variable";
+        use.onclick = () => {
+            const slot = eligible.find((s) => s.id === choose.value);
+            if (slot) this.apply(slot, input.name);
+        };
+        const label = document.createElement("label");
+        label.textContent = `${input.type} `;
+        label.append(value);
+        controls.append(label, choose, use);
+        const bounds = document.createElement("small");
+        bounds.textContent = `Default: ${input.defaultExpression}${input.min === undefined ? "" : ` · Minimum: ${input.min}`}${input.max === undefined ? "" : ` · Maximum: ${input.max}`}`;
+        section.append(controls, bounds);
+        return section;
+    }
+
     private readonly changed = () => {
         if (this.writing || this.scheduled || this.disposed) return;
         this.scheduled = true;
@@ -82,7 +161,12 @@ export class ConfigurationTablePanel {
         const slots = modelParameters(this.doc);
         const sections: HTMLElement[] = [];
         const query = this.filter.value.toLowerCase();
-        for (const input of this.data.inputs.filter(isSelectorInput)) {
+        for (const input of this.data.inputs) {
+            if (!isSelectorInput(input)) {
+                if (!query || input.name.toLowerCase().includes(query))
+                    sections.push(this.variableSection(input, slots));
+                continue;
+            }
             const configured = slots.filter((s) => {
                 const p = typeof s.value === "string" ? parseConfiguredValue(s.value) : undefined;
                 return p?.isOk && p.value.input === input.name;
@@ -93,18 +177,23 @@ export class ConfigurationTablePanel {
                 !configured.some((s) => `${s.node.name} ${s.label}`.toLowerCase().includes(query))
             )
                 continue;
-            const section = document.createElement("section");
-            section.className = style.root;
+            const section = this.inputSection(
+                input.id,
+                input.name,
+                input.kind === "checkbox" ? "Checkbox" : "List",
+            );
             const toolbar = document.createElement("div");
             toolbar.className = style.toolbar;
             const title = document.createElement("strong");
             title.textContent = input.name;
             const choose = document.createElement("select");
             choose.setAttribute("aria-label", `Configure ${input.name} parameter`);
-            choose.add(new Option("Choose a dimension or feature parameter…", ""));
+            choose.append(makeOption({ textContent: "Choose a dimension or feature parameter…", value: "" }));
             slots
                 .filter((s) => !configured.some((item) => item.id === s.id))
-                .forEach((s) => choose.add(new Option(`${s.node.name} / ${s.label}`, s.id)));
+                .forEach((s) =>
+                    choose.append(makeOption({ textContent: `${s.node.name} / ${s.label}`, value: s.id })),
+                );
             const add = document.createElement("button");
             add.textContent = "Configure";
             add.onclick = () => {
@@ -140,6 +229,10 @@ export class ConfigurationTablePanel {
                     const parsed = parseConfiguredValue(String(slot.value));
                     if (!parsed.isOk) continue;
                     field.value = parsed.value.arms.find((a) => a.option === option)?.value ?? "";
+                    if (slot.boolean) {
+                        field.type = "checkbox";
+                        field.checked = (field.value === "true") !== (slot.inverted === true);
+                    }
                     field.setAttribute("aria-label", `${option}: ${slot.node.name} / ${slot.label}`);
                     field.onchange = () => {
                         // Refresh the slot after another cell's edit; never overwrite its latest arms.
@@ -148,7 +241,12 @@ export class ConfigurationTablePanel {
                         const current = parseConfiguredValue(String(fresh.value));
                         if (!current.isOk) return;
                         const arms = current.value.arms.filter((a) => a.option !== option);
-                        arms.push({ option, value: field.value });
+                        arms.push({
+                            option,
+                            value: slot.boolean
+                                ? String(field.checked !== (slot.inverted === true))
+                                : field.value,
+                        });
                         this.apply(fresh, formatConfiguredValue({ ...current.value, arms }));
                     };
                     row.insertCell().append(field);
@@ -160,12 +258,6 @@ export class ConfigurationTablePanel {
             section.append(toolbar, scroll);
             sections.push(section);
         }
-        const add = document.createElement("button");
-        add.textContent = "Add configuration input";
-        add.onclick = () => {
-            this.data.addInput("list");
-            this.render();
-        };
         if (!sections.length) {
             const empty = document.createElement("div");
             empty.className = style.empty;
@@ -173,7 +265,7 @@ export class ConfigurationTablePanel {
                 "Add a configuration input, then choose a sketch dimension or feature parameter. Each row defines a configuration.";
             sections.push(empty);
         }
-        this.grid.replaceChildren(...sections, add);
+        this.grid.replaceChildren(...sections);
     }
     private apply(slot: ModelParameter, value: string) {
         this.writing = true;
@@ -186,6 +278,7 @@ export class ConfigurationTablePanel {
         this.doc.visual.update();
     }
     dispose() {
+        this.addMenu.close();
         this.disposed = true;
         this.inputs.dispose();
         this.doc.modelManager.removeNodeObserver(this.changed);

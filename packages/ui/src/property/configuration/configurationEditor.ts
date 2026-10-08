@@ -117,6 +117,12 @@ export class ConfigurationEditor extends HTMLElement {
         this.renderInputs();
     }
 
+    focusInput(id: string): void {
+        const card = this.cards.get(id);
+        card?.scrollIntoView?.({ block: "nearest" });
+        card?.querySelector<HTMLInputElement>(`input.${style.nameBox}`)?.focus();
+    }
+
     // ------------------------------------------------------------------ The active configuration
 
     private renderActive(): void {

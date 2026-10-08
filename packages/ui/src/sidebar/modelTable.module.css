@@ -71,3 +71,91 @@
 .root [hidden] {
     display: none;
 }
+.configuration {
+    height: 100%;
+    min-height: 0;
+}
+.configurationSections {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+}
+.inputSection {
+    margin-bottom: 12px;
+    border: 1px solid var(--border-color);
+}
+.inputSection summary {
+    padding: 5px 8px;
+    background: var(--title-background);
+    cursor: pointer;
+    font-weight: 600;
+    min-height: 24px;
+    line-height: 24px;
+}
+.inputSection summary button {
+    float: right;
+    border: 0;
+    padding: 0 6px;
+    font-size: 18px;
+}
+.inputSection .toolbar {
+    padding: 6px;
+    flex-wrap: wrap;
+}
+.inputSection .toolbar select {
+    flex: 1;
+    min-width: 120px;
+    max-width: 100%;
+}
+.inputSection small {
+    display: block;
+    padding: 0 6px 8px;
+}
+.variableValue {
+    width: 90px;
+    margin-left: 5px;
+}
+.table input[type="checkbox"] {
+    width: auto;
+}
+.inputFooter {
+    position: relative;
+    margin-top: auto;
+    flex-shrink: 0;
+    padding: 6px;
+    border-top: 1px solid var(--border-color);
+    background: var(--title-background);
+    display: flex;
+    justify-content: center;
+}
+.inputFooter button {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    cursor: pointer;
+}
+.inputFooter svg {
+    width: 16px;
+    height: 16px;
+}
+.inputMenu {
+    position: absolute;
+    bottom: calc(100% - 4px);
+    right: 6px;
+    z-index: 20;
+    background: var(--panel-background-color);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 3px 10px #0003;
+    padding: 4px;
+    min-width: 195px;
+}
+.inputMenu button {
+    width: 100%;
+    border: 0;
+    text-align: left;
+    padding: 7px;
+}
+.inputMenu button:hover,
+.inputMenu button:focus-visible {
+    background: var(--hover-background-color);
+}

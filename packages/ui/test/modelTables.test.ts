@@ -20,7 +20,7 @@ class ParameterNode extends GeometryNode {
         return "body.meshNode" as const;
     }
     protected createMesh(): IShapeMeshData {
-        return {};
+        return { edges: undefined, faces: undefined, vertexs: undefined };
     }
     get value(): number | string {
         return this.getPrivateValue("value", 20);
@@ -126,6 +126,47 @@ test("inspection displays a unitless parameter without millimeter units", () => 
         expect(panel.element.querySelectorAll("tr")[1].cells[1].textContent).toBe("20");
     } finally {
         panel.dispose();
+        doc.dispose();
+    }
+});
+
+test("the add-input menu creates independent lists, checkboxes and variables without a combination table", async () => {
+    const { doc } = fixture();
+    const panel = new ConfigurationTablePanel(doc);
+    document.body.append(panel.element);
+    try {
+        for (const kind of ["list", "checkbox", "variable"]) {
+            const add = panel.element.querySelector<HTMLButtonElement>(
+                "[aria-label='Add configuration input']",
+            );
+            expect(add).not.toBeNull();
+            add!.click();
+            const choices = panel.element.querySelectorAll<HTMLButtonElement>("[role=menuitem]");
+            expect(Array.from(choices).map((b) => b.textContent)).toEqual([
+                "List",
+                "Checkbox",
+                "Configuration variable",
+            ]);
+            panel.element.querySelector<HTMLButtonElement>(`[data-input-kind='${kind}']`)!.click();
+            expect(doc.variables.configurationInputs.at(-1)!.kind).toBe(kind);
+            expect(panel.element.querySelector("[role=menu]")).toBeNull();
+            panel.element.querySelector<HTMLButtonElement>("[role=tab]")!.click();
+            await Promise.resolve();
+        }
+        expect(panel.element.querySelectorAll("details[data-input-id]")).toHaveLength(4);
+        expect(panel.element.querySelectorAll("details table")).toHaveLength(3);
+        expect(panel.element.querySelectorAll("details tr")).toHaveLength(8); // (2 + 1 + 2) choices + 3 headers
+        const box = panel.element.querySelector<HTMLInputElement>(
+            "details input[aria-label='Variable1 value']",
+        );
+        expect(box).not.toBeNull();
+        box!.value = "35 mm";
+        box!.dispatchEvent(new FocusEvent("blur"));
+        expect(doc.variables.activeConfiguration).toEqual({ Variable1: "35 mm" });
+        expect(doc.variables.scope.get("Variable1")?.value).toBe(35);
+    } finally {
+        panel.dispose();
+        panel.element.remove();
         doc.dispose();
     }
 });
