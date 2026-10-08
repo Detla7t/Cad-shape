@@ -114,10 +114,8 @@ export class AppBuilder {
                 // Parse and instantiate the std once the app is idle, not on the first studio compile.
                 whenIdle(() => parametric.warmUpStd());
             } catch (error) {
-                Logger.warn(
-                    "Onshape's std library is unavailable; Feature Studios run on the built-in std",
-                    error,
-                );
+                parametric.markOnshapeStdUnavailable(error);
+                Logger.warn("Onshape's std library is unavailable; Feature Studios cannot evaluate", error);
             }
             this._ribbonExtras.push(
                 ...parametric.SketchRibbonProfiles,

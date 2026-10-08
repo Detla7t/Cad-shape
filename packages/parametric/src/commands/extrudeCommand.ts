@@ -49,6 +49,7 @@ import {
     planeOfPickedFace,
     SELECTED_PROFILE_STATE,
 } from "./extrudeDragStep";
+import { ExtrudePanel } from "./extrudePanel";
 import { prioritizeSketchFaces } from "./profileFaceSort";
 
 const OPERATION_NEW: I18nKeys = "option.command.operation.new";
@@ -188,6 +189,26 @@ export class SelectSketchProfilesStep implements IStep {
 
 @command({ key: "feature.extrude", icon: "icon-prism" })
 export class ExtrudeFeatureCommand extends MultistepCommand {
+    private panel?: ExtrudePanel;
+
+    protected override async executeAsync(): Promise<void> {
+        if (this.depthValue === 0) this.depth = 25;
+        this.panel = new ExtrudePanel(
+            this,
+            () => this._dragHandler?.confirm(),
+            () => {
+                void this.cancel();
+            },
+        );
+        PubSub.default.pub("closeCommandContext");
+        this.panel.setProfile();
+        try {
+            await super.executeAsync();
+        } finally {
+            this.panel.dispose();
+            this.panel = undefined;
+        }
+    }
     @property("option.command.operation", {
         combobox: Combobox.from([
             OPERATION_NEW,
@@ -291,8 +312,11 @@ export class ExtrudeFeatureCommand extends MultistepCommand {
             startOffset: this.startOffsetValue,
             buildPreview: this.buildPreview,
             meshArrow: this.meshArrow,
+            canConfirm: () => this.panel?.canConfirm ?? true,
             onReady: (handler: ExtrudeDragHandler) => {
                 this._dragHandler = handler;
+                this.panel?.setProfile(handler.state.node.name, handler.state.faces.length);
+                PubSub.default.pub("clearSelectionControl");
             },
             onDone: () => {
                 this._dragHandler = undefined;
@@ -301,6 +325,11 @@ export class ExtrudeFeatureCommand extends MultistepCommand {
                 this._syncingFromDrag = true;
                 this.depth = dist;
                 this._syncingFromDrag = false;
+                if (this._dragHandler)
+                    this.panel?.setProfile(
+                        this._dragHandler.state.node.name,
+                        this._dragHandler.state.faces.length,
+                    );
             },
         };
     };

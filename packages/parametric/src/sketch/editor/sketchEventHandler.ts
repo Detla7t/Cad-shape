@@ -29,6 +29,7 @@ import { entityDisplayMesh } from "../entityMesh";
 import {
     arcAngles,
     ConstraintKind,
+    DEFAULT_SKETCH_LAYER,
     entityPointCount,
     isDatumEntityId,
     isExternalEntityId,
@@ -124,6 +125,7 @@ export class SketchEventHandler implements IEventHandler {
     constructor(private readonly editor: SketchEditor) {
         editor.view.cameraController.onPropertyChanged?.(this.onCameraChanged);
         VisualConfig.onPropertyChanged(this.onCameraChanged);
+        Config.instance.onPropertyChanged(this.onCameraChanged);
         this.showDatum();
         this.showExternalRefs();
         this.showEntityPoints();
@@ -800,6 +802,7 @@ export class SketchEventHandler implements IEventHandler {
         this.disposed = true;
         this.editor.view.cameraController.removePropertyChanged?.(this.onCameraChanged);
         VisualConfig.removePropertyChanged(this.onCameraChanged);
+        Config.instance.removePropertyChanged(this.onCameraChanged);
         const view = this.editor.view;
         this.clearSnapFeedback();
         if (!view.isClosed) {
@@ -1079,9 +1082,16 @@ function entityColor(editor: SketchEditor, entity: SketchEntityData): number {
     if (!editor.lastSolveOutcome.result.startsWith("Ok") || editor.solver.datumErrors.size > 0)
         return 0xee6262;
     if (editor.lastSolveOutcome.dofs === 0 || editor.fullyConstrainedEntities.has(entity.id))
-        return VisualConfig.defaultEdgeColor;
+        return Config.instance.graphics.constrainedColor
+            ? Number.parseInt(Config.instance.graphics.constrainedColor.slice(1), 16)
+            : VisualConfig.defaultEdgeColor;
     const layer = editor.solver.sketchLayers().find((layer) => layer.id === (entity.layer ?? "0"));
-    return Number.parseInt((entity.color ?? layer?.color ?? "#4a9eff").slice(1), 16);
+    const layerColor =
+        layer?.id === "0" && layer.color === DEFAULT_SKETCH_LAYER.color ? undefined : layer?.color;
+    return Number.parseInt(
+        (entity.color ?? layerColor ?? Config.instance.graphics.underconstrainedColor).slice(1),
+        16,
+    );
 }
 
 function styledEntityMeshes(editor: SketchEditor): ShapeMeshData[] {
@@ -1093,13 +1103,16 @@ function styledEntityMeshes(editor: SketchEditor): ShapeMeshData[] {
         .filter((entity) => editor.solver.entityVisible(entity))
         .map((entity) => {
             const layer = layers.find((layer) => layer.id === (entity.layer ?? "0"));
-            return entityDisplayMesh(
+            const mesh = entityDisplayMesh(
                 editor.node.plane,
                 entity,
                 entityColor(editor, entity),
                 !!(entity.construction || entity.dashed || layer?.dashed),
                 pixel,
             );
+            if (editor.lastSolveOutcome.dofs > 0 && !editor.fullyConstrainedEntities.has(entity.id))
+                mesh.occludedColor = Number.parseInt(Config.instance.graphics.occludedColor.slice(1), 16);
+            return mesh;
         });
 }
 

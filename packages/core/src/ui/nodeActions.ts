@@ -2,6 +2,11 @@
 // See LICENSE file in the project root for full license information.
 
 import type { INode } from "../model";
+import type { IView, VisualShapeData } from "../visual";
+export interface NodeMenuContext {
+    view: IView;
+    picks: VisualShapeData[];
+}
 export interface NodeMenuAction {
     id: string;
     label: string;
@@ -12,14 +17,14 @@ export interface NodeMenuAction {
     icon?: string;
     separatorBefore?: boolean;
 }
-const providers = new Set<(node: INode) => NodeMenuAction[]>();
+const providers = new Set<(node: INode, context?: NodeMenuContext) => NodeMenuAction[]>();
 export const NodeActions = {
-    register(provider: (node: INode) => NodeMenuAction[]) {
+    register(provider: (node: INode, context?: NodeMenuContext) => NodeMenuAction[]) {
         providers.add(provider);
     },
-    forNode(node: INode): NodeMenuAction[] {
+    forNode(node: INode, context?: NodeMenuContext): NodeMenuAction[] {
         return [...providers]
-            .flatMap((provider) => provider(node))
+            .flatMap((provider) => provider(node, context))
             .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     },
 };

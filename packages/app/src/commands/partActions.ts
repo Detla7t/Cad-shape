@@ -11,6 +11,7 @@ import {
     ShapeNode,
     Transaction,
 } from "@chili3d/core";
+import "./viewportPartActions";
 
 let copiedPart: ShapeNode | undefined;
 NodeActions.register((node) => {

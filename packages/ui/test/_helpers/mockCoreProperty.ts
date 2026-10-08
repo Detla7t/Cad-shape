@@ -17,6 +17,7 @@ rs.mock("@chili3d/core", () => {
     // can miss them (see `coreMocks.ts`), so they come straight from their modules.
     const configuredValue = rs.hoisted(() => require("../../../core/src/parameters/configuredValue"));
     const configuration = rs.hoisted(() => require("../../../core/src/parameters/configuration"));
+    const documentUnits = rs.hoisted(() => require("../../../core/src/parameters/documentUnits"));
     const {
         LocalizeMock,
         BindingMock,
@@ -30,6 +31,7 @@ rs.mock("@chili3d/core", () => {
         ...actual,
         ...configuredValue,
         ...configuration,
+        ...documentUnits,
         Localize: LocalizeMock,
         Binding: BindingMock,
         PathBinding: PathBindingMock,

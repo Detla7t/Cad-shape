@@ -147,7 +147,7 @@ export class Document extends Observable implements IDocument {
         } else {
             await writeStorageBatch(this.application.storage, Constants.DBName, writes);
         }
-        PubSub.default.pub("documentSaved", this);
+        if (!this._isDisposed) PubSub.default.pub("documentSaved", this);
     }
 
     async close() {

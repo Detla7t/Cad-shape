@@ -3,6 +3,7 @@
 
 import {
     type Act,
+    documentConfiguration,
     History,
     type IApplication,
     type IDocument,
@@ -20,6 +21,7 @@ import {
     Observable,
     ObservableCollection,
     Result,
+    restoreConfiguration,
     type Serialized,
     Signal,
     VariableTable,
@@ -74,6 +76,7 @@ export class DetachedDocument extends Observable implements IDocument {
             name: this.name,
             models: this.modelManager.serialize(),
             variables: this.variables.items,
+            configuration: documentConfiguration(this.variables),
             acts: [],
             userData: this.userData,
         };
@@ -98,10 +101,16 @@ export class DetachedDocument extends Observable implements IDocument {
     static async load(application: IApplication, data: Serialized): Promise<DetachedDocument> {
         const document = new DetachedDocument(application, data["name"] ?? "", data["id"]);
         document.history.disabled = true;
-        document.variables.setItems(data["variables"] ?? []);
-        if (data["userData"]) document.userData = data["userData"];
-        await document.modelManager.deserialize(data["models"]);
-        return document;
+        try {
+            restoreConfiguration(document.variables, data["configuration"]);
+            document.variables.setItems(data["variables"] ?? []);
+            if (data["userData"]) document.userData = data["userData"];
+            await document.modelManager.deserialize(data["models"]);
+            return document;
+        } catch (error) {
+            document.dispose();
+            throw error;
+        }
     }
 }
 

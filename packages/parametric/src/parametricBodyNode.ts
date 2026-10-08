@@ -559,15 +559,17 @@ export class ParametricBodyNode
         this._featureErrors.clear();
         this._featureWarnings.clear();
         this._evaluating = true;
+        let result: Result<IShape>;
         try {
-            const result = this.evaluateChain();
-            // Watch-triggered failures deliberately keep the last good shape without
-            // calling setShape. They must still invalidate consumers of that geometry.
-            if (!result.isOk) this.setEvaluationError(result.error);
-            return result;
+            result = this.evaluateChain();
         } finally {
             this._evaluating = false;
         }
+        // Watch-triggered failures deliberately keep the last good shape without
+        // calling setShape. Notify after the run ends so dependents cannot mistake
+        // the failed result for a usable in-flight timeline prefix.
+        if (!result.isOk) this.setEvaluationError(result.error);
+        return result;
     }
 
     // `IBodyTrackingNode` — pure forwarding; `BodyTimeline` owns the id arrays and

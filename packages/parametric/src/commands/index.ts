@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import "./booleanCommand";
+import "./bodyContextActions";
 import "./edgeCornerCommand";
 import "./exportCommands";
 import "./extrudeCommand";

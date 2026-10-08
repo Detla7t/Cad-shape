@@ -192,7 +192,7 @@ describe("CameraController — setSize", () => {
 
         const cam = cc.camera as OrthographicCamera;
         const distance = Math.sqrt(3 * 1500 * 1500);
-        const halfHeight = distance * Math.tan((25 * Math.PI) / 180);
+        const halfHeight = distance * Math.tan((22.5 * Math.PI) / 180);
         expect(cam.top).toBeCloseTo(halfHeight);
         expect(cam.bottom).toBeCloseTo(-halfHeight);
         expect(cam.right / cam.left).toBeCloseTo(-1);
@@ -322,7 +322,7 @@ describe("CameraController — fitContent", () => {
         cc.fitContent();
 
         // Empty scene produces an invalid sphere, so SHAPE_EMPTY_SIZE (800) is used
-        const expectedDistance = 800 / Math.sin((25 * Math.PI) / 180);
+        const expectedDistance = 800 / Math.sin((22.5 * Math.PI) / 180);
         expect(cc.target.x).toBeCloseTo(0);
         expect(cc.target.y).toBeCloseTo(0);
         expect(cc.target.z).toBeCloseTo(0);
@@ -338,7 +338,7 @@ describe("CameraController — fitContent", () => {
         cc.fitContent();
 
         const radius = Math.sqrt(3 * 10 * 10);
-        const expectedDistance = radius / Math.sin((25 * Math.PI) / 180);
+        const expectedDistance = radius / Math.sin((22.5 * Math.PI) / 180);
         expect(cc.target.x).toBeCloseTo(0);
         expect(cc.target.y).toBeCloseTo(0);
         expect(cc.target.z).toBeCloseTo(0);
@@ -353,9 +353,9 @@ describe("CameraController — fitContent", () => {
         cc.fitContent();
 
         const radius = Math.sqrt(3 * 10 * 10);
-        const expectedDistance = radius / Math.sin((25 * Math.PI) / 180);
+        const expectedDistance = radius / Math.sin((22.5 * Math.PI) / 180);
         const cam = cc.camera as OrthographicCamera;
-        expect(cam.top).toBeCloseTo(expectedDistance * Math.tan((25 * Math.PI) / 180));
+        expect(cam.top).toBeCloseTo(expectedDistance * Math.tan((22.5 * Math.PI) / 180));
         expect(cc.cameraPosition.distanceTo(cc.cameraTarget)).toBeCloseTo(expectedDistance);
     });
 });

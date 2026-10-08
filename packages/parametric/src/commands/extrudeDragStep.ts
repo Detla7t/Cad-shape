@@ -105,6 +105,8 @@ export interface ExtrudeDragData {
     onDone?(): void;
     /** The handler reports the signed depth so the command syncs its depth input. */
     onDist?(dist: number): void;
+    /** The feature panel can reject confirmation while an input is invalid. */
+    canConfirm?(): boolean;
 }
 
 /** Outward plane of a picked solid face, in world coordinates. */
@@ -352,7 +354,8 @@ export class ExtrudeDragHandler implements IEventHandler {
     }
 
     /** Confirms the extrude once a non-zero depth exists; a zero depth is a no-op. */
-    private confirm() {
+    confirm() {
+        if (this.data.canConfirm?.() === false) return;
         if (Math.abs(this.state.dist) >= Precision.Float) {
             // The button/Enter has no pointer event to provide the view, so fall back to
             // the active view; without it the step returns undefined and the command
@@ -409,9 +412,8 @@ export class ExtrudeDragHandler implements IEventHandler {
             this.switchTarget(face);
         }
 
-        this.state.dist = 0;
-        this.data.onDist?.(0);
-        // Refresh the arrow before syncing the selection: a throwing selection
+        this.data.onDist?.(this.state.dist);
+        // Keep the chosen depth when changing profiles. Refresh before syncing the selection: a throwing selection
         // subscriber must not leave the arrow at the stale position.
         this.refreshTempShapes(view);
         this.document.selection.setSelectedShapes(this.state.faces, SELECTED_PROFILE_STATE, false);

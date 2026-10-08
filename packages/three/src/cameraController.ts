@@ -3,6 +3,7 @@
 
 import {
     type CameraType,
+    Config,
     type ICameraController,
     MathUtils,
     Observable,
@@ -31,7 +32,7 @@ const DEG_TO_RAD = Math.PI / 180.0;
 const ZOOM_SPEED_FACTOR = 0.1;
 const ROTATE_SPEED_FACTOR = 0.5;
 const PAN_SPEED_FACTOR = 0.002;
-const CAMERA_FOV = 50;
+
 const CAMERA_NEAR = 0.1;
 const CAMERA_FAR = 1e6;
 const MIN_CARME_TO_TARGET = 50;
@@ -125,7 +126,12 @@ export class CameraController extends Observable implements ICameraController {
     private createCamera(near: number, far: number) {
         let camera: PerspectiveCamera | OrthographicCamera;
         if (this.cameraType === "perspective") {
-            camera = new PerspectiveCamera(CAMERA_FOV, this._width / this._height, near, far);
+            camera = new PerspectiveCamera(
+                Config.instance.graphics.fieldOfView,
+                this._width / this._height,
+                near,
+                far,
+            );
         } else {
             camera = new OrthographicCamera(
                 -this._width / 2,
@@ -165,6 +171,8 @@ export class CameraController extends Observable implements ICameraController {
     }
 
     updateCameraPosionTarget() {
+        if (this._camera instanceof PerspectiveCamera)
+            this._camera.fov = Config.instance.graphics.fieldOfView;
         const oldValue = this.cameraPosition;
         this._camera.position.copy(this._position);
         this._camera.lookAt(this._target);
@@ -186,7 +194,7 @@ export class CameraController extends Observable implements ICameraController {
     private updateOrthographicCamera(camera: OrthographicCamera) {
         const aspect = this._width / this._height;
         const length = this._position.distanceTo(this._target);
-        const frustumHalfHeight = length * Math.tan((CAMERA_FOV * DEG_TO_RAD) / 2);
+        const frustumHalfHeight = length * Math.tan((Config.instance.graphics.fieldOfView * DEG_TO_RAD) / 2);
         camera.left = -frustumHalfHeight * aspect;
         camera.right = frustumHalfHeight * aspect;
         camera.top = frustumHalfHeight;
@@ -283,7 +291,7 @@ export class CameraController extends Observable implements ICameraController {
     fitContent(): void {
         const context = this.view.document.visual.context as ThreeVisualContext;
         const sphere = this.getBoundingSphere(context);
-        let fieldOfView = CAMERA_FOV / 2.0;
+        let fieldOfView = Config.instance.graphics.fieldOfView / 2.0;
         if (this._width < this._height) {
             fieldOfView = (fieldOfView * this._width) / this._height;
         }

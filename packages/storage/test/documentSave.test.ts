@@ -176,3 +176,78 @@ test("a backend returning false does not emit a successful-save notification", a
         PubSub.default.remove("documentSaved", saved);
     }
 });
+
+test.each([
+    false,
+    true,
+])("queued history persistence preserves all records when an earlier save fails: %s", async (failFirst) => {
+    const document = await newDocument();
+    await document.save();
+    const control = DocumentVersionControl.of(document);
+    if (control === undefined) throw new Error("Version control was not attached");
+    const entered = Promise.withResolvers<void>();
+    const resume = Promise.withResolvers<void>();
+    const original = storage.writeBatch.bind(storage);
+    let calls = 0;
+    rs.spyOn(storage, "writeBatch").mockImplementation(async (database, operations) => {
+        if (++calls === 1) {
+            entered.resolve();
+            await resume.promise;
+            if (failFirst) throw new Error("first save aborted");
+        }
+        return original(database, operations);
+    });
+    document.name = "First revision";
+    const first = control.persist().then(
+        () => undefined,
+        (error: unknown) => error,
+    );
+    await entered.promise;
+    document.name = "Second revision";
+    const second = control.persist();
+    expect(calls).toBe(1);
+    resume.resolve();
+    expect((await first) instanceof Error).toBe(failFirst);
+    await second;
+    const archive = await new StorageHistoryPersistence(storage).load(document.id);
+    if (archive === undefined) throw new Error("Saved history was not found");
+    const hashes = new Set(archive.records.map(([hash]) => hash));
+    expect(control.reachableRecords().length).toBeGreaterThan(0);
+    for (const [hash] of control.reachableRecords()) expect(hashes.has(hash)).toBe(true);
+    expect(archive.refs.branches.find((branch) => branch.name === control.currentBranch)?.head).toBe(
+        control.head,
+    );
+});
+
+test("aborted history compaction preserves the earlier packs and can be retried", async () => {
+    const document = await newDocument();
+    for (let index = 0; index < 24; index++) {
+        document.name = `Revision ${index}`;
+        await document.save();
+    }
+    const before = await new StorageHistoryPersistence(storage).load(document.id);
+    expect((await storage.get(Constants.DBName, Constants.HistoryTable, document.id)).packs).toBe(24);
+    document.name = "Compacted revision";
+    const original = IDBObjectStore.prototype.put;
+    const put = rs.spyOn(IDBObjectStore.prototype, "put").mockImplementation(function (
+        this: IDBObjectStore,
+        value: unknown,
+        key?: IDBValidKey,
+    ) {
+        const request = original.call(this, value, key);
+        if (this.name === Constants.RecentTable)
+            request.addEventListener("success", () => request.transaction?.abort());
+        return request;
+    });
+    await expect(document.save()).rejects.toMatchObject({ name: "AbortError" });
+    expect(await new StorageHistoryPersistence(storage).load(document.id)).toEqual(before);
+    put.mockRestore();
+    await document.save();
+    expect((await storage.get(Constants.DBName, Constants.HistoryTable, document.id)).packs).toBe(1);
+    expect(
+        await storage.get(Constants.DBName, Constants.HistoryTable, `${document.id}#pack23`),
+    ).toBeUndefined();
+    const loaded = await reopen(document);
+    expect(loaded.name).toBe("Compacted revision");
+    expect(DocumentVersionControl.of(loaded)?.log()).toHaveLength(26);
+});

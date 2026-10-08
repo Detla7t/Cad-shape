@@ -1,0 +1,50 @@
+.root {
+    position: absolute;
+    right: 42px;
+    bottom: 4px;
+    z-index: 1001;
+    pointer-events: none;
+}
+.toolbar {
+    display: flex;
+    justify-content: flex-end;
+    gap: 2px;
+    pointer-events: auto;
+}
+.toolbar button {
+    width: 28px;
+    height: 26px;
+    border: 0;
+    background: var(--panel-background-color);
+    color: var(--foreground-color);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+}
+.toolbar button:hover,
+.toolbar button[aria-expanded="true"] {
+    background: var(--hover-background-color);
+}
+.toolbar svg {
+    width: 20px;
+    height: 20px;
+}
+.popup {
+    display: flex;
+    flex-direction: column;
+    position: absolute;
+    right: 0;
+    bottom: 32px;
+    width: min(355px, 70vw);
+    max-height: 65vh;
+    border: 1px solid var(--border-color);
+    background: var(--panel-background-color);
+    box-shadow: 0 2px 10px #0003;
+    pointer-events: auto;
+}
+.popup[hidden] {
+    display: none;
+}
+.popup > section {
+    overflow: hidden;
+}

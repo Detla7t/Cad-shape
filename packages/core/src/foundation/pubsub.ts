@@ -5,7 +5,7 @@ import type { CommandKeys, ICommand } from "../command";
 import type { IDocument } from "../document";
 import type { I18nKeys } from "../i18n";
 import type { Material } from "../material";
-import type { INode } from "../model";
+import type { IFeatureListNode, INode } from "../model";
 import type { DialogButton, FloatPanelOptions } from "../ui";
 import type { CursorType, IView } from "../visual";
 import type { AsyncController } from "./asyncController";
@@ -25,8 +25,13 @@ export interface PubSubEventMap {
     documentClosed: (document: IDocument) => void;
     /** A document and its version history were written to storage (links into it may update). */
     documentSaved: (document: IDocument) => void;
+    documentUnitsChanged: (document: IDocument) => void;
+    reviewCommentsChanged: (document: IDocument) => void;
+    openReviewComments: (target?: import("../review/comments").ReviewTarget) => void;
+    openWhereUsed: (target?: import("../review/comments").ReviewTarget) => void;
     editMaterial: (document: IDocument, material: Material, callback: (material: Material) => void) => void;
     editConfiguration: (document: IDocument) => void;
+    editFeature: (node: INode & IFeatureListNode, featureId: string) => void;
     editVariables: (document: IDocument, onApplied: () => void) => void;
     executeCommand: (commandName: CommandKeys) => void;
     modelUpdate: (model: INode) => void;

@@ -3,6 +3,7 @@
 
 import { Config, I18n, type I18nKeys, Navigation3D, PubSub } from "@chili3d/core";
 import { div, label } from "@chili3d/element";
+import { DocumentUnitsControl } from "./documentUnits";
 import { SnapConfig } from "./snapConfig";
 import style from "./statusbar.module.css";
 
@@ -36,6 +37,7 @@ export class Statusbar extends HTMLElement {
         this.append(
             div({ className: style.left }, this.tip),
             div({ className: style.right }, new SnapConfig()),
+            new DocumentUnitsControl(),
         );
     }
 

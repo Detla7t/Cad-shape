@@ -10,7 +10,6 @@ import {
     type NodeMenuAction,
     PubSub,
     parseConfiguredValue,
-    ReferencePlaneNode,
     selectorOptions,
     Transaction,
 } from "@chili3d/core";
@@ -46,17 +45,6 @@ function showText(node: SketchNode, text: string) {
     });
 }
 NodeActions.register((node) => {
-    if (node instanceof ReferencePlaneNode)
-        return [
-            {
-                id: "sketch",
-                label: "New sketch",
-                run: () => {
-                    node.document.selection.setSelectedNodes([node], false);
-                    PubSub.default.pub("executeCommand", "sketch.create");
-                },
-            },
-        ];
     if (!(node instanceof SketchNode)) return [];
     const doc = node.document;
     const change = (name: string, action: () => void) => Transaction.execute(doc, name, action);

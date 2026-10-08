@@ -198,6 +198,7 @@ export class DocumentVersionControl {
     private retry?: ReturnType<typeof setTimeout>;
     private started = false;
     private disposed = false;
+    private persistenceQueue: Promise<void> = Promise.resolve();
 
     private constructor(
         readonly document: IDocument,
@@ -936,21 +937,28 @@ export class DocumentVersionControl {
 
     /** Writes the history through the configured persistence (on document save). */
     async persist(persistence = this.options.persistence): Promise<void> {
-        if (persistence === undefined) return;
+        if (persistence === undefined) return Promise.resolve();
         this.flush();
         const refs = this.repository.refs();
         const records = this.reachableRecords();
-        const unsaved = this.store.takeUnsaved();
-        const added = unsaved.flatMap((hash) => {
-            const record = this.store.record(hash);
-            return record === undefined ? [] : [[hash, record] as const];
+        // Capture one coherent revision now, but drain its dirty objects only when
+        // earlier writes settle. A failed earlier save can then restore objects the
+        // next save still needs, and concurrent saves cannot overwrite a shared pack.
+        const save = this.persistenceQueue.then(async () => {
+            const snapshot = new Map(records);
+            const pending = this.store.takeUnsaved();
+            const unsaved = pending.filter((hash) => snapshot.has(hash));
+            this.store.restoreUnsaved(pending.filter((hash) => !snapshot.has(hash)));
+            const added = unsaved.map((hash) => [hash, snapshot.get(hash)!] as const);
+            try {
+                await persistence.save(this.document.id, refs, added, () => records);
+            } catch (error) {
+                this.store.restoreUnsaved(unsaved);
+                throw error;
+            }
         });
-        try {
-            await persistence.save(this.document.id, refs, added, () => records);
-        } catch (error) {
-            this.store.restoreUnsaved(unsaved);
-            throw error;
-        }
+        this.persistenceQueue = save.catch(() => {});
+        return save;
     }
 
     /** The history as files (for the `.chili3d` project's `history/` folder). */

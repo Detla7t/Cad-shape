@@ -230,6 +230,30 @@ test("temporary feature rollback cannot generate a manufacturing result", async 
     expect(generator.post("setup").isOk).toBe(true);
 });
 
+test("a failed referenced body invalidates its downstream body and CAM", async () => {
+    const { document, generator, update } = fixture();
+    const { body: source, sketch } = addBody(document);
+    const downstream = new ParametricBodyNode({
+        document,
+        features: [
+            { id: "base", type: "extrude", sketchId: sketch.id, depth: 5 },
+            { id: "copy", type: "boolean", operation: "fuse", toolIds: [source.id], consumeTools: false },
+        ],
+    });
+    document.modelManager.addNode(downstream);
+    expect(downstream.shape.isOk).toBe(true);
+    update({ partIds: [downstream.id] });
+    expect((await generator.generateOperation("setup", "op")).state).toBe("ok");
+    source.setFeatureParameter("extrude", "depth", "missingDepth");
+    expect(source.evaluationError).toContain("Unknown identifier");
+    expect(downstream.evaluationError).toContain("failed to rebuild");
+    expect(generator.post("setup").isOk).toBe(false);
+    source.setFeatureParameter("extrude", "depth", 10);
+    expect(downstream.evaluationError).toBeUndefined();
+    await generator.regenerateStale();
+    expect(generator.post("setup").isOk).toBe(true);
+});
+
 test("lost tracked picks never fall back to a different face at the previous index", async () => {
     const { document, generator, studio, update } = fixture();
     const { body } = addBody(document);

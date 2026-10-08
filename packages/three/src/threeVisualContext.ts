@@ -37,6 +37,7 @@ import {
     Box3,
     BufferAttribute,
     BufferGeometry,
+    GreaterDepth,
     Group,
     InstancedMesh,
     LineBasicMaterial,
@@ -258,7 +259,25 @@ export class ThreeVisualContext implements IVisualContext {
             if (MeshDataUtils.isVertexMesh(data)) {
                 group.add(ThreeGeometryFactory.createVertexGeometry(data, meshOption));
             } else if (MeshDataUtils.isEdgeMesh(data)) {
-                group.add(ThreeGeometryFactory.createEdgeGeometry(data, meshOption));
+                if (data.occludedColor === undefined)
+                    group.add(ThreeGeometryFactory.createEdgeGeometry(data, meshOption));
+                else {
+                    const visible = ThreeGeometryFactory.createEdgeGeometry(data, {
+                        ...meshOption,
+                        onTop: false,
+                    });
+                    const hidden = ThreeGeometryFactory.createEdgeGeometry(
+                        { ...data, color: data.occludedColor },
+                        { ...meshOption, onTop: false },
+                    );
+                    for (const line of [visible, hidden]) {
+                        line.material.transparent = true;
+                        line.material.depthWrite = false;
+                        line.renderOrder = 998;
+                    }
+                    hidden.material.depthFunc = GreaterDepth;
+                    group.add(visible, hidden);
+                }
             } else if (MeshDataUtils.isFaceMesh(data)) {
                 group.add(ThreeGeometryFactory.createFaceGeometry(data, meshOption));
             }

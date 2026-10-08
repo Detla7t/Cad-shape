@@ -7,7 +7,9 @@ import {
     debounce,
     type EdgeMeshData,
     type IDisposable,
+    type IDocument,
     type IView,
+    PubSub,
     VisualConfig,
 } from "@chili3d/core";
 import {
@@ -198,6 +200,9 @@ export class SketchAnnotationManager implements IDisposable {
     };
     private dragCleanup?: () => void;
     private readonly onCameraChanged = debounce(() => this.refresh(), 20);
+    private readonly onUnitsChanged = (document: IDocument) => {
+        if (document === this.view.document) this.refresh();
+    };
 
     // ------------------------------------------------------------------ Selection and refresh
 
@@ -211,6 +216,7 @@ export class SketchAnnotationManager implements IDisposable {
     ) {
         // optional call: mock camera controllers in unit tests may lack the event API
         view.cameraController.onPropertyChanged?.(this.onCameraChanged);
+        PubSub.default.sub("documentUnitsChanged", this.onUnitsChanged);
     }
 
     /** True while a datum label is being dragged or follows the cursor for placement. */
@@ -471,7 +477,7 @@ export class SketchAnnotationManager implements IDisposable {
         const prefix = constraint.kind === ConstraintKind.Radius ? "R" : "";
         // An expression reads as written — that is the whole point of naming it.
         this.addBadge(
-            `${prefix}${formatDatum(constraint.kind, constraint.datum ?? 0)}`,
+            `${prefix}${formatDatum(constraint.kind, constraint.datum ?? 0, this.view.document)}`,
             ...geometry.textPosition,
             constraint,
             constraint.refs,
@@ -572,7 +578,10 @@ export class SketchAnnotationManager implements IDisposable {
         if (geometry === undefined) return;
         segments.push(...geometry.segments);
         const value = Math.hypot(preview.p2[0] - preview.p1[0], preview.p2[1] - preview.p1[1]);
-        this.addPreviewBadge(value.toFixed(2), geometry.textPosition);
+        this.addPreviewBadge(
+            formatDatum(ConstraintKind.P2PDistance, value, this.view.document),
+            geometry.textPosition,
+        );
     }
 
     private previewRadius(
@@ -589,7 +598,10 @@ export class SketchAnnotationManager implements IDisposable {
             px,
         );
         segments.push(...geometry.segments);
-        this.addPreviewBadge(`R${preview.radius.toFixed(2)}`, geometry.textPosition);
+        this.addPreviewBadge(
+            `R${formatDatum(ConstraintKind.Radius, preview.radius, this.view.document)}`,
+            geometry.textPosition,
+        );
     }
 
     private previewPointLine(
@@ -604,7 +616,11 @@ export class SketchAnnotationManager implements IDisposable {
         if (geometry === undefined) return;
         segments.push(...geometry.segments);
         this.addPreviewBadge(
-            pointLineSignedDistance(preview.p, preview.l1, preview.l2).toFixed(2),
+            formatDatum(
+                ConstraintKind.P2PDistance,
+                pointLineSignedDistance(preview.p, preview.l1, preview.l2),
+                this.view.document,
+            ),
             geometry.textPosition,
         );
     }
@@ -621,7 +637,10 @@ export class SketchAnnotationManager implements IDisposable {
         if (geometry === undefined) return;
         segments.push(...geometry.segments);
         const value = preview.axis === "h" ? preview.p2[0] - preview.p1[0] : preview.p2[1] - preview.p1[1];
-        this.addPreviewBadge(value.toFixed(2), geometry.textPosition);
+        this.addPreviewBadge(
+            formatDatum(ConstraintKind.P2PDistance, value, this.view.document),
+            geometry.textPosition,
+        );
     }
 
     private previewAngle(
@@ -643,12 +662,16 @@ export class SketchAnnotationManager implements IDisposable {
         const len2 = Math.hypot(d2[0], d2[1]);
         if (len1 < 1e-12 || len2 < 1e-12) return;
         const cos = Math.max(-1, Math.min(1, (d1[0] * d2[0] + d1[1] * d2[1]) / (len1 * len2)));
-        this.addPreviewBadge(`${((Math.acos(cos) * 180) / Math.PI).toFixed(1)}°`, geometry.textPosition);
+        this.addPreviewBadge(
+            formatDatum(ConstraintKind.Angle, Math.acos(cos), this.view.document),
+            geometry.textPosition,
+        );
     }
 
     // ------------------------------------------------------------------ Visibility, graphics helpers and disposal
 
     dispose(): void {
+        PubSub.default.remove("documentUnitsChanged", this.onUnitsChanged);
         if (this.disposed) return;
         this.disposed = true;
         this.dragCleanup?.();

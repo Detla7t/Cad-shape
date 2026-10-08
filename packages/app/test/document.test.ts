@@ -3,11 +3,13 @@
 
 import {
     type ConfigurationInputData,
+    documentUnits,
     History,
     type IApplication,
     InternalClassName,
     ModelManager,
     ObservableCollection,
+    setDocumentUnits,
     unpackProject,
 } from "@chili3d/core";
 import { createMockApplication, createMockView } from "@chili3d/core/test-utils";
@@ -235,6 +237,20 @@ describe("Document", () => {
     });
 
     describe("serialize → deserialize roundtrip", () => {
+        test("restores document units and precision without replacing unrelated metadata", async () => {
+            document.userData = { layer: "review" };
+            const units = { length: "in", angle: "rad", lengthPrecision: 3, anglePrecision: 4 } as const;
+            setDocumentUnits(document, units);
+            const loaded = await Document.load(mockApp, JSON.parse(JSON.stringify(document.serialize())));
+            expect(loaded).not.toBeUndefined();
+            try {
+                expect(documentUnits(loaded!)).toEqual(units);
+                expect(loaded!.userData?.["layer"]).toBe("review");
+            } finally {
+                loaded!.dispose();
+            }
+        });
+
         test("should restore id, name and userData through Document.load", async () => {
             document.userData = { layer: "roundtrip", count: 3 };
             const serialized = document.serialize();

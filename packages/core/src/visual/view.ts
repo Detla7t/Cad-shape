@@ -58,6 +58,8 @@ export interface IView extends IPropertyChanged, IDisposable {
     worldToScreen(point: XYZ): XY;
     isolate(nodes: INode[]): void;
     unisolate(): void;
+    showSectionView?(plane?: Plane): void;
+    renderStats?(): Record<string, number>;
     resize(width: number, heigth: number): void;
     setDom(element: HTMLElement): void;
     htmlText(text: string, point: XYZLike, options?: HtmlTextOptions): IDisposable;

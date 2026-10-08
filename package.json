@@ -7,9 +7,12 @@
     "type": "module",
     "scripts": {
         "build": "rspack build && node scripts/build-plugins.mjs",
-        "build:wasm": "cd cpp && cmake --preset release && cmake --build --preset release",
+        "build:wasm": "cd cpp && cmake --preset release && cmake --build --preset release && node ../scripts/wasm-provenance.mjs",
+        "check:wasm": "node scripts/wasm-provenance.mjs --verify",
         "build:types": "node scripts/generate_types.mjs",
         "check": "biome check --write",
+        "check:ci": "biome check --diagnostic-level=error",
+        "typecheck": "tsc --noEmit",
         "dev": "rspack dev",
         "format": "biome check --write . && npx clang-format --style=Webkit --sort-includes -i ./cpp/src/**",
         "generate:capabilities": "node scripts/generate-shape-capabilities.mjs",

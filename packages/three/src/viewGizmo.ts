@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import type { IViewGizmo } from "@chili3d/core";
+import type { IViewGizmo, Plane } from "@chili3d/core";
 import { Matrix4, Quaternion, Vector3 } from "three";
 import type { CameraController } from "./cameraController";
 import type { ThreeView } from "./threeView";
@@ -59,6 +59,10 @@ export class ViewGizmo extends HTMLElement implements IViewGizmo {
 
     dispose(): void {
         this.remove();
+    }
+
+    showSectionView(plane?: Plane): void {
+        this.menu.section(plane);
     }
 
     connectedCallback() {

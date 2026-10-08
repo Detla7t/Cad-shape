@@ -43,3 +43,19 @@
 .menu button:disabled {
     opacity: 0.45;
 }
+.planeMenu {
+    min-width: 176px;
+}
+.planeMenu button {
+    position: relative;
+    padding: 3px 10px 3px 32px;
+    min-height: 22px;
+}
+.planeMenu button svg {
+    position: absolute;
+    left: 10px;
+}
+.planeMenu button:hover,
+.planeMenu button:focus-visible {
+    background: color-mix(in srgb, #a7d8ef 40%, var(--panel-background-color));
+}

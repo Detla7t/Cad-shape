@@ -1,19 +1,19 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { Config, type XYZLike } from "@chili3d/core";
+import { type Plane as CadPlane, Config, type XYZLike } from "@chili3d/core";
 import { Plane, Vector3 } from "three";
+import { GraphicsPanel } from "./graphicsPanel";
 import type { ThreeView } from "./threeView";
 import style from "./viewGizmo.module.css";
+import { type ViewMenuItem as MenuItem, openViewMenu } from "./viewMenuPopup";
 
-type MenuItem =
-    | { name: string; action?: () => void; checked?: boolean; disabled?: boolean; children?: MenuItem[] }
-    | "separator";
 type NamedView = { name: string; eye: XYZLike; target: XYZLike; up: XYZLike; perspective: boolean };
 
 export class ViewMenu {
     private close?: () => void;
     private cancelWindow?: () => void;
+    private graphicsPanel?: GraphicsPanel;
     constructor(
         private readonly view: ThreeView,
         private readonly orient: (direction: Vector3) => void,
@@ -21,6 +21,7 @@ export class ViewMenu {
     dispose() {
         this.close?.();
         this.cancelWindow?.();
+        this.graphicsPanel?.dispose();
     }
 
     open(anchor: Element) {
@@ -32,22 +33,12 @@ export class ViewMenu {
             action();
             this.view.update();
         };
-        const menu = document.createElement("div");
-        menu.className = style.menu;
-        menu.setAttribute("role", "menu");
-        menu.setAttribute("aria-label", "View options");
-        const events = new AbortController();
-        const close = () => {
-            menu.remove();
-            events.abort();
-            this.close = undefined;
-        };
-        this.close = close;
         const mode = (name: string, value: ThreeView["mode"]): MenuItem => ({
             name,
-            checked: this.view.mode === value,
+            checked: !display.translucent && this.view.mode === value,
             action: change(() => {
                 this.view.mode = value;
+                display.translucent = false;
             }),
         });
         const items: MenuItem[] = [
@@ -55,7 +46,7 @@ export class ViewMenu {
             { name: "Dimetric", action: change(() => this.orient(new Vector3(1, -1, 0.55))) },
             { name: "Trimetric", action: change(() => this.orient(new Vector3(1, -1.6, 1.1))) },
             "separator",
-            { name: "Graphics preferences…", action: () => this.graphics() },
+            { name: "Graphics preferences…", icon: "settings", action: () => this.graphics() },
             { name: "Named views…", action: () => this.namedViews() },
             {
                 name: "Previous view",
@@ -85,21 +76,32 @@ export class ViewMenu {
             },
             "separator",
             {
-                name:
-                    this.view.mode === "solidAndWireframe"
-                        ? "Shaded with edges"
-                        : this.view.mode === "solid"
-                          ? "Shaded"
-                          : "Wireframe",
+                name: display.translucent
+                    ? "Translucent"
+                    : this.view.mode === "solidAndWireframe"
+                      ? "Shaded with edges"
+                      : this.view.mode === "solid"
+                        ? "Shaded without edges"
+                        : "Unshaded",
+                checked: true,
                 children: [
                     mode("Shaded with edges", "solidAndWireframe"),
-                    mode("Shaded", "solid"),
-                    mode("Wireframe", "wireframe"),
+                    mode("Shaded without edges", "solid"),
+                    mode("Unshaded", "wireframe"),
+                    {
+                        name: "Translucent",
+                        checked: display.translucent,
+                        action: change(() => {
+                            this.view.mode = "solidAndWireframe";
+                            display.translucent = true;
+                        }),
+                    },
                 ],
             },
             {
                 name: display.hiddenEdges ? "Hidden edges visible" : "Hidden edges removed",
-                children: [false, true].map((value) => ({
+                checked: true,
+                children: [true, false].map((value) => ({
                     name: value ? "Hidden edges visible" : "Hidden edges removed",
                     checked: display.hiddenEdges === value,
                     action: change(() => {
@@ -108,9 +110,10 @@ export class ViewMenu {
                 })),
             },
             {
-                name: `Tangent edges ${display.tangentEdges}`,
-                children: (["visible", "hidden", "phantom"] as const).map((value) => ({
-                    name: `Tangent edges ${value}`,
+                name: `Tangent edges ${display.tangentEdges === "hidden" ? "removed" : display.tangentEdges}`,
+                checked: true,
+                children: (["visible", "phantom", "hidden"] as const).map((value) => ({
+                    name: `Tangent edges ${value === "hidden" ? "removed" : value}`,
                     checked: display.tangentEdges === value,
                     action: change(() => {
                         display.tangentEdges = value;
@@ -134,63 +137,11 @@ export class ViewMenu {
                 }),
             },
             "separator",
-            { name: "Section view…", action: () => this.section() },
+            { name: "Section view…", icon: "section", action: () => this.section() },
         ];
-        const render = (entries: MenuItem[], back = false) => {
-            menu.replaceChildren();
-            if (back) {
-                const button = document.createElement("button");
-                button.textContent = "‹ View options";
-                button.onclick = () => render(items);
-                menu.append(button);
-            }
-            for (const item of entries) {
-                if (item === "separator") {
-                    menu.append(document.createElement("hr"));
-                    continue;
-                }
-                const button = document.createElement("button");
-                button.type = "button";
-                button.disabled = !!item.disabled;
-                button.setAttribute("role", item.checked === undefined ? "menuitem" : "menuitemcheckbox");
-                button.setAttribute("aria-label", item.name);
-                if (item.checked !== undefined) button.setAttribute("aria-checked", String(item.checked));
-                button.textContent = `${item.checked ? "✓" : ""}  ${item.name}${item.children ? "  ›" : ""}`;
-                button.onclick = () => {
-                    if (item.children) render(item.children, true);
-                    else {
-                        close();
-                        item.action?.();
-                    }
-                };
-                menu.append(button);
-            }
-        };
-        render(items);
-        document.body.append(menu);
-        const rect = anchor.getBoundingClientRect();
-        menu.style.left = `${Math.max(4, Math.min(rect.right - menu.offsetWidth, window.innerWidth - menu.offsetWidth - 4))}px`;
-        menu.style.top = `${Math.max(4, Math.min(rect.bottom, window.innerHeight - menu.offsetHeight - 4))}px`;
-        document.addEventListener(
-            "pointerdown",
-            (event) => {
-                if (!menu.contains(event.target as Node)) close();
-            },
-            { capture: true, signal: events.signal },
-        );
-        menu.onkeydown = (event) => {
-            event.stopPropagation();
-            if (event.key === "Escape") close();
-            if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-                event.preventDefault();
-                const buttons = [...menu.querySelectorAll<HTMLButtonElement>("button:not(:disabled)")];
-                const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
-                buttons[
-                    (index + (event.key === "ArrowDown" ? 1 : -1) + buttons.length) % buttons.length
-                ]?.focus();
-            }
-        };
-        menu.querySelector("button")?.focus();
+        this.close = openViewMenu(anchor, items, () => {
+            this.close = undefined;
+        });
     }
 
     private dialog(title: string) {
@@ -213,24 +164,8 @@ export class ViewMenu {
         dialog.append(done);
     }
     private graphics() {
-        const dialog = this.dialog("Graphics preferences");
-        const row = document.createElement("label");
-        row.textContent = "Rendering quality ";
-        const select = document.createElement("select");
-        select.add(new Option("Standard", "1"));
-        select.add(new Option("High", "2"));
-        select.value = this.view.renderer.getPixelRatio() > 1 ? "2" : "1";
-        select.onchange = () => {
-            this.view.renderer.setPixelRatio(Number(select.value));
-            this.view.update();
-        };
-        row.append(select);
-        dialog.append(row);
-        const note = document.createElement("p");
-        note.textContent =
-            "Antialiasing is enabled. High quality uses more pixels for smoother curves and edges.";
-        dialog.append(note);
-        this.done(dialog);
+        this.graphicsPanel?.dispose();
+        this.graphicsPanel = new GraphicsPanel(this.view);
     }
     private namedViews() {
         const dialog = this.dialog("Named views");
@@ -338,7 +273,7 @@ export class ViewMenu {
         };
         overlay.focus();
     }
-    private section() {
+    section(base?: CadPlane) {
         const dialog = this.dialog("Section view");
         const axis = document.createElement("select");
         axis.setAttribute("aria-label", "Section plane");
@@ -348,6 +283,10 @@ export class ViewMenu {
             ["Right (YZ)", "x"],
         ])
             axis.add(new Option(name, value));
+        if (base) {
+            axis.add(new Option("Selected plane", "selected"));
+            axis.value = "selected";
+        }
         const offset = document.createElement("input");
         offset.type = "number";
         offset.value = "0";
@@ -359,13 +298,24 @@ export class ViewMenu {
         label.append(flip, " Reverse direction");
         const apply = () => {
             if (!Number.isFinite(offset.valueAsNumber)) return;
-            const normal = new Vector3(
-                axis.value === "x" ? 1 : 0,
-                axis.value === "y" ? 1 : 0,
-                axis.value === "z" ? 1 : 0,
-            ).multiplyScalar(flip.checked ? -1 : 1);
+            const normal =
+                axis.value === "selected" && base
+                    ? new Vector3(base.normal.x, base.normal.y, base.normal.z).multiplyScalar(
+                          flip.checked ? -1 : 1,
+                      )
+                    : new Vector3(
+                          axis.value === "x" ? 1 : 0,
+                          axis.value === "y" ? 1 : 0,
+                          axis.value === "z" ? 1 : 0,
+                      ).multiplyScalar(flip.checked ? -1 : 1);
             this.view.renderer.clippingPlanes = [
-                new Plane(normal, -offset.valueAsNumber * (flip.checked ? -1 : 1)),
+                new Plane(
+                    normal,
+                    -(axis.value === "selected" && base
+                        ? normal.dot(new Vector3(base.origin.x, base.origin.y, base.origin.z))
+                        : 0) -
+                        offset.valueAsNumber * (flip.checked ? -1 : 1),
+                ),
             ];
             this.view.update();
         };

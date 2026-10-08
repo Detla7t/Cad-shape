@@ -316,9 +316,11 @@ describe("PropertyView", () => {
 
             handler!(doc, [node as INode]);
 
-            // The menu holds rename/suppress/configure suppression/delete only — no reselect entry.
+            // Review actions are available, but this feature still has no reselect entry.
             const menu = openMoreMenu(pv);
-            expect(menu.querySelectorAll("div").length).toBe(4);
+            expect(menu.querySelectorAll("div").length).toBe(6);
+            expect(menu.textContent).toContain("Add comment");
+            expect(menu.textContent).toContain("Where used…");
             expect(menu.querySelector('svg[icon="icon-sync-alt"]')).toBeNull();
             menu.remove();
         });

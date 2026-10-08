@@ -114,7 +114,9 @@ export class OccShape implements IShape {
             throw new Error("Mesh deflection must be a finite positive length");
         let mesh = this.machiningMeshes.get(linearDeflection);
         if (mesh === undefined) {
-            mesh = new Mesher(this, linearDeflection, false);
+            // OCCT's deflection controls are refinement targets, not an exact
+            // chord-error bound. Reserve a guard band for triangle interiors.
+            mesh = new Mesher(this, linearDeflection / 4, false);
             this.machiningMeshes.set(linearDeflection, mesh);
         }
         return mesh;

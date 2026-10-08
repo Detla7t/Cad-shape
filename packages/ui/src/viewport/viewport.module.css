@@ -117,7 +117,7 @@
 
 .viewControls {
     position: absolute;
-    bottom: 6px;
+    bottom: 34px;
     right: 42px;
     z-index: 999;
     pointer-events: none;

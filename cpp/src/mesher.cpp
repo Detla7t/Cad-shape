@@ -241,7 +241,15 @@ public:
         }
         // The absolute path is used for machining: its tolerance must not grow
         // with edge length. The display path retains OCCT's relative meshing.
-        BRepMesh_IncrementalMesh mesh(shape, lineDeflection, useBoxRatio, ANGLE_DEFLECTION, true);
+        IMeshTools_Parameters parameters;
+        parameters.Deflection = lineDeflection;
+        parameters.Relative = useBoxRatio;
+        parameters.Angle = ANGLE_DEFLECTION;
+        parameters.InParallel = true;
+        // Analytic surfaces otherwise skip OCCT's interior deflection control.
+        // Machining needs the face interiors to obey the absolute budget too.
+        parameters.EnableControlSurfaceDeflectionAllSurfaces = !useBoxRatio;
+        BRepMesh_IncrementalMesh mesh(shape, parameters);
     }
 
     NumberArray edgesMeshPosition()

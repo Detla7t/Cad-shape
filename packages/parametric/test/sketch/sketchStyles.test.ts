@@ -58,9 +58,10 @@ test("curve display gains segments when zoomed in and construction uses visible 
     const coarse = entityDisplayMesh(Plane.XY, circle, 0x4a9eff, true, 1);
     const fine = entityDisplayMesh(Plane.XY, circle, 0x4a9eff, true, 0.01);
     expect(fine.position.length).toBeGreaterThan(coarse.position.length);
-    expect(fine.lineType).toBe("dash");
-    expect(fine.dashSize).toBeCloseTo(0.07);
-    expect(fine.gapSize).toBeCloseTo(0.04);
+    expect(fine.lineType).toBe("solid"); // Gaps are geometry so the four-part pattern survives tessellation.
+    const start = fine.position.slice(0, 3),
+        end = fine.position.slice(3, 6);
+    expect(Math.hypot(end[0] - start[0], end[1] - start[1], end[2] - start[2])).toBeCloseTo(0.04, 4);
 });
 
 test("fixed entities remain solved beside flexible geometry, without changing live data", () => {

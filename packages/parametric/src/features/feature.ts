@@ -9,6 +9,7 @@ import {
     type IFace,
     type IShape,
     type Matrix4,
+    OperationLog,
     type ParameterValue,
     Result,
     type Scope,
@@ -451,10 +452,25 @@ export function featureHandler(type: string): FeatureHandler | undefined {
 }
 
 export function evaluateFeature(feature: FeatureData, context: FeatureContext): Result<IShape> {
-    const handler = handlers.get(feature.type);
-    if (handler === undefined) return Result.err(`Unknown feature type: ${feature.type}`);
-    const configured = resolveFeatureConfiguration(feature, handler, context.document);
-    return configured.isOk ? handler.evaluate(configured.value, context) : Result.err(configured.error);
+    const operation = OperationLog.begin("feature.rebuild", {
+        documentId: context.document.id,
+        featureId: feature.id,
+        featureType: feature.type,
+    });
+    try {
+        const handler = handlers.get(feature.type);
+        const configured = handler && resolveFeatureConfiguration(feature, handler, context.document);
+        const result: Result<IShape> = !handler
+            ? Result.err(`Unknown feature type: ${feature.type}`)
+            : configured!.isOk
+              ? handler.evaluate(configured!.value, context)
+              : Result.err(configured!.error);
+        operation.finish(result.isOk ? "success" : "error", result.isOk ? undefined : result.error);
+        return result;
+    } catch (error) {
+        operation.finish("error", error);
+        throw error;
+    }
 }
 
 /**

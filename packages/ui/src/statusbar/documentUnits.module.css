@@ -1,0 +1,55 @@
+.trigger {
+    padding: 3px 8px;
+    margin-left: 8px;
+    background: transparent;
+    color: var(--foreground-color);
+    border: 0;
+    border-left: 1px solid var(--border-color);
+    cursor: pointer;
+    white-space: nowrap;
+}
+.dialog {
+    width: 360px;
+    max-width: calc(100vw - 40px);
+    background: var(--panel-background-color);
+    color: var(--foreground-color);
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    padding: 20px;
+    box-shadow: 0 8px 32px #0003;
+}
+.dialog h2 {
+    font-size: 16px;
+    margin: 0 0 20px;
+    color: var(--primary-color);
+}
+.dialog label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin: 12px 0;
+}
+.dialog select {
+    width: 185px;
+    padding: 6px;
+    background: inherit;
+    color: inherit;
+    border: 1px solid var(--border-color);
+}
+.dialog p {
+    font-size: 12px;
+    color: var(--foreground-secondary-color);
+    line-height: 1.5;
+}
+.dialog footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 20px;
+}
+.dialog button {
+    padding: 6px 14px;
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+}

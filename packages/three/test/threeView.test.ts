@@ -363,7 +363,7 @@ describe("ThreeView — resize", () => {
         view.resize(1024, 768);
 
         const cam = view.camera as OrthographicCamera;
-        const halfHeight = Math.sqrt(3 * 1500 * 1500) * Math.tan((25 * Math.PI) / 180);
+        const halfHeight = Math.sqrt(3 * 1500 * 1500) * Math.tan((22.5 * Math.PI) / 180);
         expect(cam.top).toBeCloseTo(halfHeight);
         expect(cam.bottom).toBeCloseTo(-halfHeight);
         expect(cam.right / cam.top).toBeCloseTo(1024 / 768);

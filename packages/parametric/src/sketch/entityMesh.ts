@@ -1,8 +1,8 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import type { EdgeMeshData, Plane } from "@chili3d/core";
-import { arcAngles, SKETCH_EDGE_LINE_WIDTH, type SketchEntityData, toWorld } from "./sketchModel";
+import { Config, type EdgeMeshData, type Plane } from "@chili3d/core";
+import { arcAngles, type SketchEntityData, toWorld } from "./sketchModel";
 
 /** Analytic display geometry; never used as modeling topology. Chord error is below 0.2 screen pixels. */
 export function entityDisplayMesh(
@@ -38,13 +38,13 @@ export function entityDisplayMesh(
         }
     }
     return {
-        position: new Float32Array(points),
+        position: dashed
+            ? patternedPositions(new Float32Array(points), constructionPattern(pixelSize))
+            : new Float32Array(points),
         range: [],
         color,
-        lineType: dashed ? "dash" : "solid",
-        lineWidth: SKETCH_EDGE_LINE_WIDTH,
-        dashSize: pixelSize * 7,
-        gapSize: pixelSize * 4,
+        lineType: "solid",
+        lineWidth: Config.instance.graphics.activeLineWidth,
     };
 }
 
@@ -72,6 +72,37 @@ export function dashedPositions(position: Float32Array, dash = 1.4, gap = 0.8): 
             offset = end;
         }
         travelled += length;
+    }
+    return new Float32Array(result);
+}
+
+/** Four-part construction pattern in world units for a known pixel scale. */
+export function constructionPattern(pixel: number): number[] {
+    const g = Config.instance.graphics;
+    return [g.firstDash, g.firstGap, g.secondDash, g.secondGap].map((n) => Math.max(1e-6, n * pixel));
+}
+export function patternedPositions(position: Float32Array, pattern: readonly number[]): Float32Array {
+    const result: number[] = [];
+    if (!pattern.length || pattern.some((n) => !Number.isFinite(n) || n <= 0)) return position.slice();
+    let part = 0,
+        remaining = pattern[0];
+    for (let i = 0; i < position.length; i += 6) {
+        const a = position.subarray(i, i + 3),
+            b = position.subarray(i + 3, i + 6);
+        const length = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+        for (let at = 0; at < length; ) {
+            const step = Math.min(remaining, length - at);
+            if (part % 2 === 0)
+                for (const distance of [at, at + step])
+                    for (let axis = 0; axis < 3; axis++)
+                        result.push(a[axis] + ((b[axis] - a[axis]) * distance) / length);
+            at += step;
+            remaining -= step;
+            if (remaining < 1e-9) {
+                part = (part + 1) % pattern.length;
+                remaining = pattern[part];
+            }
+        }
     }
     return new Float32Array(result);
 }

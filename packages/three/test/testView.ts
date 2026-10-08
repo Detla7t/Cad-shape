@@ -8,6 +8,7 @@ import { ThreeView } from "../src/threeView";
 import type { ThreeVisualContext } from "../src/threeVisualContext";
 
 class TestWebGLRenderer {
+    info = { autoReset: true, reset() {} };
     dispose() {}
     forceContextLoss() {}
     constructor(readonly domElement = document.createElement("canvas")) {}
@@ -85,6 +86,8 @@ export class TestView extends ThreeView {
         this.camera.position.set(0, 0, 100);
         this.camera.lookAt(0, 0, 0);
     }
+
+    protected override renderEffects() {}
 
     protected override initRenderer() {
         const render = new TestWebGLRenderer() as any;

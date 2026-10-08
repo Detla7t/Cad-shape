@@ -43,18 +43,25 @@ export function promptDatum(
     options?: {
         positiveOnly?: boolean;
         inlineAt?: { x: number; y: number };
+        initialText?: string;
+        parse?: (text: string) => Result<ParameterValue>;
         /** Resolves an input to its display value — supplied by the editor, error text included. */
         resolve?: (input: ParameterValue) => Result<number>;
     },
 ): (() => void) | undefined {
     const textbox = document.createElement("input");
-    textbox.value = typeof initial === "number" ? initial.toFixed(2) : initial;
+    const initialText = options?.initialText ?? (typeof initial === "number" ? initial.toFixed(2) : initial);
+    textbox.value = initialText;
     textbox.autofocus = true;
     const error = createErrorLabel();
     const content = document.createElement("div");
     content.append(textbox, error);
     const confirm = () => {
-        const parsed = validateDatumInput(textbox.value, options);
+        // Enter on the displayed (rounded) measurement accepts the exact original value.
+        const parsed = validateDatumInput(
+            textbox.value,
+            textbox.value === initialText ? { ...options, parse: () => Result.ok(initial) } : options,
+        );
         if (!parsed.isOk) {
             showDatumError(error, parsed.error);
             return false;
@@ -75,7 +82,7 @@ export function promptDatum(
         const hint = document.createElement("small");
         hint.textContent = "Enter to apply · Esc to cancel";
         content.append(hint);
-        content.style.left = `${Math.max(4, Math.min(options.inlineAt.x - 50, window.innerWidth - 180))}px`;
+        content.style.left = `${Math.max(4, Math.min(options.inlineAt.x - 85, window.innerWidth - 180))}px`;
         content.style.top = `${Math.max(4, Math.min(options.inlineAt.y - 14, window.innerHeight - 90))}px`;
         let closed = false;
         const events = new AbortController();
@@ -129,10 +136,13 @@ function validateDatumInput(
     text: string,
     options?: {
         positiveOnly?: boolean;
+        parse?: (text: string) => Result<ParameterValue>;
         resolve?: (input: ParameterValue) => Result<number>;
     },
 ): Result<ParameterValue> {
-    const input = parseDatumInput(text);
+    const parsed = options?.parse?.(text) ?? Result.ok(parseDatumInput(text));
+    if (!parsed.isOk) return parsed;
+    const input = parsed.value;
     if (input === "") return Result.err(invalidNumber());
 
     const resolved = options?.resolve?.(input) ?? (typeof input === "number" ? Result.ok(input) : undefined);

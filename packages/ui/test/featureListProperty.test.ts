@@ -327,7 +327,9 @@ describe("FeatureListProperty", () => {
         const prop = new FeatureListProperty(doc, node);
         const menu = openMenu(prop);
 
-        expect(menu.querySelectorAll(".fl-menu-item").length).toBe(4);
+        expect(menu.querySelectorAll(".fl-menu-item").length).toBe(6);
+        expect(menu.textContent).toContain("Add comment");
+        expect(menu.textContent).toContain("Where used…");
 
         clickMenuItem(menu, 3);
         expect(node.removeFeature).toHaveBeenCalledWith("b1");

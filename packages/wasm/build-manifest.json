@@ -1,0 +1,25 @@
+{
+    "format": 1,
+    "compiler": "emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 5.0.6-git",
+    "occtCommit": "b8f597c677811d1f9f4d8a97f5ae2825c0353a42",
+    "sources": {
+        "cpp/CMakeLists.txt": "bd94ca9c294d47eac6955aa72ef8f6eddbab8c861f47d5faf58dc64cd2066ef4",
+        "cpp/src/converter.cpp": "602c9e5e8f77c91da086d5de2ed9a3041d8bd0c4a3841dd7c78569236665401e",
+        "cpp/src/factory.cpp": "f38fb83071b986861404e5824bb07f1bd21355b549d56dfac98dae9d19a40550",
+        "cpp/src/geometry.cpp": "7d4a31e206ecbf73f5f18e77bd3480869746e2addc77bbf9fde922d0553932af",
+        "cpp/src/helps.cpp": "a2c4cde76a84349a1b54574505d859ffbfeb46a7c7285a5b97c27f90b3e40e42",
+        "cpp/src/mesher.cpp": "3b07f0fdaa39a3392a24d0d30b03706f42a2d1d8305e7f7ffea20f09253e4a15",
+        "cpp/src/opencascade.cpp": "eb759c9bf04298ac7cb326b67cd2da3979a8e3edc1258e2abf61d7d4b69c5051",
+        "cpp/src/shape.cpp": "146a5e7dbc1d1d487a58a389c0346f369d923f8106ac853342b37a5270ac3328",
+        "cpp/src/shared.cpp": "748d34706d9e6cea237b989818ff7a363d6c3aaa392b21e9f46b55e9e8d72d70",
+        "cpp/src/shared.hpp": "085d79af683e9ef3cef528fa524aae66de729a4607e264f42005feff98277e39",
+        "cpp/src/transient.cpp": "bd22c5299352d1df2f7933a07f3dae10c181bd0abaa00485f9a90b914ad0ea76",
+        "cpp/src/utils.cpp": "3a0ee152a13b233915ccf62c48102335d50cfde4ba5e0627bc078fa78607a1a0",
+        "cpp/src/utils.hpp": "f94a0535d753019d3d7d8a5e1486c102bb85308146eac1299c06dbc3bec3ce5a"
+    },
+    "artifacts": {
+        "packages/wasm/lib/chili-wasm.js": "610368c68dc6d414651ca08bfa9288b42360dfcf95c9835d8cdd8787da0f06ba",
+        "packages/wasm/lib/chili-wasm.wasm": "b819e94ed86c15dad1d63db807ac4641541daf203370bc083e7e121290854628",
+        "packages/wasm/lib/chili-wasm.d.ts": "ca20b1d960bffbbc0be576be8bcfd86b4d4067516c755d8230813d03f6cb116e"
+    }
+}

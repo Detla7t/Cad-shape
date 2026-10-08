@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    Config,
     type EdgeMeshData,
     type FaceMeshData,
     type I18nKeys,
@@ -27,15 +28,15 @@ import { allProfiles, sketchProfiles } from "../features/profileBuilder";
 import { syncNodeWatches } from "../nodeWatch";
 import { ensureVariableSync } from "../variableSync";
 import { normalizeSnapshot } from "./entityLayout";
-import { dashedPositions, entityDisplayMesh } from "./entityMesh";
+import { constructionPattern, entityDisplayMesh, patternedPositions } from "./entityMesh";
 import { type ExternalResolveResult, resolveExternalRefs } from "./externalRef";
 import { type PlaneFaceRef, resolveFacePlane } from "./planeRef";
 import {
     arcAngles,
+    DEFAULT_SKETCH_LAYER,
     type ExternalRefData,
     profileExternalRefs,
     rawArcSweep,
-    SKETCH_EDGE_LINE_WIDTH,
     type SketchConstraintData,
     type SketchData,
     type SketchEntityData,
@@ -171,7 +172,14 @@ export class SketchNode extends ParameterShapeNode {
         this._danglingProfileCount = danglingIds.length;
         this._danglingSignature = danglingIds.join(",");
         ensureVariableSync(options.document);
+        Config.instance.onPropertyChanged(this.graphicsChanged);
     }
+
+    private readonly graphicsChanged = (key: keyof Config) => {
+        if (key !== "graphics") return;
+        this._mesh = undefined;
+        this.emitPropertyChanged("shape", this._shape);
+    };
 
     setDataEmitShapeChanged(data: SketchData): void {
         this.setPropertyEmitShapeChanged("dataJson", JSON.stringify(data));
@@ -206,7 +214,12 @@ export class SketchNode extends ParameterShapeNode {
             !data.layers?.length &&
             !data.entities.some((entity) => entity.construction || entity.color || entity.dashed)
         ) {
-            if (mesh.edges !== undefined) mesh.edges.lineWidth = SKETCH_EDGE_LINE_WIDTH;
+            if (mesh.edges !== undefined) {
+                mesh.edges.lineWidth = Config.instance.graphics.inactiveLineWidth;
+                const color = Number.parseInt(Config.instance.graphics.inactiveColor.slice(1), 16);
+                const rgb = [(color >> 16) & 255, (color >> 8) & 255, color & 255];
+                mesh.edges.color = Array.from(mesh.edges.position, (_, i) => rgb[i % 3] / 255);
+            }
             return mesh;
         }
         const source = super.createMesh().edges;
@@ -227,17 +240,30 @@ export class SketchNode extends ParameterShapeNode {
                 range.start * 3,
                 (range.start + range.count) * 3,
             );
-            if (entity?.dashed || layer?.dashed) position = dashedPositions(position);
+            if (entity?.dashed || layer?.dashed)
+                position = patternedPositions(position, constructionPattern(0.1));
             ranges.push({ ...range, start: positions.length / 3, count: position.length / 3 });
-            const color = entity?.color ?? layer?.color;
-            append(position, color ? Number.parseInt(color.slice(1), 16) : VisualConfig.defaultEdgeColor);
+            const layerColor =
+                layer?.id === "0" && layer.color === DEFAULT_SKETCH_LAYER.color ? undefined : layer?.color;
+            const color = entity?.color ?? layerColor;
+            append(
+                position,
+                color
+                    ? Number.parseInt(color.slice(1), 16)
+                    : Number.parseInt(Config.instance.graphics.inactiveColor.slice(1), 16),
+            );
         });
         for (const entity of data.entities.filter((entity) => entity.construction)) {
             const layer = data.layers?.find((item) => item.id === (entity.layer ?? "0"));
             if (layer?.visible === false) continue;
-            const color = entity.color ?? layer?.color ?? "#4a9eff";
+            const layerColor =
+                layer?.id === "0" && layer.color === DEFAULT_SKETCH_LAYER.color ? undefined : layer?.color;
+            const color = entity.color ?? layerColor ?? Config.instance.graphics.inactiveColor;
             append(
-                dashedPositions(entityDisplayMesh(this.plane, entity, 0).position),
+                patternedPositions(
+                    entityDisplayMesh(this.plane, entity, 0).position,
+                    constructionPattern(0.1),
+                ),
                 Number.parseInt(color.slice(1), 16),
             );
         }
@@ -248,7 +274,7 @@ export class SketchNode extends ParameterShapeNode {
                 color: colors,
                 range: ranges,
                 lineType: "solid",
-                lineWidth: SKETCH_EDGE_LINE_WIDTH,
+                lineWidth: Config.instance.graphics.inactiveLineWidth,
             },
             vertexs: undefined,
         };
@@ -680,6 +706,7 @@ export class SketchNode extends ParameterShapeNode {
     };
 
     override disposeInternal(): void {
+        Config.instance.removePropertyChanged(this.graphicsChanged);
         if (this._planeRefNode !== undefined && isPropertyChanged(this._planeRefNode)) {
             this._planeRefNode.removePropertyChanged(this.handlePlaneRefNodeChanged);
         }

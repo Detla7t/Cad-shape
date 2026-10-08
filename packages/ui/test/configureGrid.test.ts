@@ -287,9 +287,9 @@ describe("the Configure grid on feature parameters", () => {
         const node = featureNode([], { suppressed: false });
         const prop = new FeatureListProperty(configuredDocument(), node);
         click(mustQuery(prop, ".fl-more"));
-        // Rename, suppress, configure suppression, delete.
+        // Rename, suppress, configure suppression, delete, comment and where used.
         const entries = mustQuery(document.body, ".fl-menu").querySelectorAll(".fl-menu-item");
-        expect(entries).toHaveLength(4);
+        expect(entries).toHaveLength(6);
         expect(mustQuery(entries[2], "svg").getAttribute("icon")).toBe("icon-layer-group");
         click(entries[2]);
         const { grid, buttons } = lastDialog();

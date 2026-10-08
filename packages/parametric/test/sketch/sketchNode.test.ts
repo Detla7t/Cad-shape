@@ -422,11 +422,11 @@ describe("SketchNode", () => {
         expect(node.mesh.faces).toBeDefined();
         expect(node.mesh.faces!.range.length).toBe(1);
         expect(node.mesh.faces!.range[0].shape).toBe(face);
-        expect(node.mesh.edges!.lineWidth).toBe(2);
+        expect(node.mesh.edges!.lineWidth).toBe(1);
 
         node.setShowProfileFaces(false);
         expect(node.mesh.faces).toBeUndefined();
-        expect(node.mesh.edges!.lineWidth).toBe(2);
+        expect(node.mesh.edges!.lineWidth).toBe(1);
 
         node.setShowProfileFaces(true);
         expect(node.mesh.faces).toBeDefined();

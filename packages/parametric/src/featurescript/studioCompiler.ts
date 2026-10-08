@@ -4,14 +4,14 @@
 import type { IDocument } from "@chili3d/core";
 import { analyzeFeature, analyzeTable, type FeatureSpec } from "./featureSpec";
 import { FeatureStudioNode } from "./featureStudioNode";
-import type {
-    FeatureExport,
+import {
+    type FeatureExport,
     Interpreter,
-    ModuleInstance,
-    ModuleSource,
-    TableExport,
+    type ModuleInstance,
+    type ModuleSource,
+    type TableExport,
 } from "./lang/interpreter";
-import { createInterpreter, describeError } from "./runtime";
+import { createInterpreter, describeError, featureScriptRuntimeRevision } from "./runtime";
 
 /**
  * Compiles the Feature Studios of a document, cached by source. A studio imports another
@@ -49,6 +49,7 @@ export interface CompiledStudio {
 const MAX_CACHE = 48;
 const MAX_LOG = 200;
 const cache = new Map<string, CompiledStudio>();
+const documentCaches = new WeakMap<IDocument, Map<string, CompiledStudio>>();
 /** studio id → the dependencies its latest compilation read; what bodies watch. */
 const lastDependencies = new Map<string, readonly string[]>();
 
@@ -79,6 +80,7 @@ export function studioToken(document: IDocument, studioId: string): string {
     const studio = findStudio(document, studioId);
     if (studio === undefined) return "missing";
     const parts = [
+        String(featureScriptRuntimeRevision()),
         studio.source,
         ...studioDependencies(studio.id).map((id) => findStudio(document, id)?.source ?? "missing"),
     ];
@@ -88,12 +90,23 @@ export function studioToken(document: IDocument, studioId: string): string {
 export function compileDocumentStudio(document: IDocument, studioId: string): CompiledStudio | undefined {
     const studio = findStudio(document, studioId);
     if (studio === undefined) return undefined;
-    return compileStudioSource(studio.id, studio.name, studio.source, (path) => {
-        const imported = findStudio(document, path);
-        return imported === undefined
-            ? undefined
-            : { id: imported.id, name: imported.name, source: imported.source };
-    });
+    let cache = documentCaches.get(document);
+    if (cache === undefined) {
+        cache = new Map();
+        documentCaches.set(document, cache);
+    }
+    return compileStudioSource(
+        studio.id,
+        studio.name,
+        studio.source,
+        (path) => {
+            const imported = findStudio(document, path);
+            return imported === undefined
+                ? undefined
+                : { id: imported.id, name: imported.name, source: imported.source };
+        },
+        cache,
+    );
 }
 
 /**
@@ -106,30 +119,40 @@ export function compileStudioSource(
     name: string,
     source: string,
     lookup: (path: string) => { id: string; name: string; source: string } | undefined,
+    compilationCache = cache,
 ): CompiledStudio {
     const previous = lastDependencies.get(studioId) ?? [];
     const dependencySources = previous.map((id) => lookup(id)?.source ?? "\u0001missing");
-    const key = [studioId, source, ...previous, ...dependencySources].join("\u0000");
-    const cached = cache.get(key);
+    const key = [
+        featureScriptRuntimeRevision(),
+        studioId,
+        name,
+        source,
+        ...previous,
+        ...dependencySources,
+    ].join("\u0000");
+    const cached = compilationCache.get(key);
     if (cached !== undefined) {
-        cache.delete(key);
-        cache.set(key, cached);
+        compilationCache.delete(key);
+        compilationCache.set(key, cached);
         return cached;
     }
     const compiled = compileUncached(studioId, name, source, lookup);
     lastDependencies.set(studioId, compiled.dependencies);
     // Re-key under the dependencies actually read, so the next lookup hits.
     const finalKey = [
+        featureScriptRuntimeRevision(),
         studioId,
+        name,
         source,
         ...compiled.dependencies,
         ...compiled.dependencies.map((id) => lookup(id)?.source ?? "\u0001missing"),
     ].join("\u0000");
-    cache.set(finalKey, compiled);
-    while (cache.size > MAX_CACHE) {
-        const oldest = cache.keys().next().value;
+    compilationCache.set(finalKey, compiled);
+    while (compilationCache.size > MAX_CACHE) {
+        const oldest = compilationCache.keys().next().value;
         if (oldest === undefined) break;
-        cache.delete(oldest);
+        compilationCache.delete(oldest);
     }
     return compiled;
 }
@@ -142,23 +165,31 @@ function compileUncached(
 ): CompiledStudio {
     const log: string[] = [];
     const dependencies = new Set<string>();
-    const interpreter = createInterpreter({
-        print: (text) => {
-            log.push(text);
-            if (log.length > MAX_LOG) log.splice(0, log.length - MAX_LOG);
-        },
-        resolveModule: (path): ModuleSource | undefined => {
-            const found = lookup(path);
-            if (found === undefined) return undefined;
-            if (found.id !== studioId) dependencies.add(found.id);
-            return { path: found.name, source: found.source };
-        },
-    });
-    const specs = new Map<string, FeatureSpec | undefined>();
-    let module: ModuleInstance | undefined;
+    let interpreter: Interpreter;
     let failure: ReturnType<typeof describeError> | undefined;
     try {
-        module = interpreter.load({ path: name, source });
+        interpreter = createInterpreter({
+            print: (text) => {
+                log.push(text);
+                if (log.length > MAX_LOG) log.splice(0, log.length - MAX_LOG);
+            },
+            resolveModule: (path): ModuleSource | undefined => {
+                const found = lookup(path);
+                if (found === undefined) return undefined;
+                if (found.id !== studioId) dependencies.add(found.id);
+                return { path: found.name, source: found.source };
+            },
+        });
+    } catch (error) {
+        // A failed runtime still yields normal studio diagnostics. This empty
+        // interpreter is never loaded or used to evaluate a feature.
+        interpreter = new Interpreter({ ambientStd: false });
+        failure = describeError(error);
+    }
+    const specs = new Map<string, FeatureSpec | undefined>();
+    let module: ModuleInstance | undefined;
+    try {
+        if (failure === undefined) module = interpreter.load({ path: name, source });
     } catch (error) {
         failure = describeError(error);
     }

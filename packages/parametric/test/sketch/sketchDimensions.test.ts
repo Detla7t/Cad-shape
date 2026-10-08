@@ -8,6 +8,7 @@ import {
     Plane,
     PubSub,
     Result,
+    setDocumentUnits,
     XYZ,
 } from "@chili3d/core";
 import {
@@ -139,6 +140,28 @@ function cancelDialog(dialog: DialogCapture): void {
 // mock view maps screen (x, y) -> world (x - 400, 300 - y, 0) on the XY plane:
 // a line (0,0)-(100,0) spans screen x 400..500 at y 300
 describe("dimension commands", () => {
+    test("dimension entry uses document units, preserves the exact current size on Enter, and converts replacement input", async () => {
+        const { app, doc, view, dialog, restorePub, restoreFactory } = setup();
+        try {
+            setDocumentUnits(doc, { length: "in", angle: "deg", lengthPrecision: 3, anglePrecision: 1 });
+            const node = new SketchNode({ document: doc, plane: Plane.XY });
+            const editor = SketchEditor.enter(node);
+            editor.solver.addLine(0, 0, 100, 0);
+            editor.solve(true);
+            await placeDistanceDimension(app, doc, view);
+            expect(dialogInput(dialog).value).toBe("3.937");
+            expect(confirmDialog(dialog, "3.937")).toBe(true);
+            const constraint = editor.solver.toData().constraints[0];
+            expect(constraint.datum).toBe(100);
+            editor.editDatum(constraint.id);
+            expect(confirmDialog(dialog, "2")).toBe(true);
+            expect(editor.solver.toData().constraints[0].datum).toBeCloseTo(50.8);
+            editor.exit();
+        } finally {
+            restorePub();
+            restoreFactory();
+        }
+    });
     test("distance constraint is created at placement, before the dialog is confirmed", async () => {
         const { app, doc, view, dialog, restorePub, restoreFactory } = setup();
         try {
@@ -396,7 +419,7 @@ describe("dimension commands", () => {
             await run;
 
             // the dialog shows degrees; the solver datum is stored in radians
-            expect(dialogInput(dialog).value).toBe("90.00");
+            expect(dialogInput(dialog).value).toBe("90.0");
             const constraints = editor.solver.toData().constraints;
             expect(constraints.length).toBe(1);
             expect(constraints[0].kind).toBe(ConstraintKind.Angle);
@@ -416,7 +439,7 @@ describe("dimension commands", () => {
 
             // re-editing shows the current value in degrees again
             editor.editDatum(constraints[0].id);
-            expect(dialogInput(dialog).value).toBe("45.00");
+            expect(dialogInput(dialog).value).toBe("45.0");
             expect(confirmDialog(dialog, "60")).toBe(true);
             expect(editor.solver.toData().constraints[0].datum).toBeCloseTo(Math.PI / 3);
             editor.exit();
@@ -663,7 +686,7 @@ describe("dimension commands", () => {
             handler.pointerDown(view, pointerEvent(450, 330));
             await run;
 
-            expect(dialogInput(dialog).value).toBe("90.00");
+            expect(dialogInput(dialog).value).toBe("90.0");
             expect(confirmDialog(dialog, "45")).toBe(true);
 
             // the line rotates to -45° on the SAME side instead of flipping to +45°

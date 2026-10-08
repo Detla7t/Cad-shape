@@ -3,9 +3,12 @@
 
 import { type ChatPanel, createChatPanel } from "@chili3d/ai";
 import {
+    DocumentVersionControl,
     type IApplication,
     type ICommand,
     type IDocument,
+    type IFeatureListNode,
+    type INode,
     type Material,
     OperationLog,
     PubSub,
@@ -18,13 +21,16 @@ import { FloatPanel } from "./floatPanel";
 import { ModelSidebar } from "./project/modelSidebar";
 import { PropertyView } from "./property";
 import { showConfigurationPanel } from "./property/configuration";
+import { FeatureListProperty } from "./property/featureListProperty";
 import { MaterialDataContent, MaterialEditor } from "./property/material";
 import { showVariablesPanel } from "./property/variables";
+import { UtilityDock } from "./review/utilityDock";
 import { RibbonUI } from "./ribbon";
 import { CommandContext } from "./ribbon/commandContext";
 import { StudioSidebar } from "./sidebar/studioSidebar";
 import { Statusbar } from "./statusbar";
 import { VersionsDock } from "./versions";
+import { promptFields } from "./versions/prompt";
 import { LayoutViewport } from "./viewport";
 
 /**
@@ -47,6 +53,7 @@ export class Editor extends HTMLElement {
     private _isResizingSidebar: boolean = false;
     private _sidebarEl: HTMLDivElement | null = null;
     private readonly versionsDock: VersionsDock;
+    private readonly utilityDock: UtilityDock;
 
     constructor(
         readonly app: IApplication,
@@ -54,6 +61,11 @@ export class Editor extends HTMLElement {
     ) {
         super();
         this.versionsDock = new VersionsDock(app, () => this._contentEl);
+        this.utilityDock = new UtilityDock(
+            app,
+            () => this._contentEl,
+            () => this.versionsDock.hide(),
+        );
         const viewport = new LayoutViewport(app);
         viewport.classList.add(style.viewport);
         this._viewportContainer = div({ className: style.viewportContainer }, viewport);
@@ -88,7 +100,36 @@ export class Editor extends HTMLElement {
         history.title = "Versions and history";
         history.setAttribute("aria-label", history.title);
         history.append(createCadIcon("history"));
-        history.onclick = this.versionsDock.toggle;
+        history.onclick = this.toggleVersions;
+        const utilityButton = (title: string, icon: string, run: () => void) => {
+            const button = document.createElement("button");
+            button.title = title;
+            button.setAttribute("aria-label", title);
+            button.append(createCadIcon(icon));
+            button.onclick = () => run();
+            return button;
+        };
+        const version = utilityButton("Create version…", "create-version", () => {
+            const doc = this.app.activeView?.document,
+                control = doc && DocumentVersionControl.of(doc);
+            if (!control) {
+                PubSub.default.pub("displayError", "Open a document with version history first.");
+                return;
+            }
+            promptFields(
+                "versions.createVersion",
+                [
+                    { label: "versions.versionName", value: `V${control.versions().length + 1}` },
+                    { label: "versions.description", multiline: true },
+                ],
+                ([name, description]) => {
+                    const result = control.createVersion(name, description);
+                    if (result.isOk)
+                        PubSub.default.pub("showToast", "versions.versionCreated{0}", result.value.name);
+                    else PubSub.default.pub("displayError", result.error);
+                },
+            );
+        });
         const logs = document.createElement("button");
         logs.title = "Download diagnostic logs";
         logs.setAttribute("aria-label", logs.title);
@@ -103,7 +144,14 @@ export class Editor extends HTMLElement {
             a.click();
             setTimeout(() => URL.revokeObjectURL(url), 1000);
         };
-        rail.append(history, logs);
+        rail.append(
+            history,
+            version,
+            utilityButton("Comments", "comments", this.utilityDock.comments),
+            utilityButton("Performance", "performance", this.utilityDock.performance),
+            utilityButton("Where used", "where-used", this.utilityDock.whereUsed),
+            logs,
+        );
         this._contentEl = div({ className: style.content }, rail, partStudio, elementViews);
         this.append(
             div(
@@ -260,6 +308,7 @@ export class Editor extends HTMLElement {
     }
 
     connectedCallback(): void {
+        PubSub.default.sub("editFeature", this.editFeature);
         PubSub.default.sub("editMaterial", this._handleMaterialEdit);
         PubSub.default.sub("editVariables", this._handleVariablesEdit);
         PubSub.default.sub("editConfiguration", this._handleConfigurationEdit);
@@ -267,10 +316,17 @@ export class Editor extends HTMLElement {
         PubSub.default.sub("closeCommandContext", this.closeContext);
         PubSub.default.sub("toggleChatPanel", this.toggleChat);
         this._workspace?.connect();
-        PubSub.default.sub("toggleVersionsPanel", this.versionsDock.toggle);
+        this.utilityDock.connect();
+        PubSub.default.sub("toggleVersionsPanel", this.toggleVersions);
     }
 
+    private readonly toggleVersions = () => {
+        this.utilityDock.hide();
+        this.versionsDock.toggle();
+    };
+
     disconnectedCallback(): void {
+        PubSub.default.remove("editFeature", this.editFeature);
         PubSub.default.remove("editMaterial", this._handleMaterialEdit);
         PubSub.default.remove("editVariables", this._handleVariablesEdit);
         PubSub.default.remove("editConfiguration", this._handleConfigurationEdit);
@@ -278,12 +334,29 @@ export class Editor extends HTMLElement {
         PubSub.default.remove("closeCommandContext", this.closeContext);
         PubSub.default.remove("toggleChatPanel", this.toggleChat);
         this._workspace?.disconnect();
-        PubSub.default.remove("toggleVersionsPanel", this.versionsDock.toggle);
+        this.utilityDock.disconnect();
+        PubSub.default.remove("toggleVersionsPanel", this.toggleVersions);
         this.versionsDock.hide();
         this.chatDock?.remove();
         this.chatDock = undefined;
         this.closeFloatingChat();
     }
+
+    private readonly editFeature = (node: INode & IFeatureListNode, featureId: string) => {
+        const model = this.app.activeView?.document;
+        if (!model) return;
+        const content = new FeatureListProperty(model, node, featureId);
+        content.setAttribute("aria-label", "Edit feature");
+        PubSub.default.pub("showFloatPanel", {
+            title: "properties.header",
+            content,
+            document: model,
+            x: 282,
+            y: 76,
+            width: 280,
+            height: 400,
+        });
+    };
 
     private readonly openContext = (command: ICommand) => {
         if (this.commandContext) {

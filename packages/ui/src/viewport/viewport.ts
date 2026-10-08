@@ -12,11 +12,15 @@ import {
     Localize,
     PubSub,
     Result,
+    type ShapeType,
+    ShapeTypes,
     type ViewMode,
     ViewModeI18nKeys,
     ViewModes,
 } from "@chili3d/core";
 import { collection, div, input, label, span, svg } from "@chili3d/element";
+import { showNodeContextMenu } from "../project/nodeContextMenu";
+import { ViewportUtilities } from "../review/viewportUtilities";
 import { Flyout } from "./flyout";
 import style from "./viewport.module.css";
 
@@ -46,6 +50,7 @@ export class Viewport extends HTMLElement {
     private readonly _flyout: Flyout;
     private readonly _eventCaches: [keyof HTMLElementEventMap, (e: any) => void][] = [];
     private readonly _acts: HTMLElement;
+    private readonly utilities: ViewportUtilities;
 
     constructor(
         readonly view: IView,
@@ -55,6 +60,7 @@ export class Viewport extends HTMLElement {
         this.className = style.root;
         this._flyout = new Flyout();
         this._acts = this.createActs();
+        this.utilities = new ViewportUtilities(view);
         this.render();
         view.setDom(this);
     }
@@ -69,6 +75,7 @@ export class Viewport extends HTMLElement {
 
     private render() {
         this.append(
+            this.utilities.element,
             this._acts,
             this.showViewControls
                 ? div(
@@ -274,6 +281,7 @@ export class Viewport extends HTMLElement {
     }
 
     disconnectedCallback() {
+        this.utilities.dispose();
         this.removeEventListener("pointerdown", this.activate, true);
         this.removeEventListener("wheel", this.activate, true);
         this.removeEvents();
@@ -393,8 +401,15 @@ export class Viewport extends HTMLElement {
             const visual = this.view.document.visual;
             if (visual.viewHandler.isEnabled) visual.viewHandler.pointerUp(this.view, event);
             if (!gesture.moved && visual.eventHandler.isEnabled) {
-                visual.eventHandler.pointerDown(this.view, gesture.down);
-                visual.eventHandler.pointerUp(this.view, event);
+                if (
+                    visual.eventHandler === visual.defaultEventHandler &&
+                    this.openContextMenu(gesture.down)
+                ) {
+                    event.preventDefault();
+                } else {
+                    visual.eventHandler.pointerDown(this.view, gesture.down);
+                    visual.eventHandler.pointerUp(this.view, event);
+                }
             }
             if (this.hasPointerCapture?.(event.pointerId)) this.releasePointerCapture(event.pointerId);
             return;
@@ -405,6 +420,21 @@ export class Viewport extends HTMLElement {
             if (this.hasPointerCapture?.(event.pointerId)) this.releasePointerCapture(event.pointerId);
         }
     };
+
+    private openContextMenu(event: PointerEvent): boolean {
+        const visual = this.view.detectVisual(event.offsetX, event.offsetY)[0];
+        const node = visual && this.view.document.visual.context.getNode(visual);
+        if (!node) return false;
+        if (!this.view.document.selection.getSelectedNodes().includes(node))
+            this.view.document.selection.setSelectedNodes([node], false);
+        const picks = this.view.detectShapes(
+            (ShapeTypes.face | ShapeTypes.edge | ShapeTypes.vertex) as ShapeType,
+            event.offsetX,
+            event.offsetY,
+        );
+        showNodeContextMenu(node, event.clientX, event.clientY, { view: this.view, picks });
+        return true;
+    }
 
     private readonly pointerCancel = (event: PointerEvent) => {
         if (this.selectionPointer === event.pointerId) {

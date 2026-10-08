@@ -3,6 +3,7 @@
 
 import type { CommandKeys } from "./command/commandKeys";
 import { ObjectStorage, Observable } from "./foundation";
+import { DEFAULT_GRAPHICS, type GraphicsPreferences } from "./graphicsPreferences";
 import { I18n } from "./i18n";
 import type { Navigation3DType } from "./navigation";
 import { type SerializedData, Serializer, serialize } from "./serialize";
@@ -50,6 +51,13 @@ export class Config extends Observable {
     }
 
     readonly SnapDistance: number = 10;
+
+    get graphics(): GraphicsPreferences {
+        return { ...DEFAULT_GRAPHICS, ...this.getPrivateValue("graphics", { ...DEFAULT_GRAPHICS }) };
+    }
+    set graphics(value: GraphicsPreferences) {
+        this.setProperty("graphics", { ...value });
+    }
 
     @serialize()
     get orientNormalOnSketchEdit(): boolean {
@@ -183,6 +191,7 @@ export class Config extends Observable {
         const json = Serializer.serializeProperties(this);
         ObjectStorage.default.setValue(this.storageKey, {
             ...json,
+            graphics: this.graphics,
             customShortcuts: this.customShortcuts,
             ribbonPreferences: this.ribbonPreferences,
         });

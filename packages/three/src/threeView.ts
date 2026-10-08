@@ -66,6 +66,7 @@ import style from "./threeView.module.css";
 import type { ThreeVisualContext } from "./threeVisualContext";
 import { ThreeComponentObject, ThreeMeshObject, ThreeVisualObject } from "./threeVisualObject";
 import { ViewDisplay } from "./viewDisplay";
+import { ViewEffects } from "./viewEffects";
 import { ViewGizmo } from "./viewGizmo";
 
 /** One sub-shape a hit resolved to, and the indexes it occupies in its own node's shape list. */
@@ -111,9 +112,19 @@ export class ThreeView extends Observable implements IView {
 
     private readonly _scene: Scene;
     private readonly _renderer: WebGLRenderer;
+    private readonly effects = new ViewEffects(this);
+    private readonly graphicsChanged = (key: keyof Config) => {
+        if (key === "graphics") {
+            this.cameraController.updateCameraPosionTarget();
+            this.update();
+        }
+    };
     private readonly _cssRenderer: CSS2DRenderer;
     private readonly labelScene = new Scene();
     private readonly _gizmo: IViewGizmo;
+    showSectionView(plane?: Plane): void {
+        this._gizmo.showSectionView?.(plane);
+    }
     private readonly _resizeObserver: ResizeObserver;
 
     readonly cameraController: CameraController;
@@ -168,10 +179,13 @@ export class ThreeView extends Observable implements IView {
         this._gizmo = this.initGizmo();
         this.camera.layers.enableAll();
         this.document.application.views.push(this);
+        Config.instance.onPropertyChanged(this.graphicsChanged);
         this.animate();
     }
 
     override disposeInternal(): void {
+        Config.instance.removePropertyChanged(this.graphicsChanged);
+        this.effects.dispose();
         this.display.dispose();
         super.disposeInternal();
         this._gizmo.dispose();
@@ -301,9 +315,38 @@ export class ThreeView extends Observable implements IView {
         return element;
     }
 
+    protected renderEffects() {
+        this.effects.render();
+    }
+
+    private renderFrame() {
+        const reset = this._renderer.info.autoReset;
+        this._renderer.info.autoReset = false;
+        this._renderer.info.reset();
+        try {
+            this.display.render(() => {
+                this._renderer.render(this._scene, this.camera);
+                this.renderEffects();
+            });
+        } finally {
+            this._renderer.info.autoReset = reset;
+        }
+    }
+
     toImage(): string {
-        this.display.render(() => this._renderer.render(this._scene, this.camera));
+        this.renderFrame();
         return this.renderer.domElement.toDataURL();
+    }
+
+    renderStats(): Record<string, number> {
+        const info = this.renderer.info;
+        return {
+            "Draw calls": info.render.calls,
+            Triangles: info.render.triangles,
+            "Line segments": info.render.lines,
+            "GPU geometries": info.memory.geometries,
+            "GPU textures": info.memory.textures,
+        };
     }
 
     get workplane(): Plane {
@@ -331,7 +374,7 @@ export class ThreeView extends Observable implements IView {
 
         const dir = this.camera.position.clone().sub(this.cameraController.target);
         this.dynamicLight.position.copy(dir);
-        this.display.render(() => this._renderer.render(this._scene, this.camera));
+        this.renderFrame();
         this._cssRenderer.render(this.labelScene, this.camera);
         this._gizmo?.update();
 

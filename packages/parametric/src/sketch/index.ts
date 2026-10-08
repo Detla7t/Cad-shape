@@ -28,3 +28,5 @@ PubSub.default.sub("nodeDoubleClicked", (node) => {
 });
 import "./modelParameters";
 import "./contextActions";
+
+import "./planeContextActions";

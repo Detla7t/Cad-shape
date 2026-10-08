@@ -5,9 +5,12 @@ import {
     assignActiveArm,
     Binding,
     configuredArmSource,
+    documentParameterInput,
+    documentUnit,
     type FeatureItem,
     type FeatureParameter,
     type FeatureReference,
+    formatDocumentValue,
     I18n,
     type I18nKeys,
     type IDocument,
@@ -57,27 +60,39 @@ export class FeatureListProperty extends HTMLElement {
     constructor(
         readonly document: IDocument,
         readonly node: INode & IFeatureListNode,
+        private readonly featureId?: string,
     ) {
         super();
+        if (featureId) this.expanded.add(featureId);
         this.renderItems();
     }
 
     connectedCallback(): void {
         this.node.onPropertyChanged(this.handleNodeChanged);
+        PubSub.default.sub("documentUnitsChanged", this.handleUnitsChanged);
     }
 
     disconnectedCallback(): void {
         this.node.removePropertyChanged(this.handleNodeChanged);
+        PubSub.default.remove("documentUnitsChanged", this.handleUnitsChanged);
         this.closeMenu();
     }
 
     private readonly handleNodeChanged = (property: string) => {
         if (property === "featuresJson") this.renderItems();
     };
+    private readonly handleUnitsChanged = (model: IDocument) => {
+        if (model === this.document) this.renderItems();
+    };
 
     private renderItems() {
         this.closeMenu();
-        this.replaceChildren(...this.node.featureItems().map((item) => this.featureRow(item)));
+        this.replaceChildren(
+            ...this.node
+                .featureItems()
+                .filter((item) => !this.featureId || item.id === this.featureId)
+                .map((item) => this.featureRow(item)),
+        );
     }
 
     private isExpanded(item: FeatureItem) {
@@ -317,14 +332,19 @@ export class FeatureListProperty extends HTMLElement {
         const configured = this.configuredOf(param);
         // The stored text — what focusing reveals for editing; a configured slot's is its
         // `configure(…)`, while the box at rest shows what the active configuration selects.
-        const raw = configured ?? String(param.value);
+        const raw = configured ?? this.formatFeatureValue(param.value as number | string, param);
         const display = this.displayValue(param, configured);
         const expected = unitSpecLabelKey(unit);
-        const unitTitle = expected === undefined ? "" : (I18n.translate(expected) ?? "");
+        const unitTitle =
+            expected === undefined
+                ? ""
+                : `${I18n.translate(expected) ?? ""}${unit ? ` (${documentUnit(this.document, unit).suffix})` : ""}`;
         return input({
             className:
                 configured === undefined ? inputStyle.box : `${inputStyle.box} ${style.configuredValue}`,
             value: display,
+            ariaLabel: param.label ?? I18n.translate(param.display),
+            dataset: { initialValue: raw },
             // What the slot measures — the value may be an expression, and the rebuild
             // rejects one of the wrong unit, so say up front what fits.
             title: configured === undefined ? unitTitle : this.configuredTitle(configured),
@@ -349,10 +369,16 @@ export class FeatureListProperty extends HTMLElement {
     private displayValue(param: FeatureParameter, configured: string | undefined): string {
         if (configured === undefined || param.configured !== undefined) {
             // A feature that reports `configured` already hands the selected value in `value`.
-            return this.formatParameterValue(param.value as number | string);
+            return this.formatFeatureValue(param.value as number | string, param);
         }
         const selected = selectConfiguredArm(configured, this.document.variables.evaluate().scope);
-        return selected.isOk ? this.formatParameterValue(selected.value) : configured;
+        return selected.isOk ? this.formatFeatureValue(selected.value, param) : configured;
+    }
+
+    private formatFeatureValue(value: number | string, param: FeatureParameter): string {
+        return typeof value === "number" && param.unit && this.document.userData?.["displayUnits"]
+            ? formatDocumentValue(value, this.document, param.unit, false)
+            : this.formatParameterValue(value);
     }
 
     private readonly handleKeyDown = (e: KeyboardEvent, item: FeatureItem, key: string) => {
@@ -401,6 +427,27 @@ export class FeatureListProperty extends HTMLElement {
                 ),
             ),
         );
+        const target = {
+            documentId: this.document.id,
+            nodeId: this.node.id,
+            featureId: item.id,
+            name: `${this.node.name} / ${item.name ?? I18n.translate(item.display)}`,
+        };
+        for (const [label, topic] of [
+            ["Add comment", "openReviewComments"],
+            ["Where used…", "openWhereUsed"],
+        ] as const) {
+            const entry = div({
+                className: style.menuItem,
+                textContent: label,
+                onclick: (event: MouseEvent) => {
+                    event.stopPropagation();
+                    this.closeMenu();
+                    PubSub.default.pub(topic, target);
+                },
+            });
+            menu.append(entry);
+        }
         document.body.appendChild(menu);
         const { top, left } = this.menuPosition(anchor.getBoundingClientRect(), menu);
         menu.style.top = `${top}px`;
@@ -549,11 +596,33 @@ export class FeatureListProperty extends HTMLElement {
             box.value = String(current ?? "");
             return;
         }
-        if (text === String(current)) return;
+        if (
+            text === box.dataset["initialValue"] ||
+            (!this.document.userData?.["displayUnits"] && text === String(current))
+        )
+            return;
         // A non-numeric value is kept as an expression string; a failure to resolve
         // it surfaces as a feature error on the row.
         const asNumber = Number(text);
-        const value = parameter?.text !== true && Number.isFinite(asNumber) ? asNumber : text;
+        let value: number | string = parameter?.text !== true && Number.isFinite(asNumber) ? asNumber : text;
+        if (
+            parameter?.unit &&
+            !parameter.text &&
+            !isConfiguredValue(text) &&
+            this.document.userData?.["displayUnits"]
+        ) {
+            const parsed = documentParameterInput(
+                text,
+                this.document,
+                parameter.unit,
+                this.document.variables.scope,
+            );
+            if (!parsed.isOk) {
+                PubSub.default.pub("displayError", parsed.error);
+                return;
+            }
+            value = parsed.value;
+        }
         this.applyValue(item, key, parameter === undefined ? value : this.editedValue(parameter, value));
     }
 

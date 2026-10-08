@@ -5,6 +5,8 @@ import {
     type AsyncController,
     type CameraType,
     Config,
+    documentParameterInput,
+    formatDocumentValue,
     type I18nKeys,
     type IDisposable,
     type IDocument,
@@ -747,6 +749,11 @@ export class SketchEditor implements IDisposable {
         const before = this.solver.toData();
         this.closeDatum = datumPrompt.promptDatum(initial, apply, () => this.applyDatum(before), onCancel, {
             ...options,
+            initialText:
+                typeof initial === "number"
+                    ? formatDocumentValue(initial, this.document, unit, false)
+                    : initial,
+            parse: (text) => documentParameterInput(text, this.document, unit, this.variableScope()),
             inlineAt:
                 options?.constraintId === undefined
                     ? undefined

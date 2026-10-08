@@ -1,17 +1,88 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type INode, NodeActions, type NodeMenuAction, PubSub } from "@chili3d/core";
+import {
+    type INode,
+    Node as ModelNode,
+    NodeActions,
+    type NodeMenuAction,
+    type NodeMenuContext,
+    PubSub,
+    ReferencePlaneNode,
+} from "@chili3d/core";
 import { createCadIcon } from "@chili3d/element";
 import style from "./nodeContextMenu.module.css";
 
 let closeMenu: (() => void) | undefined;
-export function showNodeContextMenu(node: INode, x: number, y: number): void {
-    const actions = NodeActions.forNode(node);
+export function showNodeContextMenu(node: INode, x: number, y: number, context?: NodeMenuContext): void {
+    let actions = NodeActions.forNode(node, context);
+    const doc = node instanceof ModelNode ? node.document : context?.view.document;
+    const isPlane = node instanceof ReferencePlaneNode;
+    if (doc && !isPlane) {
+        const target = { documentId: doc.id, nodeId: node.id, name: node.name };
+        actions = actions.filter((action) => action.id !== "comment");
+        actions.push(
+            {
+                id: "comment",
+                label: "Add comment",
+                icon: "comments",
+                run: () => PubSub.default.pub("openReviewComments", target),
+            },
+            {
+                id: "whereUsed",
+                label: "Where used…",
+                icon: "where-used",
+                run: () => PubSub.default.pub("openWhereUsed", target),
+            },
+        );
+    }
+    if (context && !isPlane) {
+        const order = [
+            "editFeature",
+            "editSourceSketch",
+            "showDimensions",
+            "dependencies",
+            "hide",
+            "analysis",
+            "isolate",
+            "transparent",
+            "section",
+            "copy",
+            "drawing",
+            "export",
+            "selectEntities",
+            "selectOther",
+            "comment",
+            "fit",
+            "zoom",
+            "normal",
+            "delete",
+            "deleteFeature",
+            "material",
+            "appearance",
+            "faceAppearance",
+        ];
+        const index = (id: string) => {
+            const at = order.indexOf(id.startsWith("editSourceSketch") ? "editSourceSketch" : id);
+            return at < 0 ? order.length : at;
+        };
+        actions = actions
+            .filter(
+                (action) =>
+                    !["rename", "properties", "copyHere", "paste", "release", "unisolate"].includes(
+                        action.id,
+                    ),
+            )
+            .sort((a, b) => index(a.id) - index(b.id))
+            .map((action) => ({
+                ...action,
+                separatorBefore: ["hide", "copy", "comment", "delete", "material"].includes(action.id),
+            }));
+    }
     if (!actions.length) return;
     closeMenu?.();
     const menu = document.createElement("div");
-    menu.className = style.menu;
+    menu.className = isPlane ? `${style.menu} ${style.planeMenu}` : style.menu;
     menu.setAttribute("role", "menu");
     const controller = new AbortController();
     const close = () => {

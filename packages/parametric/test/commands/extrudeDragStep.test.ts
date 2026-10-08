@@ -121,6 +121,24 @@ describe("ExtrudeDragHandler", () => {
         handler.dispose();
     });
 
+    test("viewport Enter cannot bypass invalid panel input", () => {
+        let valid = false;
+        const handler = new ExtrudeDragHandler(doc, controller, {
+            ...dragData(),
+            depth: 25,
+            canConfirm: () => valid,
+        });
+        try {
+            handler.keyDown(dragView(), new KeyboardEvent("keydown", { key: "Enter" }));
+            expect(controller.result).toBeUndefined();
+            valid = true;
+            handler.keyDown(dragView(), new KeyboardEvent("keydown", { key: "Enter" }));
+            expect(controller.result?.status).toBe("success");
+        } finally {
+            handler.dispose();
+        }
+    });
+
     test("confirming a non-zero depth without dragging commits against the active view", () => {
         const view = createHandlerMockView({ document: doc });
         doc.application.activeView = view;
@@ -241,7 +259,7 @@ describe("ExtrudeDragHandler", () => {
         const face = faceData(other, [3], new XYZ({ x: 0, y: 2, z: 2 }));
         const view = createHandlerMockView({ document: doc, detectShapes: () => [face] });
 
-        const handler = new ExtrudeDragHandler(doc, controller, dragData());
+        const handler = new ExtrudeDragHandler(doc, controller, { ...dragData(), depth: 25 });
         handler.pointerDown(view, createPointerEvent());
         handler.pointerUp(view, createPointerEvent());
 
@@ -250,7 +268,7 @@ describe("ExtrudeDragHandler", () => {
         expect(handler.state.faces).toEqual([face]);
         expect(handler.state.normal.isEqualTo(XYZ.unitX)).toBe(true);
         expect(handler.state.anchor.isEqualTo(new XYZ({ x: 0, y: 2, z: 2 }))).toBe(true);
-        expect(handler.state.dist).toBe(0);
+        expect(handler.state.dist).toBe(25);
         expect(setSelectedShapes).toHaveBeenCalledWith([face], SELECTED_PROFILE_STATE, false);
     });
 

@@ -4,6 +4,42 @@ Bring the existing CAD/CAM system to production through complete, validated user
 
 The starting point is the audit of committed branch HEAD `285cb7e2`. It passed the existing 8,055 tests and the isolated production build and lint checks. Additional probes reproduced three CAM freshness/validity defects and a gap in disposal of replaced final shapes. The audit also identified a machining mesh accuracy gap. These findings establish priorities; they do not establish completion of any milestone below.
 
+## Implementation progress — 8 October 2026
+
+The first implementation pass addresses the reproduced reliability defects and adds independent model validation. UX implementation remains with the product owner's parallel work. These changes advance several milestones; they do not close the production-release gates.
+
+- **Model and CAM validity:** a failed rebuild is recorded separately from displayed last-good geometry, including failures in referenced bodies. CAM dependencies include placements, ancestors, stock, picks, rollback state and evaluation failures. Async jobs capture their geometry before yielding and can publish only against matching inputs. Cancellation, supersession, node replacement, suppression, deletion and studio disposal are covered by regressions. Missing stock and lost tracked picks now fail explicitly.
+- **Native resource ownership:** replaced parametric final shapes and failed-replay intermediates are released without disposing a cached prefix or the last good result. Ownership tests cover rollback, rebuild, failure and undo/redo.
+- **Machining meshes:** the kernel supports separate absolute machining tessellation with interior surface control and a conservative refinement margin. Surfacing operations request a fraction of their tolerance for meshing. Analytic sphere tests at radii 10 and 100 mm check vertices, edge midpoints and triangle centroids against a 0.02 mm budget. This is evidence for those fixtures, not qualification of every surface or the complete toolpath/post error budget.
+- **Persistence:** IndexedDB resolves writes on transaction completion. Document, recent-file entry and version-history writes/compaction commit atomically through the built-in adapter. Save queues prevent overlapping writes from losing history; failed saves remain retryable. Missing history packs block overwriting the recoverable project. Tests use an IndexedDB implementation with real transaction/abort semantics. Legacy adapters without `writeBatch` retain sequential writes and cannot provide the same atomicity.
+- **FeatureScript runtime:** an unavailable configured Onshape std yields explicit compilation diagnostics instead of switching to the native dialect. Compilation caches are scoped to document instances and keyed by runtime revision. Reopened/validation documents instantiate their own studio modules. Full std-version persistence and 1:1 behavioral conformance remain open.
+- **Build checks:** CI covers branch pushes and PRs, read-only lint, typecheck, application/plugin builds, JavaScript tests and native Rust tests/formatting. `check:wasm` verifies source/artifact hashes against `packages/wasm/build-manifest.json`; `build:wasm` records provenance after installation. The rebuilt artifact records OCCT 8.0.1 and the available Nix Emscripten 5.0.6-git toolchain. The normal emsdk setup is pinned to 5.0.7. Hash verification detects drift; it does not establish byte-identical reproducibility across those toolchains.
+
+### Independent model validation
+
+`validateModel` is exported from `@chili3d/builder`. It captures the document, rebuilds disposable detached copies, re-solves sketch constraints and assembly mates, checks variable/FeatureScript errors and kernel topology, then serializes and rebuilds successful cases again. Round-trip comparisons check volume and face/edge counts; they are useful invariants, not a complete geometric-equivalence proof. Detached loading now preserves configuration definitions and active values, also fixing configured linked-source rebuilding.
+
+```ts
+import { validateModel } from "@chili3d/builder";
+
+const report = await validateModel(document, { maxCases: 64, signal });
+// report.status: "passed" | "failed" | "incomplete"
+// report.cases: configuration, issues with node/item IDs, rebuilt shape summaries
+```
+
+The default checks the current configuration, enumerates list/checkbox combinations, and samples numeric defaults and declared bounds. Callers can supply explicit `configurations` for a regression corpus. Numeric coverage is labelled `sampled`; arbitrary future parameter values are not proven. Case limits, cancellation, changes to the live source during checking, unsupported geometry types, and linked source definitions that were not independently rebuilt cannot produce a complete passing report. Remaining degrees of freedom are warnings, distinguished from unsatisfied constraints. Suppressed features are evaluated only in configurations where they are enabled.
+
+This API is available for the ongoing UX work to invoke; this implementation does not add or redesign UI. Local CAD/sketch/assembly validation does not certify CAM machine output, office-file fidelity, external link source histories or PCB workflows. Next shared priorities remain schema migrations and recovery autosaves, coordinated saves across tabs, workers and browser acceptance/soak tests, broader geometry qualification, and the versioned FeatureScript conformance corpus.
+
+### Verification of this implementation pass
+
+- Full Rstest run: **8,155 passed**, 508 files, zero failures, skips or TODOs, completed 8 October 2026 at 04:59 UTC. The working tree includes concurrent UX changes; this count describes that tested snapshot.
+- Production application and all plugin builds passed. Rspack still reports bundle-size warnings; performance budgets remain open.
+- TypeScript typecheck passed. Native Rust tests passed (27 polygon tests), and Rust formatting passed.
+- Rebuilt OCCT WASM passed the kernel tests, including eight dedicated machining-mesh cases. Source/artifact provenance verification passed.
+- Fourteen model-validation tests cover independent rebuilds, re-solving stored coordinates, conflicting/missing sketch constraints, configuration failures and numeric bounds, assembly conflicts, unused broken Feature Studios, cancellation, case limits, unsupported geometry and edits during validation.
+- Targeted and final repository-wide read-only Biome checks passed. Two stale UI test helpers were updated to expose the real new unit helpers and the existing I18n mock, after which all tests passed. Concurrent UX formatting was left to its owner and was clean on the final check.
+
 ## First production release scope
 
 The first production release includes the complete suite requested by the product owner: 2D, 3D, sheet metal, CAM, PCB, document editing and viewing, full version control, easy importing, parametric tools, easy expansion, and FeatureScript compatibility with Onshape's own standard-library source. None of these areas is deferred to a later production release. Internal builds and betas can deliver these areas incrementally.

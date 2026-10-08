@@ -1,0 +1,105 @@
+.panel {
+    position: fixed;
+    left: 282px;
+    top: 76px;
+    width: 242px;
+    padding: 0 8px 10px;
+    box-sizing: border-box;
+    z-index: 101;
+    background: var(--panel-background-color);
+    color: var(--foreground-color);
+    box-shadow: 0 3px 10px #0003;
+    font-size: 12px;
+}
+.panel header {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    border-bottom: 1px solid var(--border-color);
+    height: 32px;
+}
+.panel strong {
+    flex: 1;
+}
+.panel header button {
+    font-size: 20px;
+    background: transparent;
+    border: none;
+    color: #bd3030;
+    cursor: pointer;
+}
+.panel header button:first-of-type {
+    background: #008a08;
+    color: white;
+}
+.panel button:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+.kind {
+    color: var(--primary-color);
+    padding: 7px 5px;
+    border-bottom: 1px solid var(--border-color);
+}
+.panel nav {
+    display: flex;
+    margin: 0 -8px 8px;
+    border-bottom: 1px solid var(--border-color);
+}
+.panel nav button {
+    flex: 1;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    padding: 7px 2px;
+    cursor: pointer;
+}
+.panel nav button[aria-pressed="true"] {
+    color: var(--primary-color);
+    box-shadow: inset 0 -2px var(--primary-color);
+}
+.profile {
+    width: 100%;
+    min-height: 45px;
+    padding: 8px;
+    text-align: left;
+    color: inherit;
+    border: 1px solid #73a9d9;
+    background: #dff2ff;
+    cursor: pointer;
+}
+.endType {
+    padding: 9px 3px;
+    border-bottom: 1px solid var(--border-color);
+}
+.panel label {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+    margin: 10px 0;
+}
+.length input {
+    min-width: 0;
+    width: 85px;
+    padding: 4px;
+    border: 0;
+    border-bottom: 1px solid var(--border-color);
+    background: transparent;
+    color: inherit;
+}
+.length span {
+    flex: 1;
+}
+.length button {
+    border: 0;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+}
+.panel [hidden] {
+    display: none;
+}
+.error {
+    color: #bb3030;
+    font-size: 11px;
+}

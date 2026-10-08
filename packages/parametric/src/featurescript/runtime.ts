@@ -34,6 +34,13 @@ export interface InterpreterSetup {
 
 let onshapeStd: OnshapeStdSource | undefined;
 let onshapeBase: Interpreter | undefined;
+let onshapeStdLoadError: string | undefined;
+let runtimeRevision = 0;
+
+/** Changes when the configured dialect changes or becomes unavailable. */
+export function featureScriptRuntimeRevision(): number {
+    return runtimeRevision;
+}
 
 /**
  * Makes Onshape's own std library (`@chili3d/onshape-std`) the FeatureScript std: from now
@@ -41,8 +48,20 @@ let onshapeBase: Interpreter | undefined;
  * it is provided (and in tests that never provide it) studios run on the native std.
  */
 export function provideOnshapeStd(source: OnshapeStdSource | undefined): void {
+    runtimeRevision++;
     onshapeStd = source;
     onshapeBase = undefined;
+    onshapeStdLoadError = undefined;
+}
+
+/** A configured std failed to load: do not rebuild saved studios against another std. */
+export function markOnshapeStdUnavailable(error: unknown): void {
+    runtimeRevision++;
+    onshapeStd = undefined;
+    onshapeBase = undefined;
+    onshapeStdLoadError = `Onshape's standard library could not be loaded. Reload to retry. ${
+        error instanceof Error ? error.message : String(error)
+    }`;
 }
 
 export function onshapeStdVersion(): number | undefined {
@@ -73,6 +92,7 @@ export function warmUpStd(): void {
 
 /** An interpreter on the current std: a fork over Onshape's std once provided, else the native std. */
 export function createInterpreter(setup: InterpreterSetup = {}): Interpreter {
+    if (onshapeStdLoadError !== undefined) throw new FsRuntimeError(onshapeStdLoadError);
     if (onshapeStd === undefined) return createNativeInterpreter(setup);
     return onshapeInterpreter(onshapeStd).fork({
         print: setup.print,
@@ -93,8 +113,8 @@ export interface CompileResult {
 
 /** Parses and instantiates a studio; failures come back as data, never thrown. */
 export function compileStudio(source: ModuleSource, setup: InterpreterSetup = {}): CompileResult {
-    const interpreter = createInterpreter(setup);
     try {
+        const interpreter = createInterpreter(setup);
         const module = interpreter.load(source);
         return { module, features: module.features, tables: module.tables };
     } catch (error) {

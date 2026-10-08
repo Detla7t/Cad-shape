@@ -18,13 +18,16 @@ export const pubSubRecorder = rs.hoisted(() => {
 
 rs.mock("@chili3d/core", () => {
     const actual = rs.hoisted(() => require("@chili3d/core"));
-    const { LocalizeMock, BindingMock, TransactionMock } = rs.hoisted(() => require("./coreMocks"));
+    const { LocalizeMock, BindingMock, TransactionMock, I18nMock } = rs.hoisted(() => require("./coreMocks"));
     // Pure helpers the feature list uses; the partial snapshot can miss them (see below).
     const configuredValue = rs.hoisted(() => require("../../../core/src/parameters/configuredValue"));
+    const documentUnits = rs.hoisted(() => require("../../../core/src/parameters/documentUnits"));
 
     return {
         ...actual,
         ...configuredValue,
+        ...documentUnits,
+        I18n: I18nMock,
         Localize: LocalizeMock,
         Binding: BindingMock,
         Transaction: TransactionMock,

@@ -5,6 +5,7 @@ export * from "./configuration";
 export * from "./configurationVisibility";
 export * from "./configuredValue";
 export * from "./dataTable";
+export * from "./documentUnits";
 export * from "./expression";
 export * from "./modelParameters";
 export * from "./unitSpec";

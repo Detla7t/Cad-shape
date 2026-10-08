@@ -200,6 +200,8 @@ export interface VertexMeshData extends ShapeMeshData {
 }
 
 export interface EdgeMeshData extends ShapeMeshData {
+    /** Alternate color for the portion hidden behind solid geometry. */
+    occludedColor?: number;
     dashSize?: number;
     gapSize?: number;
     lineType: LineType;

@@ -14,6 +14,7 @@ const EMSDK_DIR = path.resolve(BUILD_DIR, EMSDK_DIR_NAME);
 
 const OCCT_DIR_NAME = "occt";
 const OCCT_DIR = path.resolve(BUILD_DIR, OCCT_DIR_NAME);
+const EMSCRIPTEN_VERSION = "5.0.7";
 
 /**
  * Due to a WebXR error, we need to use --skipLibCheck
@@ -34,12 +35,12 @@ const libs = [
     {
         name: "emscripten",
         url: "https://github.com/emscripten-core/emsdk.git",
-        tag: "5.0.7",
+        tag: EMSCRIPTEN_VERSION,
         dir: EMSDK_DIR,
         actions: [fixEmscripten],
         commands: [
-            `${EMSDK_DIR}/emsdk install latest`,
-            `${EMSDK_DIR}/emsdk activate --embedded latest`,
+            `${EMSDK_DIR}/emsdk install ${EMSCRIPTEN_VERSION}`,
+            `${EMSDK_DIR}/emsdk activate --embedded ${EMSCRIPTEN_VERSION}`,
             `cd ${EMSDK_DIR}/upstream/emscripten && npm i`,
         ],
     },
@@ -91,6 +92,7 @@ function main() {
         })
         .catch((err) => {
             console.error(err);
+            process.exitCode = 1;
         });
 }
 
