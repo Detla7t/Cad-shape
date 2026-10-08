@@ -176,7 +176,7 @@ describe("SketchEditor entity selection", () => {
         }
     });
 
-    test("Escape clears the selection first and exits on the second press", () => {
+    test("Escape clears the selection and keeps the session open on repeated presses", () => {
         const { app, doc, view, restoreFactory } = setup();
         try {
             const node = new SketchNode({ document: doc, plane: Plane.XY });
@@ -192,7 +192,8 @@ describe("SketchEditor entity selection", () => {
             expect(SketchEditor.getActive()).toBe(editor);
 
             handler.keyDown(view, new KeyboardEvent("keydown", { key: "Escape" }));
-            expect(SketchEditor.getActive()).toBeUndefined();
+            expect(SketchEditor.getActive()).toBe(editor);
+            editor.exit();
         } finally {
             restoreFactory();
         }

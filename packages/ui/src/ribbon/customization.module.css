@@ -1,0 +1,105 @@
+.menu {
+    position: fixed;
+    z-index: 10020;
+    min-width: 230px;
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    background: var(--panel-background-color);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    box-shadow: var(--panel-shadow);
+}
+.menu button,
+.searchResults button {
+    border: 0;
+    background: transparent;
+    padding: 9px 12px;
+    text-align: left;
+    cursor: pointer;
+    border-radius: 3px;
+}
+.menu button:hover,
+.searchResults button:hover {
+    background: var(--hover-background-color);
+}
+.heading {
+    padding: 7px 12px;
+    font-weight: 600;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 4px;
+}
+.dialog {
+    color: var(--foreground-color);
+    background: var(--panel-background-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0;
+    width: 510px;
+    max-width: calc(100vw - 40px);
+    max-height: 85vh;
+    box-shadow: 0 12px 48px #0003;
+}
+.dialog::backdrop {
+    background: #0004;
+}
+.dialogHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-weight: 600;
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--border-color);
+}
+.dialogContent {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 18px;
+}
+.dialog input:not([type="checkbox"]),
+.dialog select {
+    padding: 8px;
+    min-width: 0;
+    border-radius: 4px;
+}
+.dialog button {
+    padding: 7px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+.dialog button:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+.hint {
+    color: var(--foreground-secondary-color);
+    font-size: 12px;
+    line-height: 1.5;
+}
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.tabList {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    overflow: auto;
+    max-height: 46vh;
+}
+.tabRow {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.tabRow input:not([type="checkbox"]) {
+    flex: 1;
+}
+.searchResults {
+    display: flex;
+    flex-direction: column;
+    max-height: 50vh;
+    overflow: auto;
+}

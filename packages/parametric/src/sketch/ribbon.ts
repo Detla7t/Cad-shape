@@ -17,7 +17,7 @@ export const SketchRibbonProfiles: RibbonProfileExtra[] = [
         groups: [
             {
                 groupName: "ribbon.group.sketch",
-                items: ["sketch.create", "sketch.enter"],
+                items: ["sketch.create", "sketch.enter", "plane.create"],
             },
         ],
     },
@@ -31,7 +31,13 @@ export const SketchRibbonProfiles: RibbonProfileExtra[] = [
             },
             {
                 groupName: "ribbon.group.draw",
-                items: ["sketch.line", "sketch.circle", "sketch.arc", "sketch.rectangle"],
+                items: [
+                    "sketch.line",
+                    "sketch.circle",
+                    "sketch.circle3Point",
+                    "sketch.arc",
+                    "sketch.rectangle",
+                ],
             },
             {
                 groupName: "ribbon.group.constraint",

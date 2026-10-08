@@ -2,7 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import type { CommandKeys, IApplication, PushButton, Ribbon } from "@chili3d/core";
-import { CommandStore, PubSub, RibbonGroup, RibbonTab } from "@chili3d/core";
+import { CommandStore, PubSub, RibbonGroup, Ribbon as RibbonModel, RibbonTab } from "@chili3d/core";
 import { afterEach, beforeEach, describe, expect, test } from "@rstest/core";
 
 // CSS modules under test (plus those of the ribbon buttons pulled in transitively)
@@ -137,11 +137,7 @@ describe("RibbonUI", () => {
     function createRibbonUI() {
         const tab1 = makeTab("tab.one");
         const tab2 = makeTab("tab.two");
-        const dataContent = {
-            quickCommands: [CMD_QUICK],
-            tabs: [tab1, tab2],
-            activeTab: tab1,
-        } as unknown as Ribbon;
+        const dataContent = new RibbonModel([CMD_QUICK], [tab1, tab2]);
         const app = { views: [], mainWindow: undefined } as unknown as IApplication;
         const ui = new RibbonUI(app, dataContent);
         return { ui, dataContent, tab1, tab2 };
@@ -156,10 +152,10 @@ describe("RibbonUI", () => {
         expect(appName.textContent).toContain("Chili3D - v");
     });
 
-    test("should render github link", () => {
+    test("should render tool search and tab customization", () => {
         const { ui } = createRibbonUI();
-        const link = mustQuery(ui, "a");
-        expect(link.getAttribute("href")).toBe("https://github.com/xiangechen/chili3d");
+        expect(mustQuery(ui, ".r-right").textContent).toContain("Search tools");
+        expect(mustQuery(ui, "button[title='Customize tabs']").textContent).toBe("⚙");
     });
 
     test("should render ribbon groups for each tab", () => {

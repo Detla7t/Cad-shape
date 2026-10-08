@@ -40,6 +40,15 @@ export interface GeometryNodeOptions {
 const NoneName = "$$_NONE_$$";
 
 export abstract class GeometryNode extends VisualNode {
+    /** Inspection tolerances keyed by stable dimension/feature slot ids. */
+    @serialize()
+    get inspectionJson(): string {
+        return this.getPrivateValue("inspectionJson", "{}");
+    }
+    set inspectionJson(value: string) {
+        this.setProperty("inspectionJson", value);
+    }
+
     @serialize()
     @property("common.material", { type: "materialId" })
     get materialId(): string | string[] {

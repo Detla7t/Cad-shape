@@ -3,10 +3,12 @@
 
 import type { IDocument } from "../document";
 import { ArrayRecord, type IHistoryRecord } from "./history";
-import { Logger } from "./logger";
+import { OperationLog } from "./operationLog";
 
 export class Transaction {
     private static readonly _transactionMap: WeakMap<IDocument, ArrayRecord> = new WeakMap();
+
+    private operation?: ReturnType<typeof OperationLog.begin>;
 
     constructor(
         readonly document: IDocument,
@@ -30,7 +32,6 @@ export class Transaction {
 
     static addToHistory(document: IDocument, record: IHistoryRecord) {
         document.history.add(record);
-        Logger.info(`history added ${record.name}`);
     }
 
     /**
@@ -81,6 +82,10 @@ export class Transaction {
             throw new Error(`The document has started a transaction ${this.name}`);
         }
         Transaction._transactionMap.set(this.document, new ArrayRecord(transactionName));
+        this.operation = OperationLog.begin("model.transaction", {
+            documentId: this.document.id,
+            action: transactionName,
+        });
     }
 
     commit() {
@@ -90,6 +95,11 @@ export class Transaction {
         }
         if (arrayRecord.records.length > 0) Transaction.addToHistory(this.document, arrayRecord);
         Transaction._transactionMap.delete(this.document);
+        this.operation?.add({
+            recordCount: arrayRecord.records.length,
+            undoCount: this.document.history.undoCount(),
+        });
+        this.operation?.finish("success");
     }
 
     rollback() {
@@ -97,5 +107,7 @@ export class Transaction {
         Transaction._transactionMap.delete(this.document);
 
         transaction?.undo();
+        this.operation?.add({ recordCount: transaction?.records.length ?? 0 });
+        this.operation?.finish("rolled_back");
     }
 }

@@ -12,13 +12,18 @@ export * from "./sketchNode";
 export * from "./solver";
 import "./commands";
 
-import { PubSub } from "@chili3d/core";
+import { PubSub, ReferencePlaneNode } from "@chili3d/core";
 import { SketchEditor } from "./editor/sketchEditor";
 import { SketchNode } from "./sketchNode";
 
 // Double-clicking a sketch node in the project tree enters its editing session.
 PubSub.default.sub("nodeDoubleClicked", (node) => {
+    if (node instanceof ReferencePlaneNode) {
+        node.document.selection.setSelectedNodes([node], false);
+        PubSub.default.pub("executeCommand", "sketch.create");
+    }
     if (node instanceof SketchNode && SketchEditor.getActive()?.node !== node) {
         SketchEditor.enter(node);
     }
 });
+import "./modelParameters";

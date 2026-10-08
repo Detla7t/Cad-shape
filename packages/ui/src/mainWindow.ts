@@ -12,6 +12,7 @@ import {
     Ribbon,
     RibbonTab,
     type RibbonTabProfile,
+    VisualConfig,
 } from "@chili3d/core";
 import { showDialog } from "./dialog";
 import { Editor } from "./editor";
@@ -131,6 +132,7 @@ export class MainWindow extends HTMLElement implements IWindow {
         }
 
         document.documentElement.setAttribute("theme", theme);
+        VisualConfig.applyTheme(theme);
     }
 
     private readonly handleConfigChanged = (prop: keyof Config) => {

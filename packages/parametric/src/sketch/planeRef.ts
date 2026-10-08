@@ -6,6 +6,7 @@ import {
     type IFace,
     type Matrix4,
     Plane,
+    ReferencePlaneNode,
     ShapeTypes,
     XYZ,
     type XYZLike,
@@ -27,6 +28,7 @@ import {
  * without tracking — see `resolveFacePlane`.
  */
 export interface PlaneFaceRef {
+    kind?: "plane";
     nodeId: string;
     normal: XYZLike;
     offset: number;
@@ -93,6 +95,10 @@ export function resolveFacePlane(
     anchors?: Record<string, number>,
     options?: TimelineSourceOptions,
 ): Plane | undefined {
+    if (ref.kind === "plane") {
+        const node = document.modelManager.findNode((n) => n.id === ref.nodeId);
+        return node instanceof ReferencePlaneNode ? node.plane : undefined;
+    }
     const source = planeFaceSource(document, ref.nodeId, anchors, options);
     if (source === undefined) return undefined;
     const faces = source.shape.findSubShapes(ShapeTypes.face) as IFace[];

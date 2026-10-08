@@ -641,3 +641,35 @@ describe("ThreeViewHandler — touch multi-finger gestures", () => {
         expect(gestureCalled).toBe(false);
     });
 });
+
+describe("ThreeViewHandler — right mouse navigation", () => {
+    test.each([
+        [{}, "rotate", "trackball"],
+        [{ altKey: true }, "rotate", "turntable"],
+        [{ ctrlKey: true }, "pan", undefined],
+        [{ metaKey: true }, "pan", undefined],
+    ] as const)("right-drag routes modifiers %j", (modifiers, operation, mode) => {
+        const handler = new ThreeViewHandler();
+        const cc = createMockCameraController();
+        const rotate = rs.spyOn(cc, "rotate");
+        const pan = rs.spyOn(cc, "pan");
+        const view = createHandlerMockView({ cameraController: cc });
+        handler.pointerDown(
+            view,
+            createPointerEvent({ pointerType: "mouse", buttons: 2, offsetX: 50, offsetY: 60 }),
+        );
+        handler.pointerMove(
+            view,
+            createPointerEvent({ pointerType: "mouse", buttons: 2, offsetX: 70, offsetY: 55, ...modifiers }),
+        );
+        if (operation === "rotate") {
+            expect(rotate).toHaveBeenCalledWith(20, -5, mode);
+            expect(pan).not.toHaveBeenCalled();
+        } else {
+            expect(pan).toHaveBeenCalledWith(20, -5);
+            expect(rotate).not.toHaveBeenCalled();
+        }
+        handler.pointerUp(view, createPointerEvent({ pointerType: "mouse", buttons: 0 }));
+        expect(offsetPointOf(handler)).toBeUndefined();
+    });
+});

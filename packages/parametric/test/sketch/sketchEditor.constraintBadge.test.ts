@@ -345,11 +345,12 @@ describe("SketchEditor constraint badge interaction", () => {
             expect(editor.annotations.selectedConstraintIds).toEqual([]);
             expect(SketchEditor.getActive()).toBe(editor);
 
-            // second Escape clears the entity selection, third exits
+            // Repeated Escape clears selections without accepting the sketch.
             handler.keyDown(view, new KeyboardEvent("keydown", { key: "Escape" }));
             expect(SketchEditor.getActive()).toBe(editor);
             handler.keyDown(view, new KeyboardEvent("keydown", { key: "Escape" }));
-            expect(SketchEditor.getActive()).toBeUndefined();
+            expect(SketchEditor.getActive()).toBe(editor);
+            editor.exit();
         } finally {
             restoreFactory();
         }

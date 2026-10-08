@@ -6,9 +6,9 @@
 .headerPanel {
     display: flex;
     flex-direction: row;
-    align-items: end;
+    align-items: center;
     flex: 0;
-    margin: 0px 12px;
+    margin: 0 6px;
 }
 
 .itemsPanel {
@@ -24,7 +24,7 @@
 .header {
     display: flex;
     flex-direction: row;
-    font-size: 1.15rem;
+    font-size: 12px;
     font-weight: bolder;
     flex: 1;
     margin: 2px 6px;
@@ -34,4 +34,17 @@
     .root {
         display: none;
     }
+}
+
+.filter {
+    margin: 8px 8px 3px;
+    min-width: 0;
+    height: 28px;
+    box-sizing: border-box;
+    padding: 4px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 2px;
+    font-size: 12px;
+    background: var(--panel-background-color);
+    color: var(--foreground-color);
 }

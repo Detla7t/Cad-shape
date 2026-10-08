@@ -1,0 +1,144 @@
+.panel {
+    position: absolute;
+    top: 0;
+    left: 4px;
+    z-index: 5;
+    width: 216px;
+    max-height: calc(100% - 28px);
+    overflow: auto;
+    box-sizing: border-box;
+    background: var(--panel-background-color);
+    color: var(--foreground-color);
+    border: 1px solid var(--border-color);
+    border-radius: 2px;
+    box-shadow: 0 3px 8px #0003;
+    padding: 0 8px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    font-size: 12px;
+    pointer-events: auto;
+}
+.panel header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.panel button,
+.panel select,
+.panel input:not([type="checkbox"]) {
+    padding: 5px 7px;
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    min-width: 0;
+}
+.panel button {
+    cursor: pointer;
+    white-space: nowrap;
+}
+.panel header {
+    margin: 0 -8px;
+    padding-left: 8px;
+    height: 30px;
+    border-bottom: 1px solid var(--border-color);
+    gap: 2px;
+}
+.panel header strong {
+    flex: 1;
+}
+.panel header button {
+    width: 27px;
+    height: 27px;
+    padding: 3px;
+    border: none;
+    border-radius: 0;
+    flex-shrink: 0;
+}
+.panel header .finish {
+    color: white;
+    background: #159229;
+}
+.panel header .cancel {
+    color: #d12d39;
+    background: transparent;
+}
+.plane {
+    border: 1px solid var(--border-color);
+    padding: 4px 6px;
+    line-height: 18px;
+}
+.plane small {
+    color: var(--foreground-secondary-color);
+}
+.panel footer {
+    border-top: 1px solid var(--border-color);
+    padding-top: 7px;
+}
+.panel footer .hint {
+    margin-top: 3px;
+    font-size: 10px;
+}
+.panel label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.status {
+    font-weight: 600;
+    font-size: 12px;
+    color: #287bd2;
+}
+.status[data-state="solved"] {
+    color: #248451;
+}
+.status[data-state="error"] {
+    color: #da5050;
+}
+.hint {
+    color: var(--foreground-secondary-color);
+}
+.row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin-top: 5px;
+}
+.row select,
+.row input:not([type="checkbox"]):not([type="color"]),
+.row span {
+    flex: 1;
+}
+.panel input[type="color"] {
+    width: 28px;
+    height: 25px;
+    padding: 2px;
+    flex-shrink: 0;
+}
+.panel summary {
+    cursor: pointer;
+    padding: 4px 0;
+}
+.legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    font-size: 10px;
+}
+.legend span::before {
+    content: "";
+    display: inline-block;
+    width: 14px;
+    height: 3px;
+    margin-right: 4px;
+    vertical-align: middle;
+    background: var(--swatch);
+    box-shadow: 0 0 0 1px #68717e;
+}
+
+.panel header strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-right: 6px;
+}

@@ -51,7 +51,7 @@ describe("appGuide manual", () => {
     test("reports every navigation profile's pan and rotate buttons", () => {
         const guide = appGuide.content;
 
-        expect(guide).toContain("- Chili3d: pan = middle-drag, rotate = Shift + middle-drag");
+        expect(guide).toContain("- Chili3d: pan = middle-drag, rotate = right-drag");
         expect(guide).toContain("- Blender: pan = Shift + middle-drag, rotate = middle-drag");
         expect(guide).toContain("- Solidworks: pan = Ctrl + middle-drag, rotate = middle-drag");
     });

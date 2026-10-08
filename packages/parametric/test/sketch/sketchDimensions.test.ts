@@ -716,3 +716,64 @@ describe("dimension commands", () => {
         }
     });
 });
+
+test("a conflicting dimension edit keeps the dialog open and restores the drawing", () => {
+    const { doc, dialog, restorePub, restoreFactory } = setup();
+    try {
+        const node = new SketchNode({ document: doc, plane: Plane.XY });
+        const editor = SketchEditor.enter(node);
+        const id = editor.solver.addLine(10, 10, 110, 10);
+        const refs = [
+            { entityId: id, pointIndex: 0 },
+            { entityId: id, pointIndex: 1 },
+        ];
+        for (const ref of refs)
+            editor.solver.addConstraint({
+                kind: ConstraintKind.Fix,
+                refs: [ref],
+                datums: editor.solver.pointOf(ref),
+            });
+        const dimension = editor.solver.addConstraint({ kind: ConstraintKind.P2PDistance, refs, datum: 100 });
+        editor.solve(true);
+        editor.commit();
+        const before = editor.solver.toData();
+        const history = doc.history.undoCount();
+        editor.editDatum(dimension);
+        expect(confirmDialog(dialog, "75")).toBe(false);
+        expect(editor.solver.toData()).toEqual(before);
+        expect(doc.history.undoCount()).toBe(history);
+        expect(dialog.content!.textContent).toContain("conflicts with the sketch");
+        expect(confirmDialog(dialog, "100")).toBe(true);
+        editor.exit();
+    } finally {
+        SketchEditor.exit();
+        restorePub();
+        restoreFactory();
+    }
+});
+
+test("distance dimensions accept a whole line followed by label placement", async () => {
+    const { app, doc, view, dialog, restorePub, restoreFactory } = setup();
+    try {
+        const editor = SketchEditor.enter(new SketchNode({ document: doc, plane: Plane.XY }));
+        const line = editor.solver.addLine(0, 0, 100, 0);
+        editor.solve(true);
+        const handler = doc.visual.eventHandler as SketchEventHandler;
+        const run = new DistanceDimensionCommand().execute(app);
+        handler.pointerDown(view, pointerEvent(450, 300));
+        await tick();
+        expect(editor.activePick?.kind).toBe("position");
+        handler.pointerDown(view, pointerEvent(450, 250));
+        await run;
+        expect(confirmDialog(dialog, "80")).toBe(true);
+        const entity = editor.solver.entity(line)!;
+        expect(
+            Math.hypot(entity.params[2] - entity.params[0], entity.params[3] - entity.params[1]),
+        ).toBeCloseTo(80);
+        expect(editor.node.data.constraints[0].kind).toBe(ConstraintKind.P2PDistance);
+    } finally {
+        SketchEditor.exit();
+        restorePub();
+        restoreFactory();
+    }
+});

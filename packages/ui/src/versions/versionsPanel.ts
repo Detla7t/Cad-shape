@@ -16,7 +16,7 @@ import {
     PubSub,
 } from "@chili3d/core";
 import { button, div, li, option, select, span, svg, ul } from "@chili3d/element";
-import { showDiffView } from "./diffView";
+import { diffView, showDiffView } from "./diffView";
 import { graphCell, laneColor } from "./graphCell";
 import { showMergeDialog } from "./mergeDialog";
 import { promptFields } from "./prompt";
@@ -228,6 +228,9 @@ export class VersionsPanel extends HTMLElement {
                           ...commit.summary.map((line) => li({ textContent: line })),
                       ),
                   ]
+                : []),
+            ...(commit.parents[0]
+                ? [diffView(control.diff(commit.parents[0], commit.id), "Changes in this operation")]
                 : []),
             div(
                 { className: style.actions },

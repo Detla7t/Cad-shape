@@ -9,6 +9,7 @@ interface MouseDownData {
 }
 
 const MOUSE_MIDDLE = 4;
+const MOUSE_RIGHT = 2;
 
 export class ThreeViewHandler implements IEventHandler {
     private _lastDown: MouseDownData | undefined;
@@ -49,7 +50,7 @@ export class ThreeViewHandler implements IEventHandler {
     }
 
     private handleMouseMove(view: IView, event: PointerEvent) {
-        if (event.buttons !== MOUSE_MIDDLE) {
+        if (event.buttons !== MOUSE_MIDDLE && event.buttons !== MOUSE_RIGHT) {
             return;
         }
 
@@ -63,13 +64,21 @@ export class ThreeViewHandler implements IEventHandler {
 
         const key = Navigation3D.getKey(event);
         const navigatioMap = Navigation3D.navigationKeyMap();
-        if (navigatioMap.pan === key) {
+        if (event.buttons === MOUSE_RIGHT) {
+            if (event.ctrlKey || event.metaKey) view.cameraController.pan(dx, dy);
+            else if (this.canRotate)
+                view.cameraController.rotate(dx, dy, event.altKey ? "turntable" : "trackball");
+        } else if (navigatioMap.pan === key) {
             view.cameraController.pan(dx, dy);
-        } else if (navigatioMap.rotate === key && this.canRotate) {
+        } else if (
+            (navigatioMap.rotate === key ||
+                (Config.instance.navigation3D === "Chili3d" && key === "Shift+Middle")) &&
+            this.canRotate
+        ) {
             view.cameraController.rotate(dx, dy);
         }
 
-        if (dx !== 0 && dy !== 0) this._lastDown = undefined;
+        if (dx !== 0 || dy !== 0) this._lastDown = undefined;
     }
 
     private handleTouchMove(view: IView, event: PointerEvent) {
@@ -147,7 +156,15 @@ export class ThreeViewHandler implements IEventHandler {
     }
 
     private handleMouseDown(event: PointerEvent, view: IView) {
-        if (this._lastDown && this._lastDown.time + 500 > Date.now() && event.buttons === MOUSE_MIDDLE) {
+        if (event.buttons === MOUSE_RIGHT) {
+            this._lastDown = undefined;
+            view.cameraController.startRotate(event.offsetX, event.offsetY);
+            this._offsetPoint = { x: event.offsetX, y: event.offsetY };
+        } else if (
+            this._lastDown &&
+            this._lastDown.time + 500 > Date.now() &&
+            event.buttons === MOUSE_MIDDLE
+        ) {
             this._lastDown = undefined;
             view.cameraController.fitContent();
             view.update();
@@ -170,6 +187,7 @@ export class ThreeViewHandler implements IEventHandler {
 
     pointerOut(view: IView, event: PointerEvent): void {
         this._lastDown = undefined;
+        this._offsetPoint = undefined;
         this.lastPointerEventMap.delete(event.pointerId);
         this.currentPointerEventMap.delete(event.pointerId);
     }

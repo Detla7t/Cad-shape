@@ -202,7 +202,8 @@ export class ThreeView extends Observable implements IView {
             antialias: true,
             alpha: true,
         });
-        renderer.setPixelRatio(window.devicePixelRatio);
+        // Supersample standard-density displays as well; cap the cost on high-DPI screens.
+        renderer.setPixelRatio(Math.min(2, Math.max(1.5, window.devicePixelRatio || 1)));
 
         return renderer;
     }

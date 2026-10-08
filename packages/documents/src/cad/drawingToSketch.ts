@@ -77,13 +77,14 @@ export function drawingToSketchData(
                 omitted++;
                 return;
             }
-            entities.push({ id: id++, type: "line", params: [a[0], a[1], b[0], b[1]] });
+            entities.push({ layer: entity.layer, id: id++, type: "line", params: [a[0], a[1], b[0], b[1]] });
         } else if (entity.kind === "circle") {
             if (!(entity.radius >= MIN_LENGTH)) {
                 omitted++;
                 return;
             }
             entities.push({
+                layer: entity.layer,
                 id: id++,
                 type: "circle",
                 params: [entity.center[0], entity.center[1], entity.radius],
@@ -102,20 +103,49 @@ export function drawingToSketchData(
             if (sweep < 0) sweep += 2 * Math.PI;
             if (sweep < MIN_ARC_SWEEP || sweep > 2 * Math.PI - MIN_ARC_SWEEP) {
                 if (sweep > Math.PI) {
-                    entities.push({ id: id++, type: "circle", params: [center[0], center[1], radius] });
+                    entities.push({
+                        layer: entity.layer,
+                        id: id++,
+                        type: "circle",
+                        params: [center[0], center[1], radius],
+                    });
                 } else if (Math.hypot(e[0] - s[0], e[1] - s[1]) >= MIN_LENGTH) {
-                    entities.push({ id: id++, type: "line", params: [s[0], s[1], e[0], e[1]] });
+                    entities.push({
+                        layer: entity.layer,
+                        id: id++,
+                        type: "line",
+                        params: [s[0], s[1], e[0], e[1]],
+                    });
                 } else {
                     omitted++;
                 }
                 return;
             }
-            entities.push({ id: id++, type: "arc", params: [center[0], center[1], s[0], s[1], e[0], e[1]] });
+            entities.push({
+                layer: entity.layer,
+                id: id++,
+                type: "arc",
+                params: [center[0], center[1], s[0], s[1], e[0], e[1]],
+            });
         } else {
             omitted++;
         }
     });
-    return { data: { entities, constraints: [], entityIdSeq: id }, omitted };
+    return {
+        data: {
+            entities,
+            constraints: [],
+            entityIdSeq: id,
+            layers: drawing.layers.map((layer) => ({
+                id: layer.name,
+                name: layer.name,
+                color: layer.color,
+                ...(layer.dashed ? { dashed: true } : {}),
+            })),
+            activeLayer: drawing.layers[0]?.name ?? "0",
+        },
+        omitted,
+    };
 }
 
 /** Adds a sketch on the XY plane holding `drawing`'s geometry to `document`. */

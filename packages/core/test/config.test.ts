@@ -199,6 +199,30 @@ describe("Config", () => {
     });
 
     describe("saveToStorage", () => {
+        test("round-trips plain shortcut and ribbon preferences without class serialization", () => {
+            const shortcuts = Config.instance.customShortcuts;
+            const preferences = Config.instance.ribbonPreferences;
+            try {
+                Config.instance.init("testCustomization");
+                Config.instance.customShortcuts = { "sketch.line": "ctrl+alt+l" };
+                Config.instance.ribbonPreferences = {
+                    pins: ["sketch.line"],
+                    tabs: { "custom.work": { custom: true, label: "Work", commands: ["sketch.line"] } },
+                };
+                Config.instance.saveToStorage();
+                Config.instance.customShortcuts = {};
+                Config.instance.ribbonPreferences = {};
+                Config.instance.readFromStorage();
+                expect(Config.instance.customShortcuts).toEqual({ "sketch.line": "ctrl+alt+l" });
+                expect(Config.instance.ribbonPreferences.tabs?.["custom.work"]?.commands).toEqual([
+                    "sketch.line",
+                ]);
+            } finally {
+                Config.instance.customShortcuts = shortcuts;
+                Config.instance.ribbonPreferences = preferences;
+                Config.instance.init("config");
+            }
+        });
         test("should call ObjectStorage.setValue", () => {
             Config.instance.init("testSave");
             Config.instance.language = "fr-FR";

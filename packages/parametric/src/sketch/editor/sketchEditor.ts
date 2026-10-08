@@ -11,6 +11,7 @@ import {
     type IView,
     type ParameterValue,
     PubSub,
+    Result,
     resolveUnitSpec,
     type Scope,
     Transaction,
@@ -34,13 +35,14 @@ import * as datumPrompt from "./datumPrompt";
 import { type DimensionAnchor, toDisplayDatum, toStorageDatum } from "./dimensionLayout";
 import { SketchAnnotationManager } from "./sketchAnnotations";
 import { SketchEventHandler } from "./sketchEventHandler";
+import { SketchPanel } from "./sketchPanel";
 
 /**
  * One sketch editing session, and the only thing that owns it.
  *
  * The object is created by `SketchEditor.enter(node)` and disposed by `exit()`; at most one is
  * live at a time (`getActive`). It owns the `SketchSolver`, swaps the view's event handler for
- * `SketchEventHandler`, locks the camera onto the sketch plane, and drives
+ * `SketchEventHandler`, initially aligns the camera to the sketch plane, and drives
  * `SketchAnnotationManager`. It is also the layer the sketch COMMANDS talk to — they call
  * `pickPoint`/`pickEntity`, `solve`, `commit`, `promptDatum`, and read `isPicking`.
  *
@@ -62,7 +64,8 @@ import { SketchEventHandler } from "./sketchEventHandler";
  * `sketchAnnotations.ts` (constraint badges and dimension graphics).
  */
 
-export type SketchPickKind = "point" | "entity" | "position";
+export type SketchPickKind = "point" | "entity" | "position" | "pointOrEntity";
+export type SketchPickTarget = { kind: "point"; ref: SketchPointRef } | { kind: "entity"; entityId: number };
 
 /** Entity type filter for picks: a single type or a set of acceptable types. */
 export type SketchEntityTypeFilter = SketchEntityType | readonly SketchEntityType[];
@@ -72,6 +75,7 @@ export type SketchPickPreview = (uv: [number, number] | undefined) => void;
 
 interface PickRequest {
     kind: SketchPickKind;
+    exclude?: SketchPickTarget;
     entityType?: SketchEntityTypeFilter;
     /** Entity picks only: also allow picking the datum X/Y axes. */
     datum?: boolean;
@@ -91,6 +95,50 @@ type RollbackMap = ReturnType<typeof computeSketchRollback>;
 
 /** The live sketch session — see the module header for its lifecycle and ownership. */
 export class SketchEditor implements IDisposable {
+    private panel?: SketchPanel;
+    private preselected: SketchPickTarget[] = [];
+    lastSolveOutcome: SolveOutcome = { result: "OkUnderconstrained", dofs: 0 };
+    fullyConstrainedEntities = new Set<number>();
+
+    get selectedEntityIds(): number[] {
+        return [
+            ...new Set([
+                ...this.eventHandler.selectedEntityIds,
+                ...this.eventHandler.selectedPoints.map((ref) => ref.entityId),
+            ]),
+        ];
+    }
+
+    get selectedWholeEntityIds(): number[] {
+        return this.eventHandler.selectedEntityIds;
+    }
+
+    beginConstraintSelection(): void {
+        this.preselected = [
+            ...this.eventHandler.selectedPoints.map((ref): SketchPickTarget => ({ kind: "point", ref })),
+            ...this.eventHandler.selectedEntityIds.map(
+                (entityId): SketchPickTarget => ({ kind: "entity", entityId }),
+            ),
+        ];
+    }
+
+    endConstraintSelection(): void {
+        this.preselected = [];
+    }
+
+    refreshPanel(): void {
+        this.panel?.refresh(this.lastSolveOutcome);
+    }
+
+    setConstruction(value: boolean): void {
+        if (this.selectedEntityIds.length) {
+            for (const id of this.selectedEntityIds) this.solver.setEntityStyle(id, { construction: value });
+            this.commit();
+        } else {
+            this.solver.constructionMode = value;
+        }
+        this.refreshPanel();
+    }
     readonly solver: SketchSolver;
     readonly annotations: SketchAnnotationManager;
     /** Label anchors (relative to the referenced geometry) for datum constraints. */
@@ -124,12 +172,12 @@ export class SketchEditor implements IDisposable {
         return SketchEditor.activeEditor;
     }
 
-    static enter(node: SketchNode): SketchEditor {
+    static enter(node: SketchNode, options: { newSketch?: boolean } = {}): SketchEditor {
         SketchEditor.exit();
         // Profile faces are normally shown for picking; hide them while editing.
         node.setShowProfileFaces(false);
         try {
-            const editor = new SketchEditor(node.document, node);
+            const editor = new SketchEditor(node.document, node, options);
             SketchEditor.activeEditor = editor;
             node.document.application.mainWindow?.ribbon.openTab("ribbon.tab.sketch");
             return editor;
@@ -148,10 +196,17 @@ export class SketchEditor implements IDisposable {
 
     // ------------------------------------------------------------------ Construction
 
+    private closeDatum?: () => void;
+    private readonly initialData: SketchData;
+    private readonly initialName: string;
+
     constructor(
         readonly document: IDocument,
         readonly node: SketchNode,
+        private readonly options: { newSketch?: boolean } = {},
     ) {
+        this.initialData = structuredClone(node.data);
+        this.initialName = node.name;
         // The only non-null assertion in here — resolve it before any session state
         // is written: enter() publishes the active editor only after the constructor
         // returns, so a later throw unwinds in this constructor's own catch, and this
@@ -184,6 +239,9 @@ export class SketchEditor implements IDisposable {
 
             this.annotations = this.createAnnotations();
             teardown.push(() => this.annotations.dispose());
+
+            this.panel = new SketchPanel(this);
+            teardown.push(() => this.panel?.dispose());
 
             node.onPropertyChanged(this.onNodeDataChanged);
             teardown.push(() => this.node.removePropertyChanged(this.onNodeDataChanged));
@@ -343,7 +401,7 @@ export class SketchEditor implements IDisposable {
         // (before the handler swap, so a throw here leaves the old handler in place)
         this.document.selection.clearSelection();
         this.document.visual.eventHandler = handler;
-        this.setCanRotate(false);
+        this.setCanRotate(true);
         return handler;
     }
 
@@ -467,8 +525,31 @@ export class SketchEditor implements IDisposable {
         prompt: I18nKeys,
         preview?: SketchPickPreview,
         controller?: AsyncController,
+        exclude?: SketchPointRef,
     ): Promise<SketchPointRef | undefined> {
-        return this.startPick("point", prompt, undefined, undefined, preview, controller);
+        const selected = this.preselected.findIndex((target) => target.kind === "point");
+        if (selected >= 0) {
+            const target = this.preselected.splice(selected, 1)[0];
+            if (target.kind === "point") return Promise.resolve(target.ref);
+        }
+        return this.startPick(
+            "point",
+            prompt,
+            undefined,
+            undefined,
+            preview,
+            controller,
+            exclude ? { kind: "point", ref: exclude } : undefined,
+        );
+    }
+
+    pickPointOrEntity(
+        prompt: I18nKeys,
+        controller?: AsyncController,
+        exclude?: SketchPickTarget,
+    ): Promise<SketchPickTarget | undefined> {
+        if (this.preselected.length) return Promise.resolve(this.preselected.shift());
+        return this.startPick("pointOrEntity", prompt, undefined, true, undefined, controller, exclude);
     }
 
     pickEntity(
@@ -477,6 +558,19 @@ export class SketchEditor implements IDisposable {
         options?: { datum?: boolean },
         controller?: AsyncController,
     ): Promise<number | undefined> {
+        const selected = this.preselected.findIndex((target) => {
+            if (target.kind !== "entity") return false;
+            const entity = this.solver.entity(target.entityId);
+            return (
+                entity &&
+                (type === undefined ||
+                    (typeof type === "string" ? entity.type === type : type.includes(entity.type)))
+            );
+        });
+        if (selected >= 0) {
+            const target = this.preselected.splice(selected, 1)[0];
+            if (target.kind === "entity") return Promise.resolve(target.entityId);
+        }
         return this.startPick("entity", prompt, type, options?.datum, undefined, controller);
     }
 
@@ -493,7 +587,7 @@ export class SketchEditor implements IDisposable {
         this.pickRequest = undefined;
         request?.resolve(undefined);
         this.annotations.suppressConstraintSymbols = false;
-        this.publishSolveStatus({ result: "Ok", dofs: this.solver.dofs() });
+        this.publishSolveStatus(this.lastSolveOutcome);
     }
 
     /**
@@ -509,8 +603,16 @@ export class SketchEditor implements IDisposable {
         }
 
         let value: unknown;
-        if (request.kind === "point") {
-            value = this.eventHandler.hitTestPoint(view, event);
+        if (request.kind === "pointOrEntity") {
+            const ref = this.eventHandler.hitTestPoint(view, event, request.exclude);
+            const entityId = ref ? undefined : this.eventHandler.hitTestEntity(view, event, undefined, true);
+            value = ref
+                ? { kind: "point", ref }
+                : entityId !== undefined
+                  ? { kind: "entity", entityId }
+                  : undefined;
+        } else if (request.kind === "point") {
+            value = this.eventHandler.hitTestPoint(view, event, request.exclude);
         } else if (request.kind === "entity") {
             value = this.eventHandler.hitTestEntity(view, event, request.entityType, request.datum ?? false);
         } else {
@@ -529,7 +631,15 @@ export class SketchEditor implements IDisposable {
 
     solve(fine: boolean): SolveOutcome {
         const outcome = this.solver.solve(fine);
+        this.lastSolveOutcome = outcome;
+        if (fine)
+            this.fullyConstrainedEntities =
+                outcome.result.startsWith("Ok") && this.solver.datumErrors.size === 0
+                    ? this.solver.fullyConstrainedEntities()
+                    : new Set();
         this.annotations.refresh();
+        this.eventHandler.refreshGeometryOverlays();
+        this.refreshPanel();
         this.publishSolveStatus(outcome);
         return outcome;
     }
@@ -605,6 +715,7 @@ export class SketchEditor implements IDisposable {
         // toData re-derives external-ref roles from the constraints — a flip
         // (dashed ↔ solid) shows up only when the session display re-renders
         this.refreshExternalDisplay();
+        this.refreshPanel();
         this.document.visual.update();
     }
 
@@ -628,10 +739,16 @@ export class SketchEditor implements IDisposable {
         apply: (value: ParameterValue) => void,
         unit: UnitSpec,
         onCancel?: () => void,
-        options?: { positiveOnly?: boolean },
+        options?: { positiveOnly?: boolean; constraintId?: number },
     ): void {
-        datumPrompt.promptDatum(initial, apply, () => this.applyDatum(), onCancel, {
+        this.closeDatum?.();
+        const before = this.solver.toData();
+        this.closeDatum = datumPrompt.promptDatum(initial, apply, () => this.applyDatum(before), onCancel, {
             ...options,
+            inlineAt:
+                options?.constraintId === undefined
+                    ? undefined
+                    : this.annotations.datumScreenPosition(options.constraintId),
             resolve: (input) => resolveUnitSpec(input, this.variableScope(), unit),
         });
     }
@@ -642,16 +759,33 @@ export class SketchEditor implements IDisposable {
         apply: (x: ParameterValue, y: ParameterValue) => void,
         unit: UnitSpec,
     ): void {
-        datumPrompt.promptDatumPair(initial, apply, () => this.applyDatum(), {
+        const before = this.solver.toData();
+        datumPrompt.promptDatumPair(initial, apply, () => this.applyDatum(before), {
             positiveOnly: false,
             resolve: (input) => resolveUnitSpec(input, this.variableScope(), unit),
         });
     }
 
     /** What a confirmed datum does to the session, whatever the dialog looked like. */
-    private applyDatum(): void {
-        this.solve(true);
+    private applyDatum(before: SketchData): Result<void> {
+        const outcome = this.solve(true);
+        if (!outcome.result.startsWith("Ok") || this.solver.datumErrors.size > 0) {
+            this.solver.reset(before);
+            this.solve(true);
+            return Result.err(
+                "This value conflicts with the sketch. Change the value or remove a conflicting constraint.",
+            );
+        }
         this.commit();
+        return Result.ok(undefined);
+    }
+
+    /** Applies an inline table edit through the same solve/rollback path as a dimension edit. */
+    setDimension(id: number, value: ParameterValue): Result<void> {
+        const before = this.solver.toData();
+        const result = this.solver.setDatumSource(id, value);
+        if (!result.isOk) return result;
+        return this.applyDatum(before);
     }
 
     /** Re-opens the datum dialog of an existing dimension constraint (double-click edit). */
@@ -686,7 +820,7 @@ export class SketchEditor implements IDisposable {
             (value) => this.solver.setDatumSource(constraintId, value),
             unit,
             undefined,
-            { positiveOnly: !signed },
+            { positiveOnly: !signed, constraintId },
         );
     }
 
@@ -695,6 +829,7 @@ export class SketchEditor implements IDisposable {
     /** Commits and disposes this session; clears the active-editor reference. */
     exit(): void {
         if (this.disposed) return;
+        this.closeDatum?.();
         if (SketchEditor.activeEditor === this) SketchEditor.activeEditor = undefined;
         try {
             this.commit();
@@ -705,6 +840,46 @@ export class SketchEditor implements IDisposable {
             this.node.document.application.mainWindow?.ribbon.closeTab("ribbon.tab.sketch");
             this.dispose();
         }
+    }
+
+    /** Restore only this session's sketch; unrelated document changes are preserved. */
+    cancel(): void {
+        if (this.disposed) return;
+        this.closeDatum?.();
+        this.cancelPick();
+        Transaction.execute(this.document, "cancel sketch edits", () => {
+            this.node.name = this.initialName;
+            this.node.setDataEmitShapeChanged(structuredClone(this.initialData));
+        });
+        if (SketchEditor.activeEditor === this) SketchEditor.activeEditor = undefined;
+        try {
+            this.node.setShowProfileFaces(true);
+            this.setNodeVisibleSilently(this.savedVisible);
+            this.node.document.application.mainWindow?.ribbon.closeTab("ribbon.tab.sketch");
+        } finally {
+            this.dispose();
+        }
+        if (this.options.newSketch) {
+            Transaction.execute(this.document, "cancel new sketch", () =>
+                this.node.parent?.remove(this.node),
+            );
+        }
+    }
+
+    normalView(): void {
+        this.lockCameraOntoPlane(this.view);
+        this.view.update();
+    }
+
+    toggleConstruction(): void {
+        const selected = this.selectedEntityIds
+            .map((id) => this.solver.entity(id))
+            .filter((entity) => entity !== undefined);
+        this.setConstruction(
+            selected.length
+                ? !selected.every((entity) => entity.construction)
+                : !this.solver.constructionMode,
+        );
     }
 
     /** Sets the sketch's visibility without recording an undo history record. */
@@ -721,6 +896,7 @@ export class SketchEditor implements IDisposable {
 
     dispose(): void {
         if (this.disposed) return;
+        this.closeDatum?.();
         this.disposed = true;
         this.cancelPick();
         this.document.visual.context.setNodeOnTop([this.node], false);
@@ -759,6 +935,7 @@ export class SketchEditor implements IDisposable {
     }
 
     private teardownSession(): void {
+        this.panel?.dispose();
         this.document.variables.removePropertyChanged(this.handleVariablesChanged);
         this.eventHandler.dispose();
         this.annotations.dispose();
@@ -787,18 +964,19 @@ export class SketchEditor implements IDisposable {
         datum?: boolean,
         preview?: SketchPickPreview,
         controller?: AsyncController,
+        exclude?: SketchPickTarget,
     ): Promise<T> {
         this.cancelPick();
         PubSub.default.pub("statusBarTip", prompt);
         return new Promise<T>((resolve) => {
-            this.pickRequest = { kind, entityType, datum, preview, resolve };
+            this.pickRequest = { kind, entityType, datum, preview, resolve, exclude };
             this.eventHandler.setController(this.view, controller);
             this.annotations.suppressConstraintSymbols = true;
         });
     }
 
     private publishSolveStatus(outcome: SolveOutcome): void {
-        const key: I18nKeys = outcome.result.startsWith("Conflict")
+        const key: I18nKeys = !outcome.result.startsWith("Ok")
             ? "sketch.conflicting"
             : outcome.dofs === 0
               ? "sketch.fullyConstrained"

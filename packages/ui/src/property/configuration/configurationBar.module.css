@@ -87,3 +87,26 @@
         background-color: var(--hover-background-color);
     }
 }
+
+.bar {
+    padding: 8px;
+    border-top: 0;
+    border-bottom: 1px solid var(--border-color);
+    position: relative;
+    background: var(--panel-background-color);
+}
+.title {
+    flex: 1;
+}
+.item {
+    flex: 0 0 100%;
+    justify-content: space-between;
+}
+.edit {
+    position: absolute;
+    right: 6px;
+    top: 5px;
+}
+.control {
+    border-radius: 0;
+}

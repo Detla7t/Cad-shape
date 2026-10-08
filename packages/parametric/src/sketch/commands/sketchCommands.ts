@@ -11,14 +11,17 @@ import {
     type IEdge,
     type IFace,
     type INode,
-    type Plane,
+    Plane,
     PubSub,
+    ReferencePlaneNode,
     ShapeTypes,
     Transaction,
 } from "@chili3d/core";
+import { createCadIcon } from "@chili3d/element";
 import { reportSilentIdLoss } from "../../features/idDiagnostics";
 import { ParametricBodyNode } from "../../parametricBodyNode";
 import { SketchEditor } from "../editor/sketchEditor";
+import panelStyle from "../editor/sketchPanel.module.css";
 import { captureExternalRef } from "../externalRef";
 import { captureFaceRef, type PlaneFaceRef, sketchPlaneOfFace } from "../planeRef";
 import {
@@ -104,6 +107,18 @@ export function captureBoundaryExternalRefs(
 function resolvePlane(document: IDocument, result: PlanePickResult | undefined): PickedPlane | undefined {
     if (result === undefined) return undefined;
     if (result.kind === "datum") return { plane: result.plane };
+    if (result.kind === "reference") {
+        const plane = result.node.plane;
+        return {
+            plane,
+            planeRef: {
+                kind: "plane",
+                nodeId: result.node.id,
+                normal: plane.normal,
+                offset: plane.normal.dot(plane.origin),
+            },
+        };
+    }
 
     const face = result.data.shape.transformedMul(result.data.transform) as IFace;
     const plane = sketchPlaneOfFace(face);
@@ -147,13 +162,68 @@ function capturePlaneOwner(
 }
 
 async function pickPlane(document: IDocument, controller: AsyncController): Promise<PickedPlane | undefined> {
+    const selected = document.selection.getSelectedNodes().find((n) => n instanceof ReferencePlaneNode);
+    if (selected instanceof ReferencePlaneNode) {
+        controller.dispose();
+        return resolvePlane(document, { kind: "reference", node: selected });
+    }
     document.selection.clearSelection();
     const handler = new PlanePickHandler(document, controller);
-    await document.picker.pickAsync(handler, "prompt.select.plane", controller, false, "select.default");
-    controller.dispose();
-    handler.dispose();
-    document.selection.clearSelection();
-    return resolvePlane(document, handler.result);
+    const view = document.application.activeView;
+    const panel = globalThis.document.createElement("section");
+    panel.className = panelStyle.panel;
+    panel.setAttribute("aria-label", "Choose sketch plane");
+    const header = globalThis.document.createElement("header");
+    const title = globalThis.document.createElement("strong");
+    title.textContent = "New sketch";
+    const cancel = globalThis.document.createElement("button");
+    cancel.className = panelStyle.cancel;
+    cancel.setAttribute("aria-label", "Cancel new sketch");
+    cancel.append(createCadIcon("close"));
+    cancel.onclick = () => controller.cancel();
+    header.append(title, cancel);
+    const hint = globalThis.document.createElement("div");
+    hint.textContent = "Select a plane or planar face";
+    hint.className = panelStyle.plane;
+    panel.append(header, hint);
+    for (const [name, plane] of [
+        ["Top (XY)", Plane.XY],
+        ["Front (XZ)", Plane.ZX],
+        ["Right (YZ)", Plane.YZ],
+    ] as const) {
+        const choice = globalThis.document.createElement("button");
+        choice.textContent = name;
+        choice.onclick = () => {
+            handler.result = { kind: "datum", plane };
+            controller.success();
+        };
+        panel.append(choice);
+    }
+    for (const node of document.modelManager.findNodes().filter((n) => n instanceof ReferencePlaneNode)) {
+        const choice = globalThis.document.createElement("button");
+        choice.textContent = node.name;
+        choice.dataset["planeId"] = node.id;
+        choice.onclick = () => {
+            handler.result = { kind: "reference", node };
+            controller.success();
+        };
+        panel.append(choice);
+    }
+    panel.addEventListener("pointerdown", (event) => event.stopPropagation());
+    panel.addEventListener("pointermove", (event) => event.stopPropagation());
+    view?.dom?.append(panel);
+    const ribbon = document.application.mainWindow?.ribbon;
+    ribbon?.openTab("ribbon.tab.sketch");
+    try {
+        await document.picker.pickAsync(handler, "prompt.select.plane", controller, false, "select.default");
+        return resolvePlane(document, handler.result);
+    } finally {
+        panel.remove();
+        ribbon?.closeTab("ribbon.tab.sketch");
+        controller.dispose();
+        handler.dispose();
+        document.selection.clearSelection();
+    }
 }
 
 function sketchDataFromPick(picked: PickedPlane): SketchData | undefined {
@@ -199,7 +269,7 @@ export class CreateSketch extends CancelableCommand {
         Transaction.execute(document, "create sketch", () => {
             document.modelManager.addNode(node);
         });
-        SketchEditor.enter(node);
+        SketchEditor.enter(node, { newSketch: true });
     }
 }
 
@@ -236,5 +306,26 @@ async function pickSketch(document: IDocument, controller: AsyncController): Pro
 export class ExitSketch implements ICommand {
     async execute(application: IApplication): Promise<void> {
         SketchEditor.exit();
+    }
+}
+
+@command({ key: "sketch.cancel", icon: "icon-times" })
+export class CancelSketch implements ICommand {
+    async execute(): Promise<void> {
+        SketchEditor.getActive()?.cancel();
+    }
+}
+
+@command({ key: "sketch.construction", icon: "icon-line" })
+export class ConstructionSketch implements ICommand {
+    async execute(): Promise<void> {
+        SketchEditor.getActive()?.toggleConstruction();
+    }
+}
+
+@command({ key: "sketch.normal", icon: "icon-sketchNew" })
+export class NormalToSketch implements ICommand {
+    async execute(): Promise<void> {
+        SketchEditor.getActive()?.normalView();
     }
 }

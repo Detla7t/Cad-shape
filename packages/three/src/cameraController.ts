@@ -193,8 +193,11 @@ export class CameraController extends Observable implements ICameraController {
         this._rotateCenter = this.selectedNodesCenter();
     }
 
-    rotate(dx: number, dy: number): void {
-        const newRotation = this.getRotation(dx * ROTATE_SPEED_FACTOR, dy * ROTATE_SPEED_FACTOR);
+    rotate(dx: number, dy: number, mode: "trackball" | "turntable" = "turntable"): void {
+        const newRotation =
+            mode === "trackball"
+                ? this.trackballRotation(dx, dy)
+                : this.getRotation(dx * ROTATE_SPEED_FACTOR, dy * ROTATE_SPEED_FACTOR);
 
         this._camera.up.copy(new Vector3(0, 1, 0).applyQuaternion(newRotation));
 
@@ -221,6 +224,15 @@ export class CameraController extends Observable implements ICameraController {
 
         this._position.copy(currentPosition);
         this.updateCameraPosionTarget();
+    }
+
+    /** Free orbit in screen axes: a top/bottom view tilts instead of spinning around world Z. */
+    private trackballRotation(dx: number, dy: number): Quaternion {
+        const axis = new Vector3(-dy, -dx, 0);
+        const angle = MathUtils.degToRad(axis.length() * ROTATE_SPEED_FACTOR);
+        return this._camera.quaternion
+            .clone()
+            .multiply(new Quaternion().setFromAxisAngle(axis.normalize(), angle));
     }
 
     private getRotation(dx: number, dy: number) {

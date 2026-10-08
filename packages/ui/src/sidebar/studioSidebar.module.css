@@ -1,0 +1,117 @@
+.root {
+    position: relative;
+    flex: 0 0 auto;
+    width: 0;
+    max-width: 60vw;
+    min-height: 0;
+    z-index: 35;
+    font-size: 12px;
+    color: var(--foreground-color);
+}
+.rail {
+    position: absolute;
+    right: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border-color);
+    border-right: 0;
+    background: var(--panel-background-color);
+    button {
+        display: grid;
+        place-items: center;
+        width: 32px;
+        height: 33px;
+        padding: 5px;
+        border: 0;
+        border-bottom: 1px solid var(--border-color);
+        border-radius: 0;
+        color: inherit;
+        background: transparent;
+        cursor: pointer;
+    }
+    button:last-child {
+        border-bottom: 0;
+    }
+    button:hover {
+        background: var(--hover-background-color);
+    }
+    button[aria-expanded="true"] {
+        background: color-mix(in srgb, #71b7e5 25%, var(--panel-background-color));
+        box-shadow: inset 3px 0 #438dca;
+        color: #438dca;
+    }
+}
+.panel {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    border-left: 1px solid var(--border-color);
+    background: var(--panel-background-color);
+}
+.panel[hidden] {
+    display: none;
+}
+.header {
+    flex: 0 0 34px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 8px 0 12px;
+    border-bottom: 1px solid var(--border-color);
+    strong {
+        font-weight: 600;
+    }
+    button {
+        display: grid;
+        place-items: center;
+        height: 26px;
+        width: 26px;
+        padding: 3px;
+        color: inherit;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+    }
+    button:hover {
+        background: var(--hover-background-color);
+    }
+}
+.content {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 10px;
+    > * {
+        min-width: 0;
+    }
+    input,
+    select,
+    textarea {
+        color: var(--foreground-color);
+    }
+}
+.resizer {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -3px;
+    width: 6px;
+    cursor: ew-resize;
+    touch-action: none;
+}
+.resizer:hover,
+.resizer:focus-visible {
+    background: #438dca55;
+}
+@media (max-width: 680px) {
+    .root[data-open] {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        right: 0;
+        max-width: calc(100vw - 38px);
+    }
+}

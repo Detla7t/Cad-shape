@@ -3,7 +3,6 @@
 
 import type { EdgeMeshData, FaceMeshData, MeshLike, MeshOption, VertexMeshData } from "@chili3d/core";
 import {
-    AlwaysDepth,
     BufferAttribute,
     BufferGeometry,
     DoubleSide,
@@ -108,7 +107,8 @@ export class ThreeGeometryFactory {
             material.color.set(data.color);
         } else if (Array.isArray(data.color)) {
             material.vertexColors = true;
-            buffer.setAttribute("color", new Float32BufferAttribute(data.color, 3));
+            if (buffer instanceof LineSegmentsGeometry) buffer.setColors(data.color);
+            else buffer.setAttribute("color", new Float32BufferAttribute(data.color, 3));
         }
     }
 
@@ -139,6 +139,7 @@ export class ThreeGeometryFactory {
     static createEdgeMaterial(data: EdgeMeshData, meshOption?: MeshOption) {
         const material = new LineMaterial({
             linewidth: data.lineWidth ?? 1,
+            alphaToCoverage: true,
             polygonOffset: true,
             polygonOffsetFactor: -4,
             polygonOffsetUnits: -4,
@@ -146,8 +147,8 @@ export class ThreeGeometryFactory {
         if (data.lineType === "dash") {
             material.dashed = true;
             material.dashScale = 1;
-            material.dashSize = 30;
-            material.gapSize = 30;
+            material.dashSize = data.dashSize ?? 30;
+            material.gapSize = data.gapSize ?? 30;
             material.defines["USE_DASH"] = "";
         }
 

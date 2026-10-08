@@ -14,9 +14,11 @@ import {
 import { newGarlicSystem } from "./garlic";
 import {
     ConstraintKind,
+    DEFAULT_SKETCH_LAYER,
     datumEntityData,
     datumPoint,
     type ExternalRefData,
+    entityPointCount,
     isDatumEntityId,
     isExternalEntityId,
     nextSketchId,
@@ -29,6 +31,7 @@ import {
     type SketchData,
     type SketchEntityData,
     type SketchEntityType,
+    type SketchLayer,
     type SketchPointRef,
     syncExternalRoles,
     toDatumSource,
@@ -108,6 +111,38 @@ interface ConstraintRecord {
  * garlic ParamId/ConstraintId handles stay internal.
  */
 export class SketchSolver implements ExternalEntityHost {
+    private readonly entityStyles = new Map<
+        number,
+        Partial<Pick<SketchEntityData, "construction" | "layer" | "color" | "dashed">>
+    >();
+    private layers?: SketchLayer[];
+    activeLayer = "0";
+    constructionMode = false;
+
+    sketchLayers(): SketchLayer[] {
+        return (this.layers ?? [DEFAULT_SKETCH_LAYER]).map((layer) => ({ ...layer }));
+    }
+
+    setLayers(layers: SketchLayer[], active = this.activeLayer): void {
+        this.layers = layers.map((layer) => ({ ...layer }));
+        this.activeLayer = layers.some((layer) => layer.id === active) ? active : (layers[0]?.id ?? "0");
+    }
+
+    setEntityStyle(
+        id: number,
+        style: Partial<Pick<SketchEntityData, "construction" | "layer" | "color" | "dashed">>,
+    ): void {
+        if (!this.entityTypes.has(id) || this.fixedEntities.has(id)) return;
+        this.entityStyles.set(id, { ...this.entityStyles.get(id), ...style });
+    }
+
+    entityVisible(entity: SketchEntityData): boolean {
+        return this.layers?.find((layer) => layer.id === (entity.layer ?? "0"))?.visible !== false;
+    }
+
+    entityLocked(entity: SketchEntityData): boolean {
+        return this.layers?.find((layer) => layer.id === (entity.layer ?? "0"))?.locked === true;
+    }
     readonly plane: Plane;
     /**
      * The garlic system every param and constraint is created in. Public because the
@@ -292,6 +327,7 @@ export class SketchSolver implements ExternalEntityHost {
         this.entityTypes.delete(id);
         this.entityParams.delete(id);
         this.entityCache.delete(id);
+        this.entityStyles.delete(id);
         return removedConstraints;
     }
 
@@ -493,6 +529,54 @@ export class SketchSolver implements ExternalEntityHost {
         return this.system.dofs();
     }
 
+    /**
+     * A fully constrained entity loses no degrees of freedom when pinned at its solved
+     * position. Probe on an isolated solver so diagnostics never alter the live sketch,
+     * its ids, drag state or undo history. Called after fine solves, never per drag frame.
+     */
+    fullyConstrainedEntities(): Set<number> {
+        const data = this.toData();
+        if (this.dofs() === 0) return new Set(data.entities.map((entity) => entity.id));
+        const referenced = new Set(
+            data.constraints.flatMap((constraint) => constraint.refs.map((ref) => ref.entityId)),
+        );
+        const candidates = data.entities.filter((entity) => referenced.has(entity.id));
+        const fixed = new Set<number>();
+        if (!candidates.length) return fixed;
+        const probe = new SketchSolver(this.plane, data, this._scope);
+        try {
+            const baseline = probe.dofs();
+            for (const entity of candidates) {
+                const pins: number[] = [];
+                for (let pointIndex = 0; pointIndex < entityPointCount(entity.type); pointIndex++) {
+                    const ref = { entityId: entity.id, pointIndex };
+                    pins.push(
+                        probe.addConstraint({
+                            kind: ConstraintKind.Fix,
+                            refs: [ref],
+                            datums: probe.pointOf(ref),
+                        }),
+                    );
+                }
+                if (entity.type === "circle")
+                    pins.push(
+                        probe.addConstraint({
+                            kind: ConstraintKind.Radius,
+                            refs: [{ entityId: entity.id, pointIndex: 0 }],
+                            datum: entity.params[2],
+                        }),
+                    );
+                const result = probe.solve(true);
+                if (result.result.startsWith("Ok") && result.dofs === baseline) fixed.add(entity.id);
+                for (const id of pins) probe.removeConstraint(id);
+                probe.solve(true);
+            }
+        } finally {
+            probe.dispose();
+        }
+        return fixed;
+    }
+
     // ------------------------------------------------------------------ Queries
 
     /** Data of every real (editable) entity; fixed datum/external entities are excluded. */
@@ -503,6 +587,7 @@ export class SketchSolver implements ExternalEntityHost {
                 id,
                 type: this.entityTypes.get(id)!,
                 params: [...params],
+                ...this.entityStyles.get(id),
             }));
     }
 
@@ -511,7 +596,9 @@ export class SketchSolver implements ExternalEntityHost {
         if (id === SKETCH_X_AXIS_ID || id === SKETCH_Y_AXIS_ID) return datumEntityData(id);
         const type = this.entityTypes.get(id);
         const params = this.entityCache.get(id);
-        return type === undefined || params === undefined ? undefined : { id, type, params: [...params] };
+        return type === undefined || params === undefined
+            ? undefined
+            : { id, type, params: [...params], ...this.entityStyles.get(id) };
     }
 
     pointOf(ref: SketchPointRef): [number, number] {
@@ -620,11 +707,50 @@ export class SketchSolver implements ExternalEntityHost {
         return this.solve(true);
     }
 
+    /** Translate a curve from the pointer-down snapshot; constraints resolve the remaining freedom. */
+    dragEntityTo(entityId: number, original: number[], du: number, dv: number): SolveOutcome {
+        const entity = this.entity(entityId);
+        if (!entity || this.fixedEntities.has(entityId) || this.entityLocked(entity))
+            return this.solve(false);
+        const moved = new Set<string>();
+        for (let pointIndex = 0; pointIndex < entityPointCount(entity.type); pointIndex++) {
+            const ref = { entityId, pointIndex };
+            for (const point of this.coincidentGroup(ref)) {
+                const key = pointRefKey(point);
+                if (moved.has(key) || this.fixedEntities.has(point.entityId)) continue;
+                moved.add(key);
+                this.setPointPosition(
+                    point,
+                    original[pointIndex * 2] + du,
+                    original[pointIndex * 2 + 1] + dv,
+                );
+            }
+        }
+        return this.solve(true);
+    }
+
+    /** Dragging a circle's circumference changes its radius; existing dimensions remain authoritative. */
+    dragCircleRadiusTo(entityId: number, radius: number): SolveOutcome {
+        const entity = this.entity(entityId);
+        if (
+            entity?.type !== "circle" ||
+            this.fixedEntities.has(entityId) ||
+            this.entityLocked(entity) ||
+            !Number.isFinite(radius) ||
+            radius <= 1e-7
+        )
+            return this.solve(false);
+        this.system.set_param(this.radiusParamId(entityId), radius);
+        return this.solve(true);
+    }
+
     // ------------------------------------------------------------------ Serialization and lifecycle
 
     toData(): SketchData {
         const constraints = this.constraintsData();
         const result: SketchData = { entities: this.entities(), constraints };
+        if (this.layers) result.layers = this.sketchLayers();
+        if (this.activeLayer !== "0") result.activeLayer = this.activeLayer;
         // external refs live in SketchData, not in the entity list — preserve them
         if (this.external.refs.length > 0) {
             result.externalRefs = JSON.parse(JSON.stringify(this.external.refs)) as ExternalRefData[];
@@ -693,6 +819,7 @@ export class SketchSolver implements ExternalEntityHost {
         this.entityTypes.clear();
         this.entityParams.clear();
         this.entityCache.clear();
+        this.entityStyles.clear();
         this.constraints.clear();
         this.fixedEntities.clear();
         this.external.clear();
@@ -868,6 +995,12 @@ export class SketchSolver implements ExternalEntityHost {
         this.entityTypes.set(entityId, type);
         this.entityParams.set(entityId, paramIds);
         this.entityCache.set(entityId, [...this.system.get_params(new Uint32Array(paramIds))]);
+        if (id === undefined && (this.constructionMode || this.activeLayer !== "0")) {
+            this.entityStyles.set(entityId, {
+                ...(this.constructionMode ? { construction: true } : {}),
+                ...(this.activeLayer !== "0" ? { layer: this.activeLayer } : {}),
+            });
+        }
         return entityId;
     }
 
@@ -1234,6 +1367,8 @@ export class SketchSolver implements ExternalEntityHost {
     }
 
     private loadData(data: SketchData): void {
+        this.layers = data.layers?.map((layer) => ({ ...layer }));
+        this.activeLayer = data.activeLayer ?? "0";
         // The constraints are rebuilt below, so their datum errors are too.
         this._datumErrors.clear();
         this.external.refPositions = data.refPositions === undefined ? undefined : { ...data.refPositions };
@@ -1243,6 +1378,8 @@ export class SketchSolver implements ExternalEntityHost {
         }
         for (const entity of data.entities) {
             this.registerEntity(entity.type, this.addEntityParams(entity.type, entity.params), entity.id);
+            const { id, type, params, ...style } = entity;
+            this.entityStyles.set(id, style);
         }
         for (const constraint of data.constraints) {
             this.addConstraintWithId(constraint.id, constraint);

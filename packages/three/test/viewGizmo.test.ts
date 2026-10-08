@@ -1,11 +1,10 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import type { XYZ } from "@chili3d/core";
+import type { XYZLike } from "@chili3d/core";
 import { PerspectiveCamera, Vector3 } from "three";
-import type { CameraController } from "../src/cameraController";
 import type { ThreeView } from "../src/threeView";
-import type { Axis, ViewGizmo } from "../src/viewGizmo";
+import type { ViewGizmo } from "../src/viewGizmo";
 
 let ViewGizmoCtor: typeof ViewGizmo;
 
@@ -32,312 +31,153 @@ beforeAll(async () => {
     }
 });
 
-/**
- * Happy-DOM does not implement the 2D canvas context, so stub getContext
- * with a call-counting fake for the duration of these tests.
- */
-interface Fake2dContext {
-    calls: { clearRect: number; fillText: number; arc: number; stroke: number };
-}
-
-let fakeContext: Fake2dContext;
-let originalGetContext: typeof HTMLCanvasElement.prototype.getContext;
-
-function createFake2dContext(): Fake2dContext {
-    const calls = { clearRect: 0, fillText: 0, arc: 0, stroke: 0 };
-    return {
-        calls,
-        clearRect: () => {
-            calls.clearRect++;
-        },
-        beginPath: () => {},
-        arc: () => {
-            calls.arc++;
-        },
-        fill: () => {},
-        closePath: () => {},
-        moveTo: () => {},
-        lineTo: () => {},
-        stroke: () => {
-            calls.stroke++;
-        },
-        fillText: () => {
-            calls.fillText++;
-        },
-        font: "",
-        fillStyle: "",
-        strokeStyle: "",
-        lineWidth: 0,
-        textBaseline: "",
-        textAlign: "",
-    } as unknown as Fake2dContext;
-}
-
-beforeEach(() => {
-    fakeContext = createFake2dContext();
-    originalGetContext = HTMLCanvasElement.prototype.getContext;
-    HTMLCanvasElement.prototype.getContext = (() =>
-        fakeContext) as unknown as typeof HTMLCanvasElement.prototype.getContext;
-});
-
-afterEach(() => {
-    HTMLCanvasElement.prototype.getContext = originalGetContext;
-});
-
-interface MockController {
-    camera: PerspectiveCamera;
-    target: Vector3;
-    rotate: ReturnType<typeof rs.fn>;
-    setRotateCenterToSelected: ReturnType<typeof rs.fn>;
-    lookAt: ReturnType<typeof rs.fn>;
-}
-
-function createGizmo(): { gizmo: ViewGizmo; cc: MockController; update: ReturnType<typeof rs.fn> } {
-    const cc: MockController = {
-        camera: new PerspectiveCamera(),
-        target: new Vector3(0, 0, 0),
+function createGizmo() {
+    const camera = new PerspectiveCamera();
+    const target = new Vector3(10, 20, 30);
+    camera.position.copy(target).add(new Vector3(0, 0, 100));
+    camera.up.set(0, 1, 0);
+    camera.lookAt(target);
+    const cc = {
+        camera,
+        target,
         rotate: rs.fn(),
         setRotateCenterToSelected: rs.fn(),
-        lookAt: rs.fn(),
+        lookAt: rs.fn((eye: XYZLike, center: XYZLike, up: XYZLike) => {
+            camera.position.set(eye.x, eye.y, eye.z);
+            camera.up.set(up.x, up.y, up.z);
+            camera.lookAt(center.x, center.y, center.z);
+        }),
     };
-    cc.camera.position.set(0, 0, 100);
-
-    const update = rs.fn();
-    const view = { cameraController: cc, update } as unknown as ThreeView;
+    const view = { cameraController: cc, update: rs.fn() } as unknown as ThreeView;
     const gizmo = new ViewGizmoCtor(view);
-    return { gizmo, cc, update };
+    document.body.append(gizmo);
+    return { gizmo, cc };
 }
 
-function canvasOf(gizmo: ViewGizmo): HTMLCanvasElement {
-    return (gizmo as any)._canvas;
+function button(gizmo: ViewGizmo, label: string) {
+    const node = gizmo.querySelector<SVGElement>(`[aria-label="${label}"]`);
+    expect(node).not.toBeNull();
+    return node!;
 }
 
-function axesOf(gizmo: ViewGizmo): Axis[] {
-    return (gizmo as any)._axes;
+function click(gizmo: ViewGizmo, label: string, props: MouseEventInit = {}) {
+    button(gizmo, label).dispatchEvent(new MouseEvent("click", { bubbles: true, ...props }));
 }
 
-function pointerEvent(props: Record<string, unknown>): PointerEvent {
-    return { stopPropagation: () => {}, ...props } as unknown as PointerEvent;
-}
-
-describe("ViewGizmo — construction and dom", () => {
-    test("constructor creates a 200x200 canvas child and absolute positioning", () => {
-        const { gizmo, cc } = createGizmo();
-
-        const canvas = canvasOf(gizmo);
-        expect(gizmo.children.length).toBe(1);
-        expect(gizmo.children[0]).toBe(canvas);
-        expect(canvas.width).toBe(200);
-        expect(canvas.height).toBe(200);
-        expect(gizmo.style.position).toBe("absolute");
-        expect(gizmo.cameraController).toBe(cc as unknown as CameraController);
-    });
-
-    test("setDom moves the gizmo into the given element", () => {
-        const { gizmo } = createGizmo();
-        const dom = document.createElement("div");
-        document.body.appendChild(dom);
-        try {
-            gizmo.setDom(dom);
-            expect(dom.contains(gizmo)).toBe(true);
-            expect(gizmo.parentElement).toBe(dom);
-        } finally {
-            dom.remove();
-        }
-    });
-
-    test("dispose removes the gizmo from its parent", () => {
-        const { gizmo } = createGizmo();
-        const dom = document.createElement("div");
-        gizmo.setDom(dom);
-        expect(dom.contains(gizmo)).toBe(true);
-
-        gizmo.dispose();
-        expect(dom.contains(gizmo)).toBe(false);
-    });
+afterEach(() => {
+    document.body.replaceChildren();
 });
 
-describe("ViewGizmo — pointer interaction", () => {
-    test("pointerenter sets the background, pointerout resets it and clears the mouse", () => {
-        const { gizmo } = createGizmo();
-        document.body.appendChild(gizmo);
-        try {
-            canvasOf(gizmo).dispatchEvent(new PointerEvent("pointerenter"));
-            expect(gizmo.style.backgroundColor).toBe("rgba(66, 66, 66, .9)");
-
-            (gizmo as any)._mouse = new Vector3(1, 2, 0);
-            canvasOf(gizmo).dispatchEvent(new PointerEvent("pointerout"));
-            expect(gizmo.style.backgroundColor).toBe("transparent");
-            expect((gizmo as any)._mouse).toBeUndefined();
-        } finally {
-            gizmo.remove();
-        }
-    });
-
-    test("detached gizmo no longer reacts to canvas events", () => {
-        const { gizmo } = createGizmo();
-        document.body.appendChild(gizmo);
-        gizmo.remove();
-
-        canvasOf(gizmo).dispatchEvent(new PointerEvent("pointerenter"));
-        expect(gizmo.style.backgroundColor).toBe("");
-    });
-
-    test("left-button drag rotates the camera by 4x the movement", () => {
-        const { gizmo, cc, update } = createGizmo();
-
-        (gizmo as any)._onPointerMove(
-            pointerEvent({ buttons: 1, movementX: 2, movementY: 3, clientX: 10, clientY: 10 }),
-        );
-
-        expect(cc.rotate).toHaveBeenCalledTimes(1);
-        expect(cc.rotate.mock.calls[0]).toEqual([8, 12]);
-        expect((gizmo as any)._canClick).toBe(false);
-        expect(update).toHaveBeenCalledTimes(1);
-        // The mouse position is tracked in canvas coordinates, scaled by 2
-        expect((gizmo as any)._mouse).toEqual(new Vector3(20, 20, 0));
-    });
-
-    test("pointer move without left button only tracks the mouse", () => {
-        const { gizmo, cc, update } = createGizmo();
-
-        (gizmo as any)._onPointerMove(
-            pointerEvent({ buttons: 0, movementX: 2, movementY: 3, clientX: 5, clientY: 5 }),
-        );
-
-        expect(cc.rotate).not.toHaveBeenCalled();
-        expect((gizmo as any)._canClick).toBe(true);
-        expect(update).toHaveBeenCalledTimes(1);
-    });
-
-    test("left-button move without movement keeps the gizmo clickable", () => {
+describe("View cube", () => {
+    test.each([
+        ["Top", [0, 0, 1], [0, 1, 0]],
+        ["Bottom", [0, 0, -1], [0, -1, 0]],
+        ["Front", [0, -1, 0], [0, 0, 1]],
+        ["Back", [0, 1, 0], [0, 0, 1]],
+        ["Right", [1, 0, 0], [0, 0, 1]],
+        ["Left", [-1, 0, 0], [0, 0, 1]],
+    ])("%s face aligns the view without changing its center or zoom", (name, direction, up) => {
         const { gizmo, cc } = createGizmo();
-
-        (gizmo as any)._onPointerMove(
-            pointerEvent({ buttons: 1, movementX: 0, movementY: 0, clientX: 5, clientY: 5 }),
-        );
-
-        expect(cc.rotate).not.toHaveBeenCalled();
-        expect((gizmo as any)._canClick).toBe(true);
+        click(gizmo, `${name} view`);
+        const expected = cc.target.clone().addScaledVector(new Vector3(...direction), 100);
+        expect(cc.camera.position.distanceTo(expected)).toBeLessThan(1e-10);
+        expect(cc.camera.up.distanceTo(new Vector3(...up))).toBeLessThan(1e-10);
+        expect(cc.target.toArray()).toEqual([10, 20, 30]);
+        expect(button(gizmo, `${name} view`).getAttribute("aria-hidden")).toBe("false");
     });
 
-    test("pointerdown captures the pointer and sets the rotate center", () => {
+    test("has 26 named targets and corner/edge clicks choose the corresponding diagonals", () => {
         const { gizmo, cc } = createGizmo();
-        const canvas = canvasOf(gizmo);
-        canvas.setPointerCapture = rs.fn();
-        canvas.releasePointerCapture = rs.fn();
-
-        (gizmo as any)._onPointerDown(pointerEvent({ pointerId: 7 }));
-        expect(canvas.setPointerCapture).toHaveBeenCalledWith(7);
-        expect(cc.setRotateCenterToSelected).toHaveBeenCalledTimes(1);
-
-        (gizmo as any)._onPointerUp(pointerEvent({ pointerId: 7 }));
-        expect(canvas.releasePointerCapture).toHaveBeenCalledWith(7);
-    });
-});
-
-describe("ViewGizmo — click to align camera", () => {
-    test("click right after a drag only re-arms clicking", () => {
-        const { gizmo, cc } = createGizmo();
-        (gizmo as any)._canClick = false;
-        (gizmo as any)._selectedAxis = axesOf(gizmo)[0];
-
-        (gizmo as any)._onClick(pointerEvent({}));
-
-        expect((gizmo as any)._canClick).toBe(true);
-        expect(cc.lookAt).not.toHaveBeenCalled();
-    });
-
-    test("click without a selected axis does nothing", () => {
-        const { gizmo, cc } = createGizmo();
-        (gizmo as any)._selectedAxis = undefined;
-
-        (gizmo as any)._onClick(pointerEvent({}));
-
-        expect(cc.lookAt).not.toHaveBeenCalled();
-        expect(cc.camera.position.toArray()).toEqual([0, 0, 100]);
+        expect(gizmo.querySelectorAll("[data-kind]").length).toBe(26);
+        click(gizmo, "Top Front Right view");
+        const direction = cc.camera.position.clone().sub(cc.target).normalize();
+        expect(direction.distanceTo(new Vector3(1, -1, 1).normalize())).toBeLessThan(1e-10);
+        click(gizmo, "Front Top view");
+        expect(
+            cc.camera.position
+                .clone()
+                .sub(cc.target)
+                .normalize()
+                .distanceTo(new Vector3(0, -1, 1).normalize()),
+        ).toBeLessThan(1e-10);
+        expect(cc.camera.position.distanceTo(cc.target)).toBeCloseTo(100);
     });
 
     test.each([
-        ["x", [100, 0, 0], [0, 0, 1]],
-        ["-x", [-100, 0, 0], [0, 0, 1]],
-        ["y", [0, 100, 0], [0, 0, 1]],
-        ["z", [0, 0, 100], [0, 1, 0]],
-        ["-z", [0, 0, -100], [0, -1, 0]],
-    ])("click on axis %s positions the camera along that axis", (axisName, expectedPos, expectedUp) => {
-        const { gizmo, cc, update } = createGizmo();
-        const axis = axesOf(gizmo).find((x) => x.axis === axisName);
-        expect(axis).toBeDefined();
-        (gizmo as any)._selectedAxis = axis;
-
-        (gizmo as any)._onClick(pointerEvent({}));
-
-        expect(cc.camera.position.x).toBeCloseTo(expectedPos[0]);
-        expect(cc.camera.position.y).toBeCloseTo(expectedPos[1]);
-        expect(cc.camera.position.z).toBeCloseTo(expectedPos[2]);
-        expect(cc.lookAt).toHaveBeenCalledTimes(1);
-        const up = cc.lookAt.mock.calls[0][2] as XYZ;
-        expect(up.x).toBe(expectedUp[0]);
-        expect(up.y).toBe(expectedUp[1]);
-        expect(up.z).toBe(expectedUp[2]);
-        expect(update).toHaveBeenCalledTimes(1);
-    });
-});
-
-describe("ViewGizmo — update rendering", () => {
-    test("update clears the canvas and draws all axes with labels", () => {
-        const { gizmo } = createGizmo();
-
-        gizmo.update();
-
-        expect(fakeContext.calls.clearRect).toBe(1);
-        // 6 axis bubbles, but only the 3 primary axes (x, y, z) draw a line and a label
-        expect(fakeContext.calls.arc).toBe(6);
-        expect(fakeContext.calls.stroke).toBe(3);
-        expect(fakeContext.calls.fillText).toBe(3);
-    });
-
-    test("update projects the x axis bubble to the right edge", () => {
-        const { gizmo } = createGizmo();
-
-        gizmo.update();
-
-        const xAxis = axesOf(gizmo).find((x) => x.axis === "x")!;
-        // center (100, 100) + direction (1, 0, 0) * (100 - bubbleSize/2 - padding)
-        expect(xAxis.position.x).toBeCloseTo(100 + (100 - 18 / 2 - 16));
-        expect(xAxis.position.y).toBeCloseTo(100);
-    });
-
-    test("update selects the axis closest to the mouse within its size", () => {
-        const { gizmo } = createGizmo();
-
-        gizmo.update();
-        const xAxis = axesOf(gizmo).find((x) => x.axis === "x")!;
-        (gizmo as any)._mouse = xAxis.position.clone();
-
-        gizmo.update();
-        expect((gizmo as any)._selectedAxis?.axis).toBe("x");
-    });
-
-    test("update selects nothing when the mouse is far from every axis", () => {
-        const { gizmo } = createGizmo();
-
-        (gizmo as any)._mouse = new Vector3(0, 0, 0);
-        gizmo.update();
-        expect((gizmo as any)._selectedAxis).toBeUndefined();
-    });
-
-    test("selected axis is clickable right after update", () => {
+        [{}, 15],
+        [{ shiftKey: true }, 90],
+        [{ ctrlKey: true }, 5],
+    ] as const)("step arrows honor modifier keys %j", (props, degrees) => {
         const { gizmo, cc } = createGizmo();
+        const rotation = cc.camera.quaternion.clone();
+        click(gizmo, "Rotate right (15°; Shift 90°; Ctrl 5°)", props);
+        expect((rotation.angleTo(cc.camera.quaternion) * 180) / Math.PI).toBeCloseTo(degrees);
+        expect(cc.camera.position.distanceTo(cc.target)).toBeCloseTo(100);
+    });
 
-        gizmo.update();
-        const yAxis = axesOf(gizmo).find((x) => x.axis === "y")!;
-        (gizmo as any)._mouse = yAxis.position.clone();
-        gizmo.update();
-        expect((gizmo as any)._selectedAxis?.axis).toBe("y");
+    test("keyboard activation works and back faces are removed from tab order", () => {
+        const { gizmo, cc } = createGizmo();
+        expect(button(gizmo, "Bottom view").getAttribute("tabindex")).toBe("-1");
+        button(gizmo, "Isometric view").dispatchEvent(
+            new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+        );
+        expect(
+            cc.camera.position
+                .clone()
+                .sub(cc.target)
+                .normalize()
+                .distanceTo(new Vector3(1, -1, 1).normalize()),
+        ).toBeLessThan(1e-10);
+        expect(button(gizmo, "Front view").getAttribute("tabindex")).toBe("0");
+    });
 
-        (gizmo as any)._onClick(pointerEvent({}));
-        expect(cc.lookAt).toHaveBeenCalledTimes(1);
-        expect(cc.camera.position.y).toBeCloseTo(100);
+    test.each([
+        0, 2,
+    ])("dragging button %s orbits without activating a face or reaching the sketch", (buttonIndex) => {
+        const { gizmo, cc } = createGizmo();
+        const parentDown = rs.fn();
+        document.body.addEventListener("pointerdown", parentDown);
+        try {
+            const top = button(gizmo, "Top view");
+            top.dispatchEvent(
+                new PointerEvent("pointerdown", {
+                    bubbles: true,
+                    pointerId: 1,
+                    button: buttonIndex,
+                    clientX: 75,
+                    clientY: 77,
+                }),
+            );
+            top.dispatchEvent(
+                new PointerEvent("pointermove", { bubbles: true, pointerId: 1, clientX: 95, clientY: 82 }),
+            );
+            top.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerId: 1 }));
+            top.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+            expect(cc.rotate).toHaveBeenCalledWith(20, 5, "trackball");
+            expect(cc.lookAt).not.toHaveBeenCalled();
+            expect(parentDown).not.toHaveBeenCalled();
+        } finally {
+            document.body.removeEventListener("pointerdown", parentDown);
+        }
+    });
+
+    test("camera changes reproject the face polygons and dispose removes the control", () => {
+        const { gizmo } = createGizmo();
+        const top = button(gizmo, "Top view").querySelector("polygon")!;
+        expect(top).not.toBeNull();
+        const before = top.getAttribute("points");
+        click(gizmo, "Isometric view");
+        expect(top.getAttribute("points")).not.toBe(before);
+        gizmo.dispose();
+        expect(document.body.contains(gizmo)).toBe(false);
+    });
+
+    test("releasing outside before capture does not leave a pending cube drag", () => {
+        const { gizmo, cc } = createGizmo();
+        const top = button(gizmo, "Top view");
+        top.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerId: 2, button: 0 }));
+        window.dispatchEvent(new PointerEvent("pointerup", { pointerId: 2, clientX: 300 }));
+        top.dispatchEvent(new PointerEvent("pointermove", { bubbles: true, pointerId: 2, clientX: 20 }));
+        expect(cc.rotate).not.toHaveBeenCalled();
     });
 });

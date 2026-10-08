@@ -61,6 +61,15 @@ export class RibbonGroupElement extends HTMLElement {
     }
 
     private initHTML() {
+        const toggle = (event: Event) => {
+            event.stopPropagation();
+            if (this.#dropdown.isOpened) this.#dropdown.close();
+            else this.openDropdown(event.currentTarget as HTMLElement);
+            (event.currentTarget as HTMLElement).setAttribute(
+                "aria-expanded",
+                String(this.#dropdown.isOpened),
+            );
+        };
         this.append(
             collection({
                 className: style.content,
@@ -68,7 +77,18 @@ export class RibbonGroupElement extends HTMLElement {
                 template: (item) => createRibbonButton(item),
             }),
             div(
-                { className: style.headerContainer },
+                {
+                    className: style.headerContainer,
+                    role: this.group.collapsedItems.length ? "button" : undefined,
+                    tabIndex: this.group.collapsedItems.length ? 0 : -1,
+                    onclick: toggle,
+                    onkeydown: (event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            toggle(event);
+                        }
+                    },
+                },
                 label({ className: style.header, textContent: new Localize(this.group.groupName) }),
                 div({
                     className: style.arrow,
@@ -78,14 +98,6 @@ export class RibbonGroupElement extends HTMLElement {
                             "length",
                             new DisplayConverter((l: number) => l > 0),
                         ),
-                    },
-                    onclick: (e) => {
-                        e.stopPropagation();
-                        if (this.#dropdown.isOpened) {
-                            this.#dropdown.close();
-                        } else {
-                            this.openDropdown((e.currentTarget as HTMLElement).parentElement as HTMLElement);
-                        }
                     },
                 }),
             ),

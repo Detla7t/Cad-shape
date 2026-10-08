@@ -281,12 +281,16 @@ export class Viewport extends HTMLElement {
         this.removeEvents();
     }
 
+    private rightGesture?: { down: PointerEvent; moved: boolean };
+
     private initEvent() {
         const events: [keyof HTMLElementEventMap, (e: any) => any][] = [
             ["pointerdown", this.pointerDown],
             ["pointermove", this.pointerMove],
             ["pointerout", this.pointerOut],
             ["pointerup", this.pointerUp],
+            ["pointercancel", this.pointerCancel],
+            ["lostpointercapture", this.pointerCancel],
             ["wheel", this.mouseWheel],
             ["dblclick", this.doubleClick],
         ];
@@ -305,6 +309,7 @@ export class Viewport extends HTMLElement {
     }
 
     private removeEvents() {
+        if (this.rightGesture) this.pointerCancel(this.rightGesture.down);
         this._eventCaches.forEach((x) => {
             this.removeEventListener(x[0], x[1]);
         });
@@ -312,7 +317,7 @@ export class Viewport extends HTMLElement {
     }
 
     private readonly handleEvent = (
-        eventName: Exclude<keyof IEventHandler, "isEnabled" | "dispose">,
+        eventName: Exclude<keyof IEventHandler, "isEnabled" | "dispose" | "resolveCommand">,
         event: PointerEvent | WheelEvent,
     ) => {
         if (this.view.document.visual.eventHandler.isEnabled)
@@ -322,6 +327,14 @@ export class Viewport extends HTMLElement {
     };
 
     private readonly pointerMove = (event: PointerEvent) => {
+        if (this.rightGesture) {
+            const { down } = this.rightGesture;
+            if (Math.hypot(event.clientX - down.clientX, event.clientY - down.clientY) >= 3)
+                this.rightGesture.moved = true;
+            if (this.rightGesture.moved && this.view.document.visual.viewHandler.isEnabled)
+                this.view.document.visual.viewHandler.pointerMove(this.view, event);
+            return;
+        }
         if (this._flyout) {
             this._flyout.style.top = `${event.offsetY}px`;
             this._flyout.style.left = `${event.offsetX}px`;
@@ -339,14 +352,46 @@ export class Viewport extends HTMLElement {
             this.view.document.application.activeView = this.view;
         }
 
+        if (event.button === 2 && event.pointerType === "mouse") {
+            // Delay a right-click's tool action until release, distinguishing it from orbit.
+            this.rightGesture = { down: event, moved: false };
+            try {
+                this.setPointerCapture?.(event.pointerId);
+            } catch {
+                /* Synthetic pointers have no capture. */
+            }
+            if (this.view.document.visual.viewHandler.isEnabled)
+                this.view.document.visual.viewHandler.pointerDown(this.view, event);
+            return;
+        }
         this.handleEvent("pointerDown", event);
     };
 
     private readonly pointerUp = (event: PointerEvent) => {
+        const gesture = this.rightGesture;
+        if (gesture) {
+            this.rightGesture = undefined;
+            const visual = this.view.document.visual;
+            if (visual.viewHandler.isEnabled) visual.viewHandler.pointerUp(this.view, event);
+            if (!gesture.moved && visual.eventHandler.isEnabled) {
+                visual.eventHandler.pointerDown(this.view, gesture.down);
+                visual.eventHandler.pointerUp(this.view, event);
+            }
+            if (this.hasPointerCapture?.(event.pointerId)) this.releasePointerCapture(event.pointerId);
+            return;
+        }
         this.handleEvent("pointerUp", event);
     };
 
+    private readonly pointerCancel = (event: PointerEvent) => {
+        if (!this.rightGesture) return;
+        this.rightGesture = undefined;
+        this.view.document.visual.viewHandler.pointerUp(this.view, event);
+        if (this.hasPointerCapture?.(event.pointerId)) this.releasePointerCapture(event.pointerId);
+    };
+
     private readonly pointerOut = (event: PointerEvent) => {
+        if (this.rightGesture) return;
         this.handleEvent("pointerOut", event);
     };
 

@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type IDocument, PubSub } from "@chili3d/core";
+import { DocumentPanels, type IDocument, PubSub } from "@chili3d/core";
 import { ConfigurationDataContent } from "./configurationDataContent";
 import { ConfigurationEditor } from "./configurationEditor";
 
@@ -11,6 +11,7 @@ import { ConfigurationEditor } from "./configurationEditor";
  * and there is no confirm step. Bound to its document — it writes straight into the table.
  */
 export function showConfigurationPanel(document: IDocument): void {
+    if (DocumentPanels.open("configuration", document)) return;
     PubSub.default.pub("showFloatPanel", {
         title: "configuration.title",
         content: new ConfigurationEditor(new ConfigurationDataContent(document)),

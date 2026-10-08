@@ -23,6 +23,7 @@ import {
     type MeshOption,
     type NodeRecord,
     NodeUtils,
+    ReferencePlaneNode,
     RefSegmentAnnotation,
     type ShapeMeshData,
     type ShapeNode,
@@ -52,6 +53,7 @@ import { ThreeRefSegmentAnnotation } from "./threeAnnotation";
 import { ThreeGeometry } from "./threeGeometry";
 import { ThreeGeometryFactory } from "./threeGeometryFactory";
 import { ThreeHelper } from "./threeHelper";
+import { ThreeReferencePlane } from "./threeReferencePlane";
 import { GroupVisualObject, ThreeComponentObject, ThreeMeshObject } from "./threeVisualObject";
 
 export class ThreeVisualContext implements IVisualContext {
@@ -376,7 +378,9 @@ export class ThreeVisualContext implements IVisualContext {
 
     private displayNode(node: INode) {
         let visualObject: (IVisualObject & Object3D) | undefined;
-        if (node instanceof MeshNode) {
+        if (node instanceof ReferencePlaneNode) {
+            visualObject = new ThreeReferencePlane(node);
+        } else if (node instanceof MeshNode) {
             visualObject = new ThreeMeshObject(this, node);
         } else if (node instanceof GeometryNode) {
             visualObject = new ThreeGeometry(node, this);

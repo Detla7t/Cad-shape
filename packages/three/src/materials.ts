@@ -25,6 +25,7 @@ export const selectedVertexMaterial = new PointsMaterial({
 });
 
 const defaultEdgeMaterialOptions = {
+    alphaToCoverage: true,
     color: VisualConfig.defaultEdgeColor,
     side: DoubleSide,
     polygonOffset: true,

@@ -5,6 +5,8 @@ export * from "./button";
 export * from "./combobox";
 export * from "./dialog";
 export * from "./documentElements";
+export * from "./documentPanels";
 export * from "./floatPanel";
 export * from "./ribbon";
+export * from "./ribbonPreferences";
 export * from "./window";

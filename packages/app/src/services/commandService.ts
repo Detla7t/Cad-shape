@@ -9,6 +9,7 @@ import {
     type IView,
     isCancelableCommand,
     Logger,
+    OperationLog,
     PubSub,
 } from "@chili3d/core";
 
@@ -46,9 +47,13 @@ export class CommandService implements IService {
     };
 
     private readonly executeCommand = async (commandName: CommandKeys) => {
-        const command = commandName === "special.last" ? this.app.lastCommand : commandName;
+        let command = commandName === "special.last" ? this.app.lastCommand : commandName;
+        if (command) {
+            command =
+                this.app.activeView?.document.visual?.eventHandler?.resolveCommand?.(command) ?? command;
+        }
         if (!command || !(await this.canExecute(command))) return;
-        Logger.info(`executing command ${command}`);
+
         await this.executeAsync(command);
     };
 
@@ -59,6 +64,12 @@ export class CommandService implements IService {
             return;
         }
 
+        const document = this.app.activeView?.document;
+        const operation = OperationLog.begin("command.execute", {
+            command: commandName,
+            documentId: document?.id,
+        });
+        let failure: unknown;
         const command = new commandCtor();
         this.app.executingCommand = command;
         PubSub.default.pub("showProperties", this.app.activeView?.document!, []);
@@ -66,9 +77,14 @@ export class CommandService implements IService {
         await Promise.try(command.execute.bind(command), this.app)
             .catch((err) => {
                 PubSub.default.pub("displayError", err as string);
-                Logger.error(err);
+                failure = err;
             })
             .finally(() => {
+                operation.add({
+                    undoCount: document?.history.undoCount(),
+                    nodeCount: document?.modelManager.findNodes().length,
+                });
+                operation.finish(failure === undefined ? "success" : "error", failure);
                 this.app.lastCommand = commandName;
                 this.app.executingCommand = undefined;
             });

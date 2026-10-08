@@ -4,7 +4,21 @@
 import type { Navigation3DType } from "../navigation";
 import type { CommandKeys } from "./commandKeys";
 
-type ShortcutMap = Partial<Record<CommandKeys, string | string[]>>;
+export type ShortcutMap = Partial<Record<CommandKeys, string | string[]>>;
+
+/** Canonical modifier order shared by recording, conflict detection and dispatch. */
+export function normalizeShortcut(shortcut: string): string {
+    const keys = shortcut.toLowerCase().split("+");
+    const modifiers = ["ctrl", "shift", "alt"].filter((key) => keys.includes(key));
+    return [...modifiers, ...keys.filter((key) => !MODIFIER_KEYS.has(key))].join("+");
+}
+
+export function effectiveShortcuts(
+    profile: Navigation3DType,
+    overrides: Partial<Record<CommandKeys, string>> = {},
+): ShortcutMap {
+    return { ...ShortcutProfiles[profile], ...overrides };
+}
 
 const MODIFIER_KEYS = new Set(["ctrl", "shift", "alt"]);
 

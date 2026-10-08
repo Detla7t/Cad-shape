@@ -280,7 +280,7 @@ describe("CreateSketch", () => {
         });
         const document = new TestDocument({
             application: app,
-            selection: { clearSelection } as any,
+            selection: { clearSelection, getSelectedNodes: () => [] } as any,
             picker: { pickAsync } as any,
         });
         let body!: ParametricBodyNode;

@@ -8,6 +8,7 @@ import {
     type CommandKeys,
     CommandStore,
     Config,
+    effectiveShortcuts,
     I18n,
     type I18nKeys,
     type IConverter,
@@ -15,7 +16,6 @@ import {
     Logger,
     PubSub,
     Result,
-    ShortcutProfiles,
 } from "@chili3d/core";
 import { createIcon, label } from "@chili3d/element";
 import style from "./ribbonButton.module.css";
@@ -34,8 +34,18 @@ export class RibbonPushButton extends HTMLElement {
         display?: I18nKeys,
     ) {
         super();
+        this.dataset["command"] = commandName;
+        this.setAttribute("role", "button");
+        this.tabIndex = 0;
         this.initHTML(display ?? `command.${commandName}`, icon, size);
         this.addEventListener("click", onClick);
+        this.addEventListener("keydown", (event) => {
+            if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                event.stopPropagation();
+                onClick();
+            }
+        });
     }
 
     static fromCommandName(commandName: CommandKeys, size: ButtonSize) {
@@ -73,7 +83,10 @@ export class RibbonPushButton extends HTMLElement {
     }
 
     updateShortcut() {
-        const shortcutData = ShortcutProfiles[Config.instance.navigation3D][this.commandName];
+        const shortcutData = effectiveShortcuts(
+            Config.instance.navigation3D,
+            Config.instance.customShortcuts,
+        )[this.commandName];
         const shortcut = Array.isArray(shortcutData) ? shortcutData.join("; ") : shortcutData;
 
         if (shortcut) {
@@ -84,7 +97,7 @@ export class RibbonPushButton extends HTMLElement {
             }
             this.#shortcut = shortcut;
         } else if (this.#shortcut) {
-            this.title = this.title.replace(this.#shortcut, "");
+            this.title = this.title.replace(` (${this.#shortcut})`, "");
             this.#shortcut = undefined;
         }
     }

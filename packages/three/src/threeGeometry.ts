@@ -48,6 +48,7 @@ export class ThreeGeometry extends ThreeVisualObject implements IVisualGeometry 
     private _faceMaterial: Material | Material[];
     private _edgeMaterial: LineMaterial = defaultEdgeMaterial;
     private _edges?: LineSegments2;
+    private ownsEdgeMaterial = false;
     private _faces?: Mesh;
     private _vertexs?: Points;
     private _renderOnTop = false;
@@ -156,6 +157,8 @@ export class ThreeGeometry extends ThreeVisualObject implements IVisualGeometry 
             this.disposeOnTopMaterial(this._edges);
             this.remove(this._edges);
             this._edges.geometry.dispose();
+            if (this.ownsEdgeMaterial) this._edgeMaterial.dispose();
+            this.ownsEdgeMaterial = false;
             this._edges = null as any;
         }
         if (this._faces) {
@@ -176,8 +179,13 @@ export class ThreeGeometry extends ThreeVisualObject implements IVisualGeometry 
 
     private initEdges(data: EdgeMeshData) {
         const buff = ThreeGeometryFactory.createEdgeBufferGeometry(data);
-        this._edgeMaterial = edgeMaterialOfWidth(data.lineWidth);
+        this.ownsEdgeMaterial = Array.isArray(data.color) || data.lineType === "dash";
+        this._edgeMaterial = this.ownsEdgeMaterial
+            ? ThreeGeometryFactory.createEdgeMaterial(data)
+            : edgeMaterialOfWidth(data.lineWidth);
+        if (this.ownsEdgeMaterial) ThreeGeometryFactory.setColor(buff, data, this._edgeMaterial);
         this._edges = new LineSegments2(buff, this._edgeMaterial);
+        if (data.lineType === "dash") this._edges.computeLineDistances();
         this._edges.layers.set(Constants.Layers.Wireframe);
         if (this._renderOnTop) this.applyOnTopMaterial(this._edges, this._edgeMaterial);
         this.add(this._edges);

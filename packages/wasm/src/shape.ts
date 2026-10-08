@@ -215,7 +215,7 @@ export class OccShape implements IShape {
     }
 
     edgesMeshPosition(): EdgeMeshData {
-        const occMesher = new wasm.Mesher(this.shape, 0.005, true);
+        const occMesher = new wasm.Mesher(this.shape, 0.001, true);
         const position = occMesher.edgesMeshPosition();
         occMesher.delete();
         return {
@@ -882,7 +882,7 @@ export class Mesher implements IShapeMeshData, IDisposable {
         this._isMeshed = true;
 
         gc((c) => {
-            const occMesher = c(new wasm.Mesher(this.shape.shape, 0.005, true));
+            const occMesher = c(new wasm.Mesher(this.shape.shape, 0.001, true));
             const meshData = c(occMesher.mesh());
             const faceMeshData = c(meshData.faceMeshData);
             const edgeMeshData = c(meshData.edgeMeshData);

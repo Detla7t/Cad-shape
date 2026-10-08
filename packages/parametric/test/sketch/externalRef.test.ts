@@ -2276,6 +2276,8 @@ describe("ToggleSketchExternalRole command", () => {
         return {
             node: { plane: Plane.XY },
             solver,
+            beginConstraintSelection: rs.fn(),
+            endConstraintSelection: rs.fn(),
             solve: rs.fn((_fine: boolean) => {}),
             commit: rs.fn(() => {}),
             refreshExternalDisplay: rs.fn(),
@@ -2426,6 +2428,8 @@ describe("ProjectSketchEdges command", () => {
             document,
             node: { plane: Plane.XY },
             solver,
+            beginConstraintSelection: rs.fn(),
+            endConstraintSelection: rs.fn(),
             pickShape,
             solve: rs.fn((_fine: boolean) => {}),
             commit: rs.fn(() => {}),

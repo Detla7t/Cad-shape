@@ -194,6 +194,22 @@ function createFixture(): Fixture {
     return { doc, root, groupA, model1, model2, tree };
 }
 
+test("filter keeps a matching node's ancestors and restores hidden siblings when cleared", () => {
+    const { tree, root, groupA, model1, model2 } = createFixture();
+    try {
+        tree.filter("MODEL1");
+        expect(tree.treeItem(model1 as any)?.style.display).toBe("");
+        expect(tree.treeItem(groupA as any)?.style.display).toBe("");
+        expect(tree.treeItem(root as any)?.style.display).toBe("");
+        expect(tree.treeItem(model2 as any)?.style.display).toBe("none");
+        tree.filter("");
+        expect(tree.treeItem(model2 as any)?.style.display).toBe("");
+    } finally {
+        tree.remove();
+        tree.dispose();
+    }
+});
+
 describe("Tree", () => {
     let fixture: Fixture;
     let originalScrollIntoView: unknown;

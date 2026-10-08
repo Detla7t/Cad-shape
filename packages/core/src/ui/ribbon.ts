@@ -66,6 +66,13 @@ export class RibbonTab extends Observable {
 
     contextual = false;
 
+    get label(): string {
+        return this.getPrivateValue("label", "");
+    }
+    set label(value: string) {
+        this.setProperty("label", value);
+    }
+
     get tabName(): RibbonTabKeys {
         return this.getPrivateValue("tabName");
     }
@@ -168,6 +175,9 @@ export class Ribbon extends Observable {
         if (!tab) return;
 
         tab.visible = !tab.contextual;
-        this.activeTab = this.preTab ?? this.tabs.find((x) => x.visible)!;
+        this.activeTab =
+            this.preTab?.visible && this.tabs.contains(this.preTab)
+                ? this.preTab
+                : this.tabs.find((x) => x.visible)!;
     }
 }

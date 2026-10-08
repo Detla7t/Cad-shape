@@ -1,60 +1,54 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type IViewGizmo, XYZ } from "@chili3d/core";
-import { Matrix4, Vector3 } from "three";
+import type { IViewGizmo } from "@chili3d/core";
+import { Matrix4, Quaternion, Vector3 } from "three";
 import type { CameraController } from "./cameraController";
 import type { ThreeView } from "./threeView";
+import { createCubeRegions } from "./viewCubeGeometry";
+import style from "./viewGizmo.module.css";
 
-const MOUSE_LEFT = 1;
-
-const options = {
-    size: 200,
-    padding: 16,
-    bubbleSizePrimary: 18,
-    bubbleSizeSeconday: 10,
-    showSecondary: true,
-    lineWidth: 2,
-    fontSize: "24px",
-    fontFamily: "arial",
-    fontColor: "#151515",
-    fontYAdjust: 0,
-    colors: {
-        x: ["#f73c3c", "#942424"],
-        y: ["#6ccb26", "#417a17"],
-        z: ["#178cf0", "#0e5490"],
-    },
-};
-
-export interface Axis {
-    axis: string;
-    direction: Vector3;
-    size: number;
-    position: Vector3;
-    color: string[];
-    lineWidth?: number;
-    label?: string;
+function svg<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, string> = {}) {
+    const node = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value);
+    return node;
 }
 
 export class ViewGizmo extends HTMLElement implements IViewGizmo {
-    private readonly _axes: Axis[];
-    private readonly _center: Vector3;
-    private readonly _canvas: HTMLCanvasElement;
-    private readonly _context: CanvasRenderingContext2D;
     readonly cameraController: CameraController;
-    private _canClick: boolean = true;
-    private _selectedAxis?: Axis;
-    private _mouse?: Vector3;
+    private readonly drawing = svg("svg", { viewBox: "0 0 150 160", "aria-label": "View cube" });
+    private readonly cube = svg("g");
+    private readonly axes = svg("g", { class: style.axes });
+    private readonly regions = createCubeRegions().map((region) => {
+        const group = svg("g", { class: style.region, "data-kind": region.kind });
+        const polygon = svg("polygon");
+        const label = svg("text", { "text-anchor": "middle", "dominant-baseline": "central" });
+        label.textContent = region.kind === "face" ? region.name : "";
+        group.append(polygon, label);
+        this.button(group, `${region.name} view`, () => this.orient(region.normal));
+        return { ...region, group, polygon, label };
+    });
+    private readonly axisLines = ["#e85b57", "#55ba65", "#608be9"].map((color, i) => {
+        const line = svg("line", { stroke: color });
+        const label = svg("text", { fill: color });
+        label.textContent = "XYZ"[i];
+        this.axes.append(line, label);
+        return { line, label };
+    });
+    private drag?: { id: number; x: number; y: number; startX: number; startY: number; moved: boolean };
+    private suppressClick = false;
+    private lastRotation?: Quaternion;
 
     constructor(readonly view: ThreeView) {
         super();
         this.cameraController = view.cameraController;
-        this._axes = this._initAxes();
-        this._center = new Vector3(options.size * 0.5, options.size * 0.5, 0);
-        this._canvas = this._initCanvas();
-        this._context = this._canvas.getContext("2d")!;
-        this._initStyle();
+        this.className = style.root;
+        this.drawing.append(this.axes, this.cube);
+        this.append(this.drawing);
+        this.addControls();
+        this.update();
     }
+
     setDom(dom: HTMLElement): void {
         this.remove();
         dom.appendChild(this);
@@ -64,242 +58,226 @@ export class ViewGizmo extends HTMLElement implements IViewGizmo {
         this.remove();
     }
 
-    private _initStyle() {
-        this.style.zIndex = "999";
-        this.style.position = "absolute";
-        this.style.top = "20px";
-        this.style.right = "20px";
-        this.style.borderRadius = "100%";
-        this.style.cursor = "pointer";
-        this.style.userSelect = "none";
-        this.style.webkitUserSelect = "none";
-    }
-
-    private _initCanvas() {
-        const canvas = document.createElement("canvas");
-        canvas.width = options.size;
-        canvas.height = options.size;
-        canvas.style.width = `${options.size * 0.5}px`;
-        canvas.style.height = `${options.size * 0.5}px`;
-        this.append(canvas);
-        return canvas;
-    }
-
-    private _initAxes() {
-        return [
-            {
-                axis: "x",
-                direction: new Vector3(1, 0, 0),
-                position: new Vector3(),
-                size: options.bubbleSizePrimary,
-                color: options.colors.x,
-                lineWidth: options.lineWidth,
-                label: "X",
-            },
-            {
-                axis: "y",
-                direction: new Vector3(0, 1, 0),
-                position: new Vector3(),
-                size: options.bubbleSizePrimary,
-                color: options.colors.y,
-                lineWidth: options.lineWidth,
-                label: "Y",
-            },
-            {
-                axis: "z",
-                direction: new Vector3(0, 0, 1),
-                position: new Vector3(),
-                size: options.bubbleSizePrimary,
-                color: options.colors.z,
-                lineWidth: options.lineWidth,
-                label: "Z",
-            },
-            {
-                axis: "-x",
-                direction: new Vector3(-1, 0, 0),
-                position: new Vector3(),
-                size: options.bubbleSizeSeconday,
-                color: options.colors.x,
-            },
-            {
-                axis: "-y",
-                direction: new Vector3(0, -1, 0),
-                position: new Vector3(),
-                size: options.bubbleSizeSeconday,
-                color: options.colors.y,
-            },
-            {
-                axis: "-z",
-                direction: new Vector3(0, 0, -1),
-                position: new Vector3(),
-                size: options.bubbleSizeSeconday,
-                color: options.colors.z,
-            },
-        ];
-    }
-
     connectedCallback() {
-        this._canvas.addEventListener("pointermove", this._onPointerMove);
-        this._canvas.addEventListener("pointerenter", this._onPointerEnter);
-        this._canvas.addEventListener("pointerout", this._onPointerOut);
-        this._canvas.addEventListener("click", this._onClick);
-        this._canvas.addEventListener("pointerdown", this._onPointerDown);
-        this._canvas.addEventListener("pointerup", this._onPointerUp);
+        this.addEventListener("pointerdown", this.pointerDown);
+        this.addEventListener("pointermove", this.pointerMove);
+        this.addEventListener("pointerup", this.pointerUp);
+        this.addEventListener("pointercancel", this.pointerCancel);
+        this.addEventListener("lostpointercapture", this.pointerCancel);
+        this.addEventListener("pointerout", this.stopPropagation);
+        this.addEventListener("contextmenu", this.contextMenu);
+        window.addEventListener("pointerup", this.endOutsideDrag);
+        window.addEventListener("pointercancel", this.endOutsideDrag);
     }
 
     disconnectedCallback() {
-        this._canvas.removeEventListener("pointermove", this._onPointerMove);
-        this._canvas.removeEventListener("pointerenter", this._onPointerEnter);
-        this._canvas.removeEventListener("pointerout", this._onPointerOut);
-        this._canvas.removeEventListener("click", this._onClick);
-        this._canvas.removeEventListener("pointerdown", this._onPointerDown);
-        this._canvas.removeEventListener("pointerup", this._onPointerUp);
+        this.removeEventListener("pointerdown", this.pointerDown);
+        this.removeEventListener("pointermove", this.pointerMove);
+        this.removeEventListener("pointerup", this.pointerUp);
+        this.removeEventListener("pointercancel", this.pointerCancel);
+        this.removeEventListener("lostpointercapture", this.pointerCancel);
+        this.removeEventListener("pointerout", this.stopPropagation);
+        this.removeEventListener("contextmenu", this.contextMenu);
+        window.removeEventListener("pointerup", this.endOutsideDrag);
+        window.removeEventListener("pointercancel", this.endOutsideDrag);
+        this.drag = undefined;
     }
 
-    private readonly _onPointerMove = (e: PointerEvent) => {
-        e.stopPropagation();
-        if (e.buttons === MOUSE_LEFT && !(e.movementX === 0 && e.movementY === 0)) {
-            this.cameraController.rotate(e.movementX * 4, e.movementY * 4);
-            this._canClick = false;
-        }
-        const rect = this._canvas.getBoundingClientRect();
-        this._mouse = new Vector3(e.clientX - rect.left, e.clientY - rect.top, 0).multiplyScalar(2);
-        this.view.update();
-    };
+    private button(node: SVGElement, name: string, action: (event: MouseEvent | KeyboardEvent) => void) {
+        node.setAttribute("role", "button");
+        node.setAttribute("tabindex", "0");
+        node.setAttribute("aria-label", name);
+        const title = svg("title");
+        title.textContent = name;
+        node.append(title);
+        node.addEventListener("click", (event) => {
+            event.stopPropagation();
+            if (!this.suppressClick) action(event);
+            this.suppressClick = false;
+        });
+        node.addEventListener("keydown", (event) => {
+            event.stopPropagation();
+            if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                action(event);
+            }
+        });
+    }
 
-    private readonly _onPointerDown = (e: PointerEvent) => {
-        e.stopPropagation();
-        this._canvas.setPointerCapture(e.pointerId);
+    private addControls() {
+        const controls: [string, string, Vector3, number][] = [
+            ["Rotate up", "M75 6 L68 15 L82 15 Z", new Vector3(1, 0, 0), -1],
+            ["Rotate down", "M75 142 L68 133 L82 133 Z", new Vector3(1, 0, 0), 1],
+            ["Rotate left", "M7 77 L16 70 L16 84 Z", new Vector3(0, 1, 0), -1],
+            ["Rotate right", "M143 77 L134 70 L134 84 Z", new Vector3(0, 1, 0), 1],
+            [
+                "Roll counterclockwise",
+                "M62 19 Q37 21 24 43 L19 37 L19 54 L35 49 L29 46 Q40 28 63 26 Z",
+                new Vector3(0, 0, 1),
+                -1,
+            ],
+            [
+                "Roll clockwise",
+                "M88 19 Q113 21 126 43 L131 37 L131 54 L115 49 L121 46 Q110 28 87 26 Z",
+                new Vector3(0, 0, 1),
+                1,
+            ],
+        ];
+        for (const [name, d, axis, sign] of controls) {
+            const group = svg("g", { class: style.control });
+            const path = svg("path", { d });
+            // Transparent stroke increases the hit area without increasing the visible arrow.
+            const hit = svg("path", { d, fill: "transparent", stroke: "transparent", "stroke-width": "12" });
+            group.append(path, hit);
+            this.button(group, `${name} (15°; Shift 90°; Ctrl 5°)`, (event) => {
+                const degrees = event.shiftKey ? 90 : event.ctrlKey || event.metaKey ? 5 : 15;
+                const rotation = this.cameraController.camera.quaternion
+                    .clone()
+                    .multiply(new Quaternion().setFromAxisAngle(axis, (sign * degrees * Math.PI) / 180));
+                this.setRotation(rotation);
+            });
+            this.drawing.append(group);
+        }
+        const home = svg("g", { class: style.control });
+        home.append(
+            svg("path", {
+                d: "M122 137 L131 133 L140 137 L140 148 L131 153 L122 148 Z",
+                stroke: "currentColor",
+                "stroke-width": "0.7",
+            }),
+            svg("path", {
+                d: "M122 137 L131 142 L140 137 M131 142 L131 153",
+                fill: "none",
+                stroke: "currentColor",
+                "stroke-width": "0.7",
+            }),
+        );
+        this.button(home, "Isometric view", () => this.orient(new Vector3(1, -1, 1)));
+        this.drawing.append(home);
+    }
+
+    private orient(direction: Vector3) {
+        const up =
+            Math.abs(direction.z) === direction.length()
+                ? new Vector3(0, Math.sign(direction.z), 0)
+                : new Vector3(0, 0, 1);
+        this.setRotation(
+            new Quaternion().setFromRotationMatrix(new Matrix4().lookAt(direction, new Vector3(), up)),
+        );
+    }
+
+    private setRotation(rotation: Quaternion) {
+        const { camera, target } = this.cameraController;
+        const distance = camera.position.distanceTo(target);
+        const eye = new Vector3(0, 0, distance).applyQuaternion(rotation).add(target);
+        const up = new Vector3(0, 1, 0).applyQuaternion(rotation);
+        this.cameraController.lookAt(eye, target, up);
+        this.view.update();
+        this.update();
+    }
+
+    private readonly stopPropagation = (event: Event) => event.stopPropagation();
+    private readonly contextMenu = (event: Event) => {
+        event.preventDefault();
+        event.stopPropagation();
+    };
+    private readonly pointerDown = (event: PointerEvent) => {
+        event.stopPropagation();
+        if (event.button !== 0 && event.button !== 2) return;
+        this.suppressClick = false;
+        this.drag = {
+            id: event.pointerId,
+            x: event.clientX,
+            y: event.clientY,
+            startX: event.clientX,
+            startY: event.clientY,
+            moved: false,
+        };
         this.cameraController.setRotateCenterToSelected();
     };
-
-    private readonly _onPointerUp = (e: PointerEvent) => {
-        e.stopPropagation();
-        this._canvas.releasePointerCapture(e.pointerId);
-    };
-
-    private readonly _onPointerOut = (e: PointerEvent) => {
-        e.stopPropagation();
-        this._mouse = undefined;
-        this.style.backgroundColor = "transparent";
-    };
-
-    private readonly _onPointerEnter = (e: PointerEvent) => {
-        e.stopPropagation();
-        this.style.backgroundColor = "rgba(66, 66, 66, .9)";
-    };
-
-    private readonly _onClick = (e: MouseEvent) => {
-        e.stopPropagation();
-        if (!this._canClick) {
-            this._canClick = true;
-            return;
-        }
-        if (this._selectedAxis) {
-            const distance = this.cameraController.camera.position.distanceTo(this.cameraController.target);
-            const position = this._selectedAxis.direction
-                .clone()
-                .multiplyScalar(distance)
-                .add(this.cameraController.target);
-            this.cameraController.camera.position.copy(position);
-            let up = new XYZ({ x: 0, y: 0, z: 1 });
-            if (this._selectedAxis.axis === "z") up = new XYZ({ x: 0, y: 1, z: 0 });
-            else if (this._selectedAxis.axis === "-z") up = new XYZ({ x: 0, y: -1, z: 0 });
-            this.cameraController.lookAt(
-                this.cameraController.camera.position,
-                this.cameraController.target,
-                up,
-            );
-            this.view.update();
-        }
-    };
-
-    clear() {
-        this._context.clearRect(0, 0, this._canvas.width, this._canvas.height);
-    }
-
-    update() {
-        this.clear();
-        const invRotMat = new Matrix4().makeRotationFromEuler(this.cameraController.camera.rotation).invert();
-        this._axes.forEach((axis) => {
-            axis.position = this.getBubblePosition(axis.direction.clone().applyMatrix4(invRotMat));
-        });
-        this._axes.sort((a, b) => a.position.z - b.position.z);
-        this.setSelectedAxis(this._axes);
-        this.drawAxes(this._axes);
-    }
-
-    private setSelectedAxis(axes: Axis[]) {
-        this._selectedAxis = undefined;
-        if (this._mouse && this._canClick) {
-            let closestDist = Infinity;
-            for (const axis of axes) {
-                const distance = this._mouse.distanceTo(axis.position);
-                if (distance < closestDist && distance < axis.size) {
-                    closestDist = distance;
-                    this._selectedAxis = axis;
-                }
+    private readonly pointerMove = (event: PointerEvent) => {
+        event.stopPropagation();
+        const drag = this.drag;
+        if (!drag || drag.id !== event.pointerId) return;
+        if (!drag.moved && Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) < 3) return;
+        if (!drag.moved) {
+            try {
+                this.setPointerCapture?.(event.pointerId);
+            } catch {
+                /* Synthetic pointers have no capture. */
             }
         }
-    }
+        drag.moved = true;
+        this.suppressClick = true;
+        this.cameraController.rotate(event.clientX - drag.x, event.clientY - drag.y, "trackball");
+        drag.x = event.clientX;
+        drag.y = event.clientY;
+        this.view.update();
+    };
+    private readonly pointerUp = (event: PointerEvent) => {
+        event.stopPropagation();
+        this.drag = undefined;
+        if (this.hasPointerCapture?.(event.pointerId)) this.releasePointerCapture(event.pointerId);
+    };
+    private readonly pointerCancel = (event: PointerEvent) => {
+        this.suppressClick = true;
+        this.pointerUp(event);
+    };
+    private readonly endOutsideDrag = (event: PointerEvent) => {
+        if (this.drag?.id === event.pointerId) this.pointerCancel(event);
+    };
 
-    drawAxes(axes: Axis[]) {
-        for (const axis of axes) {
-            const color = this.getAxisColor(axis);
-            this.drawCircle(axis.position, axis.size, color);
-            this.drawLine(this._center, axis.position, color, axis.lineWidth);
-            this.drawLabel(axis);
+    update() {
+        const rotation = this.cameraController.camera.quaternion;
+        if (this.lastRotation?.equals(rotation)) return;
+        this.lastRotation = rotation.clone();
+        const inverse = rotation.clone().invert();
+        const project = (point: Vector3) => {
+            const p = point.clone().applyQuaternion(inverse);
+            return { x: 75 + p.x * 28, y: 77 - p.y * 28, z: p.z };
+        };
+        const regions = this.regions
+            .map((region) => ({ region, normal: region.normal.clone().applyQuaternion(inverse) }))
+            .sort((a, b) => a.normal.z - b.normal.z);
+        for (const { region, normal } of regions) {
+            const visible = normal.z > 0.001;
+            region.group.style.display = visible ? "" : "none";
+            region.group.setAttribute("tabindex", visible ? "0" : "-1");
+            region.group.setAttribute("aria-hidden", String(!visible));
+            if (visible) {
+                region.polygon.setAttribute(
+                    "points",
+                    region.vertices
+                        .map((v) => {
+                            const p = project(v);
+                            return `${p.x},${p.y}`;
+                        })
+                        .join(" "),
+                );
+                if (region.up) {
+                    const right = region.up.clone().cross(region.normal).applyQuaternion(inverse);
+                    const up = region.up.clone().applyQuaternion(inverse);
+                    const center = project(region.normal);
+                    region.label.setAttribute(
+                        "transform",
+                        `matrix(${right.x} ${-right.y} ${-up.x} ${up.y} ${center.x} ${center.y})`,
+                    );
+                }
+            }
+            this.cube.append(region.group);
         }
-    }
-
-    private getAxisColor(axis: Axis) {
-        let color;
-        if (this._selectedAxis === axis) {
-            color = "#FFFFFF";
-        } else if (axis.position.z >= -0.01) {
-            color = axis.color[0];
-        } else {
-            color = axis.color[1];
+        // A small world-axis triad stays below the cube and follows the same camera rotation.
+        for (let i = 0; i < 3; i++) {
+            const axis = new Vector3().setComponent(i, 1).applyQuaternion(inverse);
+            const x = 36 + axis.x * 24;
+            const y = 116 - axis.y * 24;
+            const { line, label } = this.axisLines[i];
+            for (const [key, value] of Object.entries({ x1: 36, y1: 116, x2: x, y2: y }))
+                line.setAttribute(key, String(value));
+            label.setAttribute("x", String(x + axis.x * 7 - 3));
+            label.setAttribute("y", String(y - axis.y * 7 + 3));
+            label.style.display = Math.hypot(axis.x, axis.y) < 0.15 ? "none" : "";
         }
-        return color;
-    }
-
-    private drawCircle(p: Vector3, radius = 10, color = "#FF0000") {
-        this._context.beginPath();
-        this._context.arc(p.x, p.y, radius, 0, 2 * Math.PI, false);
-        this._context.fillStyle = color;
-        this._context.fill();
-        this._context.closePath();
-    }
-
-    private drawLine(p1: Vector3, p2: Vector3, color: string, width?: number) {
-        if (width) {
-            this._context.beginPath();
-            this._context.moveTo(p1.x, p1.y);
-            this._context.lineTo(p2.x, p2.y);
-            this._context.lineWidth = width;
-            this._context.strokeStyle = color;
-            this._context.stroke();
-            this._context.closePath();
-        }
-    }
-
-    private drawLabel(axis: Axis) {
-        if (axis.label) {
-            this._context.font = [options.fontSize, options.fontFamily].join(" ");
-            this._context.fillStyle = options.fontColor;
-            this._context.textBaseline = "middle";
-            this._context.textAlign = "center";
-            this._context.fillText(axis.label, axis.position.x, axis.position.y + options.fontYAdjust);
-        }
-    }
-
-    private getBubblePosition(vector: Vector3) {
-        return new Vector3(
-            vector.x * (this._center.x - options.bubbleSizePrimary / 2 - options.padding) + this._center.x,
-            this._center.y - vector.y * (this._center.y - options.bubbleSizePrimary / 2 - options.padding),
-            vector.z,
-        );
     }
 }
 

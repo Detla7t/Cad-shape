@@ -8,7 +8,7 @@ import { VersionsPanel } from "./versionsPanel";
 
 const MIN_WIDTH = 240;
 
-/** The Versions & History panel docked at the right edge of the editor's content row. */
+/** The Versions & History panel docked at the left edge of the editor's content row. */
 export class VersionsDock {
     private dock?: HTMLElement;
     private width = 340;
@@ -38,7 +38,7 @@ export class VersionsDock {
             panel,
         );
         dock.style.width = `${this.width}px`;
-        host.append(dock);
+        host.insertBefore(dock, host.children[1] ?? null);
         this.dock = dock;
     }
 
@@ -51,11 +51,11 @@ export class VersionsDock {
         e.preventDefault();
         const dock = this.dock;
         if (dock === undefined) return;
-        const right = dock.getBoundingClientRect().right;
+        const left = dock.getBoundingClientRect().left;
         const move = (ev: PointerEvent) => {
             this.width = Math.max(
                 MIN_WIDTH,
-                Math.min(Math.floor(window.innerWidth * 0.6), right - ev.clientX),
+                Math.min(Math.floor(window.innerWidth * 0.6), ev.clientX - left),
             );
             dock.style.width = `${this.width}px`;
         };

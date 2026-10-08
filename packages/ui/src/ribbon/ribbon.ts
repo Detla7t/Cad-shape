@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    applyRibbonPreferences,
     Binding,
     type CommandKeys,
     CommandStore,
@@ -20,9 +21,11 @@ import {
     type RibbonTab,
     type RibbonTabKeys,
 } from "@chili3d/core";
-import { a, collection, createIcon, div, label, span, svg } from "@chili3d/element";
+import { button, collection, createCadIcon, createIcon, div, label, span, svg } from "@chili3d/element";
+import { ContextToolbar } from "./contextToolbar";
+import { RibbonCustomization, tabLabel } from "./customization";
 import style from "./ribbon.module.css";
-import { RibbonPushButton } from "./ribbonButton";
+import type { RibbonPushButton } from "./ribbonButton";
 import { RibbonGroupElement } from "./ribbonGroup";
 
 export const QuickButton = (command: ICommand) => {
@@ -37,6 +40,7 @@ export const QuickButton = (command: ICommand) => {
     return span(
         {
             title: new Localize(`command.${data.key}`),
+            dataset: { command: data.key },
             onclick: () => PubSub.default.pub("executeCommand", data.key),
         },
         icon,
@@ -76,13 +80,40 @@ class DisplayConverter<T> implements IConverter<T> {
 }
 
 export class RibbonUI extends HTMLElement {
+    private readonly customization: RibbonCustomization;
     constructor(
         readonly app: IApplication,
         readonly dataContent: Ribbon,
     ) {
         super();
+        applyRibbonPreferences(dataContent, Config.instance.ribbonPreferences);
+        this.customization = new RibbonCustomization(dataContent);
         this.className = style.root;
-        this.append(this.header(), this.ribbonTabs());
+        this.dataset["compact"] = String(Config.instance.ribbonPreferences.compact !== false);
+        this.dataset["layout"] = Config.instance.ribbonPreferences.layout ?? "context";
+        const parametric = dataContent.tabs.find(
+            (tab) => tab.tabName === "ribbon.tab.parametric" && tab.visible,
+        );
+        if (this.dataset["layout"] === "context" && parametric && !dataContent.activeTab?.contextual)
+            dataContent.activeTab = parametric;
+        const home = button(
+            { title: "Home", onclick: () => PubSub.default.pub("displayHome", true) },
+            createCadIcon("box"),
+            span({ textContent: "Chili3D" }),
+        );
+        const customize = button(
+            { title: "Customize tools and tabs", onclick: () => this.customization.manageTabs() },
+            createCadIcon("menu"),
+        );
+        const documentHeader = div({ className: style.documentHeader }, home, this.centerPanel(), customize);
+        this.append(
+            div({ className: style.legacy }, this.header(), this.ribbonTabs()),
+            div(
+                { className: style.context },
+                documentHeader,
+                new ContextToolbar(app, dataContent, this.customization),
+            ),
+        );
     }
 
     private header() {
@@ -122,7 +153,9 @@ export class RibbonUI extends HTMLElement {
                 const converter = new ActivedRibbonTabConverter(tab, style.tabHeader, style.activedTab);
                 return label({
                     className: new Binding(this.dataContent, "activeTab", converter),
-                    textContent: new Localize(tab.tabName),
+                    textContent: new Binding(tab, "label", { convert: () => Result.ok(tabLabel(tab)) }),
+                    dataset: { ribbonTab: tab.tabName },
+                    title: "Right-click to customize tabs",
                     style: {
                         display: new Binding(
                             tab,
@@ -182,10 +215,17 @@ export class RibbonUI extends HTMLElement {
     private rightPanel() {
         return div(
             { className: style.right },
-            a(
-                { href: "https://github.com/xiangechen/chili3d", target: "_blank" },
-                svg({ title: "Github", className: style.icon, icon: "icon-github" }),
-            ),
+            button({
+                className: style.searchTools,
+                textContent: "Search tools…",
+                onclick: () => this.customization.searchTools(),
+            }),
+            button({
+                className: style.customize,
+                title: "Customize tabs",
+                textContent: "⚙",
+                onclick: () => this.customization.manageTabs(),
+            }),
         );
     }
 
@@ -214,16 +254,22 @@ export class RibbonUI extends HTMLElement {
     }
 
     connectedCallback(): void {
+        this.customization.start();
         Config.instance.onPropertyChanged(this.handleConfigChanged);
     }
 
     disconnectedCallback(): void {
+        this.customization.dispose();
         Config.instance.removePropertyChanged(this.handleConfigChanged);
     }
 
     private readonly handleConfigChanged = (prop: keyof Config) => {
-        if (prop === "navigation3D") {
-            this.querySelectorAll(customElements.getName(RibbonPushButton)!).forEach((x) => {
+        if (prop === "ribbonPreferences") {
+            this.dataset["compact"] = String(Config.instance.ribbonPreferences.compact !== false);
+            this.dataset["layout"] = Config.instance.ribbonPreferences.layout ?? "context";
+        }
+        if (prop === "navigation3D" || prop === "customShortcuts") {
+            this.querySelectorAll("ribbon-button, ribbon-toggle-button").forEach((x) => {
                 (x as RibbonPushButton).updateShortcut();
             });
         }

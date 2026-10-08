@@ -113,3 +113,73 @@ describe("Viewport double-click", () => {
         expect(pubSubRecorder.pubs).toEqual([]);
     });
 });
+
+describe("Viewport right-drag arbitration", () => {
+    function setup() {
+        const { view, doc } = createMockView([], undefined);
+        const handler = () => ({
+            isEnabled: true,
+            pointerDown: rs.fn(),
+            pointerMove: rs.fn(),
+            pointerUp: rs.fn(),
+            pointerOut: rs.fn(),
+        });
+        const eventHandler = handler();
+        const viewHandler = handler();
+        Object.assign(doc.visual, { eventHandler, viewHandler });
+        const viewport = new Viewport(view as unknown as IView, false);
+        document.body.append(viewport);
+        const send = (type: string, x = 30, y = 30) =>
+            viewport.dispatchEvent(
+                new PointerEvent(type, {
+                    bubbles: true,
+                    pointerType: "mouse",
+                    pointerId: 1,
+                    button: 2,
+                    buttons: type === "pointerup" ? 0 : 2,
+                    clientX: x,
+                    clientY: y,
+                }),
+            );
+        return { viewport, send, eventHandler, viewHandler };
+    }
+
+    afterEach(() => {
+        document.body.replaceChildren();
+    });
+
+    test("right-drag orbits without cancelling a pending modeling pick", () => {
+        const { send, eventHandler, viewHandler } = setup();
+        send("pointerdown");
+        send("pointermove", 80, 30);
+        send("pointerout", 100, 30);
+        send("pointerup", 100, 30);
+        expect(viewHandler.pointerMove).toHaveBeenCalledTimes(1);
+        expect(viewHandler.pointerUp).toHaveBeenCalledTimes(1);
+        expect(viewHandler.pointerOut).not.toHaveBeenCalled();
+        expect(eventHandler.pointerDown).not.toHaveBeenCalled();
+        expect(eventHandler.pointerMove).not.toHaveBeenCalled();
+        expect(eventHandler.pointerUp).not.toHaveBeenCalled();
+    });
+
+    test("a stationary right-click still reaches the tool on release", () => {
+        const { send, eventHandler } = setup();
+        send("pointerdown");
+        expect(eventHandler.pointerDown).not.toHaveBeenCalled();
+        send("pointermove", 31, 30);
+        send("pointerup", 31, 30);
+        expect(eventHandler.pointerDown).toHaveBeenCalledTimes(1);
+        expect(eventHandler.pointerUp).toHaveBeenCalledTimes(1);
+    });
+
+    test("pointer cancellation clears a drag and never fires the click action", () => {
+        const { send, eventHandler, viewHandler } = setup();
+        send("pointerdown");
+        send("pointermove", 80, 40);
+        send("pointercancel", 80, 40);
+        expect(viewHandler.pointerUp).toHaveBeenCalledTimes(1);
+        expect(eventHandler.pointerDown).not.toHaveBeenCalled();
+        send("pointermove", 90, 40);
+        expect(eventHandler.pointerMove).toHaveBeenCalledTimes(1);
+    });
+});

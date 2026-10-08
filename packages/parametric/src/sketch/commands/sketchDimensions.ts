@@ -29,22 +29,32 @@ import { SketchConstraintCommand } from "./sketchConstraints";
 export class DistanceDimensionCommand extends SketchConstraintCommand {
     protected async executeWithEditor(editor: SketchEditor): Promise<void> {
         this.controller = new AsyncController();
-        const p1 = await editor.pickPoint("prompt.pickSketchPoint", undefined, this.controller);
-        if (p1 === undefined || !allowsConstraintOnEntity(ConstraintKind.P2PDistance, p1.entityId)) return;
-
-        // rubber-band line from the first point to the cursor while picking the second
+        const first = await editor.pickPointOrEntity("prompt.pickSketchPointOrEntity", this.controller);
+        if (!first) return;
+        let p1: SketchPointRef;
+        let p2: SketchPointRef | undefined;
+        if (first.kind === "entity") {
+            if (editor.solver.entity(first.entityId)?.type !== "line") return;
+            p1 = { entityId: first.entityId, pointIndex: 0 };
+            p2 = { entityId: first.entityId, pointIndex: 1 };
+        } else {
+            p1 = first.ref;
+        }
+        if (!allowsConstraintOnEntity(ConstraintKind.P2PDistance, p1.entityId)) return;
         const uv1 = editor.solver.pointOf(p1);
-        this.controller = new AsyncController();
-        const p2 = await pickWithPreview(editor, () =>
-            editor.pickPoint(
-                "prompt.pickSketchPoint",
-                (uv) =>
-                    editor.annotations.setDimensionPreview(
-                        uv === undefined ? undefined : { kind: "segment", p1: uv1, p2: uv },
-                    ),
-                this.controller,
-            ),
-        );
+        if (!p2) {
+            this.controller = new AsyncController();
+            p2 = await pickWithPreview(editor, () =>
+                editor.pickPoint(
+                    "prompt.pickSketchPoint",
+                    (uv) =>
+                        editor.annotations.setDimensionPreview(
+                            uv === undefined ? undefined : { kind: "segment", p1: uv1, p2: uv },
+                        ),
+                    this.controller,
+                ),
+            );
+        }
         if (p2 === undefined || !allowsConstraintOnEntity(ConstraintKind.P2PDistance, p2.entityId)) return;
 
         const uv2 = editor.solver.pointOf(p2);
@@ -160,7 +170,7 @@ function commitDimension(
             editor.dimensionAnchors.delete(id);
             editor.solve(true);
         },
-        { positiveOnly: options?.positiveOnly },
+        { positiveOnly: options?.positiveOnly, constraintId: id },
     );
 }
 

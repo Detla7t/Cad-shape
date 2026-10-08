@@ -1,23 +1,25 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
+import type { CommandKeys } from "./command/commandKeys";
 import { ObjectStorage, Observable } from "./foundation";
 import { I18n } from "./i18n";
 import type { Navigation3DType } from "./navigation";
 import { type SerializedData, Serializer, serialize } from "./serialize";
 import { type ObjectSnapType, ObjectSnapTypes, ObjectSnapTypeUtils } from "./snapType";
+import type { RibbonPreferences } from "./ui/ribbonPreferences";
 
 export const DefaultLightEdgeColor = 0x333333;
 export const DefaultDarkEdgeColor = 0xeeeeee;
 
 export class VisualItemConfig extends Observable {
     defaultFaceColor = 0xdedede;
-    highlightEdgeColor = 0x33ff33;
+    highlightEdgeColor = 0xffd56a;
     highlightFaceColor = 0x99ff00;
-    selectedEdgeColor = 0x33ff33;
-    selectedFaceColor = 0x33ff33;
+    selectedEdgeColor = 0xffc247;
+    selectedFaceColor = 0xffc247;
     editVertexSize = 7;
-    editVertexColor = 0x33ff33;
+    editVertexColor = 0xffc247;
     hintVertexSize = 5;
     hintVertexColor = 0x33ff33;
     trackingVertexSize = 7;
@@ -106,6 +108,20 @@ export class Config extends Observable {
         this.setProperty("navigation3D", value);
     }
 
+    get customShortcuts(): Partial<Record<CommandKeys, string>> {
+        return this.getPrivateValue("customShortcuts", {});
+    }
+    set customShortcuts(value: Partial<Record<CommandKeys, string>>) {
+        this.setProperty("customShortcuts", value);
+    }
+
+    get ribbonPreferences(): RibbonPreferences {
+        return this.getPrivateValue("ribbonPreferences", {});
+    }
+    set ribbonPreferences(value: RibbonPreferences) {
+        this.setProperty("ribbonPreferences", value);
+    }
+
     @serialize()
     get themeMode() {
         return this.getPrivateValue("themeMode", "system");
@@ -157,6 +173,10 @@ export class Config extends Observable {
 
     saveToStorage() {
         const json = Serializer.serializeProperties(this);
-        ObjectStorage.default.setValue(this.storageKey, json);
+        ObjectStorage.default.setValue(this.storageKey, {
+            ...json,
+            customShortcuts: this.customShortcuts,
+            ribbonPreferences: this.ribbonPreferences,
+        });
     }
 }

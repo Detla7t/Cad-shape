@@ -27,6 +27,7 @@ export class PropertyView extends HTMLElement {
     constructor(props: { className: string }) {
         super();
         this.classList.add(props.className, style.root);
+        this.dataset["empty"] = "true";
         this.append(
             label({
                 className: style.header,
@@ -47,6 +48,7 @@ export class PropertyView extends HTMLElement {
 
     private readonly handleShowProperties = (document: IDocument, nodes: INode[]) => {
         this.removeProperties();
+        this.dataset["empty"] = String(nodes.length === 0);
         if (nodes.length === 0) return;
         this.addModel(document, nodes);
         this.addGeometry(nodes, document);

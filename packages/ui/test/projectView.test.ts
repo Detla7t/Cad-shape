@@ -86,6 +86,7 @@ rs.mock("../src/project/tree/index", () => {
         dispose() {
             this.disposed = true;
         }
+        filter(_text: string) {}
         treeItem(_node: unknown) {
             return undefined;
         }

@@ -9,7 +9,7 @@ export type Navigation3DType = (typeof Navigation3DTypes)[number];
 
 export class Navigation3D {
     static getKey(event: MouseEvent) {
-        let key = "Middle";
+        let key = event.buttons === 2 || event.button === 2 ? "Right" : "Middle";
         if (event.shiftKey) {
             key = `Shift+${key}`;
         }
@@ -30,7 +30,7 @@ export class Navigation3D {
         const functionKey = {
             ["Chili3d"]: {
                 pan: "Middle",
-                rotate: "Shift+Middle",
+                rotate: "Right",
             },
             ["Revit"]: {
                 pan: "Middle",

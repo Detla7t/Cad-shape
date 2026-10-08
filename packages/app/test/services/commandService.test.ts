@@ -116,6 +116,16 @@ describe("CommandService", () => {
         PubSub.default.removeAll("activeViewChanged");
     });
 
+    test("routes shared tools through the active editor's command mapping", async () => {
+        registerCommand("test.box");
+        registerCommand("test.appCmd");
+        doc.visual.eventHandler.resolveCommand = () => "test.box" as CommandKeys;
+        service.register(app);
+        service.start();
+        PubSub.default.pub("executeCommand", "test.appCmd" as CommandKeys);
+        await waitForCommandCompleted(app, "test.box");
+    });
+
     // ── lifecycle ──────────────────────────────────────────────────
 
     describe("register", () => {

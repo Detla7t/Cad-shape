@@ -27,6 +27,7 @@ export class Tree extends HTMLElement {
     private highlightedGroup: TreeGroup | undefined;
     private lastClicked: INode | undefined;
     private lastSelected: INode[] | undefined;
+    private filterText = "";
 
     constructor(private document: IDocument) {
         super();
@@ -66,6 +67,24 @@ export class Tree extends HTMLElement {
         }
     };
 
+    /** Keep ancestors of matches visible so filtered nodes retain their context. */
+    filter(text: string): void {
+        this.filterText = text;
+        const query = text.trim().toLocaleLowerCase();
+        const shown = new Set<INode>();
+        for (const node of this.nodeMap.keys()) {
+            if (!query || node.name.toLocaleLowerCase().includes(query)) {
+                let ancestor: INode | undefined = node;
+                while (ancestor) {
+                    shown.add(ancestor);
+                    ancestor = ancestor.parent;
+                }
+                if (query) this.expandParents(node);
+            }
+        }
+        for (const [node, row] of this.nodeMap) row.style.display = shown.has(node) ? "" : "none";
+    }
+
     treeItem(node: INode): TreeItem | undefined {
         return this.nodeMap.get(node);
     }
@@ -103,6 +122,7 @@ export class Tree extends HTMLElement {
             ele.refreshVisibleIcon();
             this.refreshGroupExpander(record.oldParent);
         });
+        this.filter(this.filterText);
     };
 
     private refreshGroupExpander(parent: INodeLinkedList | undefined) {

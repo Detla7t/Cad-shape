@@ -14,5 +14,6 @@ export * from "./node";
 export * from "./nodeIcon";
 export * from "./nodeSceneless";
 export * from "./nodeWarning";
+export * from "./referencePlaneNode";
 export * from "./shapeNode";
 export * from "./visualNode";

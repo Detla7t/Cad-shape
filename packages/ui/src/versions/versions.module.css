@@ -5,7 +5,7 @@
     flex: 0 0 auto;
     min-width: 240px;
     max-width: 60%;
-    border-left: 1px solid var(--border-color);
+    border-right: 1px solid var(--border-color);
     background-color: var(--background-color);
     overflow: hidden;
 }
@@ -13,7 +13,7 @@
 .dockResizer {
     position: absolute;
     top: 0;
-    left: 0;
+    right: 0;
     bottom: 0;
     width: 6px;
     z-index: 10;

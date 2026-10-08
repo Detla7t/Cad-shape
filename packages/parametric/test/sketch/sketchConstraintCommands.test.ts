@@ -35,6 +35,13 @@ function fakeEditor() {
     return {
         node: { plane: Plane.XY },
         solver,
+        selectedWholeEntityIds: [] as number[],
+        beginConstraintSelection: rs.fn(),
+        endConstraintSelection: rs.fn(),
+        pickPointOrEntity: rs.fn(() => {
+            const ref = pointQueue.shift();
+            return Promise.resolve(ref ? { kind: "point" as const, ref } : undefined);
+        }),
         solve: rs.fn((_fine: boolean) => {}),
         commit: rs.fn(() => {}),
         pickPoint: rs.fn((_prompt: I18nKeys) => Promise.resolve(pointQueue.shift())),

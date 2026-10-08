@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type IDocument, PubSub } from "@chili3d/core";
+import { DocumentPanels, type IDocument, PubSub } from "@chili3d/core";
 import { VariablesDataContent } from "./variablesDataContent";
 import { VariablesEditor } from "./variablesEditor";
 
@@ -17,6 +17,7 @@ import { VariablesEditor } from "./variablesEditor";
  * panel left up would throw out of its next edit.
  */
 export function showVariablesPanel(document: IDocument, onApplied: () => void): void {
+    if (DocumentPanels.open("variables", document, onApplied)) return;
     PubSub.default.pub("showFloatPanel", {
         title: "variables.title",
         content: new VariablesEditor(new VariablesDataContent(document, onApplied)),

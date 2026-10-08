@@ -4,11 +4,12 @@
 import {
     type CommandKeys,
     Config,
+    effectiveShortcuts,
     type IApplication,
     type IService,
     Logger,
+    normalizeShortcut,
     PubSub,
-    ShortcutProfiles,
 } from "@chili3d/core";
 
 export interface Keys {
@@ -33,15 +34,15 @@ export class HotkeyService implements IService {
 
     private loadProfile() {
         const profile = Config.instance.navigation3D;
-        const shortcuts = ShortcutProfiles[profile];
+        const shortcuts = effectiveShortcuts(profile, Config.instance.customShortcuts);
 
         this._keyMap.clear();
 
         for (const [command, keyOrKeys] of Object.entries(shortcuts)) {
             if (Array.isArray(keyOrKeys)) {
-                keyOrKeys.forEach((k) => this._keyMap.set(k.toLowerCase(), command as CommandKeys));
-            } else if (typeof keyOrKeys === "string") {
-                this._keyMap.set(keyOrKeys.toLowerCase(), command as CommandKeys);
+                keyOrKeys.forEach((k) => this._keyMap.set(normalizeShortcut(k), command as CommandKeys));
+            } else if (typeof keyOrKeys === "string" && keyOrKeys) {
+                this._keyMap.set(normalizeShortcut(keyOrKeys), command as CommandKeys);
             }
         }
         Logger.info(`Loaded shortcuts profile: ${profile}`);
@@ -73,14 +74,21 @@ export class HotkeyService implements IService {
     };
 
     private readonly handleConfigChanged = (prop: keyof Config) => {
-        if (prop === "navigation3D") {
+        if (prop === "navigation3D" || prop === "customShortcuts") {
+            this.keys = [];
             this.loadProfile();
         }
     };
 
     protected canHandleKey(e: KeyboardEvent): boolean {
         const target = e.target as HTMLElement;
-        if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
+        if (
+            e.defaultPrevented ||
+            target.tagName === "INPUT" ||
+            target.tagName === "TEXTAREA" ||
+            target.tagName === "SELECT" ||
+            target.isContentEditable
+        ) {
             return false;
         }
         return true;
@@ -128,6 +136,7 @@ export class HotkeyService implements IService {
             if (keys.ctrlKey) key = `ctrl+${key}`;
             if (keys.shiftKey) key = `shift+${key}`;
             if (keys.altKey) key = `alt+${key}`;
+            key = normalizeShortcut(key);
             if (this._keyMap.has(key)) {
                 return this._keyMap.get(key);
             }
@@ -138,7 +147,7 @@ export class HotkeyService implements IService {
     addMap(map: HotkeyMap) {
         const keys = Object.keys(map);
         keys.forEach((key) => {
-            this._keyMap.set(key.toLowerCase(), map[key]);
+            this._keyMap.set(normalizeShortcut(key), map[key]);
         });
     }
 }

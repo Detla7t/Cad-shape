@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    addDefaultPlanes,
     type CommandKeys,
     DocumentVersionControl,
     I18n,
@@ -215,8 +216,15 @@ export class Application extends Observable implements IApplication {
         const lightGray = new Material({ document, name: "LightGray", color: 0xdedede });
         const deepGray = new Material({ document, name: "DeepGray", color: 0x898989 });
         document.modelManager.materials.push(lightGray, deepGray);
+        document.history.disabled = true;
+        try {
+            addDefaultPlanes(document);
+        } finally {
+            document.history.disabled = false;
+        }
         DocumentVersionControl.create(document, { persistence: new StorageHistoryPersistence(this.storage) });
         await this.createActiveView(document);
+        this.activeView?.cameraController.fitContent();
         return document;
     }
 

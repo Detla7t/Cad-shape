@@ -2,6 +2,8 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    type EdgeMeshData,
+    type FaceMeshData,
     type I18nKeys,
     type IDocument,
     type IEdge,
@@ -18,11 +20,13 @@ import {
     Result,
     serializable,
     serialize,
+    VisualConfig,
 } from "@chili3d/core";
 import { allProfiles, sketchProfiles } from "../features/profileBuilder";
 import { syncNodeWatches } from "../nodeWatch";
 import { ensureVariableSync } from "../variableSync";
 import { normalizeSnapshot } from "./entityLayout";
+import { dashedPositions, entityDisplayMesh } from "./entityMesh";
 import { type ExternalResolveResult, resolveExternalRefs } from "./externalRef";
 import { type PlaneFaceRef, resolveFacePlane } from "./planeRef";
 import {
@@ -174,9 +178,81 @@ export class SketchNode extends ParameterShapeNode {
     }
 
     protected override createMesh(): IShapeMeshData {
+        if (this._editingSession) return { edges: undefined, faces: undefined, vertexs: undefined };
         const mesh = this.sketchMesh();
-        if (mesh.edges !== undefined) mesh.edges.lineWidth = SKETCH_EDGE_LINE_WIDTH;
-        return mesh;
+        const data = this.data;
+        if (
+            !data.layers?.length &&
+            !data.entities.some((entity) => entity.construction || entity.color || entity.dashed)
+        ) {
+            if (mesh.edges !== undefined) mesh.edges.lineWidth = SKETCH_EDGE_LINE_WIDTH;
+            return mesh;
+        }
+        const source = super.createMesh().edges;
+        const positions: number[] = [];
+        const colors: number[] = [];
+        const ranges: EdgeMeshData["range"] = [];
+        const profileEntities = data.entities.filter((entity) => !entity.construction);
+        const append = (position: Float32Array, color: number) => {
+            for (const value of position) positions.push(value);
+            for (let i = 0; i < position.length; i += 3)
+                colors.push(((color >> 16) & 255) / 255, ((color >> 8) & 255) / 255, (color & 255) / 255);
+        };
+        source?.range.forEach((range, index) => {
+            const entity = profileEntities[index];
+            const layer = data.layers?.find((item) => item.id === (entity?.layer ?? "0"));
+            if (layer?.visible === false) return;
+            let position: Float32Array = source.position.slice(
+                range.start * 3,
+                (range.start + range.count) * 3,
+            );
+            if (entity?.dashed || layer?.dashed) position = dashedPositions(position);
+            ranges.push({ ...range, start: positions.length / 3, count: position.length / 3 });
+            const color = entity?.color ?? layer?.color;
+            append(position, color ? Number.parseInt(color.slice(1), 16) : VisualConfig.defaultEdgeColor);
+        });
+        for (const entity of data.entities.filter((entity) => entity.construction)) {
+            const layer = data.layers?.find((item) => item.id === (entity.layer ?? "0"));
+            if (layer?.visible === false) continue;
+            const color = entity.color ?? layer?.color ?? "#4a9eff";
+            append(
+                dashedPositions(entityDisplayMesh(this.plane, entity, 0).position),
+                Number.parseInt(color.slice(1), 16),
+            );
+        }
+        return {
+            ...mesh,
+            edges: {
+                position: new Float32Array(positions),
+                color: colors,
+                range: ranges,
+                lineType: "solid",
+                lineWidth: SKETCH_EDGE_LINE_WIDTH,
+            },
+            vertexs: undefined,
+        };
+    }
+
+    /** Neutral region shading in the editor, separate from pickable modeling topology. */
+    editingProfileMeshes(): FaceMeshData[] {
+        if (!this.shape.isOk || !this.shape.value.mesh) return [];
+        const profiles = sketchProfiles(this);
+        if (!profiles.isOk) return [];
+        const data = this.data;
+        const hidden = new Set(
+            data.entities
+                .filter((entity) =>
+                    data.layers?.some(
+                        (layer) => layer.id === (entity.layer ?? "0") && layer.visible === false,
+                    ),
+                )
+                .map((entity) => entity.id),
+        );
+        return profiles.value.outer.flatMap((face, index) => {
+            if (profiles.value.outerEntities[index]?.some((id) => hidden.has(id))) return [];
+            const mesh = face.mesh.faces;
+            return mesh ? [{ ...mesh, color: 0xdde1e5, range: [] }] : [];
+        });
     }
 
     private sketchMesh(): IShapeMeshData {
@@ -229,6 +305,7 @@ export class SketchNode extends ParameterShapeNode {
     private buildEdges(data: SketchData): Result<IEdge[]> {
         const edges: IEdge[] = [];
         for (const entity of data.entities) {
+            if (entity.construction) continue;
             const edge = this.entityEdge(entity);
             if (!edge.isOk) return Result.err(edge.error);
             edges.push(edge.value);
@@ -316,7 +393,7 @@ export class SketchNode extends ParameterShapeNode {
 
     /** Follows the referenced face: a source rebuild or a move carries the sketch plane with it. */
     private readonly handlePlaneRefNodeChanged = (property: string) => {
-        if (property !== "shape" && property !== "transform") return;
+        if (!["shape", "transform", "basePlane", "offset"].includes(property)) return;
         this.withoutHistory(() => {
             if (this.followPlaneRef()) {
                 this.setShape(this.generateShape());
@@ -358,7 +435,11 @@ export class SketchNode extends ParameterShapeNode {
     }
 
     private isSamePlane(plane: Plane): boolean {
-        return plane.origin.isEqualTo(this.plane.origin) && plane.normal.isEqualTo(this.plane.normal);
+        return (
+            plane.origin.isEqualTo(this.plane.origin) &&
+            plane.normal.isEqualTo(this.plane.normal) &&
+            plane.xvec.isEqualTo(this.plane.xvec)
+        );
     }
 
     /** Source nodes of the external references being watched, keyed by node id. */
@@ -374,6 +455,8 @@ export class SketchNode extends ParameterShapeNode {
     /** Marks editor-session ownership; set by `SketchEditor` on entry, cleared on dispose. */
     setEditingSession(value: boolean): void {
         this._editingSession = value;
+        this._mesh = undefined;
+        this.emitPropertyChanged("shape", this._shape);
     }
 
     /**

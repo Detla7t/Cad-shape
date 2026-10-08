@@ -135,7 +135,7 @@ describe("get_ribbon tool", () => {
 
         const result = JSON.parse((await getTool("get_ribbon").handler({})) as string);
 
-        expect(result.navigationControls).toEqual({ pan: "Middle", rotate: "Shift+Middle" });
+        expect(result.navigationControls).toEqual({ pan: "Middle", rotate: "Right" });
         // A command the user cannot reach from the ribbon is called out, so the answer for it
         // is not "click the ribbon" — while the ones that do have a button stay out of the list.
         expect(result.commandsWithoutRibbonButton).toContain("modify.thickSolid");

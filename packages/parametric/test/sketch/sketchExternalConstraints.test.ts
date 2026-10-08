@@ -63,6 +63,13 @@ function fakeEditor() {
     return {
         node: { plane: Plane.XY },
         solver,
+        selectedWholeEntityIds: [] as number[],
+        beginConstraintSelection: rs.fn(),
+        endConstraintSelection: rs.fn(),
+        pickPointOrEntity: rs.fn(() => {
+            const ref = pointQueue.shift();
+            return Promise.resolve(ref ? { kind: "point" as const, ref } : undefined);
+        }),
         annotations: { setDimensionPreview: rs.fn(() => {}) },
         solve: rs.fn((_fine: boolean) => {}),
         commit: rs.fn(() => {}),

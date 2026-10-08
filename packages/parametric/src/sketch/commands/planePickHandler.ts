@@ -10,6 +10,7 @@ import {
     MeshGroup,
     Plane,
     type Ray,
+    ReferencePlaneNode,
     ShapeSelectionHandler,
     ShapeTypes,
     type VisualShapeData,
@@ -35,7 +36,10 @@ const DATUM_GAP = 50;
 const DATUM_COLOR = 0x707070;
 const DATUM_HIGHLIGHT_COLOR = 0x4a9eff;
 
-export type PlanePickResult = { kind: "face"; data: VisualShapeData } | { kind: "datum"; plane: Plane };
+export type PlanePickResult =
+    | { kind: "face"; data: VisualShapeData }
+    | { kind: "datum"; plane: Plane }
+    | { kind: "reference"; node: ReferencePlaneNode };
 
 /** Double-sided translucent quad in the plane's positive quadrant, with a gap from the axes. */
 function datumQuad(plane: Plane): FaceMeshData {
@@ -64,6 +68,7 @@ export class PlanePickHandler extends ShapeSelectionHandler {
 
     private readonly _datumMeshIds: number[] = [];
     private _hoveredDatum = -1;
+    private hoveredPlane?: ReferencePlaneNode;
 
     constructor(document: IDocument, controller: AsyncController) {
         super(document, ShapeTypes.face, false, controller, {
@@ -71,6 +76,7 @@ export class PlanePickHandler extends ShapeSelectionHandler {
         });
         this.highlightState = VisualStates.faceHighlight;
         const context = document.visual.context;
+        if (document.modelManager.findNodes().some((n) => n instanceof ReferencePlaneNode)) return;
         for (const plane of DATUM_DISPLAY_PLANES) {
             this._datumMeshIds.push(context.displayMesh([datumQuad(plane)], { meshOpacity: 0.25 }));
         }
@@ -78,14 +84,22 @@ export class PlanePickHandler extends ShapeSelectionHandler {
 
     protected override setHighlight(view: IView, event: PointerEvent): void {
         super.setHighlight(view, event);
-        const hovered = this._highlights?.length
-            ? -1
-            : this.detectDatum(view.rayAt(event.offsetX, event.offsetY));
+        this.hoveredPlane = view
+            .detectVisual(event.offsetX, event.offsetY, {
+                allow: (node) => node instanceof ReferencePlaneNode,
+            })
+            .map((visual) => this.document.visual.context.getNode(visual))
+            .find((node) => node instanceof ReferencePlaneNode) as ReferencePlaneNode | undefined;
+        const hovered =
+            this._highlights?.length || this.hoveredPlane || !this._datumMeshIds.length
+                ? -1
+                : this.detectDatum(view.rayAt(event.offsetX, event.offsetY));
         this.setHoveredDatum(view, hovered);
     }
 
     override pointerOut(view: IView, event: PointerEvent): void {
         super.pointerOut(view, event);
+        this.hoveredPlane = undefined;
         this.setHoveredDatum(view, -1);
     }
 
@@ -113,6 +127,10 @@ export class PlanePickHandler extends ShapeSelectionHandler {
         const face = this._highlights?.[0];
         if (face !== undefined) {
             this.result = { kind: "face", data: face };
+            return 1;
+        }
+        if (this.hoveredPlane) {
+            this.result = { kind: "reference", node: this.hoveredPlane };
             return 1;
         }
         if (this._hoveredDatum >= 0) {

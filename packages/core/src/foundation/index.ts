@@ -19,6 +19,7 @@ export * from "./logger";
 export * from "./messageType";
 export * from "./objectStorage";
 export * from "./observer";
+export * from "./operationLog";
 export * from "./precision";
 export * from "./pubsub";
 export * from "./result";

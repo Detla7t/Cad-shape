@@ -19,11 +19,12 @@
         flex-direction: column;
         min-width: 150px;
         max-width: 85%;
-        background-color: var(--background-color);
+        background-color: var(--panel-background-color);
+        border-right: 1px solid var(--border-color);
         position: relative;
 
         & .sidebarItem {
-            margin-top: 10px;
+            margin-top: 0;
             overflow: hidden;
             flex: 1 1 auto;
             height: 0;
@@ -176,4 +177,32 @@
     .chatResizer {
         display: none;
     }
+}
+
+.content .sidebar > chili-property-view[data-empty="true"] {
+    flex: 0 0 30px;
+    border-top: 1px solid var(--border-color);
+}
+.content .sidebar > chili-property-view[data-empty="true"] > div {
+    display: none;
+}
+
+.utilityRail {
+    flex: 0 0 34px;
+    width: 34px;
+    border-right: 1px solid var(--border-color);
+    background: var(--panel-background-color);
+}
+.utilityRail button {
+    width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    border: 0;
+    background: transparent;
+    color: var(--foreground-color);
+    cursor: pointer;
+}
+.utilityRail button:hover {
+    background: var(--hover-background-color);
 }

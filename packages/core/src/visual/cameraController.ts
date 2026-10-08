@@ -16,7 +16,7 @@ export interface ICameraController extends IPropertyChanged, IDisposable {
     lookAt(eye: XYZLike, target: XYZLike, up: XYZLike): void;
     pan(dx: number, dy: number): void;
     startRotate(x: number, y: number): void;
-    rotate(dx: number, dy: number): void;
+    rotate(dx: number, dy: number, mode?: "trackball" | "turntable"): void;
     zoom(x: number, y: number, delta: number): void;
     updateCameraPosionTarget(): void;
 }

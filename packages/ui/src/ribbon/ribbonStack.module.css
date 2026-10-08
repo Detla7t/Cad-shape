@@ -4,3 +4,8 @@
     justify-content: space-between;
     overflow: hidden;
 }
+
+:global(chili-ribbon[data-compact="true"]) .root {
+    flex-direction: row;
+    height: 30px;
+}

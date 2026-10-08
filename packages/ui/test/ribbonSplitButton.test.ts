@@ -213,7 +213,7 @@ describe("RibbonSplitButton", () => {
 
                 // main area now executes item B
                 mainArea(btn).click();
-                expect(onClickB).toHaveBeenCalledTimes(1);
+                expect(onClickB).toHaveBeenCalledTimes(2);
                 expect(onClickA).not.toHaveBeenCalled();
             } finally {
                 btn.dispose();

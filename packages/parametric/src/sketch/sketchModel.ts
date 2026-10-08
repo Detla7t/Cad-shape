@@ -33,7 +33,23 @@ export interface SketchEntityData {
     id: number;
     type: SketchEntityType;
     params: number[];
+    construction?: boolean;
+    layer?: string;
+    color?: string;
+    /** DXF display style, independent of construction/profile participation. */
+    dashed?: boolean;
 }
+
+export interface SketchLayer {
+    id: string;
+    name: string;
+    color: string;
+    visible?: boolean;
+    locked?: boolean;
+    dashed?: boolean;
+}
+
+export const DEFAULT_SKETCH_LAYER: SketchLayer = { id: "0", name: "0", color: "#4a9eff" };
 
 /**
  * line: pointIndex 0 = start, 1 = end; circle: pointIndex 0 = center;
@@ -173,6 +189,8 @@ export interface ExternalRefData {
 export interface SketchData {
     entities: SketchEntityData[];
     constraints: SketchConstraintData[];
+    layers?: SketchLayer[];
+    activeLayer?: string;
     /** Datum label positions chosen by the user; absent when never placed. */
     anchors?: SketchDimensionAnchor[];
     /** Edges of other nodes usable as constraint targets (and optionally profiles). */
@@ -284,7 +302,10 @@ export function profileExternalRefs(data: SketchData): ExternalRefData[] {
  * the kernel's source edge indexes through this list on the crossing path.
  */
 export function shapeEntityIds(data: SketchData): number[] {
-    return [...data.entities.map((entity) => entity.id), ...profileExternalRefs(data).map((r) => r.entityId)];
+    return [
+        ...data.entities.filter((entity) => !entity.construction).map((entity) => entity.id),
+        ...profileExternalRefs(data).map((r) => r.entityId),
+    ];
 }
 
 /** Point ref of the sketch origin (0, 0). */

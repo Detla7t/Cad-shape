@@ -103,10 +103,10 @@ describe("Navigation3D.navigationKeyMap", () => {
             expect(Navigation3D.navigationKeyMap().pan).toBe("Middle");
         });
 
-        test("should return Shift+Middle for rotate", () => {
+        test("should return Right for rotate", () => {
             Config.instance.init("testNavigation");
             Config.instance.navigation3D = "Chili3d";
-            expect(Navigation3D.navigationKeyMap().rotate).toBe("Shift+Middle");
+            expect(Navigation3D.navigationKeyMap().rotate).toBe("Right");
         });
     });
 

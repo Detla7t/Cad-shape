@@ -7,10 +7,11 @@ import {
     type ICommand,
     type IDocument,
     type Material,
+    OperationLog,
     PubSub,
     type Ribbon,
 } from "@chili3d/core";
-import { div } from "@chili3d/element";
+import { createCadIcon, div } from "@chili3d/element";
 import style from "./editor.module.css";
 import { ElementWorkspace } from "./elements";
 import { FloatPanel } from "./floatPanel";
@@ -21,6 +22,7 @@ import { MaterialDataContent, MaterialEditor } from "./property/material";
 import { showVariablesPanel } from "./property/variables";
 import { RibbonUI } from "./ribbon";
 import { CommandContext } from "./ribbon/commandContext";
+import { StudioSidebar } from "./sidebar/studioSidebar";
 import { Statusbar } from "./statusbar";
 import { VersionsDock } from "./versions";
 import { LayoutViewport } from "./viewport";
@@ -40,7 +42,7 @@ export class Editor extends HTMLElement {
     private chatDock?: HTMLElement;
     private chatPanel?: ChatPanel;
     private floatingChat?: FloatPanel;
-    private _sidebarWidth: number = 360;
+    private _sidebarWidth: number = 240;
     private _chatWidth: number = 320;
     private _isResizingSidebar: boolean = false;
     private _sidebarEl: HTMLDivElement | null = null;
@@ -56,7 +58,6 @@ export class Editor extends HTMLElement {
         viewport.classList.add(style.viewport);
         this._viewportContainer = div({ className: style.viewportContainer }, viewport);
         this.render();
-        this.showChat();
     }
 
     private render() {
@@ -65,6 +66,7 @@ export class Editor extends HTMLElement {
                 className: style.sidebar,
                 style: `width: ${this._sidebarWidth}px;`,
             },
+            new ConfigurationBar(this.app),
             new ProjectView({ className: style.sidebarItem }),
             new PropertyView({ className: style.sidebarItem }),
             div({
@@ -74,17 +76,41 @@ export class Editor extends HTMLElement {
         );
         // The Part Studio's view is the modeling layout as it always was; other elements'
         // views mount beside it in `elementViews`, and the workspace shows one of the two.
-        const partStudio = div({ className: style.partStudio }, this._sidebarEl, this._viewportContainer);
+        const partStudio = div(
+            { className: style.partStudio },
+            this._sidebarEl,
+            this._viewportContainer,
+            new StudioSidebar(this.app),
+        );
         const elementViews = div({ className: style.elementViews });
         this._workspace = new ElementWorkspace(this.app, partStudio, elementViews);
-        this._contentEl = div({ className: style.content }, partStudio, elementViews);
+        const rail = div({ className: style.utilityRail });
+        const history = document.createElement("button");
+        history.title = "Versions and history";
+        history.setAttribute("aria-label", history.title);
+        history.append(createCadIcon("history"));
+        history.onclick = this.versionsDock.toggle;
+        const logs = document.createElement("button");
+        logs.title = "Download diagnostic logs";
+        logs.setAttribute("aria-label", logs.title);
+        logs.append(createCadIcon("inspection"));
+        logs.onclick = () => {
+            const url = URL.createObjectURL(
+                new Blob([OperationLog.export()], { type: "application/x-ndjson" }),
+            );
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "chili3d-diagnostics.ndjson";
+            a.click();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        };
+        rail.append(history, logs);
+        this._contentEl = div({ className: style.content }, rail, partStudio, elementViews);
         this.append(
             div(
                 { className: style.root },
                 new RibbonUI(this.app, this.ribbonContent),
                 this._contentEl,
-                // The active configuration, one click away whichever element is open.
-                new ConfigurationBar(this.app),
                 this._workspace.strip,
                 new Statusbar(style.statusbar),
             ),

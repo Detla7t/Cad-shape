@@ -11,7 +11,13 @@ import {
 import { rs } from "@rstest/core";
 import { SketchEditor } from "../../src/sketch/editor/sketchEditor";
 import type { SketchEventHandler } from "../../src/sketch/editor/sketchEventHandler";
-import { SKETCH_ORIGIN_ID, SKETCH_X_AXIS_ID, SKETCH_Y_AXIS_ID } from "../../src/sketch/sketchModel";
+import {
+    ConstraintKind,
+    originRef,
+    SKETCH_ORIGIN_ID,
+    SKETCH_X_AXIS_ID,
+    SKETCH_Y_AXIS_ID,
+} from "../../src/sketch/sketchModel";
 import { SketchNode } from "../../src/sketch/sketchNode";
 import "./setup";
 
@@ -56,6 +62,139 @@ function pointerEvent(x: number, y: number): PointerEvent {
     return { offsetX: x, offsetY: y, button: 0 } as PointerEvent;
 }
 
+test("plain clicks accumulate and toggle sketch constraint targets; Space clears without exiting", () => {
+    const { doc, view, restoreFactory } = setup();
+    try {
+        const editor = SketchEditor.enter(new SketchNode({ document: doc, plane: Plane.XY }));
+        const line = editor.solver.addLine(40, 20, 140, 20);
+        const circle = editor.solver.addCircle(240, 20, 40);
+        editor.solve(true);
+        const handler = doc.visual.eventHandler as SketchEventHandler;
+        const click = (x: number, y: number) => {
+            handler.pointerDown(view, pointerEvent(x, y));
+            handler.pointerUp(view, pointerEvent(x, y));
+        };
+        click(490, 280);
+        click(680, 280);
+        expect(handler.selectedEntityIds).toEqual([line, circle]);
+        click(490, 280);
+        expect(handler.selectedEntityIds).toEqual([circle]);
+        // The shared mock's point projection uses +Y; curve ray picking uses -Y.
+        expect(handler.hitTestPoint(view, pointerEvent(440, 320))).toEqual({ entityId: line, pointIndex: 0 });
+        click(440, 320);
+        expect(handler.selectedPoints).toEqual([{ entityId: line, pointIndex: 0 }]);
+        click(400, 300);
+        expect(handler.selectedPoints).toEqual([{ entityId: line, pointIndex: 0 }, originRef()]);
+        expect(handler.selectedEntityIds).toEqual([circle]);
+        click(440, 320);
+        expect(handler.selectedPoints).toEqual([originRef()]);
+        handler.keyDown(view, new KeyboardEvent("keydown", { key: " " }));
+        expect(handler.selectedPoints).toEqual([]);
+        expect(handler.selectedEntityIds).toEqual([]);
+        expect(SketchEditor.getActive()).toBe(editor);
+        click(490, 280);
+        click(750, 500);
+        expect(handler.selectedEntityIds).toEqual([]);
+    } finally {
+        SketchEditor.exit();
+        restoreFactory();
+    }
+});
+
+test.each(["line", "arc"] as const)("Alt-drag translates an unsolved %s and Escape restores it", (type) => {
+    const { doc, view, restoreFactory } = setup();
+    try {
+        const node = new SketchNode({ document: doc, plane: Plane.XY });
+        const editor = SketchEditor.enter(node);
+        const id =
+            type === "line"
+                ? editor.solver.addLine(40, 20, 140, 20)
+                : editor.solver.addArc(90, 20, 140, 20, 40, 20);
+        editor.solve(true);
+        const original = [...editor.solver.entity(id)!.params];
+        const handler = doc.visual.eventHandler as SketchEventHandler;
+        // Mid-curve positions stay clear of the point-picking tolerance.
+        const start = type === "line" ? [490, 280] : [490, 230];
+        const event = (x: number, y: number) =>
+            ({ ...pointerEvent(x, y), altKey: true, preventDefault() {} }) as PointerEvent;
+        handler.pointerDown(view, event(start[0], start[1]));
+        handler.pointerMove(view, event(start[0] + 20, start[1] - 30));
+        expect(editor.solver.entity(id)!.params[0]).toBeCloseTo(original[0] + 20);
+        expect(editor.solver.entity(id)!.params[1]).toBeCloseTo(original[1] + 30);
+        handler.keyDown(view, { key: "Escape" } as KeyboardEvent);
+        expect(editor.solver.entity(id)!.params).toEqual(original);
+        handler.pointerDown(view, event(start[0], start[1]));
+        handler.pointerMove(view, event(start[0] + 20, start[1] - 30));
+        handler.pointerUp(view, event(start[0] + 20, start[1] - 30));
+        expect(node.data.entities[0].params[0]).toBeCloseTo(original[0] + 20);
+        expect(node.data.entities[0].params[1]).toBeCloseTo(original[1] + 30);
+        expect(editor.lastSolveOutcome.result).toMatch(/^Ok/);
+        editor.exit();
+    } finally {
+        SketchEditor.exit();
+        restoreFactory();
+    }
+});
+
+test("Alt-drag resizes a circle from its edge and moves it from its center", () => {
+    const { doc, view, restoreFactory } = setup();
+    try {
+        const editor = SketchEditor.enter(new SketchNode({ document: doc, plane: Plane.XY }));
+        const id = editor.solver.addCircle(90, 0, 50);
+        editor.solve(true);
+        const handler = doc.visual.eventHandler as SketchEventHandler;
+        const event = (x: number, y: number) =>
+            ({ ...pointerEvent(x, y), altKey: true, preventDefault() {} }) as PointerEvent;
+        handler.pointerDown(view, event(540, 300));
+        handler.pointerMove(view, event(570, 300));
+        expect(editor.solver.entity(id)!.params).toEqual([90, 0, 80]);
+        handler.keyDown(view, { key: "Escape" } as KeyboardEvent);
+        expect(editor.solver.entity(id)!.params).toEqual([90, 0, 50]);
+        handler.pointerDown(view, event(540, 300));
+        handler.pointerMove(view, event(570, 300));
+        handler.pointerUp(view, event(570, 300));
+        expect(editor.node.data.entities[0].params).toEqual([90, 0, 80]);
+        handler.pointerDown(view, event(490, 300));
+        handler.pointerMove(view, event(510, 270));
+        handler.pointerUp(view, event(510, 270));
+        expect(editor.node.data.entities[0].params).toEqual([110, 30, 80]);
+        expect(editor.solver.toData().constraints).toEqual([]);
+    } finally {
+        SketchEditor.exit();
+        restoreFactory();
+    }
+});
+
+test("Alt-drag leaves solved lines fixed beside movable geometry", () => {
+    const { doc, view, restoreFactory } = setup();
+    try {
+        const node = new SketchNode({ document: doc, plane: Plane.XY });
+        const editor = SketchEditor.enter(node);
+        const fixed = editor.solver.addLine(40, 20, 140, 20);
+        editor.solver.addCircle(250, 100, 30);
+        for (const pointIndex of [0, 1]) {
+            const ref = { entityId: fixed, pointIndex };
+            editor.solver.addConstraint({
+                kind: ConstraintKind.Fix,
+                refs: [ref],
+                datums: editor.solver.pointOf(ref),
+            });
+        }
+        editor.solve(true);
+        const original = editor.solver.entity(fixed)!.params;
+        const handler = doc.visual.eventHandler as SketchEventHandler;
+        handler.pointerDown(view, { ...pointerEvent(490, 280), altKey: true } as PointerEvent);
+        handler.pointerMove(view, pointerEvent(510, 250));
+        handler.pointerUp(view, pointerEvent(510, 250));
+        expect(editor.solver.entity(fixed)!.params).toEqual(original);
+        expect(editor.lastSolveOutcome.dofs).toBe(3);
+        editor.exit();
+    } finally {
+        SketchEditor.exit();
+        restoreFactory();
+    }
+});
+
 describe("SketchEditor picking", () => {
     test("pickPoint resolves with the hit point on pointerDown", async () => {
         const { doc, view, restoreFactory } = setup();
@@ -96,13 +235,14 @@ describe("SketchEditor picking", () => {
         }
     });
 
-    test("Escape without a pick exits the editing session", () => {
+    test("Escape without a pick keeps the sketch open for another tool", () => {
         const { app, doc, view, restoreFactory } = setup();
         try {
             const node = new SketchNode({ document: doc, plane: Plane.XY });
-            SketchEditor.enter(node);
+            const editor = SketchEditor.enter(node);
             (doc.visual.eventHandler as SketchEventHandler).keyDown(view, { key: "Escape" } as KeyboardEvent);
-            expect(SketchEditor.getActive()).toBeUndefined();
+            expect(SketchEditor.getActive()).toBe(editor);
+            editor.exit();
         } finally {
             restoreFactory();
         }
@@ -188,6 +328,8 @@ describe("SketchEditor picking", () => {
             displayMesh.mockClear();
             editor.solver.addLine(0, 0, 10, 0);
             editor.solve(true);
+            displayMesh.mockClear();
+            removeMesh.mockClear();
 
             const promise = editor.pickEntity("prompt.pickSketchEntity", "line");
             const handler = doc.visual.eventHandler as SketchEventHandler;
@@ -223,6 +365,8 @@ describe("SketchEditor picking", () => {
             displayMesh.mockClear();
             editor.solver.addLine(0, 0, 10, 0);
             editor.solve(true);
+            displayMesh.mockClear();
+            removeMesh.mockClear();
 
             const promise = editor.pickEntity("prompt.pickSketchEntity", "line");
             const handler = doc.visual.eventHandler as SketchEventHandler;
@@ -250,6 +394,7 @@ describe("SketchEditor picking", () => {
             displayMesh.mockClear();
             editor.solver.addLine(0, 0, 10, 0);
             editor.solve(true);
+            displayMesh.mockClear();
 
             expect(editor.isPicking).toBe(false);
             (doc.visual.eventHandler as SketchEventHandler).pointerMove(view, pointerEvent(405, 300));
@@ -337,8 +482,8 @@ describe("datum picking (origin and axes)", () => {
             handler.pointerMove(view, pointerEvent(500, 350));
             handler.pointerUp(view, pointerEvent(500, 350));
 
-            // no drag preview was created and the sketch is still empty
-            expect(displayMesh).not.toHaveBeenCalled();
+            // The origin can be selected for constraints, but never dragged.
+            expect(handler.selectedPoints).toEqual([{ entityId: -1, pointIndex: 0 }]);
             expect(editor.solver.entities()).toEqual([]);
             editor.exit();
         } finally {
@@ -370,4 +515,51 @@ describe("arc entity hit testing", () => {
             restoreFactory();
         }
     });
+});
+
+test("Coincident can pick the origin beneath a previously picked endpoint", async () => {
+    const { doc, view, restoreFactory } = setup();
+    try {
+        const editor = SketchEditor.enter(new SketchNode({ document: doc, plane: Plane.XY }));
+        const id = editor.solver.addLine(0, 0, 40, 60);
+        editor.solve(true);
+        const selected = { kind: "point" as const, ref: { entityId: id, pointIndex: 0 } };
+        const pick = editor.pickPointOrEntity("prompt.pickSketchPointOrEntity", undefined, selected);
+        const handler = doc.visual.eventHandler as SketchEventHandler;
+        handler.pointerDown(view, pointerEvent(400, 300));
+        await expect(pick).resolves.toEqual({ kind: "point", ref: originRef() });
+        editor.exit();
+    } finally {
+        SketchEditor.exit();
+        restoreFactory();
+    }
+});
+
+test("Alt-drag preserves a vertical line's origin attachment without adding snap constraints", () => {
+    const { doc, view, restoreFactory } = setup();
+    view.worldToScreen = (p) => ({ x: p.x + 400, y: 300 - p.y }) as never;
+    try {
+        const editor = SketchEditor.enter(new SketchNode({ document: doc, plane: Plane.XY }));
+        const id = editor.solver.addLine(0, 0, 0, 150);
+        const ref = { entityId: id, pointIndex: 0 };
+        editor.solver.addConstraint({ kind: ConstraintKind.P2PCoincident, refs: [ref, originRef()] });
+        editor.solver.addConstraint({
+            kind: ConstraintKind.VerticalAlign,
+            refs: [ref, { entityId: id, pointIndex: 1 }],
+        });
+        editor.solve(true);
+        const handler = doc.visual.eventHandler as SketchEventHandler;
+        handler.pointerDown(view, { ...pointerEvent(400, 150), altKey: true } as PointerEvent);
+        handler.pointerMove(view, pointerEvent(430, 110));
+        handler.pointerUp(view, pointerEvent(430, 110));
+        const line = editor.solver.entity(id)!.params;
+        expect(line.slice(0, 3)).toEqual([0, 0, 0]);
+        expect(line[3]).toBeCloseTo(190);
+        expect(editor.lastSolveOutcome.dofs).toBe(1);
+        expect(editor.solver.toData().constraints).toHaveLength(2);
+        editor.exit();
+    } finally {
+        SketchEditor.exit();
+        restoreFactory();
+    }
 });

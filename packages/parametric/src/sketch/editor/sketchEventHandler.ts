@@ -3,6 +3,10 @@
 
 import {
     type AsyncController,
+    type CommandKeys,
+    Config,
+    DefaultDarkEdgeColor,
+    debounce,
     type EdgeMeshData,
     type IDisposable,
     type IEventHandler,
@@ -19,6 +23,7 @@ import {
     snapConstraintKind,
     snapTargetEntityId,
 } from "../autoConstraints";
+import { entityDisplayMesh } from "../entityMesh";
 import {
     arcAngles,
     ConstraintKind,
@@ -29,6 +34,7 @@ import {
     SKETCH_EDGE_LINE_WIDTH,
     SKETCH_X_AXIS_ID,
     SKETCH_Y_AXIS_ID,
+    type SketchData,
     type SketchEntityData,
     type SketchEntityType,
     type SketchPointRef,
@@ -39,10 +45,10 @@ import {
 import { constraintTargetEntities } from "../solverEntities";
 import { applyConstraintIcon, type BadgeSymbol, badgeSymbol, isBadgeEventTarget } from "./sketchAnnotations";
 import style from "./sketchAnnotations.module.css";
-import type { SketchEditor, SketchEntityTypeFilter } from "./sketchEditor";
+import type { SketchEditor, SketchEntityTypeFilter, SketchPickTarget } from "./sketchEditor";
 
 const PICK_TOLERANCE_PX = 8;
-const CIRCLE_SEGMENTS = 64;
+const CIRCLE_SEGMENTS = 256;
 const DATUM_X_AXIS_COLOR = 0xcc5555;
 const DATUM_Y_AXIS_COLOR = 0x55aa55;
 /** External references (edges of another part): SolidWorks-style purple. */
@@ -51,8 +57,6 @@ const EXTERNAL_REF_COLOR = 0x9b59b6;
 const EXTERNAL_DANGLING_COLOR = 0xdd4444;
 /** Live-snap target accent — distinct from the green hover/selection and blue dimensions. */
 const SNAP_HIGHLIGHT_COLOR = 0xff9800;
-/** Entity point markers (endpoints, centers) — a neutral grey against either theme's background. */
-const ENTITY_POINT_COLOR = 0x8c9aa8;
 
 /**
  * Viewport event handler active while a sketch is being edited:
@@ -63,7 +67,42 @@ const ENTITY_POINT_COLOR = 0x8c9aa8;
 export class SketchEventHandler implements IEventHandler {
     isEnabled: boolean = true;
 
+    resolveCommand(command: CommandKeys): CommandKeys {
+        const aliases: Partial<Record<CommandKeys, CommandKeys>> = {
+            "create.line": "sketch.line",
+            "create.rect": "sketch.rectangle",
+            "create.circle": "sketch.circle",
+            "create.arc": "sketch.arc",
+            "measure.length": "dimension.distance",
+        };
+        return aliases[command] ?? command;
+    }
+
     private draggingRef?: SketchPointRef;
+    private dragStart?: [number, number];
+    private dragMoved = false;
+    private dragWithoutSnapping = false;
+    private readonly pointSelection = new Map<string, SketchPointRef>();
+    private geometryDisplayId?: number;
+    private profileDisplayId?: number;
+    private profileSignature?: string;
+    private disposed = false;
+    private readonly onCameraChanged = debounce(() => {
+        if (!this.disposed && !this.draggingRef && !this.entityDrag) {
+            this.refreshGeometryOverlays();
+            this.editor.annotations.refresh();
+        }
+    }, 30);
+    private entityDrag?: { id: number; start: [number, number]; params: number[]; radius?: boolean };
+    private dragSnapshot?: SketchData;
+    private selectionGlowId?: number;
+
+    get selectedEntityIds(): number[] {
+        return [...this.selectedEntities];
+    }
+    get selectedPoints(): SketchPointRef[] {
+        return [...this.pointSelection.values()];
+    }
     private dragPreviewId?: number;
     private hoverMeshId?: number;
     private hoverKey?: string;
@@ -80,6 +119,8 @@ export class SketchEventHandler implements IEventHandler {
     // ------------------------------------------------------------------ Session setup and the datum / external display
 
     constructor(private readonly editor: SketchEditor) {
+        editor.view.cameraController.onPropertyChanged?.(this.onCameraChanged);
+        VisualConfig.onPropertyChanged(this.onCameraChanged);
         this.showDatum();
         this.showExternalRefs();
         this.showEntityPoints();
@@ -119,7 +160,7 @@ export class SketchEventHandler implements IEventHandler {
                     DATUM_X_AXIS_COLOR,
                 ),
             ],
-            { onTop: true },
+            { onTop: true, lineOpacity: 0.25 },
         );
     }
 
@@ -151,12 +192,31 @@ export class SketchEventHandler implements IEventHandler {
     refreshGeometryOverlays(): void {
         const view = this.editor.document.application.activeView;
         if (view !== undefined) {
-            for (const id of [this.externalDisplayId, this.pointDisplayId]) {
+            for (const id of [this.externalDisplayId, this.pointDisplayId, this.geometryDisplayId]) {
                 if (id !== undefined) view.document.visual.context.removeMesh(id);
             }
         }
         this.externalDisplayId = undefined;
         this.pointDisplayId = undefined;
+        this.geometryDisplayId = undefined;
+        if (view) {
+            const profileSignature = `${VisualConfig.defaultEdgeColor}:${this.editor.node.dataJson}`;
+            if (this.profileSignature !== profileSignature) {
+                this.profileSignature = profileSignature;
+                if (this.profileDisplayId !== undefined)
+                    view.document.visual.context.removeMesh(this.profileDisplayId);
+                this.profileDisplayId = undefined;
+                const profiles = view.dom ? this.editor.node.editingProfileMeshes() : [];
+                if (profiles.length)
+                    this.profileDisplayId = view.document.visual.context.displayMesh(profiles, {
+                        meshOpacity: VisualConfig.defaultEdgeColor === DefaultDarkEdgeColor ? 0.32 : 0.8,
+                    });
+            }
+            const meshes = styledEntityMeshes(this.editor);
+            if (meshes.length)
+                this.geometryDisplayId = view.document.visual.context.displayMesh(meshes, { onTop: true });
+            this.updateSelectionHighlight(view);
+        }
         this.showExternalRefs();
         this.showEntityPoints();
         view?.update();
@@ -212,7 +272,7 @@ export class SketchEventHandler implements IEventHandler {
         return point === undefined ? undefined : toUV(this.editor.node.plane, point);
     }
 
-    hitTestPoint(view: IView, event: PointerEvent): SketchPointRef | undefined {
+    hitTestPoint(view: IView, event: PointerEvent, exclude?: SketchPickTarget): SketchPointRef | undefined {
         const solver = this.editor.solver;
         const plane = this.editor.node.plane;
         let best: SketchPointRef | undefined;
@@ -220,6 +280,13 @@ export class SketchEventHandler implements IEventHandler {
         for (const entity of this.pickableEntities()) {
             const pointCount = entityPointCount(entity.type);
             for (let pointIndex = 0; pointIndex < pointCount; pointIndex++) {
+                if (exclude?.kind === "entity" && exclude.entityId === entity.id) continue;
+                if (
+                    exclude?.kind === "point" &&
+                    exclude.ref.entityId === entity.id &&
+                    exclude.ref.pointIndex === pointIndex
+                )
+                    continue;
                 const [u, v] = solver.pointOf({ entityId: entity.id, pointIndex });
                 const screen = view.worldToScreen(toWorld(plane, u, v));
                 const distance = Math.hypot(screen.x - event.offsetX, screen.y - event.offsetY);
@@ -232,7 +299,10 @@ export class SketchEventHandler implements IEventHandler {
         // the origin is always a pickable datum point; real points win ties
         const originScreen = view.worldToScreen(toWorld(plane, 0, 0));
         const originDistance = Math.hypot(originScreen.x - event.offsetX, originScreen.y - event.offsetY);
-        if (originDistance < bestDistance) {
+        if (
+            originDistance < bestDistance &&
+            !(exclude?.kind === "point" && exclude.ref.entityId === originRef().entityId)
+        ) {
             best = originRef();
         }
         return best;
@@ -240,7 +310,9 @@ export class SketchEventHandler implements IEventHandler {
 
     /** Real entities plus the seeded external references (constraint targets). */
     private pickableEntities(): SketchEntityData[] {
-        return constraintTargetEntities(this.editor.solver);
+        return constraintTargetEntities(this.editor.solver).filter((entity) =>
+            this.editor.solver.entityVisible(entity),
+        );
     }
 
     hitTestEntity(
@@ -287,14 +359,52 @@ export class SketchEventHandler implements IEventHandler {
         // events over an annotation badge carry badge-relative offsets; ignoring
         // them keeps the hover alive instead of clearing it with garbage uv
         if (isBadgeEventTarget(event.target)) return;
+        if (this.entityDrag) {
+            const uv = this.pointerToUV(view, event);
+            if (
+                !uv ||
+                (this.dragStart &&
+                    Math.hypot(event.offsetX - this.dragStart[0], event.offsetY - this.dragStart[1]) < 3)
+            )
+                return;
+            this.dragMoved = true;
+            const drag = this.entityDrag;
+            if (drag.radius) {
+                const distance = (p: [number, number]) =>
+                    Math.hypot(p[0] - drag.params[0], p[1] - drag.params[1]);
+                this.editor.solver.dragCircleRadiusTo(
+                    drag.id,
+                    Math.max(1e-6, drag.params[2] + distance(uv) - distance(drag.start)),
+                );
+            } else {
+                this.editor.solver.dragEntityTo(
+                    drag.id,
+                    drag.params,
+                    uv[0] - drag.start[0],
+                    uv[1] - drag.start[1],
+                );
+            }
+            this.updateDragPreview(view);
+            this.editor.annotations.refresh();
+            return;
+        }
         if (this.draggingRef !== undefined) {
+            if (
+                !this.dragMoved &&
+                this.dragStart &&
+                Math.hypot(event.offsetX - this.dragStart[0], event.offsetY - this.dragStart[1]) < 3
+            )
+                return;
+            this.dragMoved = true;
             const uv = this.pointerToUV(view, event);
             if (uv !== undefined) {
                 const tolerance = this.editor.screenTolerance();
-                const { position, snap } = dragSnapPosition(this.editor.solver, this.draggingRef, uv, {
-                    pointTolerance: tolerance,
-                    lineTolerance: tolerance,
-                });
+                const { position, snap } = this.dragWithoutSnapping
+                    ? { position: uv, snap: undefined }
+                    : dragSnapPosition(this.editor.solver, this.draggingRef, uv, {
+                          pointTolerance: tolerance,
+                          lineTolerance: tolerance,
+                      });
                 this.editor.solver.dragTo(this.draggingRef, position[0], position[1]);
                 this.updateDragPreview(view);
                 this.showSnapFeedback(view, snap);
@@ -323,10 +433,55 @@ export class SketchEventHandler implements IEventHandler {
         const ref = this.hitTestPoint(view, event);
         // the datum origin and external references are pickable for constraints but never draggable
         if (ref !== undefined && !isDatumEntityId(ref.entityId) && !isExternalEntityId(ref.entityId)) {
+            if (this.editor.solver.entityLocked(this.editor.solver.entity(ref.entityId)!)) return;
+            if (this.editor.fullyConstrainedEntities.has(ref.entityId)) {
+                this.selectPoint(view, ref);
+                return;
+            }
+            this.dragStart = [event.offsetX, event.offsetY];
+            this.dragMoved = false;
+            this.dragWithoutSnapping = event.altKey;
             this.beginPointDrag(view, ref);
             return;
         }
 
+        if (ref) {
+            this.selectPoint(view, ref);
+            return;
+        }
+        if (event.altKey) {
+            const id = this.hitTestEntity(view, event);
+            const entity = id === undefined ? undefined : this.editor.solver.entity(id);
+            const start = this.pointerToUV(view, event);
+            if (
+                entity &&
+                start &&
+                !isDatumEntityId(entity.id) &&
+                !isExternalEntityId(entity.id) &&
+                !this.editor.solver.entityLocked(entity) &&
+                !this.editor.fullyConstrainedEntities.has(entity.id)
+            ) {
+                event.preventDefault();
+                this.dragSnapshot = this.editor.solver.toData();
+                this.entityDrag = {
+                    id: entity.id,
+                    start,
+                    params: [...entity.params],
+                    radius: entity.type === "circle",
+                };
+                this.dragStart = [event.offsetX, event.offsetY];
+                this.dragMoved = false;
+                this.clearHover(view);
+                this.clearPersistentDragGeometry(view);
+                this.editor.solver.beginDrag(
+                    Array.from({ length: entityPointCount(entity.type) }, (_, pointIndex) => ({
+                        entityId: entity.id,
+                        pointIndex,
+                    })),
+                );
+                return;
+            }
+        }
         this.selectEntityAtPointer(view, event);
     }
 
@@ -351,15 +506,16 @@ export class SketchEventHandler implements IEventHandler {
             this.clearSelection(view);
             return;
         }
-        this.selectEntity(view, entityId, event.shiftKey);
+        this.selectEntity(view, entityId);
     }
 
     private beginPointDrag(view: IView, ref: SketchPointRef): void {
+        this.dragSnapshot = this.editor.solver.toData();
         this.draggingRef = ref;
         this.clearHover(view);
         // the drag preview carries the markers while dragging; the persistent ones
         // would otherwise sit at the pre-drag positions
-        this.clearEntityPoints(view);
+        this.clearPersistentDragGeometry(view);
         const group = this.editor.solver.coincidentGroup(ref);
         this.editor.solver.beginDrag(group);
         // keep the dragged entities' constraint symbols visible during the drag
@@ -368,38 +524,92 @@ export class SketchEventHandler implements IEventHandler {
         );
     }
 
-    private selectEntity(view: IView, entityId: number, additive: boolean): void {
-        if (additive) {
-            if (!this.selectedEntities.delete(entityId)) {
-                this.selectedEntities.add(entityId);
-            }
-        } else {
-            this.selectedEntities.clear();
+    /** Ordinary clicks accumulate constraint targets; clicking a target again removes it. */
+    private selectPoint(view: IView, ref: SketchPointRef): void {
+        const key = `${ref.entityId}:${ref.pointIndex}`;
+        if (!this.pointSelection.delete(key)) this.pointSelection.set(key, ref);
+        this.updateSelectionHighlight(view);
+    }
+
+    private selectEntity(view: IView, entityId: number, toggle = true): void {
+        if (!toggle || !this.selectedEntities.delete(entityId)) {
             this.selectedEntities.add(entityId);
         }
         this.updateSelectionHighlight(view);
     }
 
-    pointerUp(view: IView, _event: PointerEvent): void {
+    pointerUp(view: IView, event: PointerEvent): void {
+        if (this.entityDrag) {
+            const id = this.entityDrag.id;
+            this.entityDrag = undefined;
+            this.clearDragPreview(view);
+            const result = this.editor.solver.endDrag();
+            if (!result.result.startsWith("Ok") && this.dragSnapshot)
+                this.editor.solver.reset(this.dragSnapshot);
+            this.dragSnapshot = undefined;
+            this.selectEntity(view, id, !this.dragMoved);
+            this.editor.solve(true);
+            if (this.dragMoved) this.editor.commit();
+            return;
+        }
         if (this.draggingRef === undefined) return;
         const ref = this.draggingRef;
         this.draggingRef = undefined;
         this.clearDragPreview(view);
         this.clearSnapFeedback();
         this.editor.solver.endDrag();
+        if (!this.dragMoved) {
+            this.dragSnapshot = undefined;
+            this.selectPoint(view, ref);
+            this.refreshGeometryOverlays();
+            return;
+        }
         // the drag is over: add an auto-constraint now, only if the point still
         // satisfies a snap condition
         const tolerance = this.editor.screenTolerance();
-        applyDragAutoConstraints(this.editor.solver, ref, {
-            pointTolerance: tolerance,
-            lineTolerance: tolerance,
-        });
+        if (!this.dragWithoutSnapping) {
+            applyDragAutoConstraints(this.editor.solver, ref, {
+                pointTolerance: tolerance,
+                lineTolerance: tolerance,
+            });
+        }
         this.syncAnnotationHighlights();
+        const result = this.editor.solve(true);
+        if (!result.result.startsWith("Ok") && this.dragSnapshot) {
+            this.editor.solver.reset(this.dragSnapshot);
+            this.editor.solve(true);
+        }
+        this.dragSnapshot = undefined;
         this.editor.commit();
-        this.editor.solve(true);
     }
 
     keyDown(view: IView, event: KeyboardEvent): void {
+        const key = event.key.toLowerCase();
+        const shortcutCommand =
+            key === "q" ? "sketch.construction" : key === "n" ? "sketch.normal" : undefined;
+        const overrides = Config.instance.customShortcuts;
+        if (
+            shortcutCommand &&
+            overrides[shortcutCommand] === undefined &&
+            !Object.values(overrides).includes(key) &&
+            !event.ctrlKey &&
+            !event.metaKey &&
+            !event.altKey &&
+            !event.shiftKey
+        ) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            if (event.key.toLowerCase() === "q") this.editor.toggleConstruction();
+            else this.editor.normalView();
+            return;
+        }
+        if (event.key === " " && !this.editor.isPicking && !this.draggingRef && !this.entityDrag) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            this.editor.annotations.clearConstraintSelection();
+            this.clearSelection(view);
+            return;
+        }
         if (event.key === "Escape") {
             this.handleEscape(view);
             return;
@@ -410,17 +620,25 @@ export class SketchEventHandler implements IEventHandler {
 
     /** Escape peels off one layer at a time: label placement, pick, constraint selection, entity selection, session. */
     private handleEscape(view: IView): void {
-        if (this.editor.annotations.isLabelDragging) {
+        if (this.draggingRef || this.entityDrag) {
+            this.draggingRef = undefined;
+            this.entityDrag = undefined;
+            this.clearDragPreview(view);
+            this.clearSnapFeedback();
+            this.editor.solver.endDrag();
+            if (this.dragSnapshot) this.editor.solver.reset(this.dragSnapshot);
+            this.dragSnapshot = undefined;
+            this.editor.solve(true);
+        } else if (this.editor.annotations.isLabelDragging) {
             this.editor.annotations.cancelLabelDrag();
         } else if (this.editor.isPicking) {
             this.editor.cancelPick();
         } else if (this.editor.annotations.selectedConstraintIds.length > 0) {
             this.editor.annotations.clearConstraintSelection();
-        } else if (this.selectedEntities.size > 0) {
+        } else if (this.selectedEntities.size > 0 || this.pointSelection.size > 0) {
             this.clearSelection(view);
-        } else {
-            this.editor.exit();
         }
+        // Escape ends tools and selection; only the explicit accept/cancel controls leave the sketch.
     }
 
     private handleDelete(view: IView, event: KeyboardEvent): void {
@@ -428,7 +646,7 @@ export class SketchEventHandler implements IEventHandler {
         // whose node-selection step can delete the very sketch node being edited,
         // leaving the editor drawing into an invisible orphan
         event.stopImmediatePropagation();
-        if (this.editor.isPicking || this.draggingRef !== undefined) return;
+        if (this.editor.isPicking || this.draggingRef !== undefined || this.entityDrag !== undefined) return;
         // a label being placed follows the cursor — it is the delete target
         const draggingLabel = this.editor.annotations.draggingLabelId;
         if (draggingLabel !== undefined) {
@@ -506,6 +724,9 @@ export class SketchEventHandler implements IEventHandler {
     }
 
     dispose(): void {
+        this.disposed = true;
+        this.editor.view.cameraController.removePropertyChanged?.(this.onCameraChanged);
+        VisualConfig.removePropertyChanged(this.onCameraChanged);
         const view = this.editor.view;
         this.clearSnapFeedback();
         if (!view.isClosed) {
@@ -522,7 +743,12 @@ export class SketchEventHandler implements IEventHandler {
                 this.externalDisplayId = undefined;
             }
             this.clearEntityPoints(view);
+            if (this.profileDisplayId !== undefined)
+                view.document.visual.context.removeMesh(this.profileDisplayId);
+            if (this.geometryDisplayId !== undefined)
+                view.document.visual.context.removeMesh(this.geometryDisplayId);
         }
+        this.pointSelection.clear();
         this.selectedEntities.clear();
         this.draggingRef = undefined;
     }
@@ -553,7 +779,7 @@ export class SketchEventHandler implements IEventHandler {
     private computeHoverTarget(view: IView, event: PointerEvent): { key?: string; mesh?: ShapeMeshData } {
         const pick = this.editor.activePick;
 
-        if (pick === undefined || pick.kind === "point") {
+        if (pick === undefined || pick.kind === "point" || pick.kind === "pointOrEntity") {
             const ref = this.hitTestPoint(view, event);
             if (ref !== undefined) {
                 const [u, v] = this.editor.solver.pointOf(ref);
@@ -568,7 +794,7 @@ export class SketchEventHandler implements IEventHandler {
             }
         }
 
-        if (pick === undefined || pick.kind === "entity") {
+        if (pick === undefined || pick.kind === "entity" || pick.kind === "pointOrEntity") {
             const entityId = this.hitTestEntity(view, event, pick?.entityType, pick?.datum ?? false);
             if (entityId !== undefined && isDatumEntityId(entityId)) {
                 return {
@@ -609,7 +835,7 @@ export class SketchEventHandler implements IEventHandler {
 
     /** Constraint symbols show for the union of hovered and selected entities. */
     private syncAnnotationHighlights(): void {
-        const ids = new Set(this.selectedEntities);
+        const ids = new Set([...this.selectedEntities, ...this.selectedPoints.map((ref) => ref.entityId)]);
         const hovered = this.hoveredEntityId();
         if (hovered !== undefined) ids.add(hovered);
         this.editor.annotations.setHighlightedEntities(ids);
@@ -617,28 +843,58 @@ export class SketchEventHandler implements IEventHandler {
 
     private updateSelectionHighlight(view: IView): void {
         this.clearSelectionHighlight(view);
-        if (this.selectedEntities.size === 0) {
+        this.editor.refreshPanel();
+        if (this.selectedEntities.size === 0 && this.pointSelection.size === 0) {
             this.syncAnnotationHighlights();
             return;
         }
         const meshes = [...this.selectedEntities]
             .map((id) => this.editor.solver.entity(id))
-            .filter((entity) => entity !== undefined)
+            .filter(
+                (entity): entity is SketchEntityData =>
+                    entity !== undefined && this.editor.solver.entityVisible(entity),
+            )
             .map((entity) => sketchEntityMesh(this.editor, entity, VisualConfig.selectedEdgeColor));
-        this.selectionMeshId = view.document.visual.context.displayMesh(meshes, { onTop: true });
+        if (meshes.length)
+            this.selectionGlowId = view.document.visual.context.displayMesh(
+                meshes.map((mesh) => ({ ...mesh, lineWidth: 8 })),
+                { onTop: true, lineOpacity: 0.22 },
+            );
+        const points = this.selectedPoints
+            .filter(
+                (ref) =>
+                    this.editor.solver.entity(ref.entityId) !== undefined || isDatumEntityId(ref.entityId),
+            )
+            .map((ref) => {
+                const [u, v] = this.editor.solver.pointOf(ref);
+                return MeshDataUtils.createVertexMesh(
+                    toWorld(this.editor.node.plane, u, v),
+                    9,
+                    VisualConfig.selectedEdgeColor,
+                );
+            });
+        this.selectionMeshId = view.document.visual.context.displayMesh([...meshes, ...points], {
+            onTop: true,
+        });
         this.syncAnnotationHighlights();
         view.update();
     }
 
     private clearSelection(view: IView): void {
-        if (this.selectedEntities.size === 0) return;
+        if (this.selectedEntities.size === 0 && this.pointSelection.size === 0) return;
+        this.pointSelection.clear();
         this.selectedEntities.clear();
+        this.editor.refreshPanel();
         this.clearSelectionHighlight(view);
         this.syncAnnotationHighlights();
         view.update();
     }
 
     private clearSelectionHighlight(view: IView): void {
+        if (this.selectionGlowId !== undefined) {
+            view.document.visual.context.removeMesh(this.selectionGlowId);
+            this.selectionGlowId = undefined;
+        }
         if (this.selectionMeshId !== undefined) {
             view.document.visual.context.removeMesh(this.selectionMeshId);
             this.selectionMeshId = undefined;
@@ -665,9 +921,20 @@ export class SketchEventHandler implements IEventHandler {
         // the markers ride along with the dragged geometry; the persistent overlay
         // was dropped when the drag began, and comes back on the commit that ends it
         this.dragPreviewId = view.document.visual.context.displayMesh(
-            [...sketchEntityMeshes(this.editor), ...entityPointMeshes(this.editor)],
+            [...styledEntityMeshes(this.editor), ...entityPointMeshes(this.editor)],
             { onTop: true },
         );
+    }
+
+    private clearPersistentDragGeometry(view: IView): void {
+        this.clearEntityPoints(view);
+        for (const id of [this.geometryDisplayId, this.profileDisplayId]) {
+            if (id !== undefined) view.document.visual.context.removeMesh(id);
+        }
+        this.geometryDisplayId = undefined;
+        this.profileDisplayId = undefined;
+        this.profileSignature = undefined;
+        this.clearSelectionHighlight(view);
     }
 
     private clearDragPreview(view: IView): void {
@@ -735,22 +1002,55 @@ export class SketchEventHandler implements IEventHandler {
     }
 }
 
+function entityColor(editor: SketchEditor, entity: SketchEntityData): number {
+    if (!editor.lastSolveOutcome.result.startsWith("Ok") || editor.solver.datumErrors.size > 0)
+        return 0xee6262;
+    if (editor.lastSolveOutcome.dofs === 0 || editor.fullyConstrainedEntities.has(entity.id))
+        return VisualConfig.defaultEdgeColor;
+    const layer = editor.solver.sketchLayers().find((layer) => layer.id === (entity.layer ?? "0"));
+    return Number.parseInt((entity.color ?? layer?.color ?? "#4a9eff").slice(1), 16);
+}
+
+function styledEntityMeshes(editor: SketchEditor): ShapeMeshData[] {
+    const pixel =
+        worldPerPixel(editor.view, editor.node.plane, editor.view.width / 2, editor.view.height / 2) ?? 0.1;
+    const layers = editor.solver.sketchLayers();
+    return editor.solver
+        .entities()
+        .filter((entity) => editor.solver.entityVisible(entity))
+        .map((entity) => {
+            const layer = layers.find((layer) => layer.id === (entity.layer ?? "0"));
+            return entityDisplayMesh(
+                editor.node.plane,
+                entity,
+                entityColor(editor, entity),
+                !!(entity.construction || entity.dashed || layer?.dashed),
+                pixel,
+            );
+        });
+}
+
 export function sketchEntityMeshes(editor: SketchEditor): ShapeMeshData[] {
-    return editor.solver.entities().map((entity) => sketchEntityMesh(editor, entity));
+    return editor.solver
+        .entities()
+        .filter((entity) => editor.solver.entityVisible(entity))
+        .map((entity) => sketchEntityMesh(editor, entity));
 }
 
 /** Vertex meshes at every entity point of the constraint targets — see `showEntityPoints`. */
 function entityPointMeshes(editor: SketchEditor): ShapeMeshData[] {
     const plane = editor.node.plane;
     const meshes: ShapeMeshData[] = [];
-    for (const entity of constraintTargetEntities(editor.solver)) {
+    for (const entity of constraintTargetEntities(editor.solver).filter((entity) =>
+        editor.solver.entityVisible(entity),
+    )) {
         for (let pointIndex = 0; pointIndex < entityPointCount(entity.type); pointIndex++) {
             const [u, v] = editor.solver.pointOf({ entityId: entity.id, pointIndex });
             meshes.push(
                 MeshDataUtils.createVertexMesh(
                     toWorld(plane, u, v),
                     VisualConfig.editVertexSize,
-                    ENTITY_POINT_COLOR,
+                    entityColor(editor, entity),
                 ),
             );
         }
@@ -762,7 +1062,7 @@ export function sketchEntityMesh(
     editor: SketchEditor,
     entity: SketchEntityData,
     color: number = VisualConfig.highlightEdgeColor,
-    lineType: "solid" | "dash" = "solid",
+    lineType: "solid" | "dash" = entity.construction || entity.dashed ? "dash" : "solid",
 ): EdgeMeshData {
     const plane = editor.node.plane;
     const [x1, y1, x2, y2] = entity.params;
@@ -776,6 +1076,9 @@ export function sketchEntityMesh(
         mesh = arcSegmentMesh(editor, x1, y1, entity.params[2], 0, Math.PI * 2, color, lineType);
     }
     mesh.lineWidth = SKETCH_EDGE_LINE_WIDTH;
+    const pixel = worldPerPixel(editor.view, plane, editor.view.width / 2, editor.view.height / 2) ?? 0.1;
+    mesh.dashSize = pixel * 7;
+    mesh.gapSize = pixel * 4;
     return mesh;
 }
 

@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    DocumentPanels,
     type FeatureParameter,
     I18n,
     type IDocument,
@@ -36,6 +37,7 @@ const open = new WeakSet<IDocument>();
 const storedValues = new WeakMap<IDocument, Map<string, Record<string, FeatureScriptParameterValue>>>();
 
 export function showTablesPanel(document: IDocument): void {
+    if (DocumentPanels.open("tables", document)) return;
     if (open.has(document)) return;
     open.add(document);
     const panel = new TablesPanel(document);
@@ -313,3 +315,13 @@ export class TablesPanel {
         if (property === "variablesJson") this.schedule();
     };
 }
+
+DocumentPanels.register({
+    id: "tables",
+    title: "featurescript.tables.title",
+    icon: "tables",
+    create(document) {
+        const panel = new TablesPanel(document);
+        return { element: panel.root, dispose: () => panel.dispose() };
+    },
+});

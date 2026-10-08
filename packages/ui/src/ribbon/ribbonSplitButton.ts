@@ -30,6 +30,7 @@ export class RibbonSplitButton extends HTMLElement {
 
         const isLarge = this.size === "large";
         this.className = isLarge ? style.split : style.splitSmall;
+        this.dataset["command"] = getItemData(this.data.items[0]).command;
 
         const { icon: iconName, display } = getItemData(this.data.items[0]);
 
@@ -107,6 +108,7 @@ export class RibbonSplitButton extends HTMLElement {
         if (!item) return;
 
         const { icon: iconName, display } = getItemData(item);
+        this.dataset["command"] = getItemData(item).command;
 
         if (this.#iconEl) {
             const newIcon = createIcon(iconName);

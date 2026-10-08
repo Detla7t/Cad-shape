@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import { I18n, type ParameterValue, PubSub, Result } from "@chili3d/core";
+import style from "./datumPrompt.module.css";
 
 /**
  * The datum value dialogs: a single box (`promptDatum`) and the X/Y pair
@@ -37,37 +38,80 @@ export function parseDatumInput(text: string): ParameterValue {
 export function promptDatum(
     initial: ParameterValue,
     apply: (value: ParameterValue) => void,
-    onApplied: () => void,
+    onApplied: () => Result<void> | void,
     onCancel?: () => void,
     options?: {
         positiveOnly?: boolean;
+        inlineAt?: { x: number; y: number };
         /** Resolves an input to its display value — supplied by the editor, error text included. */
         resolve?: (input: ParameterValue) => Result<number>;
     },
-): void {
+): (() => void) | undefined {
     const textbox = document.createElement("input");
     textbox.value = typeof initial === "number" ? initial.toFixed(2) : initial;
     textbox.autofocus = true;
     const error = createErrorLabel();
     const content = document.createElement("div");
     content.append(textbox, error);
-    PubSub.default.pub("showDialog", "dialog.title.enterValue", content, [
-        {
-            content: "common.confirm",
-            // validation lives in shouldClose: the dialog runs onclick even when
-            // shouldClose vetoes closing, so applying there would apply invalid values
-            shouldClose: () => {
-                const parsed = validateDatumInput(textbox.value, options);
-                if (!parsed.isOk) {
-                    showDatumError(error, parsed.error);
-                    return false;
-                }
-                apply(parsed.value);
-                onApplied();
-                return true;
+    const confirm = () => {
+        const parsed = validateDatumInput(textbox.value, options);
+        if (!parsed.isOk) {
+            showDatumError(error, parsed.error);
+            return false;
+        }
+        apply(parsed.value);
+        const result = onApplied();
+        if (result && !result.isOk) {
+            showDatumError(error, result.error);
+            return false;
+        }
+        return true;
+    };
+    if (options?.inlineAt) {
+        content.className = style.inline;
+        content.setAttribute("role", "dialog");
+        content.setAttribute("aria-label", "Edit dimension");
+        textbox.setAttribute("aria-label", "Dimension value");
+        const hint = document.createElement("small");
+        hint.textContent = "Enter to apply · Esc to cancel";
+        content.append(hint);
+        content.style.left = `${Math.max(4, Math.min(options.inlineAt.x - 50, window.innerWidth - 180))}px`;
+        content.style.top = `${Math.max(4, Math.min(options.inlineAt.y - 14, window.innerHeight - 90))}px`;
+        let closed = false;
+        const events = new AbortController();
+        const close = (cancel: boolean) => {
+            if (closed) return;
+            closed = true;
+            events.abort();
+            content.remove();
+            if (cancel) onCancel?.();
+        };
+        content.addEventListener("pointerdown", (event) => event.stopPropagation());
+        content.addEventListener("keydown", (event) => {
+            event.stopPropagation();
+            if (event.key === "Enter") {
+                event.preventDefault();
+                if (confirm()) close(false);
+            }
+            if (event.key === "Escape") {
+                event.preventDefault();
+                close(true);
+            }
+        });
+        document.body.append(content);
+        document.addEventListener(
+            "pointerdown",
+            (event) => {
+                if (!content.contains(event.target as Node)) close(true);
             },
-            onclick: () => {},
-        },
+            { capture: true, signal: events.signal },
+        );
+        textbox.focus();
+        textbox.select();
+        return () => close(true);
+    }
+    PubSub.default.pub("showDialog", "dialog.title.enterValue", content, [
+        { content: "common.confirm", shouldClose: confirm, onclick: () => {} },
         { content: "common.cancel", onclick: () => onCancel?.() },
     ]);
     setTimeout(() => textbox.select());
@@ -102,7 +146,7 @@ function validateDatumInput(
 export function promptDatumPair(
     initial: [ParameterValue, ParameterValue],
     apply: (x: ParameterValue, y: ParameterValue) => void,
-    onApplied: () => void,
+    onApplied: () => Result<void> | void,
     options?: {
         positiveOnly?: boolean;
         resolve?: (input: ParameterValue) => Result<number>;
@@ -124,7 +168,11 @@ export function promptDatumPair(
                     return false;
                 }
                 apply(x.value, y.value);
-                onApplied();
+                const result = onApplied();
+                if (result && !result.isOk) {
+                    showDatumError(error, result.error);
+                    return false;
+                }
                 return true;
             },
             onclick: () => {},

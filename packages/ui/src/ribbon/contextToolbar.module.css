@@ -1,0 +1,141 @@
+.root {
+    display: flex;
+    height: 36px;
+    align-items: center;
+    background: var(--panel-background-color);
+    color: var(--foreground-color);
+    border-bottom: 1px solid var(--border-color);
+    box-sizing: border-box;
+    font-size: 12px;
+    gap: 2px;
+}
+.root button,
+.menu button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    gap: 5px;
+    height: 32px;
+    min-width: 32px;
+    padding: 4px 6px;
+    color: inherit;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 2px;
+    cursor: pointer;
+    font: inherit;
+    white-space: nowrap;
+}
+.root button:hover,
+.menu button:hover,
+.menu button:focus-visible {
+    background: var(--hover-background-color);
+}
+.root button:focus-visible {
+    outline: 2px solid #629dd5;
+    outline-offset: -2px;
+}
+.root button[aria-pressed="true"],
+.root button[aria-expanded="true"] {
+    background: #79b5e63b;
+    border-color: #70a6d2;
+}
+.root svg,
+.menu svg {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+}
+.root .workspace {
+    position: absolute;
+    top: 4px;
+    right: 48px;
+    height: 30px;
+    min-width: 128px;
+    justify-content: space-between;
+    padding: 4px 10px;
+    border-left-color: var(--border-color);
+}
+.tools {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    align-items: center;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-color) transparent;
+}
+.family {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+.root .arrow {
+    min-width: 15px;
+    width: 15px;
+    padding: 0;
+    margin-left: -3px;
+    font-size: 10px;
+}
+.root .groupMenu {
+    font-size: 11px;
+    padding: 4px 7px;
+}
+.separator {
+    width: 1px;
+    height: 23px;
+    margin: 0 5px;
+    background: var(--border-color);
+    flex-shrink: 0;
+}
+.root .search {
+    font-size: 11px;
+    color: var(--foreground-secondary-color);
+    background: var(--background-color);
+    height: 28px;
+    margin: 0 6px;
+}
+.root .search svg {
+    width: 15px;
+    height: 15px;
+}
+.menu {
+    position: fixed;
+    z-index: 10000;
+    min-width: 220px;
+    max-height: 65vh;
+    overflow-y: auto;
+    padding: 4px;
+    background: var(--panel-background-color);
+    color: var(--foreground-color);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 4px 12px #0003;
+    font-size: 12px;
+}
+.menu button {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 10px;
+}
+.menu kbd {
+    margin-left: auto;
+    font: inherit;
+    font-size: 11px;
+    color: var(--foreground-secondary-color);
+    padding-left: 18px;
+}
+.menu button[aria-checked="true"] {
+    background: #79b5e63b;
+}
+@media (max-width: 800px) {
+    .root .workspace {
+        min-width: 90px;
+    }
+    .root .search {
+        width: 30px;
+        min-width: 30px;
+        overflow: hidden;
+        font-size: 0;
+    }
+}

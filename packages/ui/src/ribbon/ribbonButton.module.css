@@ -74,3 +74,28 @@
     margin-right: 8px;
     flex-shrink: 0;
 }
+
+:global(chili-ribbon[data-compact="true"]) {
+    .normal,
+    .small {
+        width: 30px;
+        min-width: 30px;
+        min-height: 30px;
+        height: 30px;
+        padding: 0;
+        margin: 0;
+        justify-content: center;
+        border-radius: 3px;
+    }
+    .icon,
+    .smallIcon {
+        width: 20px;
+        height: 20px;
+        margin: 0;
+        padding: 0;
+    }
+    .largeButtonText,
+    .smallButtonText {
+        display: none;
+    }
+}

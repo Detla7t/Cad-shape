@@ -52,7 +52,7 @@ export function resolveCommandRefs(text: string): string {
 const mouseKey = (key: string) =>
     key
         .split("+")
-        .map((part) => (part === "Middle" ? "middle-drag" : part))
+        .map((part) => (part === "Middle" ? "middle-drag" : part === "Right" ? "right-drag" : part))
         .join(" + ");
 
 /** Per-profile pan/rotate table, asked of Navigation3D rather than restated here. */
@@ -74,11 +74,11 @@ Layout of the window: title bar on top (Home button, quick commands, ribbon tab 
 const SECTIONS = [
     `## Navigating the viewport
 - Wheel = zoom toward or away from the cursor; the Solidworks and Creo profiles reverse the wheel direction to match those applications.
-- Middle-drag pans or rotates, depending on the navigation profile (the current one is also reported by get_ribbon):
+- Right-drag freely orbits; Ctrl (or Command) + right-drag pans. Alt + right-drag keeps a world-vertical orbit. Middle-button controls depend on the navigation profile (the current one is also reported by get_ribbon):
 ${navigationProfiles()}
 - Double-press the middle button (two presses within half a second) = fit content (frame everything).
 - Left-drag does NOT move the camera — in the viewport it draws a rubber-band selection box. A rotation orbits around the centre of the selection, or of the shape under the cursor when nothing is selected.
-- Right-click only cancels an in-progress pick; the app suppresses the browser menu and has no right-click menus.
+- A stationary right-click is passed to the active tool on release, for example to cancel a sketch constraint pick. Dragging with the right button navigates without cancelling the tool. Right-click toolbar tools for shortcuts, pinning and tab customization.
 - Touch: one finger drags while a pick is active, two fingers pan and zoom, three fingers rotate.`,
 
     `## Selecting geometry
@@ -89,7 +89,9 @@ ${navigationProfiles()}
 - Escape clears the selection, or cancels the command in progress. While picking, Enter or Space accepts the current pick, and Tab cycles to the next overlapping shape under the cursor.`,
 
     `## Reorienting the view
-- The coloured X/Y/Z bubbles in the top-right corner are an axis gizmo — there is no view cube. Click a bubble to snap the camera to look straight along that axis; drag the gizmo to orbit freely.
+- The labeled view cube in the top-right corner follows the camera. Click a face for Top, Bottom, Front, Back, Left or Right; click an edge or corner for a diagonal view. Drag the cube to orbit.
+- The surrounding arrows rotate 15 degrees, Shift+click rotates 90 degrees, and Ctrl/Command+click rotates 5 degrees. Curved arrows roll the view; the small cube below returns to isometric.
+- Sketches initially open normal to their plane but can be orbited. Press N while editing a sketch to restore its normal view.
 - Hiding the shapes you do not need (eye icon in the model tree) is usually easier than fighting the camera.`,
 
     `## Model tree and property panel

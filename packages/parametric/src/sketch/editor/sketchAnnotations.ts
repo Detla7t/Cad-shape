@@ -8,6 +8,7 @@ import {
     type EdgeMeshData,
     type IDisposable,
     type IView,
+    VisualConfig,
 } from "@chili3d/core";
 import {
     arcAngles,
@@ -85,11 +86,6 @@ const BADGE_OFFSET_PX = 18;
 const BADGE_REACH_PX = 30;
 /** Pointer travel (screen px) before a badge press becomes a label drag. */
 const LABEL_DRAG_THRESHOLD_PX = 4;
-/**
- * Blue for dimension graphics — matches the dark-theme `--primary-color` (#4a9eff)
- * behind the badges' `--badge-accent`; green is reserved for hover/selection highlights.
- */
-const DIMENSION_COLOR = 0x4a9eff;
 
 /**
  * True when a pointer event target is (or is inside) an annotation badge.
@@ -171,7 +167,7 @@ export type DimensionPreview =
 export class SketchAnnotationManager implements IDisposable {
     private items: IDisposable[] = [];
     private badgeElements = new Map<number, HTMLElement[]>();
-    private badgeAnchors: { u: number; v: number; entityIds: number[] }[] = [];
+    private badgeAnchors: { id: number; u: number; v: number; entityIds: number[] }[] = [];
     private meshId?: number;
     private disposed = false;
     private highlightedEntities = new Set<number>();
@@ -179,6 +175,12 @@ export class SketchAnnotationManager implements IDisposable {
     private readonly selectedConstraints = new Set<number>();
     private rebuilding = false;
     private suppressSymbols = false;
+    private allConstraints = false;
+
+    set showAllConstraints(value: boolean) {
+        this.allConstraints = value;
+        this.refresh();
+    }
     private dimensionPreview?: DimensionPreview;
     /**
      * Active datum label drag. `held` tracks the mouse button: a press-drag
@@ -678,6 +680,7 @@ export class SketchAnnotationManager implements IDisposable {
     ): boolean {
         if (this.suppressSymbols) return false;
         return (
+            this.allConstraints ||
             this.hoveredConstraint === constraint.id ||
             this.selectedConstraints.has(constraint.id) ||
             refs.some((ref) => this.highlightedEntities.has(ref.entityId))
@@ -706,7 +709,7 @@ export class SketchAnnotationManager implements IDisposable {
             const p2 = toWorld(this.solver.plane, x2, y2);
             position.set([p1.x, p1.y, p1.z, p2.x, p2.y, p2.z], i * 6);
         });
-        return { position, range: [], color: DIMENSION_COLOR, lineType: "solid" };
+        return { position, range: [], color: VisualConfig.defaultEdgeColor, lineType: "solid" };
     }
 
     /** Preview badge: not interactive — the position pick click must reach the viewport. */
@@ -730,7 +733,7 @@ export class SketchAnnotationManager implements IDisposable {
     ): void {
         const id = constraint.id;
         const entityIds = [...new Set(refs.map((r) => r.entityId))];
-        this.badgeAnchors.push({ u, v, entityIds });
+        this.badgeAnchors.push({ id, u, v, entityIds });
         this.items.push(
             this.view.htmlText(text, toWorld(this.solver.plane, u, v), {
                 hideDelete: true,
@@ -785,6 +788,14 @@ export class SketchAnnotationManager implements IDisposable {
                       },
             }),
         );
+    }
+
+    datumScreenPosition(id: number): { x: number; y: number } | undefined {
+        const anchor = this.badgeAnchors.find((anchor) => anchor.id === id);
+        if (!anchor || !this.view.dom?.isConnected) return undefined;
+        const screen = this.view.worldToScreen(toWorld(this.solver.plane, anchor.u, anchor.v));
+        const rect = this.view.dom.getBoundingClientRect();
+        return { x: screen.x + rect.left, y: screen.y + rect.top };
     }
 
     // ------------------------------------------------------------------ Badge hit-testing and label dragging

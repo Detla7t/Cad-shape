@@ -382,3 +382,29 @@ describe("CameraController — updateCameraPosionTarget", () => {
         expect(cc.camera.position.x).toBeCloseTo(200);
     });
 });
+
+describe("CameraController — free orbit", () => {
+    test("horizontal right-drag tilts a top view rather than rolling it", () => {
+        const cc = new CameraController(createFakeView());
+        cc.lookAt({ x: 10, y: 20, z: 130 }, { x: 10, y: 20, z: 30 }, { x: 0, y: 1, z: 0 });
+        cc.startRotate(0, 0);
+        cc.rotate(90, 0, "trackball");
+        expect(cc.cameraPosition.x).toBeCloseTo(10 - 100 / Math.sqrt(2));
+        expect(cc.cameraPosition.y).toBeCloseTo(20);
+        expect(cc.cameraPosition.z).toBeCloseTo(30 + 100 / Math.sqrt(2));
+        expect(cc.target.toArray()).toEqual([10, 20, 30]);
+        expect(cc.camera.position.distanceTo(cc.target)).toBeCloseTo(100);
+    });
+
+    test("a reversed diagonal orbit returns to the original view and up direction", () => {
+        const cc = new CameraController(createFakeView());
+        cc.lookAt({ x: 100, y: -200, z: 300 }, { x: 10, y: 20, z: 30 }, { x: 0, y: 0, z: 1 });
+        const position = cc.camera.position.clone();
+        const rotation = cc.camera.quaternion.clone();
+        cc.rotate(60, -30, "trackball");
+        expect(cc.camera.quaternion.angleTo(rotation)).toBeGreaterThan(0.1);
+        cc.rotate(-60, 30, "trackball");
+        expect(cc.camera.position.distanceTo(position)).toBeLessThan(1e-10);
+        expect(cc.camera.quaternion.angleTo(rotation)).toBeCloseTo(0);
+    });
+});

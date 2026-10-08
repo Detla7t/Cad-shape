@@ -55,9 +55,48 @@ function entityOf(
 
 export function sketchDrawing(data: SketchData, options: SketchDrawingOptions = {}): Drawing {
     const layers = SKETCH_DRAWING_LAYERS;
+    const outputLayers: DrawingLayer[] = [...Object.values(layers)];
+    const colorIndex = (hex: string): number => {
+        const rgb = Number.parseInt(hex.slice(1), 16);
+        const channels = [(rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255];
+        const palette = [0xff0000, 0xffff00, 0x00ff00, 0x00ffff, 0x0000ff, 0xff00ff, 0xffffff, 0x808080];
+        let best = 7,
+            distance = Infinity;
+        palette.forEach((color, index) => {
+            const d =
+                (((color >> 16) & 255) - channels[0]) ** 2 +
+                (((color >> 8) & 255) - channels[1]) ** 2 +
+                ((color & 255) - channels[2]) ** 2;
+            if (d < distance) {
+                best = index + 1;
+                distance = d;
+            }
+        });
+        return best;
+    };
+    for (const layer of data.layers ?? [])
+        outputLayers.push({
+            name: layer.name,
+            color: layer.color,
+            aci: colorIndex(layer.color),
+            dashed: layer.dashed,
+        });
     const entities: DrawingEntity[] = [];
     for (const entity of data.entities) {
-        const drawn = entityOf(entity.type, entity.params, layers.sketch.name);
+        const layer = data.layers?.find((layer) => layer.id === (entity.layer ?? "0"));
+        let name = layer?.name ?? layers.sketch.name;
+        const color = entity.color ?? layer?.color ?? layers.sketch.color;
+        if (entity.construction || entity.dashed || entity.color) {
+            name += `${entity.construction ? "_CONSTRUCTION" : entity.dashed ? "_DASHED" : ""}${entity.color ? `_${entity.color.slice(1)}` : ""}`;
+            if (!outputLayers.some((layer) => layer.name === name))
+                outputLayers.push({
+                    name,
+                    color,
+                    aci: colorIndex(color),
+                    dashed: entity.construction || entity.dashed || layer?.dashed,
+                });
+        }
+        const drawn = entityOf(entity.type, entity.params, name);
         if (drawn !== undefined) entities.push(drawn);
     }
     if (options.external !== false) {
@@ -66,5 +105,5 @@ export function sketchDrawing(data: SketchData, options: SketchDrawingOptions = 
             if (drawn !== undefined) entities.push(drawn);
         }
     }
-    return { layers: Object.values(layers), entities };
+    return { layers: [...new Map(outputLayers.map((layer) => [layer.name, layer])).values()], entities };
 }

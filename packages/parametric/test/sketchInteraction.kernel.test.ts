@@ -391,3 +391,53 @@ describe("sketch geometry rewrites", () => {
         expect(round(box[3])).toBe(50);
     });
 });
+
+test("construction guides leave profile regions intact, while hidden layers hide their shading", () => {
+    const doc = editorDoc();
+    const data = constrainedRect(100, 60);
+    data.entities.push({ id: 5, type: "line", params: [50, -20, 50, 80], construction: true });
+    data.layers = [{ id: "0", name: "Profile", color: "#4a9eff" }];
+    const node = new SketchNode({ document: doc, plane: Plane.XY, data });
+    const profiles = node.editingProfileMeshes();
+    expect(profiles).toHaveLength(1);
+    expect(profiles[0].index.length).toBeGreaterThan(0);
+    expect(node.shape.isOk).toBe(true);
+    expect(node.shape.value.findSubShapes(ShapeTypes.edge)).toHaveLength(4);
+    node.setDataEmitShapeChanged({ ...data, layers: [{ ...data.layers[0], visible: false }] });
+    expect(node.editingProfileMeshes()).toHaveLength(0);
+});
+
+test("dragging a rectangle edge preserves its joins and horizontal/vertical constraints", () => {
+    const doc = editorDoc();
+    const data = constrainedRect(100, 60);
+    for (const id of [1, 2, 3, 4])
+        data.constraints.push({
+            id: id + 4,
+            kind: id % 2 ? ConstraintKind.Horizontal : ConstraintKind.Vertical,
+            refs: [
+                { entityId: id, pointIndex: 0 },
+                { entityId: id, pointIndex: 1 },
+            ],
+        });
+    const node = new SketchNode({ document: doc, plane: Plane.XY, data });
+    const editor = SketchEditor.enter(node);
+    try {
+        const before = editor.solver.entity(3)!.params;
+        editor.solver.beginDrag([
+            { entityId: 3, pointIndex: 0 },
+            { entityId: 3, pointIndex: 1 },
+        ]);
+        editor.solver.dragEntityTo(3, before, 0, 25);
+        expect(editor.solver.endDrag().result).toMatch(/^Ok/);
+        editor.solve(true);
+        editor.commit();
+        const entities = node.data.entities;
+        expect(entities[2].params[1]).toBeCloseTo(85);
+        expect(entities[2].params[3]).toBeCloseTo(85);
+        expect(entities[1].params.slice(2)).toEqual(entities[2].params.slice(0, 2));
+        expect(entities[2].params.slice(2)).toEqual(entities[3].params.slice(0, 2));
+        expect(node.editingProfileMeshes()).toHaveLength(1);
+    } finally {
+        editor.exit();
+    }
+});

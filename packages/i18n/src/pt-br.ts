@@ -181,6 +181,9 @@ export default {
         "command.sketch.circle": "Círculo",
         "command.sketch.create": "Novo Esboço",
         "command.sketch.enter": "Editar Esboço",
+        "command.sketch.cancel": "Cancelar esboço",
+        "command.sketch.construction": "Construção",
+        "command.sketch.normal": "Normal ao esboço",
         "command.sketch.exit": "Sair",
         "command.sketch.line": "Linha",
         "command.sketch.projectEdges": "Projetar Arestas",
@@ -191,6 +194,7 @@ export default {
         "prompt.pickExternalRef":
             "escolha uma referência externa (roxa) para alternar sua função, ESC para concluir",
         "prompt.pickSketchEntity": "escolha uma entidade do esboço, ESC para cancelar",
+        "prompt.pickSketchPointOrEntity": "Pick an endpoint, center, origin, or curve",
         "prompt.pickSketchPoint": "escolha um ponto do esboço, ESC para cancelar",
         "ribbon.group.constraint": "Restrição",
         "ribbon.group.dimension": "Dimensão",

@@ -191,6 +191,7 @@ export function createElementMocks(options: ElementMockOptions = {}) {
         img: (props: any, ...children: any[]) => createEl("img", props, children, options),
         svg: createSvg,
         createIcon: createIconMock,
+        createCadIcon: createIconMock,
         setSVGIcon: setSVGIconMock,
         collection: createCollection,
         Expander: MockExpander,

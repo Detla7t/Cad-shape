@@ -210,3 +210,17 @@ select.field {
 .danger:hover:not(:disabled) {
     color: var(--error-color);
 }
+
+.root[data-docked] .row,
+.root[data-docked] .newRow,
+.root[data-docked] .header {
+    grid-template-columns: minmax(80px, 1fr) 76px minmax(100px, 1fr) 72px;
+    gap: 3px;
+    padding: 3px;
+}
+.root[data-docked] .table {
+    border-radius: 0;
+}
+.root[data-docked] .rows {
+    max-height: none;
+}

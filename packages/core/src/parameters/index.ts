@@ -5,6 +5,7 @@ export * from "./configuration";
 export * from "./configuredValue";
 export * from "./dataTable";
 export * from "./expression";
+export * from "./modelParameters";
 export * from "./unitSpec";
 export * from "./unitSuffix";
 export * from "./variableData";

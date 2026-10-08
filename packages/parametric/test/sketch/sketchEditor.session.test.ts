@@ -49,6 +49,7 @@ function mockShapeFactory() {
             line: () => Result.ok({ isEqual: () => false }),
             circle: () => Result.ok({ isEqual: () => false }),
             wire: () => Result.ok({ isEqual: () => false }),
+            combine: () => Result.ok({ isEqual: () => false }),
         },
         writable: true,
         configurable: true,
@@ -125,7 +126,7 @@ describe("SketchEditor session statics", () => {
             expect(camera.fitContent).toHaveBeenCalledTimes(1);
             expect(view.workplane).toBe(node.plane);
             expect(doc.visual.eventHandler).toBeInstanceOf(SketchEventHandler);
-            expect((doc.visual.viewHandler as any).canRotate).toBe(false);
+            expect((doc.visual.viewHandler as any).canRotate).toBe(true);
             editor.exit();
         } finally {
             SketchEditor.exit();
@@ -636,4 +637,59 @@ describe("SketchEditor session statics", () => {
             restoreFactory();
         }
     });
+});
+
+test("cancel restores committed geometry, constraints, layers and name without undoing other nodes", async () => {
+    const { doc, restoreFactory, oldHandler } = setup();
+    try {
+        const node = new SketchNode({ document: doc, plane: Plane.XY, data: DATA });
+        const other = new SketchNode({ document: doc, plane: Plane.XY });
+        doc.modelManager.addNode(node, other);
+        const before = structuredClone(node.data);
+        const name = node.name;
+        const editor = SketchEditor.enter(node);
+        editor.solver.addCircle(20, 10, 5);
+        editor.solver.setLayers([{ id: "0", name: "Changed", color: "#ff0000" }]);
+        editor.commit();
+        node.name = "Changed name";
+        other.name = "Keep this independent change";
+        expect(node.data.entities).toHaveLength(2);
+        const pending = editor.pickPoint("prompt.pickSketchPoint");
+        editor.cancel();
+        await expect(pending).resolves.toBeUndefined();
+        expect(node.data).toEqual(before);
+        expect(node.name).toBe(name);
+        expect(other.name).toBe("Keep this independent change");
+        expect(doc.visual.eventHandler).toBe(oldHandler);
+        expect(SketchEditor.getActive()).toBeUndefined();
+        const reopened = SketchEditor.enter(node);
+        expect(reopened.solver.entities().map((entity) => entity.id)).toEqual([1]);
+        reopened.exit();
+    } finally {
+        SketchEditor.exit();
+        restoreFactory();
+    }
+});
+
+test("cancel removes a newly created sketch; accept retains it", () => {
+    const { doc, restoreFactory } = setup();
+    try {
+        const abandoned = new SketchNode({ document: doc, plane: Plane.XY });
+        doc.modelManager.addNode(abandoned);
+        const canceled = SketchEditor.enter(abandoned, { newSketch: true });
+        canceled.solver.addLine(1, 2, 3, 4);
+        canceled.commit();
+        canceled.cancel();
+        expect(abandoned.parent).toBeUndefined();
+        const kept = new SketchNode({ document: doc, plane: Plane.XY });
+        doc.modelManager.addNode(kept);
+        const accepted = SketchEditor.enter(kept, { newSketch: true });
+        accepted.solver.addLine(10, 20, 30, 40);
+        accepted.exit();
+        expect(kept.parent).toBe(doc.modelManager.rootNode);
+        expect(kept.data.entities[0].params).toEqual([10, 20, 30, 40]);
+    } finally {
+        SketchEditor.exit();
+        restoreFactory();
+    }
 });

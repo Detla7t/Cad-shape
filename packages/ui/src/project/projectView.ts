@@ -2,7 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import { type IDocument, type IView, Localize, PubSub } from "@chili3d/core";
-import { div, span } from "@chili3d/element";
+import { div, input, span } from "@chili3d/element";
 import style from "./projectView.module.css";
 import { ToolBar } from "./toolBar";
 import { Tree } from "./tree";
@@ -16,6 +16,11 @@ export class ProjectView extends HTMLElement {
     }
 
     private readonly panel: HTMLDivElement;
+    private readonly filter = input({
+        type: "search",
+        placeholder: "Filter by name…",
+        className: style.filter,
+    });
 
     constructor(props: { className: string }) {
         super();
@@ -30,7 +35,11 @@ export class ProjectView extends HTMLElement {
     }
 
     private render() {
+        this.filter.setAttribute("aria-label", "Filter model tree");
+        this.filter.oninput = () => this.activeTree()?.filter(this.filter.value);
+        this.filter.onkeydown = (event) => event.stopPropagation();
         this.append(
+            this.filter,
             div(
                 { className: style.headerPanel },
                 span({
@@ -70,6 +79,7 @@ export class ProjectView extends HTMLElement {
                 this._documentTreeMap.set(view.document, tree);
             }
             this.panel.append(tree);
+            tree.filter(this.filter.value);
         }
     };
 }

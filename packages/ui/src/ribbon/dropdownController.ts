@@ -54,9 +54,10 @@ export function createDropdownItem(
     return div(
         {
             className: classes.item,
+            dataset: { command: data.command },
             onclick: (e) => {
                 e.stopPropagation();
-                PubSub.default.pub("executeCommand", data.command);
+                data.onClick();
                 onSelect();
             },
         },
