@@ -1,14 +1,27 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
+import type { IApplication } from "../application";
 import type { ICommand } from "./command";
 import type { CommandData } from "./commandData";
+import type { CommandKeys } from "./commandKeys";
 
 export type CommandConstructor = new (...args: any[]) => ICommand;
 
 const commandRegistry = new Map<string, CommandConstructor>();
 
 export class CommandStore {
+    private static readonly resolvers = new Set<(key: CommandKeys, app: IApplication) => CommandKeys>();
+
+    static registerResolver(resolve: (key: CommandKeys, app: IApplication) => CommandKeys): () => void {
+        CommandStore.resolvers.add(resolve);
+        return () => CommandStore.resolvers.delete(resolve);
+    }
+
+    static resolveCommand(key: CommandKeys, app: IApplication): CommandKeys {
+        for (const resolve of CommandStore.resolvers) key = resolve(key, app);
+        return key;
+    }
     static registerCommand<T extends CommandConstructor>(
         ctor: T,
         metadata: Omit<CommandData, "key"> & { key: string },

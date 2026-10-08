@@ -52,6 +52,7 @@ export class CommandService implements IService {
         if (command) {
             command =
                 this.app.activeView?.document.visual?.eventHandler?.resolveCommand?.(command) ?? command;
+            command = CommandStore.resolveCommand(command, this.app);
         }
         if (!command || !(await this.canExecute(command))) return;
 

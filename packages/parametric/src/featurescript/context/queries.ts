@@ -74,7 +74,22 @@ export function registerQueryType(
     extensions.set(type, resolve);
 }
 
+const seamsByShape = new WeakMap<IShape, Set<number>>();
+
+/** OCCT's periodic seam is a parameterization artifact, not an Onshape topological edge. */
 export function resolveQuery(ctx: FsContext, value: FsValue): EntityRef[] {
+    return resolveKernelQuery(ctx, value).filter((ref) => {
+        if (ref.kind !== "EDGE" || !ref.body.shape.seamEdges) return true;
+        let seams = seamsByShape.get(ref.body.shape);
+        if (!seams) {
+            seams = new Set(ref.body.shape.seamEdges());
+            seamsByShape.set(ref.body.shape, seams);
+        }
+        return !seams.has(ref.index);
+    });
+}
+
+function resolveKernelQuery(ctx: FsContext, value: FsValue): EntityRef[] {
     if (value instanceof FsArray) return union(value.items.map((item) => resolveQuery(ctx, item)));
     if (!isQuery(value)) {
         const shown = value instanceof FsMap ? ` ${toDisplayString(value).slice(0, 160)}` : "";

@@ -58,6 +58,14 @@ export function build(context is Context) {
 const ref = (entityId: number, pointIndex: number) => ({ entityId, pointIndex });
 const cases: { name: string; data: SketchData; source: string }[] = [
     {
+        name: "fit spline uses the same kernel interpolation through every point",
+        data: {
+            entities: [{ id: 1, type: "spline", params: [0, 0, 3, 10, 12, -4, 20, 0] }],
+            constraints: [],
+        },
+        source: `skFitSpline(s,"curve",{"points":[vector(0,0)*millimeter,vector(3,10)*millimeter,vector(12,-4)*millimeter,vector(20,0)*millimeter]});`,
+    },
+    {
         name: "line length and horizontal constraint move the initial endpoints",
         data: {
             entities: [{ id: 1, type: "line", params: [0, 0, 8, 6] }],
@@ -128,7 +136,7 @@ for (const std of ["native", "onshape"] as const)
                         }
                     } finally {
                         edge.value.dispose();
-                        edges.forEach((e) => e.dispose());
+                        for (const e of edges) e.dispose();
                     }
                 } finally {
                     solver.dispose();
@@ -148,3 +156,51 @@ for (const std of ["native", "onshape"] as const)
             ).toThrow(/skSolve/);
         });
     }
+
+for (const std of ["native", "onshape"] as const) {
+    test(`${std}: unsupported constraints fail explicitly`, () => {
+        expect(() =>
+            build(
+                std,
+                Plane.XY,
+                `skLineSegment(s,"l",{"start":vector(0,0)*millimeter,"end":vector(10,0)*millimeter});
+        skConstraint(s,"offset",{"constraintType":ConstraintType.OFFSET,"localFirst":"l"});`,
+            ),
+        ).toThrow(/OFFSET.*not supported/);
+    });
+    test(`${std}: initial line guesses use meters and change the published endpoints`, () => {
+        const context = build(
+            std,
+            Plane.XY,
+            `skLineSegment(s,"l",{"start":vector(0,0)*millimeter,"end":vector(10,0)*millimeter});
+        skSetInitialGuess(s,{"l":[0.01,0.02,0.04,0.06]});`,
+        );
+        try {
+            const edges = context.bodies.find((b) => b.kind === "WIRE")!.edges();
+            expect(edges).toHaveLength(1);
+            expect(edges[0].length()).toBeCloseTo(50, 6);
+            expect(edges[0].startPoint().distanceTo(new XYZ(10, 20, 0))).toBeLessThan(1e-6);
+        } finally {
+            context.dispose();
+        }
+    });
+    test(`${std}: clockwise arc start references keep their original meaning`, () => {
+        const context = build(
+            std,
+            Plane.XY,
+            `skArc(s,"arc",{"start":vector(10,0)*millimeter,"mid":vector(7.0710678118654755,-7.0710678118654755)*millimeter,"end":vector(0,-10)*millimeter});
+        skPoint(s,"p",{"position":vector(20,0)*millimeter});
+        skConstraint(s,"pfix",{"constraintType":ConstraintType.FIX,"localFirst":"p"});
+        skConstraint(s,"center",{"constraintType":ConstraintType.FIX,"localFirst":"arc.center"});
+        skConstraint(s,"join",{"constraintType":ConstraintType.COINCIDENT,"localFirst":"arc.start","localSecond":"p"});
+        skConstraint(s,"r",{"constraintType":ConstraintType.RADIUS,"localFirst":"arc","length":20*millimeter});`,
+        );
+        try {
+            const edge = context.bodies.find((b) => b.kind === "WIRE")!.edges()[0];
+            expect(edge.endPoint().distanceTo(new XYZ(20, 0, 0))).toBeLessThan(1e-5);
+            expect(edge.startPoint().distanceTo(XYZ.zero)).toBeCloseTo(20, 5);
+        } finally {
+            context.dispose();
+        }
+    });
+}

@@ -54,7 +54,30 @@ const extrudeHandler: FeatureHandler<ExtrudeFeatureData> = {
             ? []
             : [{ key: "sketchId", display: "body.sketch", nodeId: feature.sketchId }],
 
-    parameters: (feature) => [
+    parameters: (feature, document) => [
+        ...(feature.sketchId === undefined
+            ? []
+            : [
+                  {
+                      key: "sketchId",
+                      display: "body.sketch" as const,
+                      value: feature.sketchId,
+                      configurable: false,
+                      options: (document?.modelManager.findNodes() ?? [])
+                          .filter((node) => node instanceof SketchNode)
+                          .map((node) => ({ value: node.id, label: node.name })),
+                  },
+              ]),
+        {
+            key: "profiles",
+            display: "prompt.select.faces",
+            value: feature.profiles?.length
+                ? `${feature.profiles.length} profiles`
+                : feature.source
+                  ? `${feature.source.profiles.length} faces`
+                  : "All sketch profiles",
+            pick: { kinds: ["face"] },
+        },
         {
             key: "operation",
             display: "option.command.operation",
@@ -77,19 +100,21 @@ const extrudeHandler: FeatureHandler<ExtrudeFeatureData> = {
     ],
 
     setParameter: (feature, key, value) =>
-        key === "operation"
-            ? {
-                  ...feature,
-                  operation:
-                      value === "new"
-                          ? undefined
-                          : value === "fuse" || value === "cut" || value === "common"
-                            ? value
-                            : feature.operation,
-              }
-            : key === "symmetric"
-              ? { ...feature, symmetric: value === true || value === "true" }
-              : { ...feature, [key]: value },
+        key === "sketchId"
+            ? { ...feature, sketchId: String(value), profiles: undefined, source: undefined }
+            : key === "operation"
+              ? {
+                    ...feature,
+                    operation:
+                        value === "new"
+                            ? undefined
+                            : value === "fuse" || value === "cut" || value === "common"
+                              ? value
+                              : feature.operation,
+                }
+              : key === "symmetric"
+                ? { ...feature, symmetric: value === true || value === "true" }
+                : { ...feature, [key]: value },
 
     applyResolvedRefs: (feature, { resolvedProfiles }) =>
         resolvedProfiles === undefined

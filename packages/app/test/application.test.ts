@@ -6,6 +6,7 @@ import { Logger, ObservableCollection, PubSub } from "@chili3d/core";
 import { createMockView, createMockVisualWithDocument } from "@chili3d/core/test-utils";
 import { afterEach, beforeEach, describe, expect, rs, test } from "@rstest/core";
 import { Application } from "../src/application";
+import { readProjectFile } from "../src/project/projectFile";
 
 // IMPORTANT: Application constructor calls setCurrentApplication(this), which
 // throws if called more than once per module. We can only create ONE Application
@@ -93,6 +94,37 @@ function resetAppState() {
 describe("Application", () => {
     afterEach(() => {
         resetAppState();
+    });
+
+    test("library export downloads a closed document without switching views or retaining a temporary model", async () => {
+        const saved = makeSerializedDocData("Bracket", "saved-bracket");
+        const current = await sharedApp.newDocument("Current");
+        const view = sharedApp.activeView;
+        expect(view).not.toBeUndefined();
+        sharedApp.views.push(view!);
+        sharedApp.storage.get = async (_db, table, id) =>
+            table === "documents" && id === "saved-bracket" ? saved : undefined;
+        const exported = await sharedApp.exportDocument("saved-bracket");
+        expect(exported.isOk).toBe(true);
+        const archive = await readProjectFile(exported.value);
+        expect(archive.isOk).toBe(true);
+        expect(archive.value.document["name"]).toBe("Bracket");
+        expect(sharedApp.activeView).toBe(view);
+        expect([...sharedApp.documents]).toEqual([current]);
+        expect(sharedApp.views.length).toBe(1);
+        current.dispose();
+    });
+
+    test("library imports get their own document identity so a shared copy cannot overwrite its source", async () => {
+        const original = await sharedApp.newDocument("Original");
+        const file = new File([JSON.stringify(original.serialize())], "original.cd");
+        const imported = await sharedApp.importDocumentFile(file);
+        expect(imported.id).not.toBe(original.id);
+        expect(imported.name).toBe("Original");
+        expect(sharedApp.documents.size).toBe(2);
+        expect(sharedApp.activeView?.document).toBe(imported);
+        original.dispose();
+        imported.dispose();
     });
 
     // ==========================================================================

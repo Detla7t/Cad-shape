@@ -548,8 +548,9 @@ describe("face evaluation", () => {
 describe("edge evaluation", () => {
     test("curvature frames and the curvature derivative of a circle; a straight edge has none", () => {
         const result = run(`${CYLINDER}
+            opPolyline(context, makeId("straight"), { "points" : [vector(3, 0, 0) * inch, vector(3, 0, 2) * inch] });
             return { "circle" : evEdgeCurvature(context, { "edge" : topCircle, "parameter" : 0.25 }),
-                     "line" : evEdgeCurvature(context, { "edge" : qGeometry(qCreatedBy(makeId("cyl"), EntityType.EDGE), GeometryType.LINE), "parameter" : 0.5 }),
+                     "line" : evEdgeCurvature(context, { "edge" : qCreatedBy(makeId("straight"), EntityType.EDGE), "parameter" : 0.5 }),
                      "derivative" : evEdgeCurvatureDerivative(context, { "edge" : topCircle, "parameter" : 0.25 }) };`);
         expect(num(at(result, "circle", "curvature"))).toBeCloseTo(1 / INCH, 9);
         const origin = nums(at(result, "circle", "frame", "origin"));
@@ -569,7 +570,7 @@ describe("edge evaluation", () => {
         );
     });
 
-    test("edge convexity: convex box edges, a concave inner corner, smooth fillet and seam edges", () => {
+    test("edge convexity: convex box edges, a concave inner corner, smooth fillet; seams are not entities", () => {
         const result = run(`${CUBE}
             ${CORNER}
             fCuboid(context, makeId("a"), { "corner1" : vector(10, 0, 0) * inch, "corner2" : vector(12, 1, 1) * inch });
@@ -583,11 +584,11 @@ describe("edge evaluation", () => {
             return { "convex" : convex,
                      "concave" : evEdgeConvexity(context, { "edge" : qClosestTo(qParallelEdges(qEverything(EntityType.EDGE), Z_DIRECTION), vector(11, 1, 0.5) * inch) }),
                      "smooth" : evEdgeConvexity(context, { "edge" : qNthElement(qParallelEdges(qAdjacent(filletFace, AdjacencyType.EDGE, EntityType.EDGE), Z_DIRECTION), 0) }),
-                     "seam" : evEdgeConvexity(context, { "edge" : qGeometry(qCreatedBy(makeId("cyl"), EntityType.EDGE), GeometryType.LINE) }) };`);
+                     "seams" : size(evaluateQuery(context, qGeometry(qCreatedBy(makeId("cyl"), EntityType.EDGE), GeometryType.LINE))) };`);
         expect(name(at(result, "convex"))).toBe("CONVEX");
         expect(name(at(result, "concave"))).toBe("CONCAVE");
         expect(name(at(result, "smooth"))).toBe("SMOOTH");
-        expect(name(at(result, "seam"))).toBe("SMOOTH");
+        expect(at(result, "seams")).toBe(0);
     });
 
     test("planes of planar edges", () => {

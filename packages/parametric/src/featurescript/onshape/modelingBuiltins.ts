@@ -99,6 +99,9 @@ export function installModelingBuiltins(define: BuiltinRegistry, bridge: StdBrid
         "opReplaceFace",
         "opModifyFillet",
         "opPolyline",
+        "opFitSpline",
+        "opDraft",
+        "opFillSurface",
         "opExtractWires",
         "opIntersectFaces",
         "opCreateBSplineCurve",
@@ -144,7 +147,15 @@ export function installModelingBuiltins(define: BuiltinRegistry, bridge: StdBrid
 
     // Sketches: `@newSketch` receives the resolved plane (std's `newSketch` works it out).
     forward("newSketch", "newSketchOnPlane");
-    for (const name of ["skLineSegment", "skCircle", "skEllipse", "skArc", "skPoint", "skBezier"]) {
+    for (const name of [
+        "skLineSegment",
+        "skCircle",
+        "skEllipse",
+        "skArc",
+        "skPoint",
+        "skBezier",
+        "skFitSpline",
+    ]) {
         forward(name, name, sketchLengths);
     }
     forward("skConstraint");

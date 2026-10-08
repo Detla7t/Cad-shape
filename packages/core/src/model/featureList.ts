@@ -1,9 +1,19 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
+import type { Result } from "../foundation/result";
 import type { I18nKeys } from "../i18n";
 import type { UnitSpec } from "../parameters/unitSpec";
 import type { INode } from "./node";
+
+/** A temporary feature draft. Only Apply records a document change. */
+export interface IFeatureEditSession {
+    readonly featureId: string;
+    readonly closed: boolean;
+    onClose?: () => void;
+    apply(): Promise<Result<void>>;
+    cancel(): Promise<void>;
+}
 
 /** A single editable parameter of a feature, rendered by the feature list panel. */
 export interface FeatureParameter {
@@ -95,6 +105,7 @@ export interface FeatureItem {
  * node or feature types.
  */
 export interface IFeatureListNode {
+    beginFeatureEdit?(featureId: string): Promise<Result<IFeatureEditSession>>;
     readonly rollbackIndex?: number;
     setRollbackIndex?(index: number | undefined): boolean;
     featureItems(): readonly FeatureItem[];

@@ -11,6 +11,7 @@ import {
     type IApplication,
     type ICommand,
     type IConverter,
+    type IDocument,
     type IView,
     Localize,
     Logger,
@@ -22,6 +23,8 @@ import {
     type RibbonTabKeys,
 } from "@chili3d/core";
 import { button, collection, createCadIcon, createIcon, div, label, span, svg } from "@chili3d/element";
+import { PreferencesDialog } from "../preferences/preferencesDialog";
+import { ShortcutToolbar } from "../preferences/shortcutToolbar";
 import { ContextToolbar } from "./contextToolbar";
 import { RibbonCustomization, tabLabel } from "./customization";
 import style from "./ribbon.module.css";
@@ -83,13 +86,39 @@ class DisplayConverter<T> implements IConverter<T> {
 
 export class RibbonUI extends HTMLElement {
     private readonly customization: RibbonCustomization;
+    private readonly shortcutToolbar: ShortcutToolbar;
+    private preferences?: PreferencesDialog;
+    private readonly resetToolbar: () => void;
     constructor(
         readonly app: IApplication,
         readonly dataContent: Ribbon,
     ) {
         super();
+        const originalTabs = dataContent.tabs
+            .items()
+            .map((tab) => ({ tab, label: tab.label, visible: tab.visible, groups: tab.groups.items() }));
+        const originalPins = dataContent.quickCommands.items();
+        this.resetToolbar = () => {
+            const active = dataContent.activeTab;
+            for (const item of originalTabs) {
+                item.tab.label = item.label;
+                if (!item.tab.contextual) item.tab.visible = item.visible;
+                item.tab.groups.clear();
+                item.tab.groups.push(...item.groups);
+            }
+            dataContent.tabs.clear();
+            dataContent.tabs.push(...originalTabs.map((item) => item.tab));
+            dataContent.quickCommands.clear();
+            dataContent.quickCommands.push(...originalPins);
+            dataContent.activeTab = originalTabs.some((item) => item.tab === active)
+                ? active
+                : dataContent.tabs.find((tab) => tab.visible)!;
+            Config.instance.ribbonPreferences = {};
+            Config.instance.saveToStorage();
+        };
         applyRibbonPreferences(dataContent, Config.instance.ribbonPreferences);
         this.customization = new RibbonCustomization(dataContent);
+        this.shortcutToolbar = new ShortcutToolbar(dataContent);
         this.className = style.root;
         this.dataset["compact"] = String(Config.instance.ribbonPreferences.compact !== false);
         this.dataset["layout"] = Config.instance.ribbonPreferences.layout ?? "context";
@@ -107,7 +136,13 @@ export class RibbonUI extends HTMLElement {
             { title: "Customize tools and tabs", onclick: () => this.customization.manageTabs() },
             createCadIcon("menu"),
         );
-        const documentHeader = div({ className: style.documentHeader }, home, this.centerPanel(), customize);
+        const documentHeader = div(
+            { className: style.documentHeader },
+            home,
+            this.centerPanel(),
+            this.preferencesButton(),
+            customize,
+        );
         this.append(
             div({ className: style.legacy }, this.header(), this.ribbonTabs()),
             div(
@@ -119,8 +154,30 @@ export class RibbonUI extends HTMLElement {
     }
 
     private header() {
-        return div({ className: style.titleBar }, this.leftPanel(), this.centerPanel(), this.rightPanel());
+        return div(
+            { className: style.titleBar },
+            this.leftPanel(),
+            this.centerPanel(),
+            this.preferencesButton(),
+            this.rightPanel(),
+        );
     }
+
+    private preferencesButton() {
+        return button(
+            { title: "Preferences", ariaLabel: "Preferences", onclick: () => this.openPreferences() },
+            createCadIcon("settings"),
+        );
+    }
+
+    private readonly openPreferences = (model?: IDocument, section?: string) => {
+        this.preferences?.dispose();
+        this.preferences = new PreferencesDialog(
+            this.dataContent,
+            this.resetToolbar,
+            model ?? this.app.activeView?.document,
+        ).show(section ?? "language");
+    };
 
     private leftPanel() {
         return div(
@@ -257,6 +314,8 @@ export class RibbonUI extends HTMLElement {
     }
 
     connectedCallback(): void {
+        PubSub.default.sub("openPreferences", this.openPreferences);
+        this.shortcutToolbar.start();
         this.app.views.onCollectionChanged?.(this.syncDocumentTabs);
         this.syncDocumentTabs();
         this.customization.start();
@@ -267,6 +326,9 @@ export class RibbonUI extends HTMLElement {
     }
 
     disconnectedCallback(): void {
+        PubSub.default.remove("openPreferences", this.openPreferences);
+        this.shortcutToolbar.dispose();
+        this.preferences?.dispose();
         this.app.views.removeCollectionChanged?.(this.syncDocumentTabs);
         this.customization.dispose();
         Config.instance.removePropertyChanged(this.handleConfigChanged);

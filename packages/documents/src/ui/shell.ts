@@ -1,7 +1,17 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { download, I18n, type IDocument, type IElementView, Localize, Logger, PubSub } from "@chili3d/core";
+import {
+    Config,
+    download,
+    exportFileName,
+    I18n,
+    type IDocument,
+    type IElementView,
+    Localize,
+    Logger,
+    PubSub,
+} from "@chili3d/core";
 import { button, div, option, select, span, svg } from "@chili3d/element";
 import type { DocumentFileNode } from "../documentFileNode";
 import { type DocumentViewKind, formatOf } from "../documentFormats";
@@ -103,7 +113,10 @@ export function createDocumentView(node: DocumentFileNode, document: IDocument):
         if (item === undefined) return;
         try {
             const data = await item.produce();
-            download([data as BlobPart], `${node.name}${item.extension}`);
+            download(
+                [data as BlobPart],
+                exportFileName(node.name, item.extension, Config.instance.preferences.exportRules),
+            );
         } catch (error) {
             PubSub.default.pub(
                 "showToast",

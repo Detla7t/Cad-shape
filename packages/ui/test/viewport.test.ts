@@ -50,6 +50,17 @@ rs.mock("../src/viewport/flyout", () => ({
     },
 }));
 
+// Inspection behavior is exercised in selectionMeasurementControl.test.ts; these
+// fixtures intentionally model only pointer dispatch and command arbitration.
+rs.mock("../src/review/viewportUtilities", () => ({
+    ViewportUtilities: class {
+        element = document.createElement("div");
+        selection = { guide: { element: document.createElement("div") } };
+        close() {}
+        dispose() {}
+    },
+}));
+
 import { Viewport } from "../src/viewport/viewport";
 
 function createMockView(detected: unknown[], node: unknown) {

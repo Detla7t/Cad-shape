@@ -30,7 +30,10 @@ export class ThreeViewHandler implements IEventHandler {
     mouseWheel(view: IView, event: WheelEvent): void {
         const currentNav3D = Config.instance.navigation3D;
 
-        if (currentNav3D === "Solidworks" || currentNav3D === "Creo") {
+        if (
+            (currentNav3D === "Solidworks" || currentNav3D === "Creo") !==
+            Config.instance.preferences.mouse.reverseZoom
+        ) {
             view.cameraController.zoom(event.offsetX, event.offsetY, -event.deltaY);
         } else {
             view.cameraController.zoom(event.offsetX, event.offsetY, event.deltaY);
@@ -40,7 +43,10 @@ export class ThreeViewHandler implements IEventHandler {
     }
 
     pointerMove(view: IView, event: PointerEvent): void {
-        if (event.pointerType === "mouse") {
+        if (
+            event.pointerType === "mouse" ||
+            (event.pointerType === "pen" && Config.instance.preferences.mouse.penAsMouse)
+        ) {
             this.handleMouseMove(view, event);
         } else {
             this.handleTouchMove(view, event);
@@ -65,9 +71,15 @@ export class ThreeViewHandler implements IEventHandler {
         const key = Navigation3D.getKey(event);
         const navigatioMap = Navigation3D.navigationKeyMap();
         if (event.buttons === MOUSE_RIGHT) {
-            if (event.ctrlKey || event.metaKey) view.cameraController.pan(dx, dy);
+            if (event.ctrlKey || event.metaKey || !this.canRotate) view.cameraController.pan(dx, dy);
             else if (this.canRotate)
-                view.cameraController.rotate(dx, dy, event.altKey ? "turntable" : "trackball");
+                view.cameraController.rotate(
+                    dx,
+                    dy,
+                    !!event.altKey !== Config.instance.preferences.mouse.constrainedRotation
+                        ? "turntable"
+                        : "trackball",
+                );
         } else if (navigatioMap.pan === key) {
             view.cameraController.pan(dx, dy);
         } else if (
@@ -75,7 +87,11 @@ export class ThreeViewHandler implements IEventHandler {
                 (Config.instance.navigation3D === "Chili3d" && key === "Shift+Middle")) &&
             this.canRotate
         ) {
-            view.cameraController.rotate(dx, dy);
+            view.cameraController.rotate(
+                dx,
+                dy,
+                Config.instance.preferences.mouse.constrainedRotation ? "turntable" : "trackball",
+            );
         }
 
         if (dx !== 0 || dy !== 0) this._lastDown = undefined;
@@ -148,7 +164,10 @@ export class ThreeViewHandler implements IEventHandler {
 
     pointerDown(view: IView, event: PointerEvent): void {
         this.clearTimeout();
-        if (event.pointerType === "mouse") {
+        if (
+            event.pointerType === "mouse" ||
+            (event.pointerType === "pen" && Config.instance.preferences.mouse.penAsMouse)
+        ) {
             this.handleMouseDown(event, view);
         } else {
             this.lastPointerEventMap.set(event.pointerId, event);

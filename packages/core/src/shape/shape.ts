@@ -10,6 +10,12 @@ import type { ISurface } from "./surface";
 
 export type Orientation = "forward" | "reversed" | "internal" | "external";
 
+export interface ShapeDistanceMeasure {
+    value: number;
+    first: XYZLike;
+    second: XYZLike;
+}
+
 export interface IShape extends IDisposable {
     readonly shapeType: ShapeType;
     get id(): string;
@@ -44,8 +50,13 @@ export interface IShape extends IDisposable {
     clone(): IShape;
     hlr(position: XYZLike, direction: XYZLike, xDir: XYZLike): IShape;
     boundingBox(): BoundingBox;
+    /** Geometry bounds without display tessellation or shape-tolerance inflation. */
+    exactBoundingBox?(): BoundingBox;
+    /** Kernel edge indexes used only to close a periodic surface's parameter domain. */
+    seamEdges?(): number[];
     orientedBoundingBox(): OrientedBoundingBox;
     extremaDistance(other: IShape): number;
+    distanceMeasure?(other: IShape, maximum?: boolean): Result<ShapeDistanceMeasure>;
     checkShape(): boolean;
     checkFaces(): { index: number; isValid: boolean; status: string[] }[];
     fixShape(tolerance: number): IShape;
@@ -75,6 +86,8 @@ export interface IEdge extends IShape {
     update(curve: ICurve): void;
     intersect(other: IEdge | Line): { parameter: number; point: XYZ }[];
     length(): number;
+    /** Kernel parameter at a fraction of the edge's arc length, independent of display tessellation. */
+    arcLengthParameter?(fraction: number): number;
     get curve(): ITrimmedCurve;
     firstParameter(): number;
     lastParameter(): number;

@@ -1,0 +1,1293 @@
+{
+    "engine": "Onshape",
+    "libraryVersion": 3083,
+    "document": "https://cad.onshape.com/documents/bcf2b0f57a114bba79c81ac1/w/f824c55ae3e3a7f33d2eb028/e/ab12fa5ffe1cc938561b1283",
+    "capturedAt": "2026-10-08T11:05:38.021Z",
+    "cases": [
+        {
+            "id": "loft-5",
+            "sourceSha256": "226faeb98afa235547b4c8128c85b5c7be7b7d05b12fdb412fcf829477aed36b",
+            "inputs": {
+                "height": 5
+            },
+            "sourceMicroversion": "71b623fcf55407afc8fbd21a",
+            "notices": [],
+            "result": {
+                "area": 219.33551640807437,
+                "bodies": 1,
+                "edges": 2,
+                "faces": 3,
+                "length": 43.98229715025711,
+                "max": [5, 5, 5],
+                "min": [-5, -5, 0],
+                "solids": 1,
+                "volume": 204.20352248333654
+            }
+        },
+        {
+            "id": "loft-12",
+            "sourceSha256": "226faeb98afa235547b4c8128c85b5c7be7b7d05b12fdb412fcf829477aed36b",
+            "inputs": {
+                "height": 12
+            },
+            "sourceMicroversion": "71b623fcf55407afc8fbd21a",
+            "notices": [],
+            "result": {
+                "area": 363.12167216582304,
+                "bodies": 1,
+                "edges": 2,
+                "faces": 3,
+                "length": 43.98229715025711,
+                "max": [5, 5, 12],
+                "min": [-5, -5, 0],
+                "solids": 1,
+                "volume": 490.0884539600077
+            }
+        },
+        {
+            "id": "loft-30",
+            "sourceSha256": "226faeb98afa235547b4c8128c85b5c7be7b7d05b12fdb412fcf829477aed36b",
+            "inputs": {
+                "height": 30
+            },
+            "sourceMicroversion": "71b623fcf55407afc8fbd21a",
+            "notices": [],
+            "result": {
+                "area": 754.1311107909993,
+                "bodies": 1,
+                "edges": 2,
+                "faces": 3,
+                "length": 43.98229715025711,
+                "max": [5, 5, 30],
+                "min": [-5, -5, 0],
+                "solids": 1,
+                "volume": 1225.221134900019
+            }
+        },
+        {
+            "id": "draft-5-3-False",
+            "sourceSha256": "197f116b196de2f3ed4c9a8c5a6682fca9278d11b6f27441470392bd7ac9a35d",
+            "inputs": {
+                "height": 5,
+                "angle": 3,
+                "reverse": false
+            },
+            "sourceMicroversion": "71b623fcf55407afc8fbd21a",
+            "notices": [],
+            "result": {
+                "area": 1174.6125141299697,
+                "bodies": 1,
+                "edges": 12,
+                "faces": 6,
+                "length": 177.9585451049897,
+                "max": [20, 20, 5],
+                "min": [0, 0, 0],
+                "solids": 1,
+                "volume": 1948.049983271855
+            }
+        },
+        {
+            "id": "draft-12-7-False",
+            "sourceSha256": "197f116b196de2f3ed4c9a8c5a6682fca9278d11b6f27441470392bd7ac9a35d",
+            "inputs": {
+                "height": 12,
+                "angle": 7,
+                "reverse": false
+            },
+            "sourceMicroversion": "71b623fcf55407afc8fbd21a",
+            "notices": [],
+            "result": {
+                "area": 1586.7650265718587,
+                "bodies": 1,
+                "edges": 12,
+                "faces": 6,
+                "length": 196.9309583031329,
+                "max": [20, 20, 12],
+                "min": [0, 0, 0],
+                "solids": 1,
+                "volume": 4127.496144703928
+            }
+        },
+        {
+            "id": "draft-12-7-True",
+            "sourceSha256": "197f116b196de2f3ed4c9a8c5a6682fca9278d11b6f27441470392bd7ac9a35d",
+            "inputs": {
+                "height": 12,
+                "angle": 7,
+                "reverse": true
+            },
+            "sourceMicroversion": "71b623fcf55407afc8fbd21a",
+            "notices": [],
+            "result": {
+                "area": 1965.0214460614595,
+                "bodies": 1,
+                "edges": 12,
+                "faces": 6,
+                "length": 220.50559399649055,
+                "max": [21.473414730834854, 21.473414730834854, 12],
+                "min": [-1.4734147308348549, -1.4734147308348549, 0],
+                "solids": 1,
+                "volume": 5541.974286305388
+            }
+        },
+        {
+            "id": "sweep-5",
+            "sourceSha256": "1951ab4a0cd33f963b74ab35a8546dedb5d7432253e60c37cf01628e1b2877e8",
+            "inputs": {
+                "height": 5
+            },
+            "sourceMicroversion": "71b623fcf55407afc8fbd21a",
+            "notices": [],
+            "result": {
+                "area": 351.8583772020569,
+                "bodies": 1,
+                "edges": 4,
+                "faces": 4,
+                "length": 87.96459430051421,
+                "max": [5, 5, 5],
+                "min": [-5, -5, 0],
+                "solids": 1,
+                "volume": 329.86722862692824
+            }
+        },
+        {
+            "id": "sweep-12",
+            "sourceSha256": "1951ab4a0cd33f963b74ab35a8546dedb5d7432253e60c37cf01628e1b2877e8",
+            "inputs": {
+                "height": 12
+            },
+            "sourceMicroversion": "71b623fcf55407afc8fbd21a",
+            "notices": [],
+            "result": {
+                "area": 659.7344572538567,
+                "bodies": 1,
+                "edges": 4,
+                "faces": 4,
+                "length": 87.96459430051421,
+                "max": [5, 5, 12],
+                "min": [-5, -5, 0],
+                "solids": 1,
+                "volume": 791.6813487046278
+            }
+        },
+        {
+            "id": "sweep-30",
+            "sourceSha256": "1951ab4a0cd33f963b74ab35a8546dedb5d7432253e60c37cf01628e1b2877e8",
+            "inputs": {
+                "height": 30
+            },
+            "sourceMicroversion": "71b623fcf55407afc8fbd21a",
+            "notices": [],
+            "result": {
+                "area": 1451.4158059584845,
+                "bodies": 1,
+                "edges": 4,
+                "faces": 4,
+                "length": 87.96459430051421,
+                "max": [5, 5, 30],
+                "min": [-5, -5, 0],
+                "solids": 1,
+                "volume": 1979.2033717615698
+            }
+        },
+        {
+            "id": "fill-0",
+            "sourceSha256": "5be5bad3d524643d1528c41987c30996316bb8b210aa7708e6b27e36d874eba3",
+            "inputs": {
+                "height": 0
+            },
+            "sourceMicroversion": "71b623fcf55407afc8fbd21a",
+            "notices": [],
+            "result": {
+                "area": 400,
+                "bodies": 1,
+                "edges": 4,
+                "faces": 1,
+                "length": 80,
+                "max": [20, 20, 0],
+                "min": [0, 0, 0],
+                "solids": 0,
+                "volume": 0
+            }
+        },
+        {
+            "id": "fill-5",
+            "sourceSha256": "5be5bad3d524643d1528c41987c30996316bb8b210aa7708e6b27e36d874eba3",
+            "inputs": {
+                "height": 5
+            },
+            "sourceMicroversion": "71b623fcf55407afc8fbd21a",
+            "notices": [],
+            "result": {
+                "area": 408.215810564576,
+                "bodies": 1,
+                "edges": 4,
+                "faces": 1,
+                "length": 81.23105625617657,
+                "max": [20, 20, 5],
+                "min": [0, 0, 0],
+                "solids": 0,
+                "volume": 0
+            }
+        },
+        {
+            "id": "fill-feature",
+            "sourceSha256": "0013852edf09c483527fb862fc8fc9e17710e8fb4b9333f6f5715414b487592a",
+            "inputs": {
+                "height": 0
+            },
+            "sourceMicroversion": "71b623fcf55407afc8fbd21a",
+            "notices": [],
+            "result": {
+                "area": 400,
+                "bodies": 1,
+                "edges": 4,
+                "faces": 1,
+                "length": 80,
+                "max": [20, 20, 0],
+                "min": [0, 0, 0],
+                "solids": 0,
+                "volume": 0
+            }
+        },
+        {
+            "id": "draft-feature",
+            "sourceSha256": "3e21cdf64f83e4956b6beff415386e9318154d4af148b58258699fc8c2e382c2",
+            "inputs": {
+                "height": 12,
+                "angle": 7
+            },
+            "sourceMicroversion": "71b623fcf55407afc8fbd21a",
+            "notices": [],
+            "result": {
+                "area": 1586.7650265718585,
+                "bodies": 1,
+                "edges": 12,
+                "faces": 6,
+                "length": 196.9309583031329,
+                "max": [20, 20, 12],
+                "min": [0, 0, 0],
+                "solids": 1,
+                "volume": 4127.496144703929
+            }
+        },
+        {
+            "id": "spline-0-False-False",
+            "sourceSha256": "430adb0e0d2c95cc0655b19c6811ca05461aad0da86271df8472250a727a878a",
+            "inputs": {
+                "height": 0,
+                "closed": false,
+                "clamped": false
+            },
+            "sourceMicroversion": "71b623fcf55407afc8fbd21a",
+            "notices": [],
+            "result": {
+                "edges": 1,
+                "length": 21.06724358314632,
+                "samples": [
+                    {
+                        "direction": [0.9922498734636286, 0, 0.12425855548578119],
+                        "point": [0, 0, 0]
+                    },
+                    {
+                        "direction": [0.9860811151396232, 0, 0.16626495230504015],
+                        "point": [2.113603254081084, 0, 0.29570610653721996]
+                    },
+                    {
+                        "direction": [0.9609480267992918, 0, 0.27672891029046376],
+                        "point": [4.321981316843924, 0, 0.7894096565695417]
+                    },
+                    {
+                        "direction": [0.9590621217708544, 0, 0.2831957743053153],
+                        "point": [9.264318535771208, 0, 2.551087023292948]
+                    },
+                    {
+                        "direction": [0.9558737071871796, 0, -0.2937779023484202],
+                        "point": [14.597103615124027, 0, 2.5746837929475515]
+                    },
+                    {
+                        "direction": [0.8952843625942432, 0, -0.44549512914758094],
+                        "point": [17.29490439193095, 0, 1.4598677874664991]
+                    },
+                    {
+                        "direction": [0.8722528028631202, 0, -0.48905526057637966],
+                        "point": [20, 0, 0]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "spline-4-False-False",
+            "sourceSha256": "430adb0e0d2c95cc0655b19c6811ca05461aad0da86271df8472250a727a878a",
+            "inputs": {
+                "height": 4,
+                "closed": false,
+                "clamped": false
+            },
+            "sourceMicroversion": "71b623fcf55407afc8fbd21a",
+            "notices": [],
+            "result": {
+                "edges": 1,
+                "length": 27.864022183348084,
+                "samples": [
+                    {
+                        "direction": [0.5790748926235909, 0.812016509233011, 0.07281110812240071],
+                        "point": [0, 0, 0]
+                    },
+                    {
+                        "direction": [0.6830222388986699, 0.7212806554839329, 0.1150427624603837],
+                        "point": [2.1777957819623674, 2.8020155013955717, 0.30488178980792946]
+                    },
+                    {
+                        "direction": [0.9587469694415044, 0.027754224058808525, 0.28290272468398847],
+                        "point": [4.3679736087181205, 4.1104048677706535, 0.7976348637445824]
+                    },
+                    {
+                        "direction": [0.5542127381115982, -0.8126857118199786, 0.17997270548196978],
+                        "point": [8.893494369528923, -0.6373734909207832, 2.5245386774867478]
+                    },
+                    {
+                        "direction": [0.9393602902919601, 0.21161652812195975, -0.2698530897510947],
+                        "point": [14.082499040425148, -4.237720818964863, 2.627474298830241]
+                    },
+                    {
+                        "direction": [0.7425129306971282, 0.5750401210360523, -0.34351623971277406],
+                        "point": [16.99212666289217, -2.674547107517907, 1.5017615564253413]
+                    },
+                    {
+                        "direction": [0.6801326984756121, 0.6431441519099199, -0.35183108493757637],
+                        "point": [20, 0, 0]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "spline-4-False-True",
+            "sourceSha256": "430adb0e0d2c95cc0655b19c6811ca05461aad0da86271df8472250a727a878a",
+            "inputs": {
+                "height": 4,
+                "closed": false,
+                "clamped": true
+            },
+            "sourceMicroversion": "71b623fcf55407afc8fbd21a",
+            "notices": [],
+            "result": {
+                "edges": 1,
+                "length": 27.58698620528177,
+                "samples": [
+                    {
+                        "direction": [1, 0, 0],
+                        "point": [0, 0, 0]
+                    },
+                    {
+                        "direction": [0.6334414378031622, 0.7664564205744315, 0.10628499533844246],
+                        "point": [2.3118874705131836, 1.6545456747225376, 0.17531419857589206]
+                    },
+                    {
+                        "direction": [0.8369799157907023, 0.4407268918401863, 0.32438314902577425],
+                        "point": [4.406176893208775, 3.8527212441782637, 0.7507500607557533]
+                    },
+                    {
+                        "direction": [0.5247456979004838, -0.8336493002352517, 0.17225213134300857],
+                        "point": [8.785452484711492, -0.648712131808631, 2.7637112921662212]
+                    },
+                    {
+                        "direction": [0.8165385123214876, 0.4415882840147237, -0.37183954243294737],
+                        "point": [14.228204092433671, -3.5809917863012517, 2.212554370127467]
+                    },
+                    {
+                        "direction": [0.7462981167853089, 0.576350767376728, -0.33295482250142944],
+                        "point": [17.24366247826104, -1.3824256780367314, 0.7626615422551359]
+                    },
+                    {
+                        "direction": [1, 0, 0],
+                        "point": [20, 0, 0]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "spline-4-True-False",
+            "sourceSha256": "430adb0e0d2c95cc0655b19c6811ca05461aad0da86271df8472250a727a878a",
+            "inputs": {
+                "height": 4,
+                "closed": true,
+                "clamped": false
+            },
+            "sourceMicroversion": "71b623fcf55407afc8fbd21a",
+            "notices": [],
+            "result": {
+                "edges": 1,
+                "length": 49.33385878933881,
+                "samples": [
+                    {
+                        "direction": [-0.6349811697522981, 0.7556952149349804, 0.1603859600600288],
+                        "point": [-7.589415207398531e-16, -8.673617379884035e-16, 0]
+                    },
+                    {
+                        "direction": [0.870033320928521, 0.4781100047261841, 0.12021998109639385],
+                        "point": [2.3825705782091946, 3.370478083159289, 0.5233958467464185]
+                    },
+                    {
+                        "direction": [0.5859464995282763, -0.7623946000768118, 0.27462915625307843],
+                        "point": [6.803523795041013, 2.7370444321061016, 1.6571507189138859]
+                    },
+                    {
+                        "direction": [0.9381630851078028, 0.26283246638958485, -0.22532003983795437],
+                        "point": [15.12892767774554, -3.8552039567330354, 2.4602591111474883]
+                    },
+                    {
+                        "direction": [-0.9974293693535059, -0.04999790063326263, -0.05133091742151048],
+                        "point": [16.380562906085256, 0.4127273632657231, -0.6024681079444729]
+                    },
+                    {
+                        "direction": [-0.9955931036362168, -0.08289702663557107, 0.04384580900139603],
+                        "point": [6.656068595930575, -0.4994806589118494, -0.5343759675726463]
+                    },
+                    {
+                        "direction": [-0.6349811697522983, 0.7556952149349802, 0.16038596006002875],
+                        "point": [1.0842021724855044e-15, 3.2526065174565133e-16, -2.710505431213761e-17]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "spline-customParameters",
+            "sourceSha256": "430adb0e0d2c95cc0655b19c6811ca05461aad0da86271df8472250a727a878a",
+            "inputs": {
+                "height": 4,
+                "closed": false,
+                "clamped": true,
+                "customParameters": true
+            },
+            "sourceMicroversion": "71b623fcf55407afc8fbd21a",
+            "notices": [],
+            "result": {
+                "edges": 1,
+                "length": 37.40439261557087,
+                "samples": [
+                    {
+                        "direction": [1, 0, 0],
+                        "point": [0, 0, 0]
+                    },
+                    {
+                        "direction": [-0.12127916571223465, 0.9551128063363504, 0.2702792835872655],
+                        "point": [5.162417763157896, 3.009868421052632, 0.6291118421052633]
+                    },
+                    {
+                        "direction": [0.7512760282287657, -0.5892361005715807, 0.29729639619747944],
+                        "point": [6.009868421052631, 3.8157894736842106, 1.756578947368421]
+                    },
+                    {
+                        "direction": [0.20835290432687595, -0.9771032754639696, -0.0431074974469398],
+                        "point": [12, -4, 3]
+                    },
+                    {
+                        "direction": [-0.3447493970741646, 0.8380648326664769, -0.422841801936268],
+                        "point": [8.786184210526315, -3.3421052631578947, 1.4407894736842104]
+                    },
+                    {
+                        "direction": [0.9170874926011351, 0.36878082551679897, -0.151496645658283],
+                        "point": [10.419819078947368, -1.1282894736842104, 0.446546052631579]
+                    },
+                    {
+                        "direction": [1, 0, 0],
+                        "point": [20, 0, 0]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "spline-interiorDerivative",
+            "sourceSha256": "430adb0e0d2c95cc0655b19c6811ca05461aad0da86271df8472250a727a878a",
+            "inputs": {
+                "height": 4,
+                "closed": false,
+                "clamped": false,
+                "interiorDerivative": true
+            },
+            "sourceMicroversion": "71b623fcf55407afc8fbd21a",
+            "notices": [],
+            "result": {
+                "edges": 1,
+                "length": 28.273925983997113,
+                "samples": [
+                    {
+                        "direction": [0.6002554807609309, 0.7759280487058297, 0.1939820121764574],
+                        "point": [0, 0, 0]
+                    },
+                    {
+                        "direction": [0.69591264528362, 0.6966849841824315, 0.17417124604560788],
+                        "point": [2.059758988388218, 2.4565718100610545, 0.6141429525152636]
+                    },
+                    {
+                        "direction": [0.9663815930961138, 0.2494353463796689, 0.06235883659491723],
+                        "point": [4.299361435754306, 3.90960610340729, 0.9774015258518225]
+                    },
+                    {
+                        "direction": [0.47145657563067744, -0.844071193775401, 0.25548486674001836],
+                        "point": [9.194551262512261, 0.24369249930821815, 1.7357574682903436]
+                    },
+                    {
+                        "direction": [0.960823692341074, 0.15939101603250297, -0.22674288576312907],
+                        "point": [13.982351007095982, -4.530811687206619, 2.889866187769305]
+                    },
+                    {
+                        "direction": [0.7198068362316713, 0.5900462597683725, -0.3656822799200233],
+                        "point": [16.900463604206823, -2.9428060494332273, 1.7419224693743431]
+                    },
+                    {
+                        "direction": [0.6494406422950829, 0.6574985262967986, -0.3819980890696814],
+                        "point": [20, 0, 0]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "spline-arcLength",
+            "sourceSha256": "430adb0e0d2c95cc0655b19c6811ca05461aad0da86271df8472250a727a878a",
+            "inputs": {
+                "height": 4,
+                "closed": false,
+                "clamped": false,
+                "arcLength": true
+            },
+            "sourceMicroversion": "71b623fcf55407afc8fbd21a",
+            "notices": [],
+            "result": {
+                "edges": 1,
+                "length": 27.864022183348084,
+                "samples": [
+                    {
+                        "direction": [0.5790748926235909, 0.812016509233011, 0.07281110812240071],
+                        "point": [0, 0, 0]
+                    },
+                    {
+                        "direction": [0.6773063282653017, 0.7270291024088984, 0.11262691482184493],
+                        "point": [2.1221205287748024, 2.742735284637805, 0.29556427515270556]
+                    },
+                    {
+                        "direction": [0.8762716947705007, -0.37100551449352565, 0.3074131180665992],
+                        "point": [5.052738370937119, 3.978631394551929, 1.0183843650375923]
+                    },
+                    {
+                        "direction": [0.5701055121819452, -0.8049232931478726, 0.1645545414983921],
+                        "point": [9.293171011187754, -1.2133930791391072, 2.647272993930068]
+                    },
+                    {
+                        "direction": [0.87910534382731, 0.36543188638685703, -0.30599563863887014],
+                        "point": [14.851842546079332, -3.9887615111077426, 2.382307310124617]
+                    },
+                    {
+                        "direction": [0.7193354086538958, 0.6017546838079224, -0.3470560046620146],
+                        "point": [17.587080069516652, -2.1945777798129202, 1.2203789673152756]
+                    },
+                    {
+                        "direction": [0.6801326984756121, 0.6431441519099199, -0.35183108493757637],
+                        "point": [20, 0, 0]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "spline-feature-False",
+            "sourceSha256": "4b3558244560dced91dea7982ccccfa0d355bf4caba003e2b532d857a28b2bd2",
+            "inputs": {
+                "closed": false
+            },
+            "sourceMicroversion": "71b623fcf55407afc8fbd21a",
+            "notices": [],
+            "result": {
+                "edges": 1,
+                "length": 27.864022183348084,
+                "samples": [
+                    {
+                        "direction": [0.5790748926235909, 0.812016509233011, 0.07281110812240071],
+                        "point": [0, 0, 0]
+                    },
+                    {
+                        "direction": [0.6830222388986699, 0.7212806554839329, 0.1150427624603837],
+                        "point": [2.1777957819623674, 2.8020155013955717, 0.30488178980792946]
+                    },
+                    {
+                        "direction": [0.9587469694415044, 0.027754224058808525, 0.28290272468398847],
+                        "point": [4.3679736087181205, 4.1104048677706535, 0.7976348637445824]
+                    },
+                    {
+                        "direction": [0.5542127381115982, -0.8126857118199786, 0.17997270548196978],
+                        "point": [8.893494369528923, -0.6373734909207832, 2.5245386774867478]
+                    },
+                    {
+                        "direction": [0.9393602902919601, 0.21161652812195975, -0.2698530897510947],
+                        "point": [14.082499040425148, -4.237720818964863, 2.627474298830241]
+                    },
+                    {
+                        "direction": [0.7425129306971282, 0.5750401210360523, -0.34351623971277406],
+                        "point": [16.99212666289217, -2.674547107517907, 1.5017615564253413]
+                    },
+                    {
+                        "direction": [0.6801326984756121, 0.6431441519099199, -0.35183108493757637],
+                        "point": [20, 0, 0]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "spline-feature-True",
+            "sourceSha256": "4b3558244560dced91dea7982ccccfa0d355bf4caba003e2b532d857a28b2bd2",
+            "inputs": {
+                "closed": true
+            },
+            "sourceMicroversion": "71b623fcf55407afc8fbd21a",
+            "notices": [],
+            "result": {
+                "edges": 1,
+                "length": 49.33385878933881,
+                "samples": [
+                    {
+                        "direction": [-0.6349811697522981, 0.7556952149349804, 0.1603859600600288],
+                        "point": [-7.589415207398531e-16, -8.673617379884035e-16, 0]
+                    },
+                    {
+                        "direction": [0.870033320928521, 0.4781100047261841, 0.12021998109639385],
+                        "point": [2.3825705782091946, 3.370478083159289, 0.5233958467464185]
+                    },
+                    {
+                        "direction": [0.5859464995282763, -0.7623946000768118, 0.27462915625307843],
+                        "point": [6.803523795041013, 2.7370444321061016, 1.6571507189138859]
+                    },
+                    {
+                        "direction": [0.9381630851078028, 0.26283246638958485, -0.22532003983795437],
+                        "point": [15.12892767774554, -3.8552039567330354, 2.4602591111474883]
+                    },
+                    {
+                        "direction": [-0.9974293693535059, -0.04999790063326263, -0.05133091742151048],
+                        "point": [16.380562906085256, 0.4127273632657231, -0.6024681079444729]
+                    },
+                    {
+                        "direction": [-0.9955931036362168, -0.08289702663557107, 0.04384580900139603],
+                        "point": [6.656068595930575, -0.4994806589118494, -0.5343759675726463]
+                    },
+                    {
+                        "direction": [-0.6349811697522983, 0.7556952149349802, 0.16038596006002875],
+                        "point": [1.0842021724855044e-15, 3.2526065174565133e-16, -2.710505431213761e-17]
+                    }
+                ]
+            }
+        },
+        {
+            "id": "invalid-spline",
+            "sourceSha256": "cab5d7636b0b5b51ab1c1af79e7bce3c9c47964a9b83618a8d337a5119597ccf",
+            "inputs": {
+                "operation": "spline"
+            },
+            "sourceMicroversion": "71b623fcf55407afc8fbd21a",
+            "notices": [
+                {
+                    "btType": "BTNotice-227",
+                    "tryNode": null,
+                    "expressionErrorInfo": null,
+                    "type": "SEMANTIC",
+                    "stackTrace": [
+                        {
+                            "btType": "BTLocationInfo-226",
+                            "endLine": 0,
+                            "character": 0,
+                            "line": 0,
+                            "endColumn": 0,
+                            "languageVersion": 0,
+                            "column": 0,
+                            "parseNodeId": "PP2wShGMWPea/pbfo",
+                            "endCharacter": 0,
+                            "moduleIds": null,
+                            "document": "ab12fa5ffe1cc938561b1283",
+                            "version": "246a0ba66cbb3c724c653ab0",
+                            "elementMicroversion": "246a0ba66cbb3c724c653ab0",
+                            "nodeId": "pDBIdrTaxTQoSlAj",
+                            "topLevel": ""
+                        }
+                    ],
+                    "message": "Variable error set but not used",
+                    "level": "INFO",
+                    "nodeId": "OdLcNroahihEhQN1",
+                    "parameterId": ""
+                },
+                {
+                    "btType": "BTNotice-227",
+                    "tryNode": {
+                        "btType": "BTNodeReference-21",
+                        "nodeId": "PP2wShGMWPea/pbfo"
+                    },
+                    "expressionErrorInfo": null,
+                    "type": "MODELING",
+                    "stackTrace": [
+                        {
+                            "btType": "BTLocationInfo-226",
+                            "endLine": 0,
+                            "character": 0,
+                            "line": 0,
+                            "endColumn": 0,
+                            "languageVersion": 0,
+                            "column": 0,
+                            "parseNodeId": "PAnOR4dh/vKbR4AFy",
+                            "endCharacter": 0,
+                            "moduleIds": null,
+                            "document": "ab12fa5ffe1cc938561b1283",
+                            "version": "246a0ba66cbb3c724c653ab0",
+                            "elementMicroversion": "246a0ba66cbb3c724c653ab0",
+                            "nodeId": "mkr5zQ8aRLpSEe66",
+                            "topLevel": "main"
+                        },
+                        {
+                            "btType": "BTLocationInfo-226",
+                            "endLine": 0,
+                            "character": 0,
+                            "line": 0,
+                            "endColumn": 0,
+                            "languageVersion": 0,
+                            "column": 0,
+                            "parseNodeId": "PQCNX5Ge460PW8EIu",
+                            "endCharacter": 0,
+                            "moduleIds": null,
+                            "document": "ab12fa5ffe1cc938561b1283",
+                            "version": "246a0ba66cbb3c724c653ab0",
+                            "elementMicroversion": "246a0ba66cbb3c724c653ab0",
+                            "nodeId": "aUG2LQw5ZSOV7GRw",
+                            "topLevel": ""
+                        },
+                        {
+                            "btType": "BTLocationInfo-226",
+                            "endLine": 0,
+                            "character": 0,
+                            "line": 0,
+                            "endColumn": 0,
+                            "languageVersion": 0,
+                            "column": 0,
+                            "parseNodeId": "PvOoDa5bmg1zCqcEn",
+                            "endCharacter": 0,
+                            "moduleIds": null,
+                            "document": "ab12fa5ffe1cc938561b1283",
+                            "version": "246a0ba66cbb3c724c653ab0",
+                            "elementMicroversion": "246a0ba66cbb3c724c653ab0",
+                            "nodeId": "Zp7/Pzx2G30F5JEf",
+                            "topLevel": ""
+                        },
+                        {
+                            "btType": "BTLocationInfo-226",
+                            "endLine": 807,
+                            "character": 50125,
+                            "line": 807,
+                            "endColumn": 49,
+                            "languageVersion": 3083,
+                            "column": 12,
+                            "parseNodeId": "PYCq354YHDQ4uvROI",
+                            "endCharacter": 50162,
+                            "moduleIds": {
+                                "btType": "BTDocumentVersionElementIds-1897",
+                                "documentId": "12312312345abcabcabcdeff",
+                                "elementId": "ddbe7e9c67ca4a44935354fa",
+                                "versionId": "cc01d079f5427853fb34b721"
+                            },
+                            "document": "onshape/std/geomOperations.fs",
+                            "version": "3083.0",
+                            "elementMicroversion": "6e776b26bb9941a6165f26f8",
+                            "nodeId": "3CWGvpliLEOxph1F",
+                            "topLevel": "const opFitSpline"
+                        }
+                    ],
+                    "message": "@opFitSpline: INVALID_INPUT",
+                    "level": "INFO",
+                    "nodeId": "vBiGzrftZLwJcoFY",
+                    "parameterId": ""
+                }
+            ],
+            "result": {
+                "outputs": 0,
+                "rejected": true,
+                "remainingVolume": 4800
+            }
+        },
+        {
+            "id": "invalid-parameters",
+            "sourceSha256": "cab5d7636b0b5b51ab1c1af79e7bce3c9c47964a9b83618a8d337a5119597ccf",
+            "inputs": {
+                "operation": "parameters"
+            },
+            "sourceMicroversion": "71b623fcf55407afc8fbd21a",
+            "notices": [
+                {
+                    "btType": "BTNotice-227",
+                    "tryNode": null,
+                    "expressionErrorInfo": null,
+                    "type": "SEMANTIC",
+                    "stackTrace": [
+                        {
+                            "btType": "BTLocationInfo-226",
+                            "endLine": 0,
+                            "character": 0,
+                            "line": 0,
+                            "endColumn": 0,
+                            "languageVersion": 0,
+                            "column": 0,
+                            "parseNodeId": "PARSmmLqP3tGx4G9u",
+                            "endCharacter": 0,
+                            "moduleIds": null,
+                            "document": "ab12fa5ffe1cc938561b1283",
+                            "version": "246a0ba66cbb3c724c653ab0",
+                            "elementMicroversion": "246a0ba66cbb3c724c653ab0",
+                            "nodeId": "YqTb60KHhVrrMKT+",
+                            "topLevel": ""
+                        }
+                    ],
+                    "message": "Variable error set but not used",
+                    "level": "INFO",
+                    "nodeId": "eCUGpOtxh87FfH9s",
+                    "parameterId": ""
+                },
+                {
+                    "btType": "BTNotice-227",
+                    "tryNode": {
+                        "btType": "BTNodeReference-21",
+                        "nodeId": "PARSmmLqP3tGx4G9u"
+                    },
+                    "expressionErrorInfo": null,
+                    "type": "MODELING",
+                    "stackTrace": [
+                        {
+                            "btType": "BTLocationInfo-226",
+                            "endLine": 0,
+                            "character": 0,
+                            "line": 0,
+                            "endColumn": 0,
+                            "languageVersion": 0,
+                            "column": 0,
+                            "parseNodeId": "P2yYuKQGv3AOsiFjo",
+                            "endCharacter": 0,
+                            "moduleIds": null,
+                            "document": "ab12fa5ffe1cc938561b1283",
+                            "version": "246a0ba66cbb3c724c653ab0",
+                            "elementMicroversion": "246a0ba66cbb3c724c653ab0",
+                            "nodeId": "nEY9/6SuP2XVr4Zb",
+                            "topLevel": "main"
+                        },
+                        {
+                            "btType": "BTLocationInfo-226",
+                            "endLine": 0,
+                            "character": 0,
+                            "line": 0,
+                            "endColumn": 0,
+                            "languageVersion": 0,
+                            "column": 0,
+                            "parseNodeId": "P1NjiOoCg5TU4E83c",
+                            "endCharacter": 0,
+                            "moduleIds": null,
+                            "document": "ab12fa5ffe1cc938561b1283",
+                            "version": "246a0ba66cbb3c724c653ab0",
+                            "elementMicroversion": "246a0ba66cbb3c724c653ab0",
+                            "nodeId": "28k+yJpfQQ6wbmpv",
+                            "topLevel": ""
+                        },
+                        {
+                            "btType": "BTLocationInfo-226",
+                            "endLine": 0,
+                            "character": 0,
+                            "line": 0,
+                            "endColumn": 0,
+                            "languageVersion": 0,
+                            "column": 0,
+                            "parseNodeId": "Pr8ynFv12p7ToN3aC",
+                            "endCharacter": 0,
+                            "moduleIds": null,
+                            "document": "ab12fa5ffe1cc938561b1283",
+                            "version": "246a0ba66cbb3c724c653ab0",
+                            "elementMicroversion": "246a0ba66cbb3c724c653ab0",
+                            "nodeId": "3IQpalX5U9Bv8NbB",
+                            "topLevel": ""
+                        },
+                        {
+                            "btType": "BTLocationInfo-226",
+                            "endLine": 807,
+                            "character": 50125,
+                            "line": 807,
+                            "endColumn": 49,
+                            "languageVersion": 3083,
+                            "column": 12,
+                            "parseNodeId": "PYCq354YHDQ4uvROI",
+                            "endCharacter": 50162,
+                            "moduleIds": {
+                                "btType": "BTDocumentVersionElementIds-1897",
+                                "documentId": "12312312345abcabcabcdeff",
+                                "elementId": "ddbe7e9c67ca4a44935354fa",
+                                "versionId": "cc01d079f5427853fb34b721"
+                            },
+                            "document": "onshape/std/geomOperations.fs",
+                            "version": "3083.0",
+                            "elementMicroversion": "6e776b26bb9941a6165f26f8",
+                            "nodeId": "2/WDrro+p/U5hPdv",
+                            "topLevel": "const opFitSpline"
+                        }
+                    ],
+                    "message": "@opFitSpline: INVALID_RESULT",
+                    "level": "INFO",
+                    "nodeId": "NW9SzAG6GpkgM3/f",
+                    "parameterId": ""
+                }
+            ],
+            "result": {
+                "outputs": 0,
+                "rejected": true,
+                "remainingVolume": 4800
+            }
+        },
+        {
+            "id": "invalid-fill",
+            "sourceSha256": "cab5d7636b0b5b51ab1c1af79e7bce3c9c47964a9b83618a8d337a5119597ccf",
+            "inputs": {
+                "operation": "fill"
+            },
+            "sourceMicroversion": "71b623fcf55407afc8fbd21a",
+            "notices": [
+                {
+                    "btType": "BTNotice-227",
+                    "tryNode": null,
+                    "expressionErrorInfo": null,
+                    "type": "SEMANTIC",
+                    "stackTrace": [
+                        {
+                            "btType": "BTLocationInfo-226",
+                            "endLine": 0,
+                            "character": 0,
+                            "line": 0,
+                            "endColumn": 0,
+                            "languageVersion": 0,
+                            "column": 0,
+                            "parseNodeId": "P+lwbk3/7C6kujDe/",
+                            "endCharacter": 0,
+                            "moduleIds": null,
+                            "document": "ab12fa5ffe1cc938561b1283",
+                            "version": "246a0ba66cbb3c724c653ab0",
+                            "elementMicroversion": "246a0ba66cbb3c724c653ab0",
+                            "nodeId": "7gqeeNubIKUlGHkS",
+                            "topLevel": ""
+                        }
+                    ],
+                    "message": "Variable error set but not used",
+                    "level": "INFO",
+                    "nodeId": "LVmw6WXt/SUI5ArW",
+                    "parameterId": ""
+                },
+                {
+                    "btType": "BTNotice-227",
+                    "tryNode": {
+                        "btType": "BTNodeReference-21",
+                        "nodeId": "P+lwbk3/7C6kujDe/"
+                    },
+                    "expressionErrorInfo": null,
+                    "type": "MODELING",
+                    "stackTrace": [
+                        {
+                            "btType": "BTLocationInfo-226",
+                            "endLine": 0,
+                            "character": 0,
+                            "line": 0,
+                            "endColumn": 0,
+                            "languageVersion": 0,
+                            "column": 0,
+                            "parseNodeId": "PVvV48hIOVF3iACc8",
+                            "endCharacter": 0,
+                            "moduleIds": null,
+                            "document": "ab12fa5ffe1cc938561b1283",
+                            "version": "246a0ba66cbb3c724c653ab0",
+                            "elementMicroversion": "246a0ba66cbb3c724c653ab0",
+                            "nodeId": "S8fCfRInWGO1vP2v",
+                            "topLevel": "main"
+                        },
+                        {
+                            "btType": "BTLocationInfo-226",
+                            "endLine": 0,
+                            "character": 0,
+                            "line": 0,
+                            "endColumn": 0,
+                            "languageVersion": 0,
+                            "column": 0,
+                            "parseNodeId": "PLuV1rFvC+xPO+va2",
+                            "endCharacter": 0,
+                            "moduleIds": null,
+                            "document": "ab12fa5ffe1cc938561b1283",
+                            "version": "246a0ba66cbb3c724c653ab0",
+                            "elementMicroversion": "246a0ba66cbb3c724c653ab0",
+                            "nodeId": "A3+YyDqCiOlj4fyB",
+                            "topLevel": ""
+                        },
+                        {
+                            "btType": "BTLocationInfo-226",
+                            "endLine": 0,
+                            "character": 0,
+                            "line": 0,
+                            "endColumn": 0,
+                            "languageVersion": 0,
+                            "column": 0,
+                            "parseNodeId": "P5G+UfPKUyJ38+S+l",
+                            "endCharacter": 0,
+                            "moduleIds": null,
+                            "document": "ab12fa5ffe1cc938561b1283",
+                            "version": "246a0ba66cbb3c724c653ab0",
+                            "elementMicroversion": "246a0ba66cbb3c724c653ab0",
+                            "nodeId": "jpoLMAiigYKDZ2sU",
+                            "topLevel": ""
+                        },
+                        {
+                            "btType": "BTLocationInfo-226",
+                            "endLine": 770,
+                            "character": 47869,
+                            "line": 770,
+                            "endColumn": 51,
+                            "languageVersion": 3083,
+                            "column": 12,
+                            "parseNodeId": "Pmc0edUGliNA5Cgym",
+                            "endCharacter": 47908,
+                            "moduleIds": {
+                                "btType": "BTDocumentVersionElementIds-1897",
+                                "documentId": "12312312345abcabcabcdeff",
+                                "elementId": "ddbe7e9c67ca4a44935354fa",
+                                "versionId": "cc01d079f5427853fb34b721"
+                            },
+                            "document": "onshape/std/geomOperations.fs",
+                            "version": "3083.0",
+                            "elementMicroversion": "6e776b26bb9941a6165f26f8",
+                            "nodeId": "qhWgReAPXo3rU86d",
+                            "topLevel": "const opFillSurface"
+                        }
+                    ],
+                    "message": "@opFillSurface: FILL_SURFACE_OPEN_LOOP",
+                    "level": "INFO",
+                    "nodeId": "i+X71vdcPUAg9JLn",
+                    "parameterId": ""
+                }
+            ],
+            "result": {
+                "outputs": 0,
+                "rejected": true,
+                "remainingVolume": 4800
+            }
+        },
+        {
+            "id": "invalid-draft",
+            "sourceSha256": "cab5d7636b0b5b51ab1c1af79e7bce3c9c47964a9b83618a8d337a5119597ccf",
+            "inputs": {
+                "operation": "draft",
+                "angle": 91
+            },
+            "sourceMicroversion": "71b623fcf55407afc8fbd21a",
+            "notices": [
+                {
+                    "btType": "BTNotice-227",
+                    "tryNode": null,
+                    "expressionErrorInfo": null,
+                    "type": "SEMANTIC",
+                    "stackTrace": [
+                        {
+                            "btType": "BTLocationInfo-226",
+                            "endLine": 0,
+                            "character": 0,
+                            "line": 0,
+                            "endColumn": 0,
+                            "languageVersion": 0,
+                            "column": 0,
+                            "parseNodeId": "PLb+F2Hu+WRvd40Tl",
+                            "endCharacter": 0,
+                            "moduleIds": null,
+                            "document": "ab12fa5ffe1cc938561b1283",
+                            "version": "246a0ba66cbb3c724c653ab0",
+                            "elementMicroversion": "246a0ba66cbb3c724c653ab0",
+                            "nodeId": "Ufr0StUxKnL/Gg7/",
+                            "topLevel": ""
+                        }
+                    ],
+                    "message": "Variable error set but not used",
+                    "level": "INFO",
+                    "nodeId": "A0kU6tDIEhAjhaFK",
+                    "parameterId": ""
+                },
+                {
+                    "btType": "BTNotice-227",
+                    "tryNode": {
+                        "btType": "BTNodeReference-21",
+                        "nodeId": "PLb+F2Hu+WRvd40Tl"
+                    },
+                    "expressionErrorInfo": null,
+                    "type": "MODELING",
+                    "stackTrace": [
+                        {
+                            "btType": "BTLocationInfo-226",
+                            "endLine": 0,
+                            "character": 0,
+                            "line": 0,
+                            "endColumn": 0,
+                            "languageVersion": 0,
+                            "column": 0,
+                            "parseNodeId": "PJC/7GCC5Jrw/uteg",
+                            "endCharacter": 0,
+                            "moduleIds": null,
+                            "document": "ab12fa5ffe1cc938561b1283",
+                            "version": "246a0ba66cbb3c724c653ab0",
+                            "elementMicroversion": "246a0ba66cbb3c724c653ab0",
+                            "nodeId": "cJ2cau9cC0Q2gy1R",
+                            "topLevel": "main"
+                        },
+                        {
+                            "btType": "BTLocationInfo-226",
+                            "endLine": 0,
+                            "character": 0,
+                            "line": 0,
+                            "endColumn": 0,
+                            "languageVersion": 0,
+                            "column": 0,
+                            "parseNodeId": "P5OqGu6eTAjA5Tb01",
+                            "endCharacter": 0,
+                            "moduleIds": null,
+                            "document": "ab12fa5ffe1cc938561b1283",
+                            "version": "246a0ba66cbb3c724c653ab0",
+                            "elementMicroversion": "246a0ba66cbb3c724c653ab0",
+                            "nodeId": "teOPoH7TKYOuuvMf",
+                            "topLevel": ""
+                        },
+                        {
+                            "btType": "BTLocationInfo-226",
+                            "endLine": 0,
+                            "character": 0,
+                            "line": 0,
+                            "endColumn": 0,
+                            "languageVersion": 0,
+                            "column": 0,
+                            "parseNodeId": "PZqWMNiFUtmmgkBC7",
+                            "endCharacter": 0,
+                            "moduleIds": null,
+                            "document": "ab12fa5ffe1cc938561b1283",
+                            "version": "246a0ba66cbb3c724c653ab0",
+                            "elementMicroversion": "246a0ba66cbb3c724c653ab0",
+                            "nodeId": "JPZtbt7uj12Yt8xl",
+                            "topLevel": ""
+                        },
+                        {
+                            "btType": "BTLocationInfo-226",
+                            "endLine": 515,
+                            "character": 29848,
+                            "line": 515,
+                            "endColumn": 45,
+                            "languageVersion": 3083,
+                            "column": 12,
+                            "parseNodeId": "PcR5Ab3Us6YsuLgBo",
+                            "endCharacter": 29881,
+                            "moduleIds": {
+                                "btType": "BTDocumentVersionElementIds-1897",
+                                "documentId": "12312312345abcabcabcdeff",
+                                "elementId": "ddbe7e9c67ca4a44935354fa",
+                                "versionId": "cc01d079f5427853fb34b721"
+                            },
+                            "document": "onshape/std/geomOperations.fs",
+                            "version": "3083.0",
+                            "elementMicroversion": "6e776b26bb9941a6165f26f8",
+                            "nodeId": "IZova6Ljig0HRHFG",
+                            "topLevel": "const opDraft"
+                        }
+                    ],
+                    "message": "@opDraft: INVALID_INPUT",
+                    "level": "INFO",
+                    "nodeId": "9l451sFMf59NTbtM",
+                    "parameterId": ""
+                }
+            ],
+            "result": {
+                "outputs": 0,
+                "rejected": true,
+                "remainingVolume": 4800
+            }
+        },
+        {
+            "id": "draft-face-disappearance",
+            "sourceSha256": "cab5d7636b0b5b51ab1c1af79e7bce3c9c47964a9b83618a8d337a5119597ccf",
+            "inputs": {
+                "operation": "draft",
+                "angle": 89
+            },
+            "sourceMicroversion": "71b623fcf55407afc8fbd21a",
+            "notices": [
+                {
+                    "btType": "BTNotice-227",
+                    "tryNode": null,
+                    "expressionErrorInfo": null,
+                    "type": "SEMANTIC",
+                    "stackTrace": [
+                        {
+                            "btType": "BTLocationInfo-226",
+                            "endLine": 0,
+                            "character": 0,
+                            "line": 0,
+                            "endColumn": 0,
+                            "languageVersion": 0,
+                            "column": 0,
+                            "parseNodeId": "PtaLVhWB+6pG7Ei6s",
+                            "endCharacter": 0,
+                            "moduleIds": null,
+                            "document": "ab12fa5ffe1cc938561b1283",
+                            "version": "246a0ba66cbb3c724c653ab0",
+                            "elementMicroversion": "246a0ba66cbb3c724c653ab0",
+                            "nodeId": "Lpht98BEDOkLouck",
+                            "topLevel": ""
+                        }
+                    ],
+                    "message": "Variable error set but not used",
+                    "level": "INFO",
+                    "nodeId": "I4idAGbzPyNi3Z1a",
+                    "parameterId": ""
+                }
+            ],
+            "result": {
+                "outputs": 0,
+                "rejected": false,
+                "remainingVolume": 69.82025971286211
+            }
+        },
+        {
+            "id": "fill-G1",
+            "sourceSha256": "0cea3bcec0f1e6b82b7d985832b0c75a7017e646b85da3af4b47d5b2f22e824f",
+            "inputs": {
+                "order": 1
+            },
+            "sourceMicroversion": "71b623fcf55407afc8fbd21a",
+            "notices": [],
+            "result": {
+                "area": 400,
+                "bodies": 1,
+                "edges": 4,
+                "faces": 1,
+                "length": 80,
+                "max": [20, 20, 10],
+                "min": [0, 0, 10],
+                "solids": 0,
+                "volume": 0
+            }
+        },
+        {
+            "id": "fill-G2",
+            "sourceSha256": "0cea3bcec0f1e6b82b7d985832b0c75a7017e646b85da3af4b47d5b2f22e824f",
+            "inputs": {
+                "order": 2
+            },
+            "sourceMicroversion": "71b623fcf55407afc8fbd21a",
+            "notices": [],
+            "result": {
+                "area": 400,
+                "bodies": 1,
+                "edges": 4,
+                "faces": 1,
+                "length": 80,
+                "max": [20, 20, 10],
+                "min": [0, 0, 10],
+                "solids": 0,
+                "volume": 0
+            }
+        }
+    ]
+}

@@ -29,7 +29,7 @@ import {
 import {
     button,
     ColorConverter,
-    createIcon,
+    createCadIcon,
     div,
     input,
     label,
@@ -57,7 +57,7 @@ export class CommandContext extends HTMLElement implements IDisposable {
 
     private render() {
         const data = CommandStore.getComandData(this.command);
-        const icon = createIcon(data!.icon);
+        const icon = createCadIcon(data!.key, data!.icon);
         icon.classList.add(style.icon);
         this.container.append(
             div(

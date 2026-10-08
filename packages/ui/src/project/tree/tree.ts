@@ -3,9 +3,11 @@
 
 import {
     FolderNode,
+    I18n,
     type IDocument,
     type INode,
     type INodeLinkedList,
+    isFeatureListNode,
     type ModelManager,
     type NodeRecord,
     NodeSelectionHandler,
@@ -100,7 +102,16 @@ export class Tree extends HTMLElement {
         const query = text.trim().toLocaleLowerCase();
         const shown = new Set<INode>();
         for (const node of this.nodeMap.keys()) {
-            if (!query || node.name.toLocaleLowerCase().includes(query)) {
+            if (
+                !query ||
+                node.name.toLocaleLowerCase().includes(query) ||
+                (isFeatureListNode(node) &&
+                    node
+                        .featureItems()
+                        .some((item) =>
+                            (item.name ?? I18n.translate(item.display)).toLocaleLowerCase().includes(query),
+                        ))
+            ) {
                 let ancestor: INode | undefined = node;
                 while (ancestor) {
                     shown.add(ancestor);

@@ -19,6 +19,7 @@ import {
 import { div } from "@chili3d/element";
 import style from "./elements.module.css";
 import { ElementTabStrip } from "./elementTabStrip";
+import { ElementTabsSidebar } from "./elementTabsSidebar";
 import { setShown } from "./visibility";
 
 /** The Part Studio's tab id: one per document, and not a node. */
@@ -67,6 +68,9 @@ interface DocumentState {
  */
 export class ElementWorkspace implements IElementHost {
     readonly strip: ElementTabStrip;
+    readonly tabsSidebar: ElementTabsSidebar;
+    /** The editor closes other left docks before showing the tab browser. */
+    onTabsOpened?: () => void;
     private readonly states = new Map<IDocument, DocumentState>();
     /** Element nodes of the active document whose renames redraw their tab. */
     private readonly watched = new Set<INode>();
@@ -82,6 +86,7 @@ export class ElementWorkspace implements IElementHost {
     ) {
         // The Part Studio until told otherwise.
         setShown(viewArea, false);
+        this.tabsSidebar = new ElementTabsSidebar(this, () => this.closeTabs(true));
         this.strip = new ElementTabStrip(this);
     }
 
@@ -91,6 +96,7 @@ export class ElementWorkspace implements IElementHost {
         this.connected = true;
         PubSub.default.sub("activeViewChanged", this.handleActiveViewChanged);
         PubSub.default.sub("documentClosed", this.handleDocumentClosed);
+        PubSub.default.sub("documentSaved", this.handleDocumentSaved);
         DocumentElements.onChanged(this.handleRegistryChanged);
         DocumentElements.setHost(this);
         this.setDocument(this.app.activeView?.document);
@@ -101,6 +107,8 @@ export class ElementWorkspace implements IElementHost {
         this.connected = false;
         PubSub.default.remove("activeViewChanged", this.handleActiveViewChanged);
         PubSub.default.remove("documentClosed", this.handleDocumentClosed);
+        PubSub.default.remove("documentSaved", this.handleDocumentSaved);
+        this.closeTabs();
         DocumentElements.removeChanged(this.handleRegistryChanged);
         if (DocumentElements.host === this) DocumentElements.setHost(undefined);
         this.setDocument(undefined);
@@ -114,6 +122,23 @@ export class ElementWorkspace implements IElementHost {
     /** The active tab of the current document. */
     get activeId(): string {
         return this._document === undefined ? PART_STUDIO_ID : this.stateOf(this._document).activeId;
+    }
+
+    toggleTabs(): void {
+        if (!this.tabsSidebar.hidden) this.closeTabs();
+        else if (this._document) {
+            this.onTabsOpened?.();
+            this.partStudio.setAttribute("data-tabs-open", "");
+            this.tabsSidebar.show();
+            this.strip.render();
+        }
+    }
+
+    closeTabs(focusButton = false): void {
+        this.tabsSidebar.hide();
+        this.partStudio.removeAttribute("data-tabs-open");
+        this.strip.render();
+        if (focusButton) this.strip.focusTabsButton();
     }
 
     /** The current document's tabs: the Part Studio, then its element nodes in model-tree order. */
@@ -305,6 +330,7 @@ export class ElementWorkspace implements IElementHost {
         this.partStudio.toggleAttribute("data-viewport-only", beside);
         this.viewArea.toggleAttribute("data-beside-viewport", beside);
         this.strip.render();
+        this.tabsSidebar.render();
         if (active?.view !== this.shownView) {
             this.shownView?.deactivated?.();
             this.shownView = active?.view;
@@ -376,7 +402,14 @@ export class ElementWorkspace implements IElementHost {
     };
 
     private readonly handleNodeChanged = (property: string) => {
-        if (property === "name") this.strip.render();
+        if (property === "name") {
+            this.strip.render();
+            this.tabsSidebar.render();
+        }
+    };
+
+    private readonly handleDocumentSaved = (document: IDocument) => {
+        if (document === this._document) this.tabsSidebar.refreshPreview();
     };
 }
 

@@ -9,6 +9,7 @@ import type { Navigation3DType } from "./navigation";
 import { type SerializedData, Serializer, serialize } from "./serialize";
 import { type ObjectSnapType, ObjectSnapTypes, ObjectSnapTypeUtils } from "./snapType";
 import type { RibbonPreferences } from "./ui/ribbonPreferences";
+import { defaultUserPreferences, mergeUserPreferences, type UserPreferences } from "./userPreferences";
 
 export const DefaultLightEdgeColor = 0x333333;
 export const DefaultDarkEdgeColor = 0xeeeeee;
@@ -51,6 +52,13 @@ export class Config extends Observable {
     }
 
     readonly SnapDistance: number = 10;
+
+    get preferences(): UserPreferences {
+        return mergeUserPreferences(this.getPrivateValue("preferences", defaultUserPreferences()));
+    }
+    set preferences(value: UserPreferences) {
+        this.setProperty("preferences", structuredClone(value));
+    }
 
     get graphics(): GraphicsPreferences {
         return { ...DEFAULT_GRAPHICS, ...this.getPrivateValue("graphics", { ...DEFAULT_GRAPHICS }) };
@@ -194,6 +202,7 @@ export class Config extends Observable {
             graphics: this.graphics,
             customShortcuts: this.customShortcuts,
             ribbonPreferences: this.ribbonPreferences,
+            preferences: this.preferences,
         });
     }
 }

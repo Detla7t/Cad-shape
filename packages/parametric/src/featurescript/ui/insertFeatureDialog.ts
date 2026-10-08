@@ -5,6 +5,8 @@ import { I18n, type IDocument, PubSub, showPartStudio } from "@chili3d/core";
 import { ParametricBodyNode } from "../../parametricBodyNode";
 import type { FeatureStudioNode } from "../featureStudioNode";
 import { customFeatures, insertCustomFeature } from "../insertFeature";
+import { providedOnshapeStd } from "../runtime";
+import { insertStandardFeature, STANDARD_FEATURES } from "../standardFeatures";
 import style from "./insertFeatureDialog.module.css";
 
 function element<K extends keyof HTMLElementTagNameMap>(
@@ -28,11 +30,17 @@ function translate(key: Parameters<typeof I18n.translate>[0], ...args: unknown[]
  */
 export function showInsertFeatureDialog(document: IDocument, studio?: FeatureStudioNode): void {
     const entries = customFeatures(document, studio);
-    if (entries.length === 0) {
+    const standardEntries = studio === undefined && providedOnshapeStd() ? STANDARD_FEATURES : [];
+    if (entries.length === 0 && standardEntries.length === 0) {
         PubSub.default.pub("showToast", "featurescript.insert.none");
         return;
     }
     const featureSelect = element("select");
+    for (const entry of standardEntries) {
+        const option = element("option", undefined, entry.displayName);
+        option.value = `standard:${entry.featureName}`;
+        featureSelect.append(option);
+    }
     entries.forEach((entry, index) => {
         const option = element(
             "option",
@@ -70,10 +78,13 @@ export function showInsertFeatureDialog(document: IDocument, studio?: FeatureStu
         {
             content: "common.confirm",
             onclick: () => {
-                const entry = entries[Number(featureSelect.value)];
                 const body = bodies.find((candidate) => candidate.id === targetSelect.value);
-                if (entry === undefined) return;
-                const result = insertCustomFeature(document, entry, body);
+                const standard = featureSelect.value.startsWith("standard:");
+                const entry = entries[Number(featureSelect.value)];
+                if (!standard && entry === undefined) return;
+                const result = standard
+                    ? insertStandardFeature(document, featureSelect.value.slice("standard:".length), body)
+                    : insertCustomFeature(document, entry, body);
                 if (!result.isOk) PubSub.default.pub("showToast", "error.default:{0}", result.error);
                 // Inserted from a studio's tab: show the body taking the new feature.
                 else showPartStudio(document);

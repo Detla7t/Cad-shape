@@ -70,6 +70,29 @@ export interface IShapeFactory {
     shell(faces: IFace[]): Result<IShell>;
     solid(shells: IShell[]): Result<ISolid>;
     bezier(points: XYZLike[], weights?: number[]): Result<IEdge>;
+    /** Interpolate points in mm at the supplied parameters, with optional first derivatives. */
+    fitSpline?(
+        points: XYZLike[],
+        parameters: number[],
+        derivatives: (XYZLike | undefined)[],
+        periodic: boolean,
+    ): Result<IEdge>;
+    /** Fill one closed boundary. Support faces are required for G1/G2 constraints. */
+    fillSurface?(
+        edges: IEdge[],
+        continuity: number[],
+        supports: (IFace | undefined)[],
+        points: XYZLike[],
+    ): Result<TrackedShape>;
+    /** Neutral-plane draft; angle in degrees, lengths in mm. */
+    draftTracked?(
+        shape: IShape,
+        faces: number[],
+        pull: XYZLike,
+        origin: XYZLike,
+        normal: XYZLike,
+        angle: number,
+    ): Result<TrackedShape>;
     helix(
         origin: XYZLike,
         normal: XYZLike,

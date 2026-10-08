@@ -77,7 +77,7 @@ function featureNode(parameters: FeatureItem["parameters"], item?: Partial<Featu
 
 function expandFirstRow(prop: FeatureListProperty) {
     const header = mustQuery<HTMLElement>(prop, ".fl-header");
-    (header as unknown as { _onclick: () => void })._onclick();
+    (header as unknown as { _onclick: (event: MouseEvent) => void })._onclick(new MouseEvent("click"));
 }
 
 function openMenu(prop: FeatureListProperty) {
@@ -327,11 +327,12 @@ describe("FeatureListProperty", () => {
         const prop = new FeatureListProperty(doc, node);
         const menu = openMenu(prop);
 
-        expect(menu.querySelectorAll(".fl-menu-item").length).toBe(6);
+        expect(menu.querySelectorAll(".fl-menu-item").length).toBe(7);
+        expect(menu.textContent).toContain("Edit…");
         expect(menu.textContent).toContain("Add comment");
         expect(menu.textContent).toContain("Where used…");
 
-        clickMenuItem(menu, 3);
+        clickMenuItem(menu, 4);
         expect(node.removeFeature).toHaveBeenCalledWith("b1");
         expect(document.body.querySelector(".fl-menu")).toBeNull();
     });
@@ -342,7 +343,7 @@ describe("FeatureListProperty", () => {
         const prop = new FeatureListProperty(doc, node);
         const menu = openMenu(prop);
 
-        clickMenuItem(menu, 1);
+        clickMenuItem(menu, 2);
         expect(node.setFeatureSuppressed).toHaveBeenCalledWith("b1", true);
     });
 
@@ -352,7 +353,7 @@ describe("FeatureListProperty", () => {
         const prop = new FeatureListProperty(doc, node);
         const menu = openMenu(prop);
 
-        clickMenuItem(menu, 0);
+        clickMenuItem(menu, 1);
         expect(showDialogMock.calls.length).toBe(1);
         const dialogInput = showDialogMock.calls[0][1] as HTMLInputElement;
         dialogInput.value = "  Boss  ";

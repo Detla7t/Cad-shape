@@ -3,10 +3,14 @@
 
 import {
     AsyncController,
+    Config,
     CurveUtils,
+    documentQuantityUnit,
     documentUnit,
     documentUnits,
+    evaluateSelectionMeasurement,
     evaluateShapeProperties,
+    formatDocumentQuantity,
     type IEdge,
     type IFace,
     type INodeVisual,
@@ -31,6 +35,8 @@ export class GeometryPanel {
     readonly element: HTMLElement;
     private readonly output = document.createElement("div");
     private readonly density = document.createElement("input");
+    private readonly densityLabel = document.createElement("label");
+    private densityFactor = 1000;
     private readonly measureType = document.createElement("select");
     private readonly lengthUnit = document.createElement("select");
     private readonly angleUnit = document.createElement("select");
@@ -85,6 +91,7 @@ export class GeometryPanel {
                 ["diameter", "Diameter"],
                 ["angle", "Angle"],
                 ["distance", "Minimum distance"],
+                ["maxDistance", "Maximum distance"],
                 ["area", "Area"],
                 ["volume", "Volume"],
             ]);
@@ -141,14 +148,15 @@ export class GeometryPanel {
             this.density.min = "0";
             this.density.step = "any";
             this.density.placeholder = "Enter density";
-            this.density.setAttribute("aria-label", "Density in g/cm³");
+            this.updateDensityUnit();
             this.density.oninput = this.render;
-            body.append(labeled("Density (g/cm³)", this.density));
+            body.append(this.densityLabel);
         }
         body.append(this.output);
         view.document.selection.onNodeChanged.sub(this.render);
         view.document.selection.onShapeChanged.sub(this.render);
         PubSub.default.sub("documentUnitsChanged", this.unitsChanged);
+        Config.instance.onPropertyChanged(this.preferencesChanged);
         view.document.history.onChanged(this.modelChanged);
         this.render();
         root.addEventListener("keydown", (event) => event.stopPropagation());
@@ -202,8 +210,22 @@ export class GeometryPanel {
         }
     }
     private readonly unitsChanged = (doc: IView["document"]) => {
-        if (doc === this.view.document) this.render();
+        if (doc === this.view.document) {
+            this.updateDensityUnit();
+            this.render();
+        }
     };
+    private readonly preferencesChanged = (key: keyof Config) => {
+        if (key === "preferences") this.render();
+    };
+    private updateDensityUnit() {
+        const unit = documentQuantityUnit(this.view.document, "density");
+        if (Number.isFinite(this.density.valueAsNumber))
+            this.density.value = String((this.density.valueAsNumber * this.densityFactor) / unit.factor);
+        this.densityFactor = unit.factor;
+        this.density.setAttribute("aria-label", `Density in ${unit.suffix}`);
+        this.densityLabel.replaceChildren(document.createTextNode(`Density (${unit.suffix})`), this.density);
+    }
     private readonly modelChanged = () => {
         if (this.queued || this.disposed) return;
         this.queued = true;
@@ -354,9 +376,12 @@ export class GeometryPanel {
                     ["Centroid Y", length(props.centroid[1])],
                     ["Centroid Z", length(props.centroid[2])],
                 );
-                const density = this.density.valueAsNumber;
+                const density = (this.density.valueAsNumber * this.densityFactor) / 1000;
                 if (props.dimension === 3 && Number.isFinite(density) && density > 0)
-                    rows.push(["Mass", `${((props.measure * density) / 1e6).toFixed(6)} kg`]);
+                    rows.push([
+                        "Mass",
+                        formatDocumentQuantity((props.measure * density) / 1e6, this.view.document, "mass"),
+                    ]);
                 else if (props.dimension === 3)
                     rows.push(["Mass", "Enter a density; material densities are not assigned."]);
                 let surfaceArea = 0;
@@ -463,6 +488,22 @@ export class GeometryPanel {
             if (volumeSum) rows.push(["Volume", power(volumeSum, 3)]);
             if (shapes.length === 2)
                 rows.push(["Minimum distance", length(shapes[0].extremaDistance(shapes[1]))]);
+            if (
+                this.kind === "measure" &&
+                shapes.length === 2 &&
+                ["all", "maxDistance"].includes(this.measureType.value)
+            ) {
+                const maximum = shapes[0].distanceMeasure?.(shapes[1], true);
+                if (maximum?.isOk) rows.push(["Maximum distance", length(maximum.value.value)]);
+            }
+            if (this.kind === "measure" && shapes.length === 1 && shapes[0].shapeType === ShapeTypes.face) {
+                const radial = evaluateSelectionMeasurement(doc, "diameter");
+                if (radial.isOk && radial.value.measurement.mode === "diameter")
+                    rows.push(
+                        ["Radius", length(radial.value.measurement.value / 2)],
+                        ["Diameter", length(radial.value.measurement.value)],
+                    );
+            }
             if (shapes.length === 2 && shapes.every((shape) => shape.shapeType === ShapeTypes.edge)) {
                 const curves = shapes.map((shape) => (shape as IEdge).curve);
                 if (curves.every((curve) => CurveUtils.isLine(curve.basisCurve))) {
@@ -485,7 +526,8 @@ export class GeometryPanel {
                 radius: /^Radius$/,
                 diameter: /^Diameter$/,
                 angle: /^Angle$/,
-                distance: /distance/i,
+                distance: /^Minimum distance$/,
+                maxDistance: /^Maximum distance$/,
                 area: /area/i,
                 volume: /^Volume$/,
             };
@@ -509,6 +551,7 @@ export class GeometryPanel {
         }
     };
     dispose() {
+        Config.instance.removePropertyChanged(this.preferencesChanged);
         this.disposed = true;
         this.picker?.cancel();
         this.view.document.selection.onNodeChanged.remove(this.render);

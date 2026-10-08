@@ -63,7 +63,9 @@ class TestNode extends (Node as unknown as new () => object) {
 /** Expands every feature row by clicking its header (the row's first child). */
 function expandRows(list: Element) {
     for (const row of Array.from(list.children)) {
-        (row.firstElementChild as unknown as { _onclick?: () => void })?._onclick?.();
+        (row.firstElementChild as unknown as { _onclick?: (event: MouseEvent) => void })?._onclick?.(
+            new MouseEvent("click"),
+        );
     }
 }
 
@@ -318,7 +320,8 @@ describe("PropertyView", () => {
 
             // Review actions are available, but this feature still has no reselect entry.
             const menu = openMoreMenu(pv);
-            expect(menu.querySelectorAll("div").length).toBe(6);
+            expect(menu.querySelectorAll("div").length).toBe(7);
+            expect(menu.textContent).toContain("Edit…");
             expect(menu.textContent).toContain("Add comment");
             expect(menu.textContent).toContain("Where used…");
             expect(menu.querySelector('svg[icon="icon-sync-alt"]')).toBeNull();

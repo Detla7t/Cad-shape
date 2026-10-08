@@ -80,6 +80,7 @@ export class AppBuilder {
             await this._storage.createDBIfNeeded(Constants.DBName, [
                 Constants.DocumentTable,
                 Constants.RecentTable,
+                Constants.LibraryTable,
                 Constants.HistoryTable,
                 Constants.LinkCacheTable,
             ]);

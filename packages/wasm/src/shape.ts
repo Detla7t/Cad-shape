@@ -38,6 +38,7 @@ import {
     Result,
     type Serialized,
     type SerializedData,
+    type ShapeDistanceMeasure,
     type ShapeMeshRange,
     type ShapeType,
     serializable,
@@ -200,6 +201,19 @@ export class OccShape implements IShape {
         return this._boundingBox;
     }
 
+    exactBoundingBox(): BoundingBox {
+        return wasm.Shape.exactBoundingBox(this.shape);
+    }
+
+    seamEdges(): number[] {
+        const indexes = wasm.Shape.seamEdges(this.shape);
+        try {
+            return Array.from({ length: indexes.size() }, (_, i) => indexes.get(i)!);
+        } finally {
+            indexes.delete();
+        }
+    }
+
     orientedBoundingBox(): OrientedBoundingBox {
         if (!this._orientedBoundingBox) {
             this._orientedBoundingBox = wasm.Shape.orientedBoundingBox(this.shape, this._mesh !== undefined);
@@ -248,6 +262,16 @@ export class OccShape implements IShape {
             return wasm.Shape.extremaDistance(this.shape, other.shape);
         }
         throw new Error("Invalid shape type");
+    }
+
+    distanceMeasure(other: IShape, maximum = false): Result<ShapeDistanceMeasure> {
+        if (!(other instanceof OccShape)) return Result.err("Invalid shape type");
+        const measure = wasm.Shape.distanceMeasure(
+            this.shape,
+            other.shape,
+            maximum,
+        ) as ShapeDistanceMeasure | null;
+        return measure ? Result.ok(measure) : Result.err("Distance could not be measured on these entities.");
     }
 
     clone(): IShape {
@@ -483,6 +507,10 @@ export class OccEdge extends OccShape implements IEdge {
 
     length(): number {
         return wasm.Edge.curveLength(this.edge);
+    }
+
+    arcLengthParameter(fraction: number): number {
+        return wasm.Edge.arcLengthParameter(this.edge, fraction);
     }
 
     firstParameter(): number {

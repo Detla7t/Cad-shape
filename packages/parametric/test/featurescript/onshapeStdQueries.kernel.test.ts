@@ -413,8 +413,9 @@ describe("holes, axes and geometric filters", () => {
             onAxisAreWallAndCircles: true,
             axisSignIgnored: 3,
             offAxis: 0,
-            twoSided: 15,
-            edges: 15,
+            // The cylindrical wall's OCCT seam is not an Onshape edge.
+            twoSided: 14,
+            edges: 14,
             lineThroughHole: true,
             facesAlongZ: 5,
             planesAlongZ: 4,

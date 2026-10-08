@@ -112,6 +112,7 @@ export class TablesPanel {
         });
         document.modelManager.addNodeObserver(this.onNodesChanged);
         document.variables.onPropertyChanged(this.onVariablesChanged);
+        PubSub.default.sub("documentUnitsChanged", this.unitsChanged);
         this.compute();
     }
 
@@ -121,6 +122,7 @@ export class TablesPanel {
         this.timer = undefined;
         this.document.modelManager.removeNodeObserver(this.onNodesChanged);
         this.document.variables.removePropertyChanged(this.onVariablesChanged);
+        PubSub.default.remove("documentUnitsChanged", this.unitsChanged);
         syncNodeWatches(this.document, this.watched, new Set(), this.onNodeChanged);
     }
 
@@ -145,6 +147,10 @@ export class TablesPanel {
         if (this.timer !== undefined) clearTimeout(this.timer);
         this.timer = setTimeout(() => this.compute(), RECOMPUTE_DELAY);
     }
+
+    private readonly unitsChanged = (document: IDocument) => {
+        if (document === this.document) this.schedule();
+    };
 
     /** Re-reads the tables on offer, redraws the parameters and recomputes the selected table. */
     compute(): void {

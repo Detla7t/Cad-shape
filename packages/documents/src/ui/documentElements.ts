@@ -77,6 +77,12 @@ export function registerDocumentElements(): IDisposable {
                 icon: documentIcon(kind.format),
                 display: kind.display,
                 isElement: isKind(kind.view),
+                ...(["drawing", "image"].includes(kind.view)
+                    ? {
+                          thumbnail: async (node: INode) =>
+                              (await import("./tabThumbnail")).documentTabThumbnail(node as DocumentFileNode),
+                      }
+                    : {}),
                 ...(kind.newCommand === undefined ? {} : { newCommand: kind.newCommand }),
             }),
             registerElementView(kind.kind, (node: INode, document: IDocument) =>

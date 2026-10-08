@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 export interface RecentDocumentDTO {
+    branch?: string;
     id: string;
     name: string;
     date: number;

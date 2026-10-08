@@ -4,6 +4,8 @@
 import {
     addDefaultPlanes,
     type CommandKeys,
+    Config,
+    DocumentLibrary,
     DocumentVersionControl,
     I18n,
     type IApplication,
@@ -17,6 +19,7 @@ import {
     type IView,
     type IVisualFactory,
     type IWindow,
+    initializeDocumentPreferences,
     Logger,
     Material,
     Observable,
@@ -24,6 +27,7 @@ import {
     PLUGIN_FILE_EXTENSION,
     Plane,
     PubSub,
+    Result,
     type Serialized,
     StorageHistoryPersistence,
     setCurrentApplication,
@@ -32,7 +36,7 @@ import {
 } from "@chili3d/core";
 import { Document } from "./document";
 import { PluginManager } from "./pluginManager";
-import { isDocumentFileName, openDocumentFile } from "./project/projectFile";
+import { isDocumentFileName, openDocumentFile, writeProjectFile } from "./project/projectFile";
 import { importFiles } from "./utils";
 
 export interface ApplicationOptions {
@@ -208,14 +212,54 @@ export class Application extends Observable implements IApplication {
     async openDocument(id: string): Promise<IDocument | undefined> {
         const document = await Document.open(this, id);
         await this.createActiveView(document);
+        if (document)
+            await new DocumentLibrary(this.storage)
+                .update(id, { lastOpened: Date.now() })
+                .catch((error) => Logger.warn("Could not record last opened time", error));
         return document;
+    }
+
+    async importDocumentFile(file: File): Promise<IDocument> {
+        const result = await openDocumentFile(this, file, { asCopy: true });
+        if (!result.isOk) throw new Error(result.error);
+        this.activeView?.cameraController.fitContent();
+        return result.value;
+    }
+
+    async exportDocument(id: string): Promise<Result<Uint8Array>> {
+        const open = [...this.documents].find((document) => document.id === id);
+        let document = open;
+        try {
+            document ??= await Document.open(this, id);
+            if (!document) return Result.err("The document could not be found.");
+            return await writeProjectFile(document);
+        } catch (error) {
+            return Result.err(error instanceof Error ? error.message : String(error));
+        } finally {
+            if (document && !open) {
+                this.documents.delete(document);
+                document.dispose();
+            }
+        }
     }
 
     async newDocument(name: string): Promise<IDocument> {
         const document = new Document(this, name);
+        initializeDocumentPreferences(document);
         const lightGray = new Material({ document, name: "LightGray", color: 0xdedede });
         const deepGray = new Material({ document, name: "DeepGray", color: 0x898989 });
         document.modelManager.materials.push(lightGray, deepGray);
+        for (const library of Config.instance.preferences.materialLibraries) {
+            for (const material of library.materials) {
+                const entry = new Material({
+                    document,
+                    name: `${library.name} · ${material.name}`,
+                    color: material.color,
+                });
+                entry.opacity = material.opacity;
+                document.modelManager.materials.push(entry);
+            }
+        }
         document.history.disabled = true;
         try {
             addDefaultPlanes(document);

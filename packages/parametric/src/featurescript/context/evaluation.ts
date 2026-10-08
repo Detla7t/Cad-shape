@@ -29,6 +29,7 @@ import {
     vec,
 } from "../std/geometry";
 import { arg, type StdBuilder } from "../std/registry";
+import { edgeParameter as parameterOnEdge } from "./differential";
 import { type EntityRef, entityShape, FsContext, MM_PER_METER } from "./fsContext";
 import { kernelMatrix } from "./operations";
 import { curveTypeOf, facePlane, measureOf, resolveQuery, samplePoints, surfaceTypeOf } from "./queries";
@@ -50,17 +51,10 @@ function definitionOf(args: FsValue[], fn: string): [FsContext, FsMap] {
     return [FsContext.of(arg(args, 0, fn)), expectMap(arg(args, 1, fn), `${fn} definition`)];
 }
 
-/** Normalized edge parameter (0..1) → kernel parameter. */
-function edgeParameter(edge: IEdge, t: number): number {
-    return edge.firstParameter() + (edge.lastParameter() - edge.firstParameter()) * t;
-}
-
 function tangentAt(edge: IEdge, u: number): Vec3 {
-    const span = edge.lastParameter() - edge.firstParameter();
-    const h = Math.max(1e-7, Math.abs(span) * 1e-5);
-    const a = edge.pointAt(Math.max(edge.firstParameter(), u - h));
-    const b = edge.pointAt(Math.min(edge.lastParameter(), u + h));
-    return vec.normalize([b.x - a.x, b.y - a.y, b.z - a.z]);
+    const tangent = edge.curve.d1(u).vec;
+    if (tangent.length() < 1e-12) fail("The edge has no tangent at this parameter");
+    return vec.normalize([tangent.x, tangent.y, tangent.z]);
 }
 
 export function installEvaluation(std: StdBuilder): void {
@@ -103,7 +97,7 @@ export function installEvaluation(std: StdBuilder): void {
         const ref = single(ctx, definition.field("edge"), "EDGE", "evEdgeTangentLine edge");
         const edge = ref.body.edges()[ref.index];
         const t = numberOr(definition.field("parameter"), 0);
-        const u = edgeParameter(edge, t);
+        const u = parameterOnEdge(edge, t, definition.field("arcLengthParameterization") !== false);
         return makeLine({ origin: toM(edge.pointAt(u)), direction: tangentAt(edge, u) });
     });
     std.fn("evEdgeTangentLines", (args) => {
@@ -114,7 +108,7 @@ export function installEvaluation(std: StdBuilder): void {
         const ts = parameters instanceof FsArray ? parameters.items.map((p) => numberOr(p, 0)) : [0];
         return new FsArray(
             ts.map((t) => {
-                const u = edgeParameter(edge, t);
+                const u = parameterOnEdge(edge, t, definition.field("arcLengthParameterization") !== false);
                 return makeLine({ origin: toM(edge.pointAt(u)), direction: tangentAt(edge, u) });
             }),
         );
@@ -179,7 +173,10 @@ export function installEvaluation(std: StdBuilder): void {
                 : kernelMatrix(invertAffine(coordSystemAffine(readCoordSystem(cSys, "cSys"))));
         for (const ref of refs) {
             const shape = toLocal === undefined ? entityShape(ref) : entityShape(ref).transformedMul(toLocal);
-            const box = shape.boundingBox();
+            const box =
+                definition.field("tight") === true && shape.exactBoundingBox
+                    ? shape.exactBoundingBox()
+                    : shape.boundingBox();
             if (toLocal !== undefined) shape.dispose();
             min[0] = Math.min(min[0], box.min.x);
             min[1] = Math.min(min[1], box.min.y);

@@ -5,6 +5,7 @@ import {
     DOCUMENT_FILE_EXTENSION,
     type IApplication,
     type IDocument,
+    Id,
     isNodeSceneless,
     Logger,
     PROJECT_FILE_EXTENSION,
@@ -271,12 +272,22 @@ export async function restoreProjectState(document: IDocument, project: Unpacked
     }
 }
 
+export interface ProjectOpenOptions {
+    /** A library import is a separate document; saving it must not replace the original. */
+    asCopy?: boolean;
+}
+
 /** Opens `.chili3d` bytes as a new document of `app`. */
-export async function openProjectFile(app: IApplication, bytes: Uint8Array): Promise<Result<IDocument>> {
+export async function openProjectFile(
+    app: IApplication,
+    bytes: Uint8Array,
+    options: ProjectOpenOptions = {},
+): Promise<Result<IDocument>> {
     const project = await readProjectFile(bytes);
     if (!project.isOk) return Result.err(project.error);
     for (const warning of project.value.warnings) Logger.warn(`project: ${warning}`);
-    const document = await app.loadDocument(project.value.document);
+    const data = options.asCopy ? { ...project.value.document, id: Id.generate() } : project.value.document;
+    const document = await app.loadDocument(data);
     if (document === undefined) return Result.err("The document could not be loaded");
     await restoreProjectState(document, project.value);
     return Result.ok(document);
@@ -289,16 +300,17 @@ export async function openProjectFile(app: IApplication, bytes: Uint8Array): Pro
 export async function openDocumentFile(
     app: IApplication,
     file: Blob & { name?: string },
+    options: ProjectOpenOptions = {},
 ): Promise<Result<IDocument>> {
     const bytes = new Uint8Array(await file.arrayBuffer());
-    if (isZipData(bytes)) return openProjectFile(app, bytes);
+    if (isZipData(bytes)) return openProjectFile(app, bytes, options);
     let data: Serialized;
     try {
         data = JSON.parse(new TextDecoder().decode(bytes));
     } catch {
         return Result.err(`${file.name ?? "The file"} is not a Chili3D document`);
     }
-    const document = await app.loadDocument(data);
+    const document = await app.loadDocument(options.asCopy ? { ...data, id: Id.generate() } : data);
     if (document === undefined) return Result.err("The document could not be loaded");
     return Result.ok(document);
 }

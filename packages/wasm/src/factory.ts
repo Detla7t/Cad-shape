@@ -178,6 +178,59 @@ function filletResultEdges(edges: TopoDS_Shape[]): OccEdge[] {
 export class ShapeFactory implements IShapeFactory {
     readonly kernelName = "opencascade";
 
+    fitSpline(
+        points: XYZLike[],
+        parameters: number[],
+        derivatives: (XYZLike | undefined)[],
+        periodic: boolean,
+    ): Result<IEdge> {
+        return convertShapeResult(
+            wasm.ShapeFactory.fitSpline,
+            [
+                points,
+                parameters,
+                derivatives.map((d) => d ?? { x: 0, y: 0, z: 0 }),
+                derivatives.map((d) => (d === undefined ? 0 : 1)),
+                periodic,
+            ],
+            "Spline interpolation failed",
+        ) as Result<IEdge>;
+    }
+
+    draftTracked(
+        shape: IShape,
+        faces: number[],
+        pull: XYZLike,
+        origin: XYZLike,
+        normal: XYZLike,
+        angle: number,
+    ): Result<TrackedShape> {
+        return convertTrackedShapeResult(
+            wasm.ShapeFactory.draftTracked,
+            [ensureOccShape(shape)[0], faces, pull, origin, normal, (angle * Math.PI) / 180],
+            "Draft failed",
+        );
+    }
+
+    fillSurface(
+        edges: IEdge[],
+        continuity: number[],
+        supports: (IFace | undefined)[],
+        points: XYZLike[],
+    ): Result<TrackedShape> {
+        // The G0 slot is unused by OCCT; pass its edge instead of allocating a null shape handle.
+        return convertTrackedShapeResult(
+            wasm.ShapeFactory.fillSurface,
+            [
+                ensureOccShape(edges),
+                continuity,
+                ensureOccShape(supports.map((face, i) => face ?? edges[i])),
+                points,
+            ],
+            "Fill failed",
+        );
+    }
+
     edge(curve: ICurve): IEdge {
         if (!(curve instanceof OccCurve)) {
             throw new Error("Invalid curve");

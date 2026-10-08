@@ -13,6 +13,8 @@ import type {
     IVisualContext,
     IVisualObject,
 } from "../src";
+import { Signal } from "../src/foundation/signal";
+import type { VisualShapeData } from "../src/visual";
 
 /**
  * Lightweight mock of IVisual + IVisualContext for unit tests that don't need a real viewport.
@@ -156,8 +158,8 @@ export function createMockSelection(): ISelection {
         getSelectedShapes: () => [],
         getSelectedVisualNodes: () => [],
         clearSelection: () => {},
-        onNodeChanged: { on: () => {}, off: () => {} } as any,
-        onShapeChanged: { on: () => {}, off: () => {} } as any,
+        onNodeChanged: new Signal<(selected: INode[]) => void>(),
+        onShapeChanged: new Signal<(selected: VisualShapeData[]) => void>(),
         dispose: () => {},
     };
 }

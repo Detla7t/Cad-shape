@@ -5,7 +5,13 @@ import type { IDocument } from "../document";
 import type { IDisposable } from "../foundation";
 import type { I18nKeys } from "../i18n";
 
-export type DocumentPanelId = "configuration" | "tables" | "sheetMetal" | "inspection" | "variables";
+export type DocumentPanelId =
+    | "appearance"
+    | "configuration"
+    | "tables"
+    | "sheetMetal"
+    | "inspection"
+    | "variables";
 export interface DocumentPanelContent extends IDisposable {
     readonly element: HTMLElement;
 }
@@ -13,6 +19,8 @@ export interface DocumentPanelDefinition {
     readonly id: DocumentPanelId;
     readonly title: I18nKeys;
     readonly icon: string;
+    /** Omit a contextual tool from the rail until its document content exists. */
+    isVisible?(document: IDocument): boolean;
     create(document: IDocument, onApplied?: () => void): DocumentPanelContent;
 }
 export interface IDocumentPanelHost {

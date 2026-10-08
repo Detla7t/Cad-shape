@@ -48,6 +48,12 @@ function edgeCornerHandler<F extends FilletFeatureData | ChamferFeatureData>(
 
         parameters: (feature) => [
             {
+                key: "edges",
+                display: "prompt.select.edges",
+                value: `${feature.edges.length} edge${feature.edges.length === 1 ? "" : "s"}`,
+                pick: { kinds: ["edge"] },
+            },
+            {
                 key: options.parameterKey,
                 display: options.parameterDisplay,
                 value: feature[options.parameterKey] as number | string,

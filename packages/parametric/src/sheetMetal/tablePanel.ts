@@ -87,5 +87,13 @@ DocumentPanels.register({
     id: "sheetMetal",
     title: "ribbon.group.sheetMetal",
     icon: "sheetMetal",
+    isVisible: (doc) =>
+        doc.modelManager
+            .findNodes()
+            .some(
+                (node) =>
+                    node instanceof ParametricBodyNode &&
+                    node.features.some((feature) => feature.type.startsWith("sm")),
+            ),
     create: (doc) => new SheetMetalTablePanel(doc),
 });

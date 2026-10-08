@@ -1,0 +1,293 @@
+.dialog {
+    width: min(1120px, calc(100vw - 48px));
+    height: min(900px, calc(100vh - 48px));
+    max-width: none;
+    max-height: none;
+    padding: 0;
+    border: 1px solid var(--border-color);
+    border-radius: 7px;
+    background: var(--panel-background-color);
+    color: var(--foreground-color);
+    box-shadow: 0 16px 70px #0005;
+    font-size: 13px;
+}
+.dialog::backdrop {
+    background: #0005;
+}
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    height: 80px;
+    padding: 0 28px;
+    border-bottom: 1px solid var(--border-color);
+    box-sizing: border-box;
+}
+.header h2 {
+    font-size: 21px;
+    font-weight: 600;
+    margin: 0;
+}
+.header p {
+    margin: 5px 0 0;
+}
+.layout {
+    display: grid;
+    grid-template-columns: 204px minmax(0, 1fr);
+    height: calc(100% - 80px);
+}
+.navigation {
+    padding: 18px 10px;
+    border-right: 1px solid var(--border-color);
+    overflow-y: auto;
+}
+.navigation button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: 0 !important;
+    background: transparent;
+    padding: 9px 12px;
+}
+.navigation button[aria-current="true"] {
+    color: var(--primary-color, #2674d9);
+    background: var(--hover-background-color);
+    font-weight: 600;
+}
+.content {
+    position: relative;
+    padding: 0 30px 48px;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+}
+.section {
+    padding: 27px 0 17px;
+}
+.section h3 {
+    font-size: 17px;
+    font-weight: 600;
+    margin: 0 0 19px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-color);
+}
+.note {
+    color: var(--foreground-secondary-color, #888);
+    line-height: 1.55;
+    margin: 8px 0 19px;
+}
+.dialog button,
+.dialog input,
+.dialog select {
+    font: inherit;
+    color: inherit;
+}
+.dialog button {
+    cursor: pointer;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    padding: 8px 11px;
+}
+.dialog button:hover {
+    background: var(--hover-background-color);
+}
+.dialog button:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+.dialog input:not([type="checkbox"]):not([type="radio"]),
+.dialog select {
+    box-sizing: border-box;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 8px 10px;
+    min-width: 0;
+    max-width: 100%;
+}
+.dialog select {
+    min-width: 166px;
+}
+.dialog select option {
+    background: var(--panel-background-color);
+    color: var(--foreground-color);
+}
+.dialog .primary {
+    background: #2059b8;
+    border-color: #2059b8;
+    color: white;
+}
+.dialog .primary:hover {
+    background: #174894;
+}
+.field {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    margin: 12px 0;
+}
+.field select {
+    width: 250px;
+}
+.check {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin: 12px 0;
+}
+.check input {
+    accent-color: #2674d9;
+}
+.check + .note {
+    margin-left: 25px;
+}
+.units {
+    display: grid;
+    grid-template-columns: minmax(200px, 270px) 170px;
+    gap: 0 24px;
+}
+.units .field select {
+    width: 100%;
+}
+.actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 9px;
+    margin-top: 22px;
+}
+.status {
+    color: var(--foreground-secondary-color);
+    font-size: 12px;
+}
+.controls {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 25px 0;
+    table-layout: fixed;
+}
+.controls th,
+.controls td {
+    text-align: center;
+    padding: 17px 9px;
+    line-height: 1.65;
+}
+.controls th:first-child {
+    text-align: left;
+    width: 24%;
+}
+.controls tr:first-child {
+    border-bottom: 1px solid var(--border-color);
+}
+.tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 12px;
+}
+.tabs button {
+    border: 0;
+    border-radius: 0;
+    padding: 8px;
+    background: transparent;
+}
+.tabs button[aria-selected="true"] {
+    color: var(--primary-color, #2674d9);
+    border-bottom: 2px solid currentColor;
+}
+.shortcutLayout {
+    display: grid;
+    grid-template-columns: minmax(240px, 1fr) 200px;
+    align-items: start;
+    gap: 20px;
+    margin-top: 12px;
+}
+.shortcutList,
+.toolList {
+    height: 330px;
+    overflow: auto;
+    padding: 6px 10px;
+    border: 1px solid var(--border-color);
+}
+.shortcutRow {
+    display: grid;
+    grid-template-columns: 116px 1fr;
+    align-items: center;
+    gap: 12px;
+    padding: 4px 0;
+}
+.shortcutRow button {
+    font-size: 12px;
+    padding: 4px;
+    border-radius: 0;
+}
+.shortcutRow button[data-state="custom"] {
+    border-color: #58a4e8;
+}
+.legend {
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 12px;
+    font-size: 12px;
+}
+.legend p {
+    margin: 8px 0 14px;
+}
+.toolList {
+    height: 215px;
+}
+.toolList svg,
+.toolbarPreview svg {
+    width: 21px;
+    height: 21px;
+}
+.toolbarPreview {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    box-shadow: 0 3px 12px #0002;
+}
+.libraries {
+    width: 100%;
+    border-collapse: collapse;
+}
+.libraries th,
+.libraries td {
+    text-align: left;
+    padding: 12px 8px;
+    border-bottom: 1px solid var(--border-color);
+}
+.libraries td:last-child {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+.section code {
+    display: block;
+    overflow: auto;
+    padding: 12px 0;
+    font-size: 11px;
+    margin-bottom: 12px;
+}
+@media (max-width: 800px) {
+    .layout {
+        grid-template-columns: 150px minmax(0, 1fr);
+    }
+    .content {
+        padding: 0 18px 32px;
+    }
+    .shortcutLayout {
+        grid-template-columns: 1fr;
+    }
+    .units {
+        grid-template-columns: minmax(160px, 1fr) 130px;
+        gap: 12px;
+    }
+    .units select {
+        min-width: 0;
+    }
+}

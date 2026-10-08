@@ -7,9 +7,11 @@ import { analysisMenu } from "./analysisMenu";
 import { GeometryPanel, type GeometryPanelKind } from "./geometryPanel";
 import { action, textElement } from "./helpers";
 import panelStyle from "./review.module.css";
+import { SelectionMeasurementControl } from "./selectionMeasurementControl";
 import style from "./viewportUtilities.module.css";
 
 export class ViewportUtilities {
+    readonly selection: SelectionMeasurementControl;
     readonly element = document.createElement("div");
     private readonly popup = document.createElement("section");
     private mounted?: GeometryPanel;
@@ -21,6 +23,8 @@ export class ViewportUtilities {
         toolbar.className = style.toolbar;
         toolbar.setAttribute("role", "toolbar");
         toolbar.setAttribute("aria-label", "Viewport inspection tools");
+        this.selection = new SelectionMeasurementControl(view, () => this.close());
+        toolbar.append(this.selection.element);
         for (const [kind, label, icon] of [
             ["measure", "Show measure details", "measure-details"],
             ["analysis", "Show analysis tools", "analysis-tools"],
@@ -37,7 +41,7 @@ export class ViewportUtilities {
         }
         this.popup.className = style.popup;
         this.popup.hidden = true;
-        this.element.append(this.popup, toolbar);
+        this.element.append(this.popup, this.selection.popup, toolbar);
         for (const event of [
             "pointerdown",
             "pointerup",
@@ -88,6 +92,7 @@ export class ViewportUtilities {
         this.popup.querySelector<HTMLElement>("button:not(:disabled), select")?.focus();
     }
     close() {
+        this.selection.close();
         this.mounted?.dispose();
         this.mounted = undefined;
         this.active = undefined;
@@ -97,5 +102,6 @@ export class ViewportUtilities {
     }
     dispose() {
         this.close();
+        this.selection.dispose();
     }
 }

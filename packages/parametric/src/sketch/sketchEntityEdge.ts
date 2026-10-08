@@ -4,14 +4,16 @@
 import { type IEdge, type Plane, Precision, Result } from "@chili3d/core";
 import { curvePoles } from "./curveGeometry";
 import { arcAngles, rawArcSweep, type SketchEntityData, toWorld } from "./sketchModel";
+import { sketchSpline } from "./sketchSpline";
 
 export function sketchEntityEdge(plane: Plane, entity: SketchEntityData): Result<IEdge> {
     const p = entity.params;
     switch (entity.type) {
         case "point":
             return Result.err("Points do not define a profile edge");
-        case "bezier":
         case "spline":
+            return sketchSpline(plane, curvePoles(entity));
+        case "bezier":
             return shapeFactory.bezier(curvePoles(entity).map(([u, v]) => toWorld(plane, u, v)));
         case "line":
             return shapeFactory.line(toWorld(plane, p[0], p[1]), toWorld(plane, p[2], p[3]));

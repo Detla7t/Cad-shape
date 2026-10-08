@@ -27,7 +27,7 @@ export function tabLabel(tab: RibbonTab): string {
 }
 
 /** Includes nested variants and customized tabs, rather than guessing from command names. */
-function toolCategories(ribbon: Ribbon): Map<CommandKeys, Set<string>> {
+export function toolCategories(ribbon: Ribbon): Map<CommandKeys, Set<string>> {
     const result = new Map<CommandKeys, Set<string>>();
     const add = (item: RibbonCommand, categories: string[]) => {
         if (item instanceof ObservableCollection) item.forEach((key) => add(key, categories));
@@ -207,10 +207,10 @@ export class RibbonCustomization {
         return { content, close };
     }
 
-    assignShortcut(command: CommandKeys): void {
+    assignShortcut(command: CommandKeys, fallback?: string): void {
         const { content, close } = this.openDialog(`Shortcut · ${I18n.translate(`command.${command}`)}`);
         const shortcuts = effectiveShortcuts(Config.instance.navigation3D, Config.instance.customShortcuts);
-        const existing = shortcuts[command];
+        const existing = shortcuts[command] ?? fallback;
         let recorded = typeof existing === "string" ? existing : (existing?.[0] ?? "");
         const field = input({
             placeholder: "Press a key combination",
@@ -253,10 +253,13 @@ export class RibbonCustomization {
                         (key) => key && normalizeShortcut(key) === recorded,
                     ),
             );
-            message.textContent = conflict
-                ? `Already assigned to ${I18n.translate(`command.${conflict[0]}` as `command.${CommandKeys}`)}. Choose another shortcut.`
-                : "Ready to save.";
-            save.disabled = !!conflict;
+            const reserved = recorded === "shift+ " || recorded === "shift+space";
+            message.textContent = reserved
+                ? "Shift+Space opens the shortcut toolbar. Choose another shortcut."
+                : conflict
+                  ? `Already assigned to ${I18n.translate(`command.${conflict[0]}` as `command.${CommandKeys}`)}. Choose another shortcut.`
+                  : "Ready to save.";
+            save.disabled = !!conflict || reserved;
         });
         content.append(
             field,

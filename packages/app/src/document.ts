@@ -16,6 +16,7 @@ import {
     type ISelection,
     type IVariableTable,
     type IVisual,
+    isCancelableCommand,
     Logger,
     ModelManager,
     Observable,
@@ -118,8 +119,13 @@ export class Document extends Observable implements IDocument {
                 cause: this.versioningError,
             });
         const data = structuredClone(this.serialize());
-        const view = this.application.activeView;
-        const image = view?.document === this ? view.toImage() : undefined;
+        const view =
+            this.application.activeView?.document === this
+                ? this.application.activeView
+                : this.application.views.find((item) => item.document === this);
+        const image = view
+            ? view.toImage()
+            : (await this.application.storage.get(Constants.DBName, Constants.RecentTable, this.id))?.image;
         const writes: StorageOperation[] = [
             { type: "put", table: Constants.DocumentTable, id: this.id, value: data },
             {
@@ -130,6 +136,7 @@ export class Document extends Observable implements IDocument {
                     id: this.id,
                     name: data["name"],
                     date: Date.now(),
+                    branch: DocumentVersionControl.of(this)?.currentBranch,
                     image,
                 },
             },
@@ -151,6 +158,9 @@ export class Document extends Observable implements IDocument {
     }
 
     async close() {
+        const running = this.application.executingCommand;
+        if (this.application.activeView?.document === this && running && isCancelableCommand(running))
+            await running.cancel();
         if (window.confirm(I18n.translate("prompt.saveDocument{0}", this.name))) {
             await this.save();
         }

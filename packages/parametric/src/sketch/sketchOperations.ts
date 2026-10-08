@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import type { UV } from "./curveGeometry";
+import { curvePoles, evaluateBezier, type UV } from "./curveGeometry";
 import {
     arcAngles,
     ConstraintKind,
@@ -145,21 +145,35 @@ export function trimPreview(data: SketchData, id: number, pick: UV): SketchEntit
     return { ...entity, ...piece(entity, a, b) };
 }
 /** Replaces the picked interval; unrelated entity ids and constraints remain stable. */
-export function trimOrSplit(data: SketchData, id: number, pick: UV, mode: "trim" | "split" | "extend"): void {
+export function trimOrSplit(
+    data: SketchData,
+    id: number,
+    pick: UV,
+    mode: "trim" | "split" | "extend",
+    secondPick?: UV,
+): void {
     const e = data.entities.find((e) => e.id === id);
     if (!e) return;
+    if (mode === "split" && e.type === "bezier") {
+        splitBezier(data, e, pick);
+        return;
+    }
     if (!["line", "circle", "arc"].includes(e.type))
         throw new Error("Trim and extend currently support lines, circles and arcs.");
     const t = parameterAt(e, pick);
     const cuts = curveCuts(data, e, mode === "extend");
     let intervals: [number, number][] = [];
     if (mode === "split") {
-        if (e.type === "circle")
+        if (e.type === "circle") {
+            if (!secondPick) throw new Error("Choose two points on the circle to split it.");
+            let u = parameterAt(e, secondPick);
+            if (Math.abs(u - t) < EPS) throw new Error("Choose two distinct split points.");
+            if (u < t) u += 1;
             intervals = [
-                [t, t + 0.5],
-                [t + 0.5, t + 1],
+                [t, u],
+                [u, t + 1],
             ];
-        else {
+        } else {
             if (t <= EPS || t >= 1 - EPS) return;
             intervals = [
                 [0, t],
@@ -226,15 +240,15 @@ export function trimOrSplit(data: SketchData, id: number, pick: UV, mode: "trim"
     let nextId = Math.max(oldMax, ...data.constraints.map((c) => c.id)) + 1;
     for (const constraint of originalConstraints) {
         if (directionKinds.includes(constraint.kind) && e.type === "line") {
-            parts.forEach((part, i) =>
+            parts.forEach((part, i) => {
                 data.constraints.push({
                     ...structuredClone(constraint),
                     id: i === 0 ? constraint.id : nextId++,
                     refs: constraint.refs.map((r) =>
                         r.entityId === id ? { ...r, entityId: part.entity.id } : r,
                     ),
-                }),
-            );
+                });
+            });
             continue;
         }
         if (constraint.kind === ConstraintKind.PointOnArc && constraint.refs.every((r) => r.entityId === id))
@@ -258,6 +272,21 @@ export function trimOrSplit(data: SketchData, id: number, pick: UV, mode: "trim"
                 { entityId: second.id, pointIndex: second.type === "line" ? 0 : 1 },
             ],
         });
+    }
+    if (mode === "split" && e.type === "circle" && parts.length === 2) {
+        const [a, b] = parts.map((p) => p.entity.id);
+        for (const [ap, bp] of [
+            [1, 2],
+            [0, 0],
+        ])
+            data.constraints.push({
+                id: Math.max(0, ...data.constraints.map((c) => c.id)) + 1,
+                kind: ConstraintKind.P2PCoincident,
+                refs: [
+                    { entityId: a, pointIndex: ap },
+                    { entityId: b, pointIndex: bp },
+                ],
+            });
     }
 }
 export function transformEntity(
@@ -380,6 +409,65 @@ function ensureArcConstraint(data: SketchData, id: number): void {
             { entityId: id, pointIndex: 2 },
             { entityId: id, pointIndex: 0 },
             { entityId: id, pointIndex: 1 },
+        ],
+    });
+}
+
+/** De Casteljau subdivision keeps the exact curve and degree on both sides. */
+function splitBezier(data: SketchData, entity: SketchEntityData, pick: UV): void {
+    const poles = curvePoles(entity),
+        last = poles.length - 1;
+    if (distance(poles[0], poles[last]) < EPS)
+        throw new Error("Splitting a closed Bezier is not supported yet.");
+    let closest = 0,
+        best = Infinity;
+    for (let i = 0; i <= 128; i++) {
+        const d = distance(evaluateBezier(poles, i / 128), pick);
+        if (d < best) {
+            closest = i / 128;
+            best = d;
+        }
+    }
+    let lo = Math.max(0, closest - 1 / 128),
+        hi = Math.min(1, closest + 1 / 128);
+    for (let i = 0; i < 55; i++) {
+        const a = lo + (hi - lo) / 3,
+            b = hi - (hi - lo) / 3;
+        if (distance(evaluateBezier(poles, a), pick) < distance(evaluateBezier(poles, b), pick)) hi = b;
+        else lo = a;
+    }
+    const t = (lo + hi) / 2;
+    if (t < EPS || t > 1 - EPS) return;
+    let level = poles;
+    const left: UV[] = [poles[0]],
+        right: UV[] = [poles[last]];
+    while (level.length > 1) {
+        level = level
+            .slice(0, -1)
+            .map((p, i) => [p[0] * (1 - t) + level[i + 1][0] * t, p[1] * (1 - t) + level[i + 1][1] * t]);
+        left.push(level[0]);
+        right.unshift(level[level.length - 1]);
+    }
+    entity.params = left.flat();
+    const id = appendEntity(data, "bezier", right.flat(), entity);
+    data.constraints = data.constraints.flatMap((c) => {
+        if (c.refs.some((r) => r.entityId === entity.id && r.pointIndex !== 0 && r.pointIndex !== last))
+            return [];
+        return [
+            {
+                ...c,
+                refs: c.refs.map((r) =>
+                    r.entityId === entity.id && r.pointIndex === last ? { ...r, entityId: id } : r,
+                ),
+            },
+        ];
+    });
+    data.constraints.push({
+        id: Math.max(0, ...data.constraints.map((c) => c.id)) + 1,
+        kind: ConstraintKind.P2PCoincident,
+        refs: [
+            { entityId: entity.id, pointIndex: last },
+            { entityId: id, pointIndex: 0 },
         ],
     });
 }

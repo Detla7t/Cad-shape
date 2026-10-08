@@ -32,6 +32,8 @@
 #include <BRepFilletAPI_MakeFillet.hxx>
 #include <BRepGProp.hxx>
 #include <BRepLib.hxx>
+#include <BRepOffsetAPI_DraftAngle.hxx>
+#include <BRepOffsetAPI_MakeFilling.hxx>
 #include <BRepOffsetAPI_MakePipe.hxx>
 #include <BRepOffsetAPI_MakePipeShell.hxx>
 #include <BRepOffsetAPI_MakeThickSolid.hxx>
@@ -54,6 +56,7 @@
 #include <ChFi2d_ChamferAPI.hxx>
 #include <ChFi2d_FilletAPI.hxx>
 #include <GProp_GProps.hxx>
+#include <GeomAPI_Interpolate.hxx>
 #include <GeomAPI_ProjectPointOnCurve.hxx>
 #include <Geom_BSplineCurve.hxx>
 #include <Geom_BezierCurve.hxx>
@@ -62,6 +65,7 @@
 #include <Geom_TrimmedCurve.hxx>
 #include <HelixBRep_BuilderHelix.hxx>
 #include <NCollection_Array1.hxx>
+#include <NCollection_HArray1.hxx>
 #include <NCollection_IndexedMap.hxx>
 #include <Precision.hxx>
 #include <ShapeAnalysis_Edge.hxx>
@@ -557,6 +561,127 @@ static RegionsResult boundedAreas(const TopoDS_Face& baseFace, const NCollection
 
 class ShapeFactory {
 public:
+    static ShapeResult fitSpline(const Vector3Array& points, const NumberArray& parameters,
+        const Vector3Array& derivatives, const NumberArray& flags, bool periodic)
+    {
+        try {
+            auto pts = vecFromJSArray<Vector3>(points);
+            auto params = vecFromJSArray<double>(parameters);
+            auto tangents = vecFromJSArray<Vector3>(derivatives);
+            auto active = vecFromJSArray<int>(flags);
+            int n = pts.size();
+            if (n < 2 || params.size() != n + (periodic ? 1 : 0) || tangents.size() != n || active.size() != n)
+                return { {}, false, "Invalid spline interpolation arrays" };
+            Handle(NCollection_HArray1<gp_Pnt>) p = new NCollection_HArray1<gp_Pnt>(1, n);
+            Handle(NCollection_HArray1<double>) t = new NCollection_HArray1<double>(1, params.size());
+            Handle(NCollection_HArray1<bool>) used = new NCollection_HArray1<bool>(1, n);
+            NCollection_Array1<gp_Vec> d(1, n);
+            for (int i = 0; i < n; ++i) {
+                p->SetValue(i + 1, Vector3::toPnt(pts[i]));
+                d.SetValue(i + 1, Vector3::toVec(tangents[i]));
+                used->SetValue(i + 1, active[i] != 0);
+            }
+            for (int i = 0; i < params.size(); ++i) {
+                if (!std::isfinite(params[i]) || (i > 0 && params[i] <= params[i - 1]))
+                    return { {}, false, "Spline parameters must be finite and strictly increasing" };
+                t->SetValue(i + 1, params[i]);
+            }
+            GeomAPI_Interpolate interpolation(p, t, periodic, Precision::Confusion());
+            interpolation.Load(d, used, false);
+            interpolation.Perform();
+            if (!interpolation.IsDone())
+                return { {}, false, "Spline interpolation failed" };
+            BRepBuilderAPI_MakeEdge edge(interpolation.Curve());
+            if (!edge.IsDone())
+                return { {}, false, "Spline edge construction failed" };
+            return { edge.Edge(), true, "" };
+        } catch (const Standard_Failure& error) {
+            return { {}, false, error.GetMessageString() };
+        }
+    }
+
+    static TrackedShapeResult draftTracked(const TopoDS_Shape& shape, const NumberArray& indexes,
+        const Vector3& pull, const Vector3& origin, const Vector3& normal, double angle)
+    {
+        try {
+            auto faces = vecFromJSArray<int>(indexes);
+            if (faces.empty() || !std::isfinite(angle) || std::abs(angle) >= M_PI / 2 || std::abs(angle) < 1e-10)
+                return { {}, false, "Draft needs faces and a nonzero angle below 90 degrees", {}, {} };
+            NCollection_IndexedMap<TopoDS_Shape, TopTools_ShapeMapHasher> allFaces;
+            TopExp::MapShapes(shape, TopAbs_FACE, allFaces);
+            BRepOffsetAPI_DraftAngle draft(shape);
+            gp_Pln neutral(Vector3::toPnt(origin), Vector3::toDir(normal));
+            for (int index : faces) {
+                if (index < 0 || index >= allFaces.Extent())
+                    return { {}, false, "Draft face index is out of range", {}, {} };
+                auto face = TopoDS::Face(allFaces.FindKey(index + 1));
+                // OCCT propagates over tangent faces. Faces already added by propagation need no second Add.
+                if (draft.ModifiedFaces().Contains(face))
+                    continue;
+                draft.Add(face, Vector3::toDir(pull), angle, neutral);
+                if (!draft.AddDone())
+                    return { {}, false, "Cannot draft the selected face", {}, {} };
+            }
+            draft.Build();
+            if (!draft.IsDone() || !BRepCheck_Analyzer(draft.Shape()).IsValid())
+                return { {}, false, "Draft produced invalid geometry", {}, {} };
+            auto output = draft.Shape();
+            return { output, true, "", faceHistory(draft, shape, output), edgeHistory(draft, shape, output) };
+        } catch (const Standard_Failure& error) {
+            return { {}, false, error.GetMessageString(), {}, {} };
+        }
+    }
+
+    static TrackedShapeResult fillSurface(const ShapeArray& edges, const NumberArray& continuity,
+        const ShapeArray& supports, const Vector3Array& points)
+    {
+        try {
+            auto boundary = vecFromJSArray<TopoDS_Shape>(edges);
+            auto orders = vecFromJSArray<int>(continuity);
+            auto faces = vecFromJSArray<TopoDS_Shape>(supports);
+            if (boundary.empty() || orders.size() != boundary.size() || faces.size() != boundary.size())
+                return { {}, false, "Invalid fill boundary arrays", {}, {} };
+            NCollection_List<TopoDS_Shape> list;
+            BRepOffsetAPI_MakeFilling fill;
+            for (int i = 0; i < boundary.size(); ++i) {
+                if (boundary[i].ShapeType() != TopAbs_EDGE || orders[i] < 0 || orders[i] > 2)
+                    return { {}, false, "Fill needs edges and G0/G1/G2 continuity", {}, {} };
+                list.Append(boundary[i]);
+                auto edge = TopoDS::Edge(boundary[i]);
+                if (orders[i] == 0)
+                    fill.Add(edge, GeomAbs_C0);
+                else {
+                    if (faces[i].IsNull() || faces[i].ShapeType() != TopAbs_FACE)
+                        return { {}, false, "Tangent/curvature fill needs an unambiguous support face", {}, {} };
+                    // OCCT 8.0 BRepFill forwards this enum's integer directly to GeomPlate's
+                    // derivative order (0/1/2); GeomAbs_G2 is 3 and raises instead of imposing G2.
+                    fill.Add(edge, TopoDS::Face(faces[i]), static_cast<GeomAbs_Shape>(orders[i]));
+                }
+            }
+            BRepBuilderAPI_MakeWire wire;
+            wire.Add(list);
+            if (!wire.IsDone() || !wire.Wire().Closed())
+                return { {}, false, "Fill boundary must form one closed wire", {}, {} };
+            for (const auto& point : vecFromJSArray<Vector3>(points))
+                fill.Add(Vector3::toPnt(point));
+            fill.Build();
+            if (!fill.IsDone() || !BRepCheck_Analyzer(fill.Shape()).IsValid() || fill.G0Error() > 1e-4)
+                return { {}, false, "Fill failed to satisfy its boundary/point constraints", {}, {} };
+            if (fill.G1Error() > 0.01 || fill.G2Error() > 0.1)
+                return { {}, false, "Fill failed to satisfy continuity constraints", {}, {} };
+            auto output = fill.Shape();
+            // Use a compound to preserve the caller's edge ordering for history.
+            BRep_Builder builder;
+            TopoDS_Compound input;
+            builder.MakeCompound(input);
+            for (const auto& edge : boundary)
+                builder.Add(input, edge);
+            return { output, true, "", faceHistory(fill, input, output), edgeHistory(fill, input, output) };
+        } catch (const Standard_Failure& error) {
+            return { {}, false, error.GetMessageString(), {}, {} };
+        }
+    }
+
     static ShapeResult box(const Pln& ax3, double x, double y, double z)
     {
         gp_Pln pln = Pln::toPln(ax3);
@@ -1905,6 +2030,9 @@ EMSCRIPTEN_BINDINGS(ShapeFactory)
         .class_function("circle", &ShapeFactory::circle)
         .class_function("arc", &ShapeFactory::arc)
         .class_function("bezier", &ShapeFactory::bezier)
+        .class_function("fitSpline", &ShapeFactory::fitSpline)
+        .class_function("draftTracked", &ShapeFactory::draftTracked)
+        .class_function("fillSurface", &ShapeFactory::fillSurface)
         .class_function("helix", &ShapeFactory::helix)
         .class_function("rect", &ShapeFactory::rect)
         .class_function("point", &ShapeFactory::point)

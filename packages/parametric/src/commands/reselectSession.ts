@@ -11,6 +11,7 @@ import {
     type INode,
     type INodeVisual,
     type IShape,
+    type IShapeFilter,
     Matrix4,
     PubSub,
     Result,
@@ -29,6 +30,7 @@ import {
     type FeatureData,
     type FilletFeatureData,
     isFeatureSuppressed,
+    type RevolveFeatureData,
 } from "../features/feature";
 import { reportSilentIdLoss } from "../features/idDiagnostics";
 import { allProfiles, profileEntitiesOf, sketchProfiles } from "../features/profileBuilder";
@@ -52,6 +54,7 @@ import type { SketchNode } from "../sketch/sketchNode";
  * this module never imports the node class, so there is no import cycle.
  */
 export interface ReselectHost extends INode, IBodyTrackingNode {
+    readonly rollbackIndex?: number;
     readonly document: IDocument;
     readonly features: FeatureData[];
     readonly shape: Result<IShape>;
@@ -67,6 +70,7 @@ export interface ReselectHost extends INode, IBodyTrackingNode {
  * `runReselectSession`).
  */
 export interface ReselectPickSpec<TRef> {
+    shapeFilter?: IShapeFilter;
     prompt: I18nKeys;
     shapeType: ShapeType;
     /** The pick is restricted to this node. */
@@ -121,6 +125,7 @@ export async function runReselectSession<TRef>(
         spec.preselect?.();
         controller.onCancelled(() => (cancelled = true));
         const picked = await host.document.picker.pickShape(spec.prompt, controller, {
+            shapeFilter: spec.shapeFilter,
             shapeType: spec.shapeType,
             multi: true,
             nodeFilter: { allow: (node) => node === spec.targetNode },
@@ -163,7 +168,8 @@ export class EdgeReselectSession {
         featureIndex: number,
         controller: AsyncController,
     ): Promise<EdgeRef[] | undefined> {
-        const original = this.host.features;
+        const previousRollback = this.host.rollbackIndex;
+        const original = this.host.features.slice(0, featureIndex + 1);
         let active = true;
         const preview = debounce((selected: VisualShapeData[]) => {
             if (active) this.previewSelection(original, featureIndex, selected);
@@ -181,10 +187,8 @@ export class EdgeReselectSession {
             onEmptyPick: () => PubSub.default.pub("showToast", "toast.select.noSelected"),
             preview,
             setup: () => {
-                // Deliberately ignores the boolean: a failed rollback replay keeps the
-                // full chain displayed (discarding keeps shape and cache consistent),
-                // so the pick simply proceeds against the unrolled shape.
-                this.host.setRollbackIndex(featureIndex);
+                if (!this.host.setRollbackIndex(featureIndex))
+                    throw new Error("Cannot select entities because the feature input failed to rebuild.");
                 if (owner !== undefined && shapeType !== undefined) {
                     this.host.document.visual.highlighter.addState(
                         owner,
@@ -211,7 +215,7 @@ export class EdgeReselectSession {
                         shapeType,
                     );
                 }
-                this.host.setRollbackIndex(undefined);
+                this.host.setRollbackIndex(previousRollback);
             },
         });
     }
@@ -320,11 +324,12 @@ export class ProfileReselectSession {
     constructor(private readonly host: ReselectHost) {}
 
     async pick(
-        feature: ExtrudeFeatureData,
+        feature: ExtrudeFeatureData | RevolveFeatureData,
         sketch: SketchNode,
         controller: AsyncController,
     ): Promise<ProfileRef[] | undefined> {
         const original = this.host.features;
+        const owner = this.host.document.visual.context.getVisual(this.host);
         return runReselectSession(this.host, controller, {
             prompt: "prompt.select.faces",
             shapeType: ShapeTypes.face,
@@ -336,11 +341,27 @@ export class ProfileReselectSession {
             // Ahead of the preview subscription: preselecting here must not fire a
             // preview of the profiles it just selected.
             setup: () => {
+                this.host.document.visual.context.setVisible(sketch, true);
+                if (owner)
+                    this.host.document.visual.highlighter.addState(
+                        owner,
+                        VisualStates.faceTransparent,
+                        ShapeTypes.shape,
+                    );
                 this.host.document.visual.update();
                 this.preselect(feature, sketch);
             },
             capture: (picked) => picked.map((x) => captureProfileRef(x.shape as unknown as IFace)),
-            teardown: () => this.host.setFeaturesEmitShapeChanged(original),
+            teardown: () => {
+                if (owner)
+                    this.host.document.visual.highlighter.removeState(
+                        owner,
+                        VisualStates.faceTransparent,
+                        ShapeTypes.shape,
+                    );
+                this.host.setFeaturesEmitShapeChanged(original);
+                this.host.document.visual.context.setVisible(sketch, sketch.visible && sketch.parentVisible);
+            },
         });
     }
 
@@ -349,7 +370,11 @@ export class ProfileReselectSession {
      * profiles. An empty selection previews the whole sketch, matching what an empty
      * confirmation commits.
      */
-    private preview(feature: ExtrudeFeatureData, sketch: SketchNode, selected: VisualShapeData[]): void {
+    private preview(
+        feature: ExtrudeFeatureData | RevolveFeatureData,
+        sketch: SketchNode,
+        selected: VisualShapeData[],
+    ): void {
         const faces = selected.filter((x) => x.owner.node === sketch);
         const profiles =
             faces.length > 0 ? faces.map((x) => captureProfileRef(x.shape as unknown as IFace)) : undefined;
@@ -360,23 +385,24 @@ export class ProfileReselectSession {
     }
 
     /** Selects the profiles the feature currently references so the pick starts from them. */
-    private preselect(feature: ExtrudeFeatureData, sketch: SketchNode): void {
-        if (feature.profiles === undefined || feature.profiles.length === 0) return;
+    private preselect(feature: ExtrudeFeatureData | RevolveFeatureData, sketch: SketchNode): void {
         const profiles = sketchProfiles(sketch);
         if (!profiles.isOk) return;
         // A failed match is a common reason to re-pick; then there is nothing to preselect.
-        const indexes = matchProfileIndexes(
-            allProfiles(profiles.value),
-            feature.profiles,
-            profileEntitiesOf(profiles.value),
-        );
+        const indexes = !feature.profiles?.length
+            ? Result.ok(profiles.value.outer.map((_, i) => i))
+            : matchProfileIndexes(
+                  allProfiles(profiles.value),
+                  feature.profiles,
+                  profileEntitiesOf(profiles.value),
+              );
         if (!indexes.isOk) return;
         // The profile mesh appends faces in the same outer-then-inner order, so a
         // matched position indexes into the face ranges directly.
-        const ranges = sketch.mesh.faces?.range;
-        if (ranges === undefined) return;
         const owner = this.host.document.visual.context.getVisual(sketch) as INodeVisual | undefined;
         if (owner === undefined) return;
+        const ranges = sketch.mesh.faces?.range;
+        if (ranges === undefined) return;
         const picked: VisualShapeData[] = indexes.value.map((index) => ({
             owner,
             shape: ranges[index].shape,

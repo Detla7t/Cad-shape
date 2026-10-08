@@ -2,8 +2,10 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    Config,
     DocumentVersionControl,
     download,
+    exportFileName,
     NodeActions,
     type NodeMenuAction,
     PhongMaterial,
@@ -141,7 +143,15 @@ NodeActions.register((node) => {
                     void doc.application.dataExchange
                         .export(picker.value, [node])
                         .then((data) => {
-                            if (data) download(data, `${node.name}${picker.value.split(" ")[0]}`);
+                            if (data)
+                                download(
+                                    data,
+                                    exportFileName(
+                                        node.name,
+                                        picker.value.split(" ")[0],
+                                        Config.instance.preferences.exportRules,
+                                    ),
+                                );
                         })
                         .catch((error) => PubSub.default.pub("displayError", String(error)));
                 });

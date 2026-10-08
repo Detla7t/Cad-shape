@@ -6,6 +6,49 @@
     flex-direction: column;
 }
 
+.timelineRow {
+    border-radius: 0;
+    &[data-rolled-back="true"] {
+        opacity: 0.45;
+    }
+    &[aria-selected="true"] {
+        background: var(--hover-background-color);
+    }
+    .header {
+        padding: 4px 6px;
+    }
+    .name {
+        font-size: 12px;
+        font-weight: 400;
+    }
+}
+.editHint {
+    font-size: 12px;
+    opacity: 0.7;
+}
+.accept,
+.cancel {
+    border: 0;
+    width: 28px;
+    height: 28px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    svg {
+        width: 20px;
+        height: 20px;
+    }
+}
+.accept {
+    background: #008900;
+    color: white;
+}
+.cancel {
+    background: transparent;
+    color: #c62938;
+}
+
 /* Flat rows separated by a hairline pseudo-element instead of bordered cards. */
 .item {
     border-radius: 6px;

@@ -105,7 +105,13 @@ export function showDocumentUnits(model: IDocument): HTMLDialogElement {
         });
         close();
     };
-    footer.append(cancel, save);
+    const preferences = document.createElement("button");
+    preferences.textContent = "Preferences…";
+    preferences.onclick = () => {
+        close();
+        PubSub.default.pub("openPreferences", model, "document");
+    };
+    footer.append(preferences, cancel, save);
     dialog.append(footer);
     dialog.onkeydown = (event) => event.stopPropagation();
     dialog.oncancel = close;

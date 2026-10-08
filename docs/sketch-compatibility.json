@@ -1,0 +1,46 @@
+{
+    "schemaVersion": 1,
+    "auditedAt": "2026-10-08",
+    "stdVersion": 3083,
+    "parityCertified": false,
+    "requirement": "Equivalent user tools and FeatureScript operations must produce equivalent geometry, units, constraints, references, and rebuild behavior to Onshape. Similar menus or successful execution alone do not establish compatibility.",
+    "verified": [
+        {
+            "scope": "Local UI model versus native and bundled Onshape std execution",
+            "cases": "Constrained line length, circle diameter and fixed centers, circular arc orientation, Bezier control points, fitted splines, conflicting dimensions, initial guesses, clockwise arc endpoint references; tested on XY, ZX and a translated tilted plane.",
+            "evidence": "packages/parametric/test/featurescript/sketchParity.kernel.test.ts",
+            "limit": "Both FeatureScript interpreters execute locally. This is not differential execution against Onshape's sketch solver."
+        },
+        {
+            "scope": "Shared spline interpolation against an Onshape reference",
+            "cases": "Planar open spline length and seven sampled positions, using the saved Onshape opFitSpline result.",
+            "evidence": "packages/parametric/test/sketch/sketchTools.kernel.test.ts",
+            "limit": "Verifies the underlying interpolation for this fixture, not all skFitSpline options or sketch solver behavior."
+        },
+        {
+            "scope": "Sketch editing geometry",
+            "cases": "Segment-only trim preview and matching removal; circle splitting at two chosen points; exact open Bezier subdivision; joined fillet/chamfer corners; closed and open offset chains; transform constraint remapping; copied arc structural constraints; text profile hole nesting.",
+            "evidence": [
+                "packages/parametric/test/sketch/sketchTools.test.ts",
+                "packages/parametric/test/sketch/sketchTools.kernel.test.ts"
+            ]
+        },
+        {
+            "scope": "Native browser interactions",
+            "cases": "Trim previews only the removed semicircle; split waits for a second circle point; offset accepts exact model values despite rounded inch display; sketch copy/paste and finish; stable Features position on selection and double-click; adjustable Properties accordion; history bar rollback and keyboard control.",
+            "documents": ["Trim and sketch parity · verification", "Spline and split · verification"]
+        }
+    ],
+    "knownLimits": [
+        "Trim and Extend support line, circle and circular arc geometry. Split additionally supports open Beziers. General spline trim/split is not implemented.",
+        "Spline control point editing currently changes interpolation points; it does not implement shape-preserving knot insertion.",
+        "Offset results have joined geometry but no associative offset relationship to the source entities.",
+        "Intersection imports supported line/circle/arc section geometry without associative references to the source shape.",
+        "Text uses the bundled Helvetiker outlines; matching Onshape's font, layout and editable text constraints is unverified.",
+        "Polygon, slot and pattern geometry is available, but complete Onshape construction constraints and associative pattern editing are not implemented.",
+        "Raster images can be inserted and persisted; interactive image handles are not implemented.",
+        "The FeatureScript sketch constraint bridge supports common geometric and dimensional constraints. Unsupported constraints or unsatisfied solves report an error; not all Onshape constraint types, external references or out-of-line initial guesses are supported.",
+        "Part body history uses feature replay. The document-level history bar previews node visibility rather than rebuilding a unified cross-node timeline.",
+        "Full Onshape std and UI compatibility remains unverified. Broader differential fixtures are tracked separately in docs/onshape-compatibility.json."
+    ]
+}

@@ -9,6 +9,7 @@ export default {
     translation: {
         "command.sketch.circle3Point": "3 point circle",
         "sidebar.inspection": "Inspection table",
+        "sidebar.appearance": "外观",
         "body.referencePlane": "Plane",
         "command.plane.create": "Plane",
         "plane.offset": "Offset (mm)",

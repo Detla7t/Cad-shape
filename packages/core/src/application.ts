@@ -4,7 +4,7 @@
 import type { CommandKeys, ICommand } from "./command";
 import type { IDataExchange } from "./dataExchange";
 import type { IDocument } from "./document";
-import type { IPropertyChanged, IStorage, ObservableCollection } from "./foundation";
+import type { IPropertyChanged, IStorage, ObservableCollection, Result } from "./foundation";
 import type { IPluginManager } from "./plugin";
 import type { Serialized } from "./serialize";
 import type { IService } from "./service";
@@ -27,6 +27,10 @@ export interface IApplication extends IPropertyChanged {
     activeView: IView | undefined;
     newDocument(name: string): Promise<IDocument>;
     openDocument(id: string): Promise<IDocument | undefined>;
+    /** A portable copy of an open or saved document, without switching the active view. */
+    exportDocument?(id: string): Promise<Result<Uint8Array>>;
+    /** Opens a portable project file and returns its document after loading has finished. */
+    importDocumentFile?(file: File): Promise<IDocument>;
     loadDocument(data: Serialized): Promise<IDocument | undefined>;
     loadFileFromUrl(url: string): Promise<void>;
 }

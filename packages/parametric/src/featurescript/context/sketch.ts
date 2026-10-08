@@ -10,6 +10,7 @@ import {
     type Polygon,
     sampleLoop,
 } from "../../features/profileGeometry";
+import { sketchSpline } from "../../sketch/sketchSpline";
 import {
     expectArray,
     expectMap,
@@ -49,6 +50,7 @@ interface SketchEntity {
     readonly id: string;
     readonly construction: boolean;
     readonly edges: IEdge[];
+    readonly reverseEndpoints?: boolean;
 }
 
 export class FsSketch {
@@ -82,13 +84,13 @@ export class FsSketch {
         return new XYZ(this.plane.normal[0], this.plane.normal[1], this.plane.normal[2]);
     }
 
-    add(id: string, construction: boolean, edges: IEdge[]): void {
+    add(id: string, construction: boolean, edges: IEdge[], reverseEndpoints = false): void {
         if (this.solved) fail(`Sketch already solved; cannot add "${id}"`);
         if (this.entities.some((entity) => entity.id === id) || this.points.some((p) => p.id === id)) {
             fail(`Sketch entity id "${id}" is already used`);
         }
         this.context.track(edges);
-        this.entities.push({ id, construction, edges });
+        this.entities.push({ id, construction, edges, reverseEndpoints });
     }
 }
 
@@ -220,7 +222,7 @@ export function installSketch(std: StdBuilder): void {
             sweepToMid < sweepToEnd
                 ? arcEdge(sketch, center, start, sweepToEnd, `skArc "${id}"`)
                 : arcEdge(sketch, center, end, 2 * Math.PI - sweepToEnd, `skArc "${id}"`);
-        sketch.add(id, isConstruction(definition), [edge]);
+        sketch.add(id, isConstruction(definition), [edge], sweepToMid >= sweepToEnd);
         return undefined;
     });
     std.fn("skRectangle", (args) => {
@@ -289,6 +291,36 @@ export function installSketch(std: StdBuilder): void {
         // from the left side to the right at `start`.
         sketch.add(`${id}.end1`, construction, [arcEdge(sketch, b, b2, Math.PI, "slot end")]);
         sketch.add(`${id}.end2`, construction, [arcEdge(sketch, a, a1, Math.PI, "slot end")]);
+        return undefined;
+    });
+    std.fn("skFitSpline", (args) => {
+        const [sketch, id, definition] = sketchArgs(args, "skFitSpline");
+        const uv = (value: FsValue, name: string): [number, number] => {
+            const p = readPoint2d(value, name);
+            return [p[0] * MM_PER_METER, p[1] * MM_PER_METER];
+        };
+        const points = expectArray(definition.field("points"), "skFitSpline points").items.map((p, i) =>
+            uv(p, `point ${i}`),
+        );
+        const parameters =
+            definition.field("parameters") === undefined
+                ? undefined
+                : expectArray(definition.field("parameters"), "parameters").items.map((v) =>
+                      expectNumber(v, "parameter"),
+                  );
+        const derivative = (name: string) =>
+            definition.field(name) === undefined ? undefined : uv(definition.field(name), name);
+        const edge = kernel(
+            sketchSpline(
+                toKernelPlane(sketch.plane),
+                points,
+                parameters,
+                derivative("startDerivative"),
+                derivative("endDerivative"),
+            ),
+            `skFitSpline "${id}"`,
+        );
+        sketch.add(id, isConstruction(definition), [edge]);
         return undefined;
     });
     std.fn("skBezier", (args) => {

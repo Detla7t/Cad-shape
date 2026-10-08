@@ -14,6 +14,7 @@ import {
     type SnapResult,
     SubshapeSelectionHandler,
     type VisualShapeData,
+    VisualStates,
     type XYZ,
 } from "@chili3d/core";
 import {
@@ -187,9 +188,9 @@ export class EdgeCornerPickHandler extends SubshapeSelectionHandler {
 }
 
 /**
- * Edge pick step for fillet/chamfer: reuses a valid preselection (same rule as
- * GetOrSelectShapeStep), otherwise runs an EdgeCornerPickHandler so the value arrow
- * is available while picking. The active handler is reported through `onHandler` so
+ * Edge pick step for fillet/chamfer: restores valid preselected edges and waits for
+ * confirmation with an EdgeCornerPickHandler so the value arrow is available while
+ * picking. The active handler is reported through `onHandler` so
  * the command can refresh the arrow when the value changes outside the handler.
  */
 export class EdgeCornerSelectStep implements IStep {
@@ -201,14 +202,12 @@ export class EdgeCornerSelectStep implements IStep {
 
     async execute(document: IDocument, controller: AsyncController): Promise<SnapResult | undefined> {
         const preselected = this.preselectedEdges(document);
-        if (preselected.length > 0) {
-            controller.success();
-            return toSnapResult(document, preselected);
-        }
-
         document.selection.clearSelection();
+        if (preselected.length)
+            document.selection.setSelectedShapes(preselected, VisualStates.edgeSelected, false);
         const handler = new EdgeCornerPickHandler(document, controller, this.nodeFilter, this.callbacks);
         this.onHandler(handler);
+        handler.refreshArrow(document.application.activeView);
         try {
             await document.picker.pickAsync(
                 handler,

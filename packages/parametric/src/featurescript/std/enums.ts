@@ -11,6 +11,7 @@ import type { StdBuilder } from "./registry";
 export const STD_ENUMS: Record<string, readonly string[]> = {
     EntityType: ["VERTEX", "EDGE", "FACE", "BODY"],
     BodyType: ["SOLID", "SHEET", "WIRE", "POINT", "MATE_CONNECTOR", "COMPOSITE"],
+    DraftType: ["REFERENCE_SURFACE", "REFERENCE_ENTITY"],
     BoundingType: [
         "BLIND",
         "SYMMETRIC",

@@ -11,4 +11,6 @@ export * from "./sheetMetal";
 export * from "./sketch";
 export * from "./versioning";
 import "./commands";
+import "./commands/modelingCommandRouting";
 import "./measurement/shapeProperties";
+import "./measurement/selectionMeasurement";

@@ -39,6 +39,34 @@
     height: 14px;
 }
 
+.browse {
+    display: grid;
+    place-items: center;
+    flex: 0 0 34px;
+    width: 34px;
+    border: 0;
+    border-right: 1px solid var(--border-color);
+    padding: 5px;
+    background: var(--panel-background-color);
+    color: var(--foreground-color);
+    cursor: pointer;
+}
+.browse svg {
+    width: 20px;
+    height: 20px;
+}
+.browse:hover {
+    background: var(--hover-background-color);
+}
+.browse[aria-expanded="true"] {
+    color: var(--primary-color);
+    background: color-mix(in srgb, #b4def2 35%, var(--panel-background-color));
+}
+.browse:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: -2px;
+}
+
 .tabs {
     display: flex;
     flex-direction: row;

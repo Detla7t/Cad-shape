@@ -9,6 +9,7 @@ import {
     type IDisposable,
     type IDocument,
     Id,
+    type INode,
     type ISelection,
     type IView,
     Node,
@@ -172,7 +173,7 @@ function setup() {
     const viewArea = document.createElement("div");
     const workspace = new ElementWorkspace(app, partStudio, viewArea);
     workspaces.push(workspace);
-    document.body.append(partStudio, viewArea, workspace.strip);
+    document.body.append(partStudio, viewArea, workspace.tabsSidebar, workspace.strip);
     app.activeView = view;
     workspace.connect();
     return { app, doc, view, workspace, partStudio, viewArea, strip: workspace.strip };
@@ -246,6 +247,147 @@ describe("the element tab strip", () => {
         app.activeView = undefined;
         expect(isHidden(strip)).toBe(true);
         expect(tabs(strip)).toHaveLength(0);
+    });
+});
+
+describe("Tabs sidebar", () => {
+    test("the button before + toggles the sidebar, and closing restores focus and the model panel", () => {
+        const { workspace, strip, partStudio } = setup();
+        const button = mustQuery<HTMLButtonElement>(strip, 'button[aria-label="Tabs"]');
+        expect(strip.firstElementChild).toBe(button);
+        expect(button.nextElementSibling?.className).toBe("el-add");
+        expect(workspace.tabsSidebar.hidden).toBe(true);
+        button.click();
+        expect(workspace.tabsSidebar.hidden).toBe(false);
+        expect(button.getAttribute("aria-expanded")).toBe("true");
+        expect(partStudio.hasAttribute("data-tabs-open")).toBe(true);
+        mustQuery<HTMLButtonElement>(workspace.tabsSidebar, 'button[aria-label="Close Tabs"]').click();
+        expect(workspace.tabsSidebar.hidden).toBe(true);
+        expect(partStudio.hasAttribute("data-tabs-open")).toBe(false);
+        expect(button.getAttribute("aria-expanded")).toBe("false");
+        expect(document.activeElement).toBe(button);
+    });
+
+    test("combines name search and type filters, clears them, and changes row layout", () => {
+        const { workspace, doc } = setup();
+        const script = add(doc, new ScriptNode({ document: doc, name: "Bracket code" }));
+        const variables = add(doc, new VariableStudioNode({ document: doc, name: "Bracket sizes" }));
+        workspace.toggleTabs();
+        const panel = workspace.tabsSidebar;
+        const search = mustQuery<HTMLInputElement>(panel, 'input[type="search"]');
+        search.value = "Bracket";
+        search.dispatchEvent(new Event("input"));
+        expect(
+            [...panel.querySelectorAll<HTMLElement>('[role="option"]')].map((row) => row.dataset["tabId"]),
+        ).toEqual([script.id, variables.id]);
+        mustQuery<HTMLButtonElement>(panel, 'button[data-kind="variableStudio"]').click();
+        expect(panel.querySelectorAll('[role="option"]')).toHaveLength(1);
+        expect(mustQuery<HTMLElement>(panel, '[role="option"]').dataset["tabId"]).toBe(variables.id);
+        const clear = [...panel.querySelectorAll<HTMLButtonElement>("button")].find(
+            (button) => button.textContent === "Clear",
+        );
+        expect(clear).not.toBeUndefined();
+        clear!.click();
+        expect(search.value).toBe("");
+        expect(panel.querySelectorAll('[role="option"]')).toHaveLength(3);
+        mustQuery<HTMLButtonElement>(panel, 'button[aria-label="Compact list"]').click();
+        expect(panel.dataset["compact"]).toBe("true");
+        mustQuery<HTMLButtonElement>(panel, 'button[aria-label="Detailed list"]').click();
+        expect(panel.dataset["compact"]).toBe("false");
+        expect(workspace.activeId).toBe(PART_STUDIO_ID);
+        expect(views).toHaveLength(0);
+    });
+
+    test("sort and arrow navigation preview tabs; Enter opens the existing editor and preserves drafts", () => {
+        const { workspace, doc } = setup();
+        const last = add(doc, new ScriptNode({ document: doc, name: "Zulu" }));
+        const first = add(doc, new ScriptNode({ document: doc, name: "Alpha" }));
+        workspace.activate(last.id);
+        const draft = document.createElement("input");
+        draft.value = "unsaved draft";
+        views[0].element.append(draft);
+        workspace.toggleTabs();
+        const panel = workspace.tabsSidebar;
+        mustQuery<HTMLButtonElement>(panel, 'button[aria-label="Sort tabs"]').click();
+        const nameSort = [...panel.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]')].find(
+            (button) => button.textContent === "Name",
+        );
+        expect(nameSort).not.toBeUndefined();
+        nameSort!.click();
+        expect(mustQuery<HTMLElement>(panel, '[role="option"]').dataset["tabId"]).toBe(first.id);
+        const list = mustQuery<HTMLElement>(panel, '[role="listbox"]');
+        list.dispatchEvent(new KeyboardEvent("keydown", { key: "Home", bubbles: true }));
+        expect(mustQuery<HTMLElement>(panel, '[role="option"][aria-selected="true"]').dataset["tabId"]).toBe(
+            first.id,
+        );
+        expect(workspace.activeId).toBe(last.id);
+        expect(views).toHaveLength(1);
+        list.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+        expect(workspace.activeId).toBe(first.id);
+        expect(views).toHaveLength(2);
+        mustQuery<HTMLElement>(panel, `[data-tab-id="${last.id}"]`).click();
+        expect(workspace.activeId).toBe(last.id);
+        expect(views).toHaveLength(2);
+        expect(draft.value).toBe("unsaved draft");
+        expect(views[0].element.contains(draft)).toBe(true);
+    });
+
+    test("tracks renames, deletion, undo and document switches without leaving stale selection or filters", async () => {
+        const { workspace, app, doc } = setup();
+        const script = add(doc, new ScriptNode({ document: doc, name: "Old name" }));
+        workspace.toggleTabs();
+        const panel = workspace.tabsSidebar;
+        mustQuery<HTMLElement>(panel, `[data-tab-id="${script.id}"]`).click();
+        workspace.rename(script, "New name");
+        expect(mustQuery<HTMLElement>(panel, `[data-tab-id="${script.id}"]`).textContent).toContain(
+            "New name",
+        );
+        workspace.delete(script);
+        expect(panel.querySelector(`[data-tab-id="${script.id}"]`)).toBeNull();
+        expect(workspace.activeId).toBe(PART_STUDIO_ID);
+        await doc.history.undo();
+        expect(mustQuery<HTMLElement>(panel, `[data-tab-id="${script.id}"]`).textContent).toContain(
+            "New name",
+        );
+        const search = mustQuery<HTMLInputElement>(panel, 'input[type="search"]');
+        search.value = "New name";
+        search.dispatchEvent(new Event("input"));
+        const other = addDocument(app);
+        app.activeView = other.view;
+        expect(search.value).toBe("");
+        expect(panel.querySelectorAll('[role="option"]')).toHaveLength(1);
+        expect(mustQuery<HTMLElement>(panel, '[role="option"]').dataset["tabId"]).toBe(PART_STUDIO_ID);
+        app.activeView = undefined;
+        expect(panel.hidden).toBe(true);
+        expect(workspace.partStudio.hasAttribute("data-tabs-open")).toBe(false);
+    });
+
+    test("loads thumbnails without mounting elements, caches them, and refreshes them after a save", async () => {
+        const thumbnail = rs.fn(async (_node: INode, _document: IDocument) => "data:image/svg+xml,<svg/>");
+        registrations.push(
+            registerElementKind({
+                kind: "script",
+                icon: "icon-macro",
+                display: "featurescript.studio",
+                isElement: (node) => node instanceof ScriptNode,
+                thumbnail,
+            }),
+        );
+        const { workspace, doc } = setup();
+        const node = add(doc, new ScriptNode({ document: doc, name: "Drawing preview" }));
+        workspace.toggleTabs();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        const image = mustQuery<HTMLImageElement>(workspace.tabsSidebar, `[data-tab-id="${node.id}"] img`);
+        expect(image.getAttribute("src")).toBe("data:image/svg+xml,<svg/>");
+        expect(thumbnail).toHaveBeenCalledTimes(1);
+        expect(views).toHaveLength(0);
+        workspace.tabsSidebar.render();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(thumbnail).toHaveBeenCalledTimes(1);
+        PubSub.default.pub("documentSaved", doc);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(thumbnail).toHaveBeenCalledTimes(2);
+        expect(views).toHaveLength(0);
     });
 });
 

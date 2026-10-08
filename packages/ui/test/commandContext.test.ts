@@ -187,7 +187,8 @@ describe("CommandContext", () => {
             const header = mustQuery(ctx, ".cc-command");
 
             const icon = mustQuery(header, "svg");
-            expect(icon.getAttribute("icon")).toBe("icon-ctx");
+            // The shared icon mock records the command key sent to the CAD icon resolver.
+            expect(icon.getAttribute("icon")).toBe(CMD_KEY);
             expect(icon.classList.contains("cc-icon")).toBe(true);
 
             mustQuery(header, ".cc-title");

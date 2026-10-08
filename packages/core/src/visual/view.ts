@@ -52,6 +52,8 @@ export interface IView extends IPropertyChanged, IDisposable {
     update(): void;
     up(): XYZ;
     toImage(): string;
+    /** A fitted model thumbnail, without changing the user's camera or selection. */
+    toThumbnail?(): string | undefined;
     direction(): XYZ;
     rayAt(mx: number, my: number): Ray;
     screenToWorld(mx: number, my: number): XYZ;

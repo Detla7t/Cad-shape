@@ -18,7 +18,7 @@ import {
     type Serialized,
     VariableTable,
 } from "../src";
-import { createMockVisual } from "./mockVisual";
+import { createMockSelection, createMockVisual } from "./mockVisual";
 
 export class TestDocument implements IDocument {
     application: IApplication;
@@ -74,7 +74,7 @@ export class TestDocument implements IDocument {
         this.id = "test";
         this.visual = overrides?.visual ?? createMockVisual();
         this.history = new History();
-        this.selection = overrides?.selection ?? ({} as ISelection);
+        this.selection = overrides?.selection ?? createMockSelection();
         this.picker = overrides?.picker ?? ({} as IPicker);
         this.application = overrides?.application ?? ({ views: [] } as unknown as IApplication);
         this.modelManager = new ModelManager(this);

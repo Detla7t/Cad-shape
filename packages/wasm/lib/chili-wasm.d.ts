@@ -665,11 +665,13 @@ interface EmbindModule {
     chamfer2d(_0: TopoDS_Face, _1: TopoDS_Edge, _2: TopoDS_Edge, _3: number): ShapeResult;
     polygon(_0: Array<Vector3>): ShapeResult;
     bezier(_0: Array<Vector3>, _1: Array<number>): ShapeResult;
+    fitSpline(_0: Array<Vector3>, _1: Array<number>, _2: Array<Vector3>, _3: Array<number>, _4: boolean): ShapeResult;
     fillet(_0: TopoDS_Shape, _1: Array<number>, _2: number): ShapeResult;
     chamfer(_0: TopoDS_Shape, _1: Array<number>, _2: number): ShapeResult;
     filletTracked(_0: TopoDS_Shape, _1: Array<number>, _2: number): TrackedShapeResult;
     chamferTracked(_0: TopoDS_Shape, _1: Array<number>, _2: number): TrackedShapeResult;
     sweep(_0: Array<TopoDS_Shape>, _1: TopoDS_Wire, _2: boolean, _3: boolean): ShapeResult;
+    fillSurface(_0: Array<TopoDS_Shape>, _1: Array<number>, _2: Array<TopoDS_Shape>, _3: Array<Vector3>): TrackedShapeResult;
     makeThickSolidByJoin(_0: TopoDS_Shape, _1: Array<TopoDS_Shape>, _2: number, _3: GeomAbs_JoinType, _4: BRepOffset_Mode, _5: boolean): ShapeResult;
     simplifyShape(_0: TopoDS_Shape, _1: boolean, _2: boolean, _3: Array<TopoDS_Shape>, _4: number, _5: number): ShapeResult;
     booleanCommon(_0: Array<TopoDS_Shape>, _1: Array<TopoDS_Shape>): ShapeResult;
@@ -699,6 +701,7 @@ interface EmbindModule {
     pushPull(_0: TopoDS_Shape, _1: TopoDS_Shape, _2: Vector3): ShapeResult;
     circle(_0: Vector3, _1: Vector3, _2: number): ShapeResult;
     arc(_0: Vector3, _1: Vector3, _2: Vector3, _3: number): ShapeResult;
+    draftTracked(_0: TopoDS_Shape, _1: Array<number>, _2: Vector3, _3: Vector3, _4: Vector3, _5: number): TrackedShapeResult;
     helix(_0: Vector3, _1: Vector3, _2: Vector3, _3: number, _4: number, _5: number): ShapeResult;
     point(_0: Vector3): ShapeResult;
     line(_0: Vector3, _1: Vector3): ShapeResult;
@@ -850,6 +853,7 @@ interface EmbindModule {
   Shape: {
     ptr(_0: TopoDS_Shape): number;
     extremaDistance(_0: TopoDS_Shape, _1: TopoDS_Shape): number;
+    distanceMeasure(_0: TopoDS_Shape, _1: TopoDS_Shape, _2: boolean): any;
     clean(_0: TopoDS_Shape): void;
     clone(_0: TopoDS_Shape): TopoDS_Shape;
     transformed(_0: TopoDS_Shape, _1: gp_Trsf): TopoDS_Shape;
@@ -860,11 +864,13 @@ interface EmbindModule {
     shellSewing(_0: TopoDS_Shape, _1: number): TopoDS_Shape;
     setTolerance(_0: TopoDS_Shape, _1: number): void;
     volume(_0: TopoDS_Shape): number;
+    seamEdges(_0: TopoDS_Shape): IntVector;
     findAncestor(_0: TopoDS_Shape, _1: TopoDS_Shape, _2: TopAbs_ShapeEnum): Array<TopoDS_Shape>;
     findSubShapes(_0: TopoDS_Shape, _1: TopAbs_ShapeEnum): Array<TopoDS_Shape>;
     getDirectSubShapes(_0: TopoDS_Shape): Array<TopoDS_Shape>;
     splitShapes(_0: Array<TopoDS_Shape>, _1: Array<TopoDS_Shape>, _2: number): TopoDS_Shape;
     boundingBox(_0: TopoDS_Shape, _1: boolean): BoundingBox;
+    exactBoundingBox(_0: TopoDS_Shape): BoundingBox;
     orientedBoundingBox(_0: TopoDS_Shape, _1: boolean): OrientedBoundingBox;
     sectionSP(_0: TopoDS_Shape, _1: Pln): TopoDS_Shape;
     checkFaces(_0: TopoDS_Shape): FaceCheckResultVector;
@@ -876,6 +882,7 @@ interface EmbindModule {
     fromCurve(_0: Geom_Curve | null): TopoDS_Edge;
     curve(_0: TopoDS_Edge): Handle_Geom_TrimmedCurve;
     curveLength(_0: TopoDS_Edge): number;
+    arcLengthParameter(_0: TopoDS_Edge, _1: number): number;
     firstParameter(_0: TopoDS_Edge): number;
     lastParameter(_0: TopoDS_Edge): number;
     trim(_0: TopoDS_Edge, _1: number, _2: number): TopoDS_Edge;

@@ -17,6 +17,7 @@ import {
     type IFeatureListNode,
     type INode,
     isConfiguredValue,
+    isFeatureListNode,
     Localize,
     PubSub,
     selectConfiguredArm,
@@ -57,11 +58,14 @@ export class FeatureListProperty extends HTMLElement {
     private menu: HTMLElement | undefined;
     private draggingId: string | undefined;
     private dropTarget: DropTarget | undefined;
+    private historyBar?: HistoryBar;
+    private picking = false;
 
     constructor(
         readonly document: IDocument,
         readonly node: INode & IFeatureListNode,
         private readonly featureId?: string,
+        private readonly timeline = false,
     ) {
         super();
         if (featureId) this.expanded.add(featureId);
@@ -77,6 +81,7 @@ export class FeatureListProperty extends HTMLElement {
         this.node.removePropertyChanged(this.handleNodeChanged);
         PubSub.default.remove("documentUnitsChanged", this.handleUnitsChanged);
         this.closeMenu();
+        this.historyBar?.dispose();
     }
 
     private readonly handleNodeChanged = (property: string) => {
@@ -88,12 +93,14 @@ export class FeatureListProperty extends HTMLElement {
 
     private renderItems() {
         this.closeMenu();
+        this.historyBar?.dispose();
         this.replaceChildren(
             ...this.node
                 .featureItems()
                 .filter((item) => !this.featureId || item.id === this.featureId)
                 .map((item) => this.featureRow(item)),
         );
+        if (this.picking) this.setInputsDisabled(true);
         if (!this.featureId && this.node.setRollbackIndex) {
             const rows = [...this.children] as HTMLElement[];
             const bar = new HistoryBar(
@@ -110,6 +117,7 @@ export class FeatureListProperty extends HTMLElement {
                     }
                 },
             );
+            this.historyBar = bar;
             this.append(bar.element);
             bar.refresh();
         }
@@ -137,8 +145,26 @@ export class FeatureListProperty extends HTMLElement {
                 title: item.error ?? item.warning ?? "",
             },
             this.featureHeader(item, expanded),
-            ...(expanded ? [this.featureBody(item)] : []),
+            ...(!this.timeline && expanded ? [this.featureBody(item)] : []),
         );
+        row.dataset["featureId"] = item.id;
+        row.dataset["rolledBack"] = String(
+            this.node.rollbackIndex !== undefined &&
+                this.node.featureItems().findIndex((f) => f.id === item.id) >= this.node.rollbackIndex,
+        );
+        if (this.timeline) {
+            row.classList.add(style.timelineRow);
+            row.setAttribute("role", "treeitem");
+            row.addEventListener("dblclick", (event) => {
+                event.stopPropagation();
+                PubSub.default.pub("editFeature", this.node, item.id);
+            });
+            row.addEventListener("contextmenu", (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                this.openMenu(row, item);
+            });
+        }
         this.addDropHandlers(row, item);
         return row;
     }
@@ -153,19 +179,61 @@ export class FeatureListProperty extends HTMLElement {
             },
         });
         const header = div(
-            { className: style.header, onclick: () => this.toggleExpand(item) },
+            {
+                className: style.header,
+                onclick: (event: MouseEvent) => {
+                    event.stopPropagation();
+                    if (this.timeline) {
+                        this.document.selection.setSelectedNodes([this.node], false);
+                        this.querySelectorAll('[aria-selected="true"]').forEach((row) =>
+                            row.removeAttribute("aria-selected"),
+                        );
+                        (event.currentTarget as HTMLElement).parentElement?.setAttribute(
+                            "aria-selected",
+                            "true",
+                        );
+                    } else this.toggleExpand(item);
+                },
+            },
             ...(item.icon === undefined ? [] : [svg({ className: style.icon, icon: item.icon })]),
-            span({ className: style.name, textContent: item.name ?? new Localize(item.display) }),
-            more,
-            svg({
-                className: style.expander,
-                icon: expanded ? "icon-angle-down" : "icon-angle-right",
+            span({
+                className: style.name,
+                textContent: this.featureName(item),
             }),
+            more,
+            ...(!this.timeline
+                ? [
+                      svg({
+                          className: style.expander,
+                          icon: expanded ? "icon-angle-down" : "icon-angle-right",
+                      }),
+                  ]
+                : []),
         );
         header.draggable = true;
         header.addEventListener("dragstart", this.handleDragStart(item));
         header.addEventListener("dragend", () => this.clearDrag());
         return header;
+    }
+
+    private featureName(item: FeatureItem): string {
+        if (item.name) return item.name;
+        const nodes = this.document.modelManager?.findNodes?.() ?? [this.node];
+        let count = 0;
+        for (const node of nodes) {
+            if (!isFeatureListNode(node)) continue;
+            for (const feature of node.featureItems()) {
+                if (feature.display === item.display) count++;
+                if (node === this.node && feature.id === item.id)
+                    return `${I18n.translate(item.display)} ${count}`;
+            }
+        }
+        return `${I18n.translate(item.display)} ${
+            this.node
+                .featureItems()
+                .filter((f) => f.display === item.display)
+                .findIndex((f) => f.id === item.id) + 1
+        }`;
     }
 
     private featureBody(item: FeatureItem) {
@@ -180,6 +248,15 @@ export class FeatureListProperty extends HTMLElement {
         return div(
             { className: style.body },
             ...(message === undefined ? [] : [message]),
+            ...(this.featureId && item.reselectable && !item.parameters.some((p) => p.pick)
+                ? [
+                      button({
+                          textContent: "Edit selections…",
+                          ariaLabel: "Edit feature selections",
+                          onclick: () => this.pick(item),
+                      }),
+                  ]
+                : []),
             ...(item.references ?? []).map((ref) => this.referenceRow(item, ref)),
             ...item.parameters.map((param) => this.parameterRow(item, param)),
         );
@@ -341,10 +418,31 @@ export class FeatureListProperty extends HTMLElement {
                 textContent: new Localize("featurescript.pick"),
                 onclick: (e: MouseEvent) => {
                     e.stopPropagation();
-                    this.node.reselectShapes?.(item.id, param.key);
+                    void this.pick(item, param.key);
                 },
             }),
         );
+    }
+
+    private setInputsDisabled(value: boolean): void {
+        this.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLButtonElement>(
+            "input, select, button",
+        ).forEach((input) => {
+            input.disabled = value;
+        });
+    }
+
+    private async pick(item: FeatureItem, key?: string): Promise<void> {
+        this.picking = true;
+        this.setInputsDisabled(true);
+        try {
+            await this.node.reselectShapes?.(item.id, key);
+        } catch (error) {
+            PubSub.default.pub("displayError", String(error));
+        } finally {
+            this.picking = false;
+            this.setInputsDisabled(false);
+        }
     }
 
     private textParamInput(item: FeatureItem, param: FeatureParameter) {
@@ -402,7 +500,7 @@ export class FeatureListProperty extends HTMLElement {
     }
 
     private readonly handleKeyDown = (e: KeyboardEvent, item: FeatureItem, key: string) => {
-        e.stopPropagation();
+        if (e.key !== "Escape" || !this.featureId) e.stopPropagation();
         if (e.key === "Enter") this.applyParameter(e.target as HTMLInputElement, item, key);
     };
 
@@ -453,6 +551,17 @@ export class FeatureListProperty extends HTMLElement {
             featureId: item.id,
             name: `${this.node.name} / ${item.name ?? I18n.translate(item.display)}`,
         };
+        menu.prepend(
+            div({
+                className: style.menuItem,
+                textContent: "Edit…",
+                onclick: (event: MouseEvent) => {
+                    event.stopPropagation();
+                    this.closeMenu();
+                    PubSub.default.pub("editFeature", this.node, item.id);
+                },
+            }),
+        );
         for (const [label, topic] of [
             ["Add comment", "openReviewComments"],
             ["Where used…", "openWhereUsed"],
@@ -526,6 +635,7 @@ export class FeatureListProperty extends HTMLElement {
     // --- drag reorder ---
 
     private readonly handleDragStart = (item: FeatureItem) => (e: DragEvent) => {
+        e.stopPropagation();
         this.draggingId = item.id;
         if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
     };
@@ -535,6 +645,7 @@ export class FeatureListProperty extends HTMLElement {
         row.addEventListener("dragleave", () => row.classList.remove(style.dropBefore, style.dropAfter));
         row.addEventListener("drop", (e) => {
             e.preventDefault();
+            e.stopPropagation();
             this.applyDrop();
         });
     }

@@ -12,6 +12,7 @@ import { readDxfFile } from "../src/cad/dxfReader";
 import { aciColor, decodeDxfText, importDxf, mtextLines } from "../src/cad/dxfToDrawing";
 import { DocumentFileNode } from "../src/documentFileNode";
 import { DRAWING_IMPORTER } from "../src/importers";
+import { documentTabThumbnail } from "../src/ui/tabThumbnail";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const plate = readFileSync(path.join(here, "fixtures/plate.dxf"));
@@ -326,6 +327,21 @@ describe("DXF import", () => {
         expect(aciColor(7)).toBe("#000000");
         expect(aciColor(10)).toBe("#ff0000");
         expect(aciColor(250)).toBe("#333333");
+    });
+
+    test("tab thumbnails fit the drawing without adding a sketch or modifying the source file", async () => {
+        const document = new TestDocument();
+        const node = new DocumentFileNode({ document, fileName: "Plate.dxf", format: "dxf", bytes: plate });
+        const before = node.content;
+        const image = await documentTabThumbnail(node);
+        expect(image?.startsWith("data:image/svg+xml;charset=utf-8,")).toBe(true);
+        const svg = decodeURIComponent(image!.slice(image!.indexOf(",") + 1));
+        expect(svg).toContain("viewBox=");
+        expect(svg).toContain("<circle");
+        expect(svg).toContain("<line");
+        expect(node.content).toBe(before);
+        expect(document.modelManager.findNodes().some((item) => item instanceof SketchNode)).toBe(false);
+        document.dispose();
     });
 
     test("the importer adds a sketch on XY and a drawing element holding the original file", async () => {

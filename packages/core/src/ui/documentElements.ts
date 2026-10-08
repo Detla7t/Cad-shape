@@ -64,6 +64,11 @@ export interface ElementKind {
      * toolpaths, picking geometry). The Part Studio's own sidebar is hidden meanwhile.
      */
     readonly besideViewport?: boolean;
+    /** Optional tab-browser thumbnail, generated without opening or changing the element's view. */
+    readonly thumbnail?: (
+        node: INode,
+        document: IDocument,
+    ) => string | undefined | Promise<string | undefined>;
 }
 
 /** One element of a document, as the tab strip lists it. */

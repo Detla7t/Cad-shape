@@ -3,6 +3,7 @@
 
 import {
     addReviewComment,
+    Config,
     deleteReviewComment,
     type IDocument,
     PubSub,
@@ -163,7 +164,7 @@ export class CommentsPanel {
                 target,
                 textElement(
                     "div",
-                    `${new Date(comment.created).toLocaleString()} · ${comment.branch ?? "Workspace"}${comment.commit ? ` · ${comment.commit.slice(0, 9)}` : ""}`,
+                    `${new Date(comment.created).toLocaleString([], { hour12: Config.instance.preferences.timeFormat === "12" })} · ${comment.branch ?? "Workspace"}${comment.commit ? ` · ${comment.commit.slice(0, 9)}` : ""}`,
                     style.muted,
                 ),
                 textElement("p", comment.text),

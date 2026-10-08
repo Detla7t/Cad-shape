@@ -18,6 +18,7 @@ import {
     ShapeTypes,
     Signal,
     Transaction,
+    type VisualShapeData,
     VisualStates,
     type XYZ,
 } from "@chili3d/core";
@@ -355,6 +356,42 @@ describe("ParametricBodyNode", () => {
         expect(body.features[0]).toMatchObject({ depth: 12 });
     });
 
+    test("canceling a feature draft during an edge pick awaits cleanup and restores history", async () => {
+        const body = bodyWith([
+            extrudeFeature(sketch.id),
+            { id: "f2", type: "fillet", radius: 2, edges: [EDGE_REF] },
+        ]);
+        expect(body.shape.isOk).toBe(true);
+        mockSelection();
+        const original = body.featuresJson,
+            undo = doc.history.undoCount();
+        const started = await body.beginFeatureEdit("f2");
+        expect(started.isOk).toBe(true);
+        body.setFeatureParameter("f2", "radius", 4);
+        let pickedAt: number | undefined,
+            cancelled = false;
+        doc.picker.pickShape = rs.fn((_prompt: I18nKeys, controller: AsyncController) => {
+            pickedAt = body.rollbackIndex;
+            return new Promise<VisualShapeData[]>((resolve) =>
+                controller.onCancelled(() => {
+                    cancelled = true;
+                    resolve([]);
+                }),
+            );
+        });
+        const pending = body.reselectShapes("f2");
+        expect(pickedAt).toBe(1);
+        expect(doc.history.disabled).toBe(true);
+        await started.value.cancel();
+        await pending;
+        expect(cancelled).toBe(true);
+        expect(doc.history.disabled).toBe(false);
+        expect(body.rollbackIndex).toBeUndefined();
+        expect(body.featuresJson).toBe(original);
+        expect(doc.history.undoCount()).toBe(undo);
+        expect(doc.application.executingCommand).toBeUndefined();
+    });
+
     test("removeFeature with no features left yields an empty compound", () => {
         const body = bodyWith([extrudeFeature(sketch.id)]);
         expect(body.shape.isOk).toBe(true);
@@ -391,6 +428,8 @@ describe("ParametricBodyNode", () => {
         expect(items[0].icon).toBe("icon-prism");
         expect(items[0].error).toBeUndefined();
         expect(items[0].parameters).toMatchObject([
+            { key: "sketchId", value: sketch.id, configurable: false },
+            { key: "profiles", value: "All sketch profiles", pick: { kinds: ["face"] }, configurable: false },
             {
                 key: "operation",
                 value: "new",
@@ -716,8 +755,8 @@ describe("ParametricBodyNode", () => {
         expect(doc.history.undoCount()).toBe(undoCount);
     });
 
-    test("reselectShapes ignores features without shape references", async () => {
-        const body = bodyWith([{ id: "b1", type: "boolean", operation: "fuse", toolIds: [] }]);
+    test("reselectShapes ignores an extrude without an available source", async () => {
+        const body = bodyWith([{ id: "b1", type: "extrude", depth: 5 }]);
         const pickShape = rs.fn(() => Promise.resolve([]));
         doc.picker.pickShape = pickShape as any;
 

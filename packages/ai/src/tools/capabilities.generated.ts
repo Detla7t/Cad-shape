@@ -578,6 +578,22 @@ export const queryCapabilities: QueryCapability[] = [
         params: [],
     },
     {
+        method: "shape.exactBoundingBox",
+        name: "exactBoundingBox",
+        owner: "shape",
+        family: "shape",
+        returnKind: "data",
+        params: [],
+    },
+    {
+        method: "shape.seamEdges",
+        name: "seamEdges",
+        owner: "shape",
+        family: "shape",
+        returnKind: "data",
+        params: [],
+    },
+    {
         method: "shape.orientedBoundingBox",
         name: "orientedBoundingBox",
         owner: "shape",
@@ -592,6 +608,17 @@ export const queryCapabilities: QueryCapability[] = [
         family: "shape",
         returnKind: "data",
         params: [{ name: "other", kind: "ref" }],
+    },
+    {
+        method: "shape.distanceMeasure",
+        name: "distanceMeasure",
+        owner: "shape",
+        family: "shape",
+        returnKind: "shapeRef",
+        params: [
+            { name: "other", kind: "ref" },
+            { name: "maximum", kind: "boolean", required: false },
+        ],
     },
     {
         method: "shape.checkShape",
@@ -682,6 +709,14 @@ export const queryCapabilities: QueryCapability[] = [
         params: [{ name: "other", kind: "refOrLine" }],
     },
     { method: "edge.length", name: "length", owner: "edge", family: "shape", returnKind: "data", params: [] },
+    {
+        method: "edge.arcLengthParameter",
+        name: "arcLengthParameter",
+        owner: "edge",
+        family: "shape",
+        returnKind: "data",
+        params: [{ name: "fraction", kind: "number" }],
+    },
     {
         method: "edge.curve",
         name: "curve",
@@ -2031,8 +2066,11 @@ shape.* (target must be a shape):
   shape.clone(target) -> shape ref (registered under the op id)
   shape.hlr(target, position: xyz, direction: xyz, xDir: xyz) -> shape ref (registered under the op id)
   shape.boundingBox(target) -> BoundingBox
+  shape.exactBoundingBox(target) -> BoundingBox
+  shape.seamEdges(target) -> number[]
   shape.orientedBoundingBox(target) -> OrientedBoundingBox
   shape.extremaDistance(target, other: ref) -> number
+  shape.distanceMeasure(target, other: ref, maximum: boolean?) -> shape ref (registered under the op id)
   shape.checkShape(target) -> boolean
   shape.checkFaces(target) -> { index: number; isValid: boolean; status: string[]; }[]
   shape.fixShape(target, tolerance: number) -> shape ref (registered under the op id)
@@ -2049,6 +2087,7 @@ edge.* (target must be an edge):
   edge.update(target, curve: curveRef) -> null — mutates the target ref's geometry in place (re-applied on ref refresh)
   edge.intersect(target, other: refOrLine) -> { parameter: number; point: XYZ; }[]
   edge.length(target) -> number
+  edge.arcLengthParameter(target, fraction: number) -> number
   edge.curve(target) -> curve ref (registered under the op id)
   edge.firstParameter(target) -> number
   edge.lastParameter(target) -> number

@@ -21,6 +21,7 @@ import { setShown } from "./visibility";
  */
 export class ElementTabStrip extends HTMLElement {
     private readonly tabsPanel = div({ className: style.tabs });
+    private readonly browse: HTMLButtonElement;
     /** The id of the tab whose name is being edited in place. */
     private renaming: string | undefined;
     /** What the tabs on screen show — the workspace asks for a render on every tree change. */
@@ -29,6 +30,13 @@ export class ElementTabStrip extends HTMLElement {
     constructor(private readonly workspace: ElementWorkspace) {
         super();
         this.className = style.strip;
+        this.browse = document.createElement("button");
+        this.browse.type = "button";
+        this.browse.className = style.browse;
+        this.browse.title = "Tabs";
+        this.browse.setAttribute("aria-label", "Tabs");
+        this.browse.append(createCadIcon("tabsBrowser"));
+        this.browse.onclick = () => this.workspace.toggleTabs();
         const add = button(
             {
                 className: style.add,
@@ -37,11 +45,12 @@ export class ElementTabStrip extends HTMLElement {
             },
             svg({ className: style.addIcon, icon: "icon-plus" }),
         );
-        this.append(add, this.tabsPanel);
+        this.append(this.browse, add, this.tabsPanel);
         this.render();
     }
 
     render(): void {
+        this.browse.setAttribute("aria-expanded", String(!this.workspace.tabsSidebar.hidden));
         const tabs = this.workspace.tabs();
         // No document (the home screen): nothing to list.
         setShown(this, tabs.length > 0);
@@ -62,6 +71,10 @@ export class ElementTabStrip extends HTMLElement {
             editor.focus();
             editor.select();
         }
+    }
+
+    focusTabsButton(): void {
+        this.browse.focus();
     }
 
     /** Starts renaming `tab` in place (a no-op for the Part Studio). */

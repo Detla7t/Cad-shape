@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    Config,
     debounce,
     download,
     type IApplication,
@@ -120,6 +121,7 @@ export class AssemblyView implements IElementView {
         (this.element as HTMLElement & { assemblyView?: AssemblyView }).assemblyView = this;
         this.bindViewport();
         node.onPropertyChanged(this.handleNodeChanged);
+        Config.instance.onPropertyChanged(this.preferencesChanged);
         node.geometryChanged.sub(this.scheduleRefresh);
         document.modelManager.addNodeObserver(this.handleNodes);
         const service = linkService() as PartLinkService | undefined;
@@ -141,6 +143,7 @@ export class AssemblyView implements IElementView {
     }
 
     dispose(): void {
+        Config.instance.removePropertyChanged(this.preferencesChanged);
         if (this.disposed) return;
         this.disposed = true;
         this.node.removePropertyChanged(this.handleNodeChanged);
@@ -321,6 +324,10 @@ export class AssemblyView implements IElementView {
         return badges;
     }
 
+    private readonly preferencesChanged = (key: keyof Config) => {
+        if (key === "preferences") this.renderInstances();
+    };
+
     private renderInstances(): void {
         const entries = this.evaluation.instances;
         if (entries.length === 0) {
@@ -347,7 +354,11 @@ export class AssemblyView implements IElementView {
                     span(
                         { className: style.rowName },
                         instance.name,
-                        span({ className: style.rowSub, textContent: sub }),
+                        span({
+                            className: style.rowSub,
+                            textContent: sub,
+                            hidden: !Config.instance.preferences.assemblyProperties,
+                        }),
                     ),
                     ...this.instanceBadges(entry),
                 );

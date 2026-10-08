@@ -160,7 +160,11 @@ describe("sketch editing operations", () => {
         appendEntity(d, "point", [20, 10]);
         const spline = { id: 3, type: "spline" as const, params: [0, 0, 5, 8, 10, 0] },
             poles = curvePoles(spline);
-        expect(evaluateBezier(poles, 0.5)).toEqual([5, 8]);
+        expect(poles).toEqual([
+            [0, 0],
+            [5, 8],
+            [10, 0],
+        ]);
         const solver = new SketchSolver(Plane.XY, d);
         try {
             expect(solver.dofs()).toBe(10);
@@ -278,4 +282,46 @@ test("a fillet remains tangent and connected when its radius is edited", () => {
     } finally {
         solver.dispose();
     }
+});
+
+test("circle split waits for two chosen points and keeps their exact angular positions", () => {
+    const data = blank(),
+        id = appendEntity(data, "circle", [0, 0, 10]);
+    expect(() => trimOrSplit(data, id, [10, 0], "split")).toThrow(/two points/);
+    expect(data.entities[0].type).toBe("circle");
+    trimOrSplit(data, id, [10, 0], "split", [0, 10]);
+    expect(data.entities).toHaveLength(2);
+    expect(data.entities.every((e) => e.type === "arc")).toBe(true);
+    expect(data.entities[0].params[2]).toBeCloseTo(10);
+    expect(data.entities[0].params[5]).toBeCloseTo(10);
+    const solver = new SketchSolver(Plane.XY, data);
+    try {
+        expect(solver.solve(true).result.startsWith("Ok")).toBe(true);
+    } finally {
+        solver.dispose();
+    }
+});
+test("Bezier split preserves degree and the exact original shape", () => {
+    const data = blank(),
+        poles: [number, number][] = [
+            [0, 0],
+            [3, 8],
+            [12, -4],
+            [20, 0],
+        ],
+        id = appendEntity(data, "bezier", poles.flat()),
+        t = 0.37;
+    trimOrSplit(data, id, evaluateBezier(poles, t), "split");
+    expect(data.entities).toHaveLength(2);
+    for (const e of data.entities) expect(e.params).toHaveLength(8);
+    const [left, right] = data.entities.map(curvePoles);
+    for (const u of [0, 0.25, 0.5, 0.75, 1]) {
+        const a = evaluateBezier(left, u),
+            b = evaluateBezier(poles, u * t),
+            c = evaluateBezier(right, u),
+            d = evaluateBezier(poles, t + u * (1 - t));
+        expect(Math.hypot(a[0] - b[0], a[1] - b[1])).toBeLessThan(1e-6);
+        expect(Math.hypot(c[0] - d[0], c[1] - d[1])).toBeLessThan(1e-6);
+    }
+    expect(data.constraints[0].kind).toBe(ConstraintKind.P2PCoincident);
 });

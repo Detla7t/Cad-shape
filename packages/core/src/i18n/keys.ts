@@ -4,6 +4,7 @@
 export const I18N_KEYS = [
     "command.sketch.circle3Point",
     "sidebar.inspection",
+    "sidebar.appearance",
     "body.referencePlane",
     "command.plane.create",
     "plane.offset",

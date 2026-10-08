@@ -3,11 +3,14 @@
 
 import {
     AsyncController,
+    formatDocumentValue,
     type IDocument,
     type INode,
     isConstantName,
     LENGTH_UNITS,
+    MEASUREMENT_LABELS,
     PubSub,
+    Result,
     resolveUnitSpec,
     type ShapeType,
     ShapeTypes,
@@ -20,7 +23,7 @@ import {
     type MeasuredVariableData,
     type MeasurementMode,
     type MeasurementReference,
-    measureReferences,
+    measureReferenceDetails,
 } from "./measurement";
 import style from "./variableEditor.module.css";
 
@@ -28,6 +31,7 @@ export function editMeasuredVariable(
     model: IDocument,
     controller: AsyncController,
     existing?: MeasuredVariableNode,
+    initial?: Pick<MeasuredVariableData, "mode" | "entities">,
 ): Promise<void> {
     return new Promise((resolve) => {
         const editor = SketchEditor.getActive();
@@ -48,10 +52,16 @@ export function editMeasuredVariable(
               });
         let draft: MeasuredVariableData = existing
             ? structuredClone(existing.definition)
-            : { name: "Length", source: "measured", mode: "length", entities: initialPicks };
+            : {
+                  name: initial ? MEASUREMENT_LABELS[initial.mode].replace(/ /g, "_") : "Length",
+                  source: "measured",
+                  mode: initial?.mode ?? "length",
+                  entities: initial?.entities ?? initialPicks,
+              };
         if (!existing) {
             const taken = model.variables.scope;
-            for (let index = 1; taken.has(draft.name); index++) draft.name = `Length${index}`;
+            const baseName = draft.name;
+            for (let index = 1; taken.has(draft.name); index++) draft.name = `${baseName}${index}`;
         }
         const root = document.createElement("div");
         root.className = style.root;
@@ -63,6 +73,8 @@ export function editMeasuredVariable(
             if (closed) return;
             closed = true;
             picker?.cancel();
+            PubSub.default.pub("measurementPreview", model, undefined);
+            PubSub.default.remove("documentUnitsChanged", unitsChanged);
             for (const node of watched) node.removePropertyChanged(update);
             const panel = root.closest("chili-float-panel") as (HTMLElement & { close(): void }) | null;
             panel?.close();
@@ -112,6 +124,12 @@ export function editMeasuredVariable(
             tab.dataset["mode"] = mode;
             modes.append(tab);
         }
+        const method = document.createElement("select");
+        method.setAttribute("aria-label", "Measurement method");
+        method.onchange = () => {
+            draft = { ...draft, mode: method.value as MeasurementMode };
+            render();
+        };
         const name = document.createElement("input");
         name.value = draft.name;
         name.setAttribute("aria-label", "Variable name");
@@ -146,7 +164,7 @@ export function editMeasuredVariable(
             try {
                 let ref: MeasurementReference | undefined;
                 if (editor?.document === model && SketchEditor.getActive() === editor) {
-                    if (draft.mode === "distance") {
+                    if (draft.mode === "distance" || draft.mode === "maxDistance") {
                         const target = await editor.pickPointOrEntity("prompt.select.edges", currentPicker);
                         if (target)
                             ref = {
@@ -159,7 +177,9 @@ export function editMeasuredVariable(
                     } else {
                         const id = await editor.pickEntity(
                             "prompt.select.edges",
-                            draft.mode === "diameter" ? ["circle", "arc"] : undefined,
+                            draft.mode === "diameter" || draft.mode === "radius"
+                                ? ["circle", "arc"]
+                                : undefined,
                             undefined,
                             currentPicker,
                         );
@@ -197,41 +217,68 @@ export function editMeasuredVariable(
         const status = document.createElement("div");
         status.className = style.status;
         status.setAttribute("role", "status");
-        root.append(header, tabs, modes, name, expression, entities, pick, description, status);
+        root.append(header, tabs, modes, method, name, expression, entities, pick, description, status);
         root.onkeydown = (event) => {
             event.stopPropagation();
             if (event.key === "Escape") picker ? picker.cancel() : finish();
         };
         function update() {
             if (closed) return;
+            const details =
+                draft.source === "measured"
+                    ? measureReferenceDetails(model, draft.mode, draft.entities)
+                    : undefined;
+            PubSub.default.pub("measurementPreview", model, details?.isOk ? details.value : null);
             const result =
                 draft.source === "assigned"
                     ? resolveUnitSpec(draft.expression ?? "0", model.variables.scope, LENGTH_UNITS)
-                    : measureReferences(model, draft.mode, draft.entities);
+                    : details!.isOk
+                      ? Result.ok(details!.value.value)
+                      : Result.err(details!.error);
             const validName = /^[A-Za-z_]\w*$/.test(draft.name) && !isConstantName(draft.name);
             const duplicate =
                 draft.name !== existing?.definition.name && model.variables.scope.has(draft.name);
-            title.textContent = `#${draft.name || "Variable"}${result.isOk ? ` = ${Number(result.value.toPrecision(8))} mm` : ""}`;
+            title.textContent = `#${draft.name || "Variable"}${result.isOk ? ` = ${formatDocumentValue(result.value, model, LENGTH_UNITS)}` : ""}`;
             status.textContent = !validName
                 ? "Use a name beginning with a letter or underscore."
                 : duplicate
                   ? "A variable with that name already exists."
                   : result.isOk
-                    ? draft.mode === "distance"
-                        ? "Minimum distance between entities"
-                        : draft.mode === "length"
-                          ? "Total curve / boundary length"
-                          : "Circle, arc, or face diameter"
+                    ? MEASUREMENT_LABELS[draft.mode]
                     : result.error;
             accept.disabled = !validName || duplicate || !result.isOk;
         }
         function render() {
             modes.hidden = entities.hidden = pick.hidden = draft.source !== "measured";
+            method.hidden = draft.source !== "measured" || draft.mode === "length";
+            const options: MeasurementMode[] =
+                draft.mode === "distance" || draft.mode === "maxDistance"
+                    ? ["distance", "maxDistance"]
+                    : ["diameter", "radius"];
+            method.replaceChildren(
+                ...options.map((mode) => {
+                    const option = document.createElement("option");
+                    option.value = mode;
+                    option.textContent = MEASUREMENT_LABELS[mode];
+                    return option;
+                }),
+            );
+            method.value = draft.mode;
             expression.hidden = draft.source !== "assigned";
             for (const tab of tabs.querySelectorAll("button"))
                 tab.setAttribute("aria-pressed", String(tab.dataset["source"] === draft.source));
             for (const tab of modes.querySelectorAll("button"))
-                tab.setAttribute("aria-pressed", String(tab.dataset["mode"] === draft.mode));
+                tab.setAttribute(
+                    "aria-pressed",
+                    String(
+                        tab.dataset["mode"] ===
+                            (draft.mode === "maxDistance"
+                                ? "distance"
+                                : draft.mode === "radius"
+                                  ? "diameter"
+                                  : draft.mode),
+                    ),
+                );
             entities.replaceChildren();
             for (const [index, ref] of draft.entities.entries()) {
                 const row = document.createElement("div");
@@ -253,13 +300,17 @@ export function editMeasuredVariable(
             pick.textContent = "Select entities…";
             update();
         }
+        const unitsChanged = (document: IDocument) => {
+            if (document === model) update();
+        };
+        PubSub.default.sub("documentUnitsChanged", unitsChanged);
         render();
         PubSub.default.pub("showFloatPanel", {
             title: "command.feature.variable",
             content: root,
             document: model,
             width: 300,
-            height: 365,
+            height: 405,
             x: 285,
             y: 100,
             onClose: finish,

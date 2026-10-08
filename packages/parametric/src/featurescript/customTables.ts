@@ -159,7 +159,7 @@ export function evaluateCustomTable(
             variables: documentVariables(scope),
             configurationVariables: configurationVariableNames(scope),
             dataTables: (reference) => findDataTable(document, reference),
-            format,
+            format: { document, ...format },
         });
     } catch (error) {
         return { tables: [], error: error instanceof Error ? error.message : String(error) };

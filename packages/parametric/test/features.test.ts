@@ -555,6 +555,7 @@ describe("feature evaluation", () => {
             expect(tool.parentVisible).toBe(false);
             expect(body.shape.isOk).toBe(true);
             expect(body.featureItems()[1].parameters).toMatchObject([
+                { key: "toolIds", value: "1 tools", configurable: false },
                 { key: "operation", value: "fuse", configurable: true },
                 { key: "consumeTools", display: "features.consumeTools", value: true, configurable: false },
             ]);

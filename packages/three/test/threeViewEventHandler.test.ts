@@ -643,6 +643,49 @@ describe("ThreeViewHandler — touch multi-finger gestures", () => {
 });
 
 describe("ThreeViewHandler — right mouse navigation", () => {
+    test("saved mouse controls reverse zoom and make pen rotation constrained", () => {
+        const saved = Config.instance.preferences;
+        const nav = Config.instance.navigation3D;
+        const handler = new ThreeViewHandler();
+        const cc = createMockCameraController();
+        const rotate = rs.spyOn(cc, "rotate");
+        const zoom = rs.spyOn(cc, "zoom");
+        const view = createHandlerMockView({ cameraController: cc });
+        Config.instance.navigation3D = "Chili3d";
+        Config.instance.preferences = {
+            ...saved,
+            mouse: { reverseZoom: true, constrainedRotation: true, penAsMouse: true },
+        };
+        try {
+            handler.mouseWheel(view, { offsetX: 10, offsetY: 15, deltaY: 100 } as WheelEvent);
+            expect(zoom).toHaveBeenCalledWith(10, 15, -100);
+            handler.pointerDown(
+                view,
+                createPointerEvent({ pointerType: "pen", buttons: 2, offsetX: 50, offsetY: 60 }),
+            );
+            handler.pointerMove(
+                view,
+                createPointerEvent({ pointerType: "pen", buttons: 2, offsetX: 70, offsetY: 55 }),
+            );
+            expect(rotate).toHaveBeenLastCalledWith(20, -5, "turntable");
+            handler.pointerMove(
+                view,
+                createPointerEvent({
+                    pointerType: "pen",
+                    buttons: 2,
+                    offsetX: 75,
+                    offsetY: 60,
+                    altKey: true,
+                }),
+            );
+            expect(rotate).toHaveBeenLastCalledWith(5, 5, "trackball");
+        } finally {
+            handler.dispose();
+            Config.instance.preferences = saved;
+            Config.instance.navigation3D = nav;
+        }
+    });
+
     test.each([
         [{}, "rotate", "trackball"],
         [{ altKey: true }, "rotate", "turntable"],

@@ -34,7 +34,7 @@ import { sketchToolInput } from "./sketchToolInput";
 function connectedLoop(data: SketchData, points: UV[]) {
     const ids = points.map((p, i) => appendEntity(data, "line", [...p, ...points[(i + 1) % points.length]]));
     let id = Math.max(0, ...data.constraints.map((c) => c.id)) + 1;
-    ids.forEach((e, i) =>
+    ids.forEach((e, i) => {
         data.constraints.push({
             id: id++,
             kind: ConstraintKind.P2PCoincident,
@@ -42,8 +42,8 @@ function connectedLoop(data: SketchData, points: UV[]) {
                 { entityId: e, pointIndex: 1 },
                 { entityId: ids[(i + 1) % ids.length], pointIndex: 0 },
             ],
-        }),
-    );
+        });
+    });
 }
 const registrations: Record<string, string> = {
     midpointLine: "Midpoint line",
@@ -124,8 +124,27 @@ for (const [operation, title] of Object.entries(registrations)) {
                         if (id === undefined) break;
                         const pick =
                             editor.lastPickPosition ?? editor.solver.pointOf({ entityId: id, pointIndex: 0 });
+                        let secondPick: UV | undefined;
+                        if (operation === "split" && editor.solver.entity(id)?.type === "circle") {
+                            preview = editor.document.visual.context.displayMesh(
+                                [
+                                    entityDisplayMesh(
+                                        editor.node.plane,
+                                        { id: 0, type: "point", params: pick },
+                                        0xffaa33,
+                                    ),
+                                ],
+                                { onTop: true },
+                            );
+                            const second = await entity("circle");
+                            clear();
+                            if (second === undefined) break;
+                            if (second !== id)
+                                throw new Error("Choose the second split point on the same circle.");
+                            secondPick = editor.lastPickPosition;
+                        }
                         editSketch(editor, (d) =>
-                            trimOrSplit(d, id, pick, operation as "trim" | "split" | "extend"),
+                            trimOrSplit(d, id, pick, operation as "trim" | "split" | "extend", secondPick),
                         );
                     }
                     return;
@@ -172,7 +191,9 @@ for (const [operation, title] of Object.entries(registrations)) {
                         throw new Error(
                             "The selected geometry does not intersect this sketch plane with supported curves.",
                         );
-                    editSketch(editor, (d) => entries.forEach((e) => appendEntity(d, e.type, e.params)));
+                    editSketch(editor, (d) => {
+                        for (const e of entries) appendEntity(d, e.type, e.params);
+                    });
                     return;
                 }
                 if (

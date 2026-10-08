@@ -3,6 +3,7 @@
 
 import {
     type ConfigurationInputData,
+    Constants,
     documentUnits,
     History,
     type IApplication,
@@ -112,6 +113,20 @@ describe("Document", () => {
     });
 
     describe("save", () => {
+        test("saving a document without a view preserves its last thumbnail", async () => {
+            mockApp.storage.get = async (_db, table) =>
+                table === Constants.RecentTable ? { image: "data:image/png;base64,saved" } : undefined;
+            const writes: { table: string; value: unknown }[] = [];
+            mockApp.storage.put = async (_db, table, _id, value) => {
+                writes.push({ table, value });
+                return true;
+            };
+            await document.save();
+            expect(writes.find((write) => write.table === Constants.RecentTable)?.value).toMatchObject({
+                id: document.id,
+                image: "data:image/png;base64,saved",
+            });
+        });
         test("should save document to storage", async () => {
             let saved = false;
             const originalPut = mockApp.storage.put;

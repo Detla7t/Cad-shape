@@ -26,7 +26,10 @@ import {
     serialize,
     Transaction,
 } from "@chili3d/core";
+import { reselectBodyFaces } from "./commands/bodyFaceReselectSession";
+import { FeatureEditSession } from "./commands/featureEditSession";
 import { FeatureScriptPickSession } from "./commands/featureScriptPickSession";
+import { pickFeatureSources } from "./commands/featureSourcePick";
 import { ReselectFeatureCommand } from "./commands/reselectCommand";
 import { EdgeReselectSession, ProfileReselectSession } from "./commands/reselectSession";
 import { evaluateFeature, type FeatureData, featureHandler, type ShapeTracking } from "./features";
@@ -164,7 +167,65 @@ export class ParametricBodyNode
     }
 
     get features(): FeatureData[] {
-        return JSON.parse(this.featuresJson);
+        return this._featureDraft
+            ? structuredClone(this._featureDraft.features)
+            : JSON.parse(this.featuresJson);
+    }
+
+    private _featureDraft?: { id: string; features: FeatureData[]; rollback?: number };
+    featureEditSession?: FeatureEditSession;
+
+    async beginFeatureEdit(featureId: string) {
+        return FeatureEditSession.start(this, featureId);
+    }
+
+    /** Draft data is runtime-only: serialization and undo continue to see the committed list. */
+    startFeatureDraft(featureId: string): Result<void> {
+        if (this._featureDraft) return Result.err("A feature is already being edited.");
+        const features = this.features;
+        const index = features.findIndex((feature) => feature.id === featureId);
+        if (index < 0) return Result.err("This feature no longer exists.");
+        this._featureDraft = { id: featureId, features, rollback: this.rollbackIndex };
+        this._rollbackIndex = index + 1;
+        this.refreshFeatureDraft();
+        return Result.ok(undefined);
+    }
+
+    finishFeatureDraft(apply: boolean): Result<void> {
+        const draft = this._featureDraft;
+        if (!draft) return Result.ok(undefined);
+        if (apply) {
+            const error = this._featureErrors.get(draft.id);
+            if (error) return Result.err(error);
+        }
+        this._featureDraft = undefined;
+        this._rollbackIndex = draft.rollback;
+        const json = JSON.stringify(draft.features);
+        if (apply && json !== this.featuresJson) {
+            Transaction.execute(this.document, "Edit feature", () =>
+                this.setFeaturesEmitShapeChanged(draft.features),
+            );
+        } else {
+            this.shape = this.generateShape();
+        }
+        this.emitPropertyChanged("featuresJson", this.featuresJson);
+        this.document.visual.update();
+        return Result.ok(undefined);
+    }
+
+    private refreshFeatureDraft(): void {
+        const result = this.generateShape();
+        if (result.isOk) this.shape = result;
+        else {
+            // Keep the input visible for repairing a bad radius/depth, never a stale final solid.
+            const stop = this._rollbackIndex;
+            this._rollbackIndex = Math.max(0, (stop ?? 1) - 1);
+            this.shape = this.generateShape();
+            this._rollbackIndex = stop;
+            if (this._featureDraft) this._featureErrors.set(this._featureDraft.id, result.error);
+        }
+        this.emitPropertyChanged("featuresJson", this.featuresJson);
+        this.document.visual.update();
     }
 
     /** Referenced nodes (sketches) currently watched for shape changes, by id. */
@@ -217,6 +278,7 @@ export class ParametricBodyNode
         }
         if (!result.isOk) return false;
         this.shape = result;
+        this.emitPropertyChanged("featuresJson", this.featuresJson);
         this.document.visual.update();
         return true;
     }
@@ -231,6 +293,11 @@ export class ParametricBodyNode
     }
 
     setFeaturesEmitShapeChanged(features: FeatureData[]): void {
+        if (this._featureDraft) {
+            this._featureDraft.features = structuredClone(features);
+            this.refreshFeatureDraft();
+            return;
+        }
         this.setPropertyEmitShapeChanged("featuresJson", JSON.stringify(features));
     }
 
@@ -409,6 +476,7 @@ export class ParametricBodyNode
      * re-enabling the history) always completes before the new command runs.
      */
     async reselectShapes(featureId: string, key?: string): Promise<void> {
+        if (this.featureEditSession) return this.featureEditSession.pick(key);
         await ReselectFeatureCommand.start(this, featureId, key);
     }
 
@@ -425,6 +493,8 @@ export class ParametricBodyNode
         const featureIndex = this.features.findIndex((x) => x.id === featureId);
         const feature = this.features[featureIndex];
         if (feature?.type === "extrude") return this.reselectProfiles(feature, controller);
+        if (feature?.type === "revolve" || feature?.type === "boolean")
+            return pickFeatureSources(this, feature, controller, key);
         if (feature?.type === "featurescript") {
             if (key !== undefined)
                 await this.reselectFeatureScriptPick(feature, featureIndex, key, controller);
@@ -444,11 +514,31 @@ export class ParametricBodyNode
     }
 
     /**
-     * Re-picks the profiles of an extrude feature. Body-face extrudes (`source`) re-match
-     * by fingerprint, so only sketch profiles can be re-picked. Confirming with nothing
-     * selected clears `profiles` — back to extruding every profile of the sketch.
+     * Re-picks sketch profiles or the planar source faces of a press-pull extrude.
+     * Confirming a sketch pick with nothing selected clears `profiles` — back to
+     * extruding every profile of the sketch.
      */
     private async reselectProfiles(feature: ExtrudeFeatureData, controller: AsyncController): Promise<void> {
+        if (feature.source) {
+            const source = this.document.modelManager.findNode((node) => node.id === feature.source?.nodeId);
+            if (!(source instanceof ParametricBodyNode)) return;
+            const profiles = await reselectBodyFaces(
+                this,
+                source,
+                feature,
+                this.features.findIndex((f) => f.id === feature.id),
+                controller,
+            );
+            if (!profiles) return;
+            Transaction.execute(this.document, "Reselect extrude faces", () => {
+                this.setFeaturesEmitShapeChanged(
+                    this.features.map((f) =>
+                        f.id === feature.id ? { ...feature, source: { nodeId: source.id, profiles } } : f,
+                    ),
+                );
+            });
+            return;
+        }
         if (feature.sketchId === undefined) return;
         const sketch = findSketch(this.document, feature.sketchId);
         if (sketch === undefined) return;
@@ -1072,6 +1162,10 @@ export class ParametricBodyNode
             return next;
         });
         if (!changed) return;
+        if (this._featureDraft) {
+            this._featureDraft.features = features;
+            return;
+        }
         const history = this.document.history;
         const disabled = history.disabled;
         history.disabled = true;

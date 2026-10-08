@@ -62,6 +62,7 @@ export class FeatureScriptPickSession {
         const bodyShape = this.host.shape;
         const ownerShapeType = bodyShape.isOk ? bodyShape.value.shapeType : undefined;
         const transparent = wanted.includes("edge") || wanted.includes("vertex");
+        const previousRollback = this.host.rollbackIndex;
 
         const picked = await runReselectSession<PickedRef>(this.host, controller, {
             prompt: wanted.length === 1 ? PROMPTS[wanted[0]] : "prompt.select.entities",
@@ -70,7 +71,8 @@ export class FeatureScriptPickSession {
             emptyIsCancel: false,
             preview: () => {},
             setup: () => {
-                this.host.setRollbackIndex(featureIndex);
+                if (!this.host.setRollbackIndex(featureIndex))
+                    throw new Error("Cannot select entities because the feature input failed to rebuild.");
                 if (transparent && owner !== undefined && ownerShapeType !== undefined) {
                     this.host.document.visual.highlighter.addState(
                         owner,
@@ -89,7 +91,7 @@ export class FeatureScriptPickSession {
                         ownerShapeType,
                     );
                 }
-                this.host.setRollbackIndex(undefined);
+                this.host.setRollbackIndex(previousRollback);
             },
         });
         if (picked === undefined) return undefined;

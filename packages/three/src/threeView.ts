@@ -5,6 +5,7 @@ import {
     BoundingBox,
     Config,
     debounce,
+    displayPixelRatio,
     type HtmlTextOptions,
     type IDisposable,
     type IDocument,
@@ -58,6 +59,7 @@ import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
 import { CSS2DObject, CSS2DRenderer } from "three/examples/jsm/renderers/CSS2DRenderer.js";
 import { CameraController } from "./cameraController";
 import { Constants } from "./constants";
+import { renderModelThumbnail } from "./modelThumbnail";
 import { ThreeRefSegmentAnnotation } from "./threeAnnotation";
 import { ThreeGeometry } from "./threeGeometry";
 import { ThreeHelper } from "./threeHelper";
@@ -114,6 +116,12 @@ export class ThreeView extends Observable implements IView {
     private readonly _renderer: WebGLRenderer;
     private readonly effects = new ViewEffects(this);
     private readonly graphicsChanged = (key: keyof Config) => {
+        if (key === "preferences") {
+            this._renderer.setPixelRatio(
+                displayPixelRatio(Config.instance.preferences.pixelDensity, window.devicePixelRatio),
+            );
+            this.update();
+        }
         if (key === "graphics") {
             this.cameraController.updateCameraPosionTarget();
             this.update();
@@ -232,7 +240,9 @@ export class ThreeView extends Observable implements IView {
             alpha: true,
         });
         // Supersample standard-density displays as well; cap the cost on high-DPI screens.
-        renderer.setPixelRatio(Math.min(2, Math.max(1.5, window.devicePixelRatio || 1)));
+        renderer.setPixelRatio(
+            displayPixelRatio(Config.instance.preferences.pixelDensity, window.devicePixelRatio),
+        );
 
         return renderer;
     }
@@ -336,6 +346,16 @@ export class ThreeView extends Observable implements IView {
     toImage(): string {
         this.renderFrame();
         return this.renderer.domElement.toDataURL();
+    }
+
+    toThumbnail(): string | undefined {
+        return renderModelThumbnail(
+            this._renderer,
+            this._scene,
+            this.content.visualShapes,
+            this.camera,
+            (render) => this.display.render(render),
+        );
     }
 
     renderStats(): Record<string, number> {

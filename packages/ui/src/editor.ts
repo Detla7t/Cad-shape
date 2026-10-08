@@ -20,6 +20,7 @@ import { ElementWorkspace } from "./elements";
 import { FloatPanel } from "./floatPanel";
 import { ModelSidebar } from "./project/modelSidebar";
 import { showConfigurationPanel } from "./property/configuration";
+import { showFeatureEditPanel } from "./property/featureEditPanel";
 import { FeatureListProperty } from "./property/featureListProperty";
 import { MaterialDataContent, MaterialEditor } from "./property/material";
 import { showVariablesPanel } from "./property/variables";
@@ -63,7 +64,10 @@ export class Editor extends HTMLElement {
         this.utilityDock = new UtilityDock(
             app,
             () => this._contentEl,
-            () => this.versionsDock.hide(),
+            () => {
+                this.versionsDock.hide();
+                this._workspace?.closeTabs();
+            },
         );
         const viewport = new LayoutViewport(app);
         viewport.classList.add(style.viewport);
@@ -93,6 +97,10 @@ export class Editor extends HTMLElement {
         );
         const elementViews = div({ className: style.elementViews });
         this._workspace = new ElementWorkspace(this.app, partStudio, elementViews);
+        this._workspace.onTabsOpened = () => {
+            this.versionsDock.hide();
+            this.utilityDock.hide();
+        };
         const rail = div({ className: style.utilityRail });
         const history = document.createElement("button");
         history.title = "Versions and history";
@@ -150,7 +158,13 @@ export class Editor extends HTMLElement {
             utilityButton("Where used", "where-used", this.utilityDock.whereUsed),
             logs,
         );
-        this._contentEl = div({ className: style.content }, rail, partStudio, elementViews);
+        this._contentEl = div(
+            { className: style.content },
+            rail,
+            this._workspace.tabsSidebar,
+            partStudio,
+            elementViews,
+        );
         this.append(
             div(
                 { className: style.root },
@@ -320,6 +334,7 @@ export class Editor extends HTMLElement {
 
     private readonly toggleVersions = () => {
         this.utilityDock.hide();
+        this._workspace?.closeTabs();
         this.versionsDock.toggle();
     };
 
@@ -340,9 +355,19 @@ export class Editor extends HTMLElement {
         this.closeFloatingChat();
     }
 
-    private readonly editFeature = (node: INode & IFeatureListNode, featureId: string) => {
+    private readonly editFeature = async (node: INode & IFeatureListNode, featureId: string) => {
         const model = this.app.activeView?.document;
         if (!model) return;
+        if (node.beginFeatureEdit) {
+            const session = await node.beginFeatureEdit(featureId);
+            if (!session.isOk) {
+                PubSub.default.pub("displayError", session.error);
+                return;
+            }
+            this._workspace?.showPartStudio();
+            showFeatureEditPanel(model, node, session.value);
+            return;
+        }
         const content = new FeatureListProperty(model, node, featureId);
         content.setAttribute("aria-label", "Edit feature");
         PubSub.default.pub("showFloatPanel", {

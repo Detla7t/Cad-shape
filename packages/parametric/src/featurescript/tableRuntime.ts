@@ -1,7 +1,15 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import type { IShape } from "@chili3d/core";
+import {
+    Config,
+    documentQuantityUnit,
+    documentUnits,
+    type IDocument,
+    type IShape,
+    type QuantityKind,
+    unitSuffix,
+} from "@chili3d/core";
 import { FsContext, type FsDataTableSource } from "./context/fsContext";
 import { FsThrow } from "./lang/errors";
 import type { Interpreter, TableExport } from "./lang/interpreter";
@@ -78,6 +86,7 @@ export interface TableHostBody {
 export interface TableFormatOptions {
     /** Decimal places of numbers and quantities (trailing zeros dropped). Default 3. */
     readonly precision?: number;
+    readonly document?: IDocument;
 }
 
 export interface TableRun {
@@ -108,7 +117,9 @@ export function runTable(run: TableRun): TableRunResult {
             run.table.module.exports.get(run.table.name) ??
             run.table.module.env.lookup(run.table.name)?.value;
         const output = run.interpreter.callFunction(callable, [context.value, definition]);
-        return { tables: tableData(output, new TableFormatter(run.format?.precision ?? 3)) };
+        return {
+            tables: tableData(output, new TableFormatter(run.format?.precision ?? 3, run.format?.document)),
+        };
     } catch (error) {
         return { tables: [], ...describeFailure(error) };
     } finally {
@@ -156,7 +167,16 @@ function tableData(output: FsValue, format: TableFormatter): TableData[] {
 const ALIGNMENTS = new Set<string>(["LEFT", "CENTER", "RIGHT"]);
 
 class TableFormatter {
-    constructor(private readonly precision: number) {}
+    constructor(
+        private readonly precision: number,
+        private readonly document?: IDocument,
+    ) {}
+
+    private quantity(value: { value: number; units: Units }, precision?: number, keepZeros = false): string {
+        return this.document
+            ? formatDocumentTableQuantity(value, this.document, precision, keepZeros)
+            : formatQuantity(value, precision ?? this.precision, keepZeros);
+    }
 
     table(table: FsMap): TableData {
         const columns = (table.field("columnDefinitions") as FsArray).items.map((column, i) =>
@@ -202,14 +222,14 @@ class TableFormatter {
         if (typeof value === "boolean") return String(value);
         if (value instanceof FsEnumValue) return value.name;
         const quantity = quantityOf(value);
-        if (quantity !== undefined) return formatQuantity(quantity, this.precision, false);
+        if (quantity !== undefined) return this.quantity(quantity);
         if (value instanceof FsMap) {
             if (typeof value.field("template") === "string")
                 return expandTemplate(value, (field) => this.text(field));
             const precision = value.field("precision");
             const inner = quantityOf(value.field("value"));
             if (typeof precision === "number" && inner !== undefined)
-                return formatQuantity(inner, Math.max(0, Math.round(precision)), true);
+                return this.quantity(inner, Math.max(0, Math.round(precision)), true);
             const components = value.field("components");
             if (components instanceof FsArray) return components.items.map((c) => this.component(c)).join("");
         }
@@ -259,6 +279,53 @@ const APP_UNITS: readonly { units: Units; scale: number; symbol: string }[] = [
     { units: VOLUME, scale: 1e9, symbol: "mm³" },
     { units: ANGLE, scale: 180 / Math.PI, symbol: "deg" },
 ];
+
+/** Custom-table display is localized at the boundary; FeatureScript values remain in SI. */
+export function formatDocumentTableQuantity(
+    quantity: { value: number; units: Units },
+    document: IDocument,
+    precision?: number,
+    keepZeros = false,
+): string {
+    const { meter, radian, kilogram, second } = quantity.units;
+    const settings = documentUnits(document);
+    let suffix: string | undefined;
+    let factor = 1;
+    let decimals = precision ?? settings.lengthPrecision;
+    if (!kilogram && !second && !radian && meter >= 1 && meter <= 3) {
+        suffix = settings.length + (meter === 2 ? "²" : meter === 3 ? "³" : "");
+        factor = (unitSuffix(settings.length)!.factor / 1000) ** meter;
+    } else if (!kilogram && !second && !meter && radian === 1) {
+        suffix = settings.angle;
+        factor = settings.angle === "deg" ? Math.PI / 180 : 1;
+        decimals = precision ?? settings.anglePrecision;
+    } else {
+        const key = `${meter},${radian},${kilogram},${second}`;
+        const kind = (
+            {
+                "1,0,0,-2": "acceleration",
+                "0,1,0,-1": "angularVelocity",
+                "0,0,1,0": "mass",
+                "-3,0,1,0": "density",
+                "1,0,1,-2": "force",
+                "0,0,0,-1": "frequency",
+                "2,-1,1,-2": "moment",
+                "-1,0,1,-2": "pressure",
+                "2,0,1,-2": "energy",
+            } as Record<string, QuantityKind>
+        )[key];
+        if (kind) {
+            const unit = documentQuantityUnit(document, kind);
+            suffix = unit.suffix;
+            factor = unit.factor;
+            decimals = precision ?? unit.precision;
+        }
+    }
+    if (suffix === undefined) return formatQuantity(quantity, precision ?? 3, keepZeros);
+    let text = decimal(quantity.value / factor, decimals, keepZeros);
+    if (Config.instance.preferences.decimalComma) text = text.replace(".", ",");
+    return `${text} ${suffix}`;
+}
 
 export function formatQuantity(
     quantity: { value: number; units: Units },

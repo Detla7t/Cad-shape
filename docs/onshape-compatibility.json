@@ -3,7 +3,7 @@
     "auditedAt": "2026-10-08",
     "stdVersion": 3083,
     "reference": "https://cad.onshape.com/FsDoc/library.html",
-    "scope": "Bundled std 3083 and official documentation; no authenticated Onshape differential execution.",
+    "scope": "Bundled Onshape std 3083, official documentation, and authenticated differential FeatureScript execution in the user-designated Testing document. Differential coverage is scoped to the recorded fixtures; full parity is not certified.",
     "parityCertified": false,
     "definitions": {
         "verified-subset": "Positive geometric assertions exist for the stated subset, not all modes or UI parity.",
@@ -28,11 +28,13 @@
             "module": "sweep.fs",
             "feature": "sweep",
             "status": "verified-subset",
-            "limits": "Fresh-context annular and disjoint regions, surface profiles, straight/curved paths and fixed versus path-normal orientation tested. Twist, scale, locked profiles and partial-path extents rejected. Stable subshape history and all boolean modes still need parity fixtures.",
+            "limits": "Fresh-context annular and disjoint regions, surface profiles, straight/curved paths and fixed versus path-normal orientation tested. Twist, scale, locked profiles and partial-path extents rejected. Stable subshape history and all boolean modes still need parity fixtures. Live Onshape comparisons now cover varying heights, physical edge queries excluding periodic seams, exact tight bounds, area, length and volume.",
             "missingBuiltins": [],
             "evidence": [
                 "packages/parametric/test/featurescript/stdFeatures.kernel.test.ts",
-                "packages/parametric/test/featurescript/sweepLoftCompatibility.kernel.test.ts"
+                "packages/parametric/test/featurescript/sweepLoftCompatibility.kernel.test.ts",
+                "packages/parametric/test/featurescript/onshapeConformance.kernel.test.ts",
+                "packages/parametric/test/featurescript/fixtures/conformance/onshape-reference.json"
             ]
         },
         {
@@ -40,11 +42,13 @@
             "module": "loft.fs",
             "feature": "loft",
             "status": "verified-subset",
-            "limits": "Simple solid profiles tested at multiple heights. Guides, connections, end constraints, periodicity, path sections and profiles with holes explicitly rejected.",
+            "limits": "Simple solid profiles tested at multiple heights. Guides, connections, end constraints, periodicity, path sections and profiles with holes explicitly rejected. Live Onshape comparisons now cover varying heights, physical edge queries excluding periodic seams, exact tight bounds, area, length and volume.",
             "missingBuiltins": [],
             "evidence": [
                 "packages/parametric/test/featurescript/stdFeatures.kernel.test.ts",
-                "packages/parametric/test/featurescript/sweepLoftCompatibility.kernel.test.ts"
+                "packages/parametric/test/featurescript/sweepLoftCompatibility.kernel.test.ts",
+                "packages/parametric/test/featurescript/onshapeConformance.kernel.test.ts",
+                "packages/parametric/test/featurescript/fixtures/conformance/onshape-reference.json"
             ]
         },
         {
@@ -105,10 +109,14 @@
             "tool": "Draft",
             "module": "draft.fs",
             "feature": "draft",
-            "status": "blocked",
-            "limits": "No draft kernel operation.",
-            "missingBuiltins": ["opDraft"],
-            "evidence": []
+            "status": "verified-subset",
+            "limits": "Neutral-plane/reference-surface draft and the actual std draft feature match Onshape for tested angles, heights and reversed pull. Available through Insert custom feature. Parting lines, curved neutral surfaces and refilleting are rejected. Steep drafts requiring disappearing faces remain a recorded differential gap.",
+            "missingBuiltins": [],
+            "evidence": [
+                "packages/parametric/test/featurescript/onshapeConformance.kernel.test.ts",
+                "packages/parametric/test/featurescript/fixtures/conformance/onshape-reference.json",
+                "packages/parametric/test/featurescript/standardFeatures.kernel.test.ts"
+            ]
         },
         {
             "tool": "Body draft",
@@ -123,9 +131,9 @@
             "tool": "Rib",
             "module": "rib.fs",
             "feature": "rib",
-            "status": "blocked",
-            "limits": "Std rib relies on unimplemented draft and profile-extension paths; no positive end-to-end rib fixture.",
-            "missingBuiltins": ["opDraft", "opFitSpline"],
+            "status": "unverified",
+            "limits": "Shared kernel operation is now implemented, but this complete standard feature and its option families still need positive differential fixtures. Std rib relies on unimplemented draft and profile-extension paths; no positive end-to-end rib fixture.",
+            "missingBuiltins": [],
             "evidence": []
         },
         {
@@ -334,10 +342,14 @@
             "tool": "Fill",
             "module": "fillSurface.fs",
             "feature": "fill",
-            "status": "blocked",
-            "limits": "Required host surface operation is missing.",
-            "missingBuiltins": ["opFillSurface"],
-            "evidence": []
+            "status": "verified-subset",
+            "limits": "Closed G0 planar/nonplanar boundaries and planar G1/G2 support cases match live Onshape; the actual std fill feature is covered. Position continuity is exposed through Insert custom feature. Guide vertices supported by the kernel; curved support/guide-point geometry, sampled guide curves and surface joins need differential coverage.",
+            "missingBuiltins": [],
+            "evidence": [
+                "packages/parametric/test/featurescript/onshapeConformance.kernel.test.ts",
+                "packages/parametric/test/featurescript/fixtures/conformance/onshape-reference.json",
+                "packages/parametric/test/featurescript/standardFeatures.kernel.test.ts"
+            ]
         },
         {
             "tool": "Move boundary",
@@ -388,10 +400,14 @@
             "tool": "3D fit spline",
             "module": "fitSpline.fs",
             "feature": "fitSpline",
-            "status": "blocked",
-            "limits": "Required host curve operation is missing.",
-            "missingBuiltins": ["opFitSpline"],
-            "evidence": []
+            "status": "verified-subset",
+            "limits": "Actual std fitSpline plus open/periodic, clamped-end and explicit-parameter cubic splines match live Onshape samples. Vertex mode is exposed through Insert custom feature. Interior derivatives explicitly rejected after a differential mismatch; second derivatives, target length and edge approximation remain unsupported.",
+            "missingBuiltins": [],
+            "evidence": [
+                "packages/parametric/test/featurescript/onshapeConformance.kernel.test.ts",
+                "packages/parametric/test/featurescript/fixtures/conformance/onshape-reference.json",
+                "packages/parametric/test/featurescript/standardFeatures.kernel.test.ts"
+            ]
         },
         {
             "tool": "Projected curve",
@@ -478,9 +494,9 @@
             "tool": "Routing curve",
             "module": "routingCurve.fs",
             "feature": "routingCurve",
-            "status": "blocked",
-            "limits": "Spline generation and routing edits are not end-to-end tested.",
-            "missingBuiltins": ["opFitSpline"],
+            "status": "unverified",
+            "limits": "Shared kernel operation is now implemented, but this complete standard feature and its option families still need positive differential fixtures. Spline generation and routing edits are not end-to-end tested.",
+            "missingBuiltins": [],
             "evidence": []
         },
         {
@@ -525,7 +541,7 @@
             "feature": "frame",
             "status": "blocked",
             "limits": "Profile import, path construction, corners, trimming and identity behavior are not complete.",
-            "missingBuiltins": ["constructPaths", "opFitSpline"],
+            "missingBuiltins": ["constructPaths"],
             "evidence": []
         },
         {
@@ -550,9 +566,9 @@
             "tool": "End cap",
             "module": "endcap.fs",
             "feature": "endcap",
-            "status": "blocked",
-            "limits": "Filling the profile boundary is unavailable; offsets are restricted to planar faces.",
-            "missingBuiltins": ["opFillSurface"],
+            "status": "unverified",
+            "limits": "Shared kernel operation is now implemented, but this complete standard feature and its option families still need positive differential fixtures. Filling the profile boundary is unavailable; offsets are restricted to planar faces.",
+            "missingBuiltins": [],
             "evidence": []
         },
         {
@@ -703,6 +719,22 @@
     "testCaveats": [
         "onshapeStdLayers.kernel.test.ts allows an exact known-missing-builtin list and accepts domain failures; its success is not behavioral parity.",
         "stdFeatures.kernel.test.ts retains an expected failure for evDistance from a point to a part. A green suite does not establish full evDistance compatibility.",
-        "Subset tests assert analytic geometry against local OCCT. They are not differential executions inside Onshape."
-    ]
+        "Subset tests outside onshapeConformance.kernel.test.ts assert analytic geometry against local OCCT; they are not differential executions inside Onshape.",
+        "The live differential suite covers 29 cases and retains two explicit known gaps. Passing regression tests does not imply all comparisons pass; compare:onshape remains nonzero for known gaps."
+    ],
+    "differential": {
+        "libraryVersion": 3083,
+        "reference": "packages/parametric/test/featurescript/fixtures/conformance/onshape-reference.json",
+        "cases": "packages/parametric/test/featurescript/fixtures/conformance/cases.json",
+        "testedCases": 29,
+        "matchingCases": 27,
+        "knownGaps": [
+            "Interior spline derivative constraints (explicitly rejected).",
+            "Drafts that require a face to disappear (fail without mutating the source body)."
+        ],
+        "tolerances": "Absolute 1e-5 plus relative 1e-6 for measurements; exact topology counts. The documented approximate arc-length evaluator is compared at 0.001 mm, recorded per case. Native-parameter curve samples retain the strict default.",
+        "run": "ONSHAPE_LOCAL_REPORT=/tmp/chili-local-conformance.json npm run test:onshape",
+        "compare": "npm run compare:onshape -- packages/parametric/test/featurescript/fixtures/conformance/onshape-reference.json /tmp/chili-local-conformance.json",
+        "gate": "The regression tests assert the exact known gaps. The comparison command exits nonzero while any incompatibility remains, including known gaps."
+    }
 }

@@ -37,12 +37,19 @@ const ICONS: Record<BooleanOperation, string> = {
 };
 
 const booleanHandler: FeatureHandler<BooleanFeatureData> = {
+    reselectable: true,
     display: (feature) => DISPLAYS[feature.operation],
     icon: (feature) => ICONS[feature.operation],
 
     nodeIds: (feature) => feature.toolIds,
 
     parameters: (feature) => [
+        {
+            key: "toolIds",
+            display: "prompt.select.models",
+            value: `${feature.toolIds.length} tools`,
+            pick: { kinds: [] },
+        },
         {
             key: "operation",
             display: "option.command.operation",

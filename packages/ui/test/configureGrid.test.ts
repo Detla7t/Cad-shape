@@ -121,7 +121,7 @@ function featureNode(parameters: FeatureItem["parameters"], item?: Partial<Featu
 }
 
 function expand(prop: FeatureListProperty) {
-    (mustQuery(prop, ".fl-header") as unknown as { _onclick: () => void })._onclick();
+    click(mustQuery(prop, ".fl-header"), new MouseEvent("click"));
 }
 
 function click(element: Element, event: unknown = { stopPropagation: () => {} }) {
@@ -287,11 +287,15 @@ describe("the Configure grid on feature parameters", () => {
         const node = featureNode([], { suppressed: false });
         const prop = new FeatureListProperty(configuredDocument(), node);
         click(mustQuery(prop, ".fl-more"));
-        // Rename, suppress, configure suppression, delete, comment and where used.
+        // Edit, rename, suppress, configure suppression, delete, comment and where used.
         const entries = mustQuery(document.body, ".fl-menu").querySelectorAll(".fl-menu-item");
-        expect(entries).toHaveLength(6);
-        expect(mustQuery(entries[2], "svg").getAttribute("icon")).toBe("icon-layer-group");
-        click(entries[2]);
+        expect(entries).toHaveLength(7);
+        const configure = mustQuery(
+            mustQuery(document.body, ".fl-menu"),
+            'svg[icon="icon-layer-group"]',
+        ).parentElement;
+        expect(configure).not.toBeNull();
+        click(configure!);
         const { grid, buttons } = lastDialog();
         const select = mustQuery<HTMLSelectElement>(grid, ".cg-input-select");
         select.value = "Holes";
@@ -312,9 +316,12 @@ describe("the Configure grid on feature parameters", () => {
         });
         const prop = new FeatureListProperty(configuredDocument("S"), node);
         click(mustQuery(prop, ".fl-more"));
-        const entries = mustQuery(document.body, ".fl-menu").querySelectorAll(".fl-menu-item");
-        expect(mustQuery(entries[1], "svg").getAttribute("icon")).toBe("icon-eye");
-        click(entries[1]);
+        const unsuppress = mustQuery(
+            mustQuery(document.body, ".fl-menu"),
+            'svg[icon="icon-eye"]',
+        ).parentElement;
+        expect(unsuppress).not.toBeNull();
+        click(unsuppress!);
         expect(node.setFeatureSuppressed).toHaveBeenCalledWith(
             "f1",
             'configure(Size, "S": false, "L": false)',

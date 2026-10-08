@@ -1,6 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
+import { installAdvancedOperations } from "./context/advancedOperations";
 import { installCompositeParts } from "./context/compositeParts";
 import { installCurveOperations } from "./context/curveOperations";
 import { installDirectEdits } from "./context/directEdit";
@@ -48,6 +49,7 @@ export function createNativeInterpreter(
     installSplitFaces(std);
     installDirectEdits(std);
     installCurveOperations(std);
+    installAdvancedOperations(std);
     installCompositeParts(std);
     installMateConnectors(std);
     installHoleOperation(std);

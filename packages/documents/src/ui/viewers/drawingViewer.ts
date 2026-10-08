@@ -1,8 +1,8 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { I18n, Localize, PubSub, Transaction } from "@chili3d/core";
-import { div, input, label, option, p, select, span } from "@chili3d/element";
+import { Config, I18n, Localize, PubSub, Transaction } from "@chili3d/core";
+import { button, div, input, label, option, p, select, span } from "@chili3d/element";
 import { writeDxf, writeSvg } from "@chili3d/parametric";
 import { addDrawingSketch } from "../../cad/drawingToSketch";
 import { importDwg, writeDwg } from "../../cad/dwg";
@@ -30,6 +30,20 @@ export function createDrawingViewer({ node, document }: ViewerContext): IDocumen
     let toMm: number | undefined;
     let svgElement: SVGSVGElement | undefined;
     let view = { x: 0, y: 0, width: 1, height: 1 };
+    const appearance = () => {
+        const dark = Config.instance.preferences.drawingBackground === "dark";
+        canvasHost.style.background = dark ? "#25272b" : "#ffffff";
+        for (const element of svgElement?.querySelectorAll<SVGElement>("[stroke]") ?? []) {
+            const original = element.dataset["originalStroke"] ?? element.getAttribute("stroke")!;
+            element.dataset["originalStroke"] = original;
+            if (["#000", "#000000", "black", "#fff", "#ffffff", "white"].includes(original.toLowerCase()))
+                element.setAttribute("stroke", dark ? "#eeeeee" : "#222222");
+        }
+    };
+    const preferencesChanged = (key: keyof Config) => {
+        if (key === "preferences") appearance();
+    };
+    Config.instance.onPropertyChanged(preferencesChanged);
 
     const applyView = () =>
         svgElement?.setAttribute("viewBox", `${view.x} ${view.y} ${view.width} ${view.height}`);
@@ -41,6 +55,7 @@ export function createDrawingViewer({ node, document }: ViewerContext): IDocumen
             "",
         );
         svgElement = canvasHost.querySelector("svg") ?? undefined;
+        appearance();
         const box = svgElement?.getAttribute("viewBox")?.split(" ").map(Number);
         if (svgElement !== undefined && box?.length === 4) {
             svgElement.removeAttribute("width");
@@ -125,7 +140,7 @@ export function createDrawingViewer({ node, document }: ViewerContext): IDocumen
             const scale = Math.min(view.width / rect.width, view.height / rect.height);
             const fx = view.x + (e.clientX - rect.left - (rect.width - view.width / scale) / 2) * scale;
             const fy = view.y + (e.clientY - rect.top - (rect.height - view.height / scale) / 2) * scale;
-            const factor = e.deltaY > 0 ? 1.2 : 1 / 1.2;
+            const factor = e.deltaY > 0 !== Config.instance.preferences.mouse.reverseZoom ? 1.2 : 1 / 1.2;
             view = {
                 x: fx - (fx - view.x) * factor,
                 y: fy - (fy - view.y) * factor,
@@ -136,7 +151,10 @@ export function createDrawingViewer({ node, document }: ViewerContext): IDocumen
         },
         { passive: false },
     );
+    let endPan = () => {};
+    canvasHost.addEventListener("contextmenu", (e) => e.preventDefault());
     canvasHost.addEventListener("mousedown", (e) => {
+        endPan();
         if (svgElement === undefined) return;
         const rect = canvasHost.getBoundingClientRect();
         const scale = Math.max(view.width / rect.width, view.height / rect.height);
@@ -153,6 +171,7 @@ export function createDrawingViewer({ node, document }: ViewerContext): IDocumen
             window.removeEventListener("mousemove", onMove);
             window.removeEventListener("mouseup", onUp);
         };
+        endPan = onUp;
         window.addEventListener("mousemove", onMove);
         window.addEventListener("mouseup", onUp);
     });
@@ -205,6 +224,12 @@ export function createDrawingViewer({ node, document }: ViewerContext): IDocumen
                 span({ textContent: new Localize("documents.drawing.units") }),
                 unitMenu,
                 toolButton("documents.fit", "⤢", render),
+                button({
+                    className: style.button,
+                    textContent: "Preferences",
+                    title: "Preferences",
+                    onclick: () => PubSub.default.pub("openPreferences", document, "drawings"),
+                }),
             ),
             div(
                 { className: style.drawingBody },
@@ -214,6 +239,10 @@ export function createDrawingViewer({ node, document }: ViewerContext): IDocumen
         ),
         reload: () => void load(),
         exports,
-        dispose: () => canvasHost.replaceChildren(),
+        dispose: () => {
+            endPan();
+            Config.instance.removePropertyChanged(preferencesChanged);
+            canvasHost.replaceChildren();
+        },
     };
 }

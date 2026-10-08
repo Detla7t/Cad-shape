@@ -39,6 +39,7 @@ import { fuseProfiles } from "./sweepGeometry";
 import { combineIds } from "./trackedId";
 
 const revolveHandler: FeatureHandler<RevolveFeatureData> = {
+    reselectable: true,
     display: "command.feature.revolve",
     icon: "icon-revolve",
 
@@ -52,6 +53,18 @@ const revolveHandler: FeatureHandler<RevolveFeatureData> = {
     references: (feature) => [{ key: "sketchId", display: "body.sketch", nodeId: feature.sketchId }],
 
     parameters: (feature) => [
+        {
+            key: "profiles",
+            display: "prompt.select.faces",
+            value: feature.profiles?.length ? `${feature.profiles.length} profiles` : "All sketch profiles",
+            pick: { kinds: ["face"] },
+        },
+        {
+            key: "axis",
+            display: "prompt.select.axis",
+            value: feature.axisSource ? "Referenced edge" : "Axis direction",
+            pick: { kinds: ["edge"] },
+        },
         { key: "angle", display: "common.angle", value: feature.angle, unit: ANGLE_UNITS },
     ],
 

@@ -42,13 +42,22 @@ export function solveSketchConstraints(sketch: FsSketch): void {
     }
     for (const [name, values] of sketch.initialGuesses) {
         const entity = byName.get(name);
-        if (!entity || values.length !== entity.params.length)
+        if (
+            !entity ||
+            !["line", "circle", "point"].includes(entity.type) ||
+            values.length !== entity.params.length
+        )
             fail(`skSetInitialGuess: unsupported seed for "${name}"`);
         entity.params = values.map((v) => v * MM_PER_METER);
     }
     for (const { id, definition } of sketch.constraints) {
         try {
-            appendConstraint(data, byName, definition);
+            appendConstraint(
+                data,
+                byName,
+                definition,
+                new Set(sketch.entities.filter((e) => e.reverseEndpoints).map((e) => e.id)),
+            );
         } catch (error) {
             fail(`skConstraint "${id}": ${error instanceof Error ? error.message : String(error)}`);
         }
@@ -78,7 +87,12 @@ export function solveSketchConstraints(sketch: FsSketch): void {
 }
 
 type Target = { entity: SketchEntityData; point?: SketchPointRef };
-function appendConstraint(data: SketchData, names: Map<string, SketchEntityData>, definition: FsMap): void {
+function appendConstraint(
+    data: SketchData,
+    names: Map<string, SketchEntityData>,
+    definition: FsMap,
+    reversed: Set<string>,
+): void {
     const kind = enumName(definition.field("constraintType"), "ConstraintType", "constraintType");
     if (kind === "NONE" || definition.field("driving") === false) return;
     for (const key of ["externalFirst", "externalSecond", "externalThird"])
@@ -103,6 +117,7 @@ function appendConstraint(data: SketchData, names: Map<string, SketchEntityData>
         if (suffix === "start" && parent.type === "arc") index = 1;
         if (suffix === "end" && parent.type === "arc") index = 2;
         if (index === undefined) fail(`Unsupported sketch point "${name}"`);
+        if (parent.type === "arc" && index > 0 && reversed.has(name.slice(0, split))) index = 3 - index;
         return { entity: parent, point: { entityId: parent.id, pointIndex: index } };
     };
     const first = read("localFirst"),
@@ -206,6 +221,8 @@ function appendConstraint(data: SketchData, names: Map<string, SketchEntityData>
                 definition.field("direction") === undefined
                     ? "MINIMUM"
                     : enumName(definition.field("direction"), "DimensionDirection", "direction");
+            if (!["MINIMUM", "ALIGNED", "HORIZONTAL", "VERTICAL"].includes(direction))
+                fail(`Unsupported distance direction "${direction}"`);
             if (!first.point || !second?.point)
                 fail("Distance between curves is not supported by the sketch constraint bridge yet");
             const k =

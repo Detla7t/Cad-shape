@@ -154,12 +154,14 @@ export function edgeCurve(edge: IEdge): ITrimmedCurve {
 
 /** Kernel parameter of a normalized edge parameter, measured by arc length when asked. */
 export function edgeParameter(edge: IEdge, t: number, arcLength: boolean): number {
+    if (!Number.isFinite(t) || t < 0 || t > 1) fail("Edge parameter must be between 0 and 1");
     const t0 = edge.firstParameter();
     const t1 = edge.lastParameter();
     const linear = t0 + (t1 - t0) * t;
     const type = curveTypeOf(edge);
     // Lines and circles run at constant speed.
     if (!arcLength || type === "LINE" || type === "CIRCLE" || type === "ARC") return linear;
+    if (edge.arcLengthParameter) return edge.arcLengthParameter(t);
     const curve = edgeCurve(edge);
     const speed = (u: number) => curve.d1(u).vec.length();
     const lengthTo = (u: number) =>

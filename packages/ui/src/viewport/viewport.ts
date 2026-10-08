@@ -75,6 +75,7 @@ export class Viewport extends HTMLElement {
 
     private render() {
         this.append(
+            this.utilities.selection.guide.element,
             this.utilities.element,
             this._acts,
             this.showViewControls

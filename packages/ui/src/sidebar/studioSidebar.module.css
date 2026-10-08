@@ -34,6 +34,9 @@
     button:last-child {
         border-bottom: 0;
     }
+    button[hidden] {
+        display: none;
+    }
     button:hover {
         background: var(--hover-background-color);
     }
@@ -63,6 +66,7 @@
     border-bottom: 1px solid var(--border-color);
     strong {
         font-weight: 600;
+        flex: 1;
     }
     button {
         display: grid;
@@ -77,6 +81,9 @@
     }
     button:hover {
         background: var(--hover-background-color);
+    }
+    button[hidden] {
+        display: none;
     }
 }
 .content {

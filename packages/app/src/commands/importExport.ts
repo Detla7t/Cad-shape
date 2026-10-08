@@ -5,8 +5,10 @@ import {
     AsyncController,
     CancelableCommand,
     Combobox,
+    Config,
     command,
     download,
+    exportFileName,
     I18n,
     type IApplication,
     type ICommand,
@@ -98,7 +100,7 @@ export class Export extends CancelableCommand {
     private async exportMergedAsync(nodes: VisualNode[]) {
         const data = await this.application.dataExchange.export(this.format, nodes);
         if (!data) return;
-        download(data, `${nodes[0].name}${this.suffix}`);
+        download(data, exportFileName(nodes[0].name, this.suffix, Config.instance.preferences.exportRules));
     }
 
     // Browsers block multiple automatic downloads, so pack the files into one zip.
@@ -117,10 +119,11 @@ export class Export extends CancelableCommand {
     }
 
     private uniqueFileName(nodeName: string, usedNames: Set<string>) {
-        let fileName = `${nodeName}${this.suffix}`;
+        const original = exportFileName(nodeName, this.suffix, Config.instance.preferences.exportRules);
+        let fileName = original;
         let counter = 1;
         while (usedNames.has(fileName)) {
-            fileName = `${nodeName}-${counter++}${this.suffix}`;
+            fileName = `${original.slice(0, -this.suffix.length)}-${counter++}${this.suffix}`;
         }
         usedNames.add(fileName);
         return fileName;

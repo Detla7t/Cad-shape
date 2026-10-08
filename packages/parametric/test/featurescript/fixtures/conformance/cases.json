@@ -1,0 +1,247 @@
+{
+    "libraryVersion": 3083,
+    "absoluteTolerance": 1e-5,
+    "relativeTolerance": 1e-6,
+    "cases": [
+        {
+            "id": "sweep-5",
+            "file": "sweep.fs",
+            "inputs": {
+                "height": 5
+            }
+        },
+        {
+            "id": "loft-5",
+            "file": "loft.fs",
+            "inputs": {
+                "height": 5
+            }
+        },
+        {
+            "id": "sweep-12",
+            "file": "sweep.fs",
+            "inputs": {
+                "height": 12
+            }
+        },
+        {
+            "id": "loft-12",
+            "file": "loft.fs",
+            "inputs": {
+                "height": 12
+            }
+        },
+        {
+            "id": "sweep-30",
+            "file": "sweep.fs",
+            "inputs": {
+                "height": 30
+            }
+        },
+        {
+            "id": "loft-30",
+            "file": "loft.fs",
+            "inputs": {
+                "height": 30
+            }
+        },
+        {
+            "id": "draft-5-3-False",
+            "file": "draft.fs",
+            "inputs": {
+                "height": 5,
+                "angle": 3,
+                "reverse": false
+            }
+        },
+        {
+            "id": "draft-12-7-False",
+            "file": "draft.fs",
+            "inputs": {
+                "height": 12,
+                "angle": 7,
+                "reverse": false
+            }
+        },
+        {
+            "id": "draft-12-7-True",
+            "file": "draft.fs",
+            "inputs": {
+                "height": 12,
+                "angle": 7,
+                "reverse": true
+            }
+        },
+        {
+            "id": "spline-0-False-False",
+            "file": "fit-spline.fs",
+            "inputs": {
+                "height": 0,
+                "closed": false,
+                "clamped": false
+            }
+        },
+        {
+            "id": "spline-4-False-False",
+            "file": "fit-spline.fs",
+            "inputs": {
+                "height": 4,
+                "closed": false,
+                "clamped": false
+            }
+        },
+        {
+            "id": "spline-4-False-True",
+            "file": "fit-spline.fs",
+            "inputs": {
+                "height": 4,
+                "closed": false,
+                "clamped": true
+            }
+        },
+        {
+            "id": "spline-4-True-False",
+            "file": "fit-spline.fs",
+            "inputs": {
+                "height": 4,
+                "closed": true,
+                "clamped": false
+            }
+        },
+        {
+            "id": "fill-0",
+            "file": "fill.fs",
+            "inputs": {
+                "height": 0
+            }
+        },
+        {
+            "id": "fill-5",
+            "file": "fill.fs",
+            "inputs": {
+                "height": 5
+            }
+        },
+        {
+            "id": "draft-feature",
+            "file": "draft-feature.fs",
+            "inputs": {
+                "height": 12,
+                "angle": 7
+            }
+        },
+        {
+            "id": "fill-feature",
+            "file": "fill-feature.fs",
+            "inputs": {
+                "height": 0
+            }
+        },
+        {
+            "id": "spline-customParameters",
+            "file": "fit-spline.fs",
+            "inputs": {
+                "height": 4,
+                "closed": false,
+                "clamped": true,
+                "customParameters": true
+            }
+        },
+        {
+            "id": "spline-interiorDerivative",
+            "file": "fit-spline.fs",
+            "inputs": {
+                "height": 4,
+                "closed": false,
+                "clamped": false,
+                "interiorDerivative": true
+            },
+            "expectedUnsupported": "opFitSpline: interior derivative constraints are not compatible yet",
+            "limitation": "Onshape preserves additional continuity through an interior derivative constraint. Reject until its interpolation construction matches."
+        },
+        {
+            "id": "spline-arcLength",
+            "file": "fit-spline.fs",
+            "inputs": {
+                "height": 4,
+                "closed": false,
+                "clamped": false,
+                "arcLength": true
+            },
+            "absoluteTolerance": 0.001,
+            "toleranceReason": "Onshape documents arcLengthParameterization as approximate (evaluate.fs / evEdgeTangentLines); compare this evaluator case at 1 micrometre in mm, with the ordinary 1e-5 tolerance retained for native-parameter curve shape cases."
+        },
+        {
+            "id": "spline-feature-False",
+            "file": "fit-spline-feature.fs",
+            "inputs": {
+                "closed": false
+            }
+        },
+        {
+            "id": "spline-feature-True",
+            "file": "fit-spline-feature.fs",
+            "inputs": {
+                "closed": true
+            }
+        },
+        {
+            "id": "invalid-spline",
+            "file": "invalid-input.fs",
+            "inputs": {
+                "operation": "spline"
+            },
+            "expectedOperationErrors": true
+        },
+        {
+            "id": "invalid-parameters",
+            "file": "invalid-input.fs",
+            "inputs": {
+                "operation": "parameters"
+            },
+            "expectedOperationErrors": true
+        },
+        {
+            "id": "invalid-fill",
+            "file": "invalid-input.fs",
+            "inputs": {
+                "operation": "fill"
+            },
+            "expectedOperationErrors": true
+        },
+        {
+            "id": "invalid-draft",
+            "file": "invalid-input.fs",
+            "inputs": {
+                "operation": "draft",
+                "angle": 91
+            },
+            "expectedOperationErrors": true
+        },
+        {
+            "id": "draft-face-disappearance",
+            "file": "invalid-input.fs",
+            "inputs": {
+                "operation": "draft",
+                "angle": 89
+            },
+            "expectedOperationErrors": true,
+            "knownDifferencePaths": ["$.rejected", "$.remainingVolume"],
+            "limitation": "Onshape removes a face as a steep draft crosses it. OCCT DraftAngle currently fails without changing the source body."
+        },
+        {
+            "id": "fill-G1",
+            "file": "fill-continuity.fs",
+            "inputs": {
+                "order": 1
+            }
+        },
+        {
+            "id": "fill-G2",
+            "file": "fill-continuity.fs",
+            "inputs": {
+                "order": 2
+            }
+        }
+    ]
+}

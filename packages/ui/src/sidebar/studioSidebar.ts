@@ -13,32 +13,46 @@ import {
     PubSub,
 } from "@chili3d/core";
 import { createCadIcon } from "@chili3d/element";
+import { AppearancePanel } from "./appearancePanel";
 import { ConfigurationTablePanel } from "./configurationTablePanel";
 import { InspectionPanel } from "./inspectionPanel";
 import style from "./studioSidebar.module.css";
 import { VariableTablePanel } from "./variableTablePanel";
 
 DocumentPanels.register({
+    id: "appearance",
+    title: "sidebar.appearance",
+    icon: "appearance",
+    create: (document) => new AppearancePanel(document),
+});
+DocumentPanels.register({
     id: "configuration",
     title: "sidebar.configurations",
-    icon: "configuration",
+    icon: "configurationPanel",
     create: (document) => new ConfigurationTablePanel(document),
 });
 DocumentPanels.register({
     id: "variables",
     title: "sidebar.variables",
-    icon: "variable",
+    icon: "variableTable",
     create: (document, onApplied) => new VariableTablePanel(document, onApplied),
 });
 
 DocumentPanels.register({
     id: "inspection",
     title: "sidebar.inspection",
-    icon: "inspection",
+    icon: "inspectionPanel",
     create: (document) => new InspectionPanel(document),
 });
 
-const ORDER: DocumentPanelId[] = ["configuration", "tables", "sheetMetal", "inspection", "variables"];
+const ORDER: DocumentPanelId[] = [
+    "appearance",
+    "configuration",
+    "tables",
+    "sheetMetal",
+    "inspection",
+    "variables",
+];
 
 /** The Part Studio's right-hand rail; one live document panel occupies the dock at a time. */
 export class StudioSidebar extends HTMLElement implements IDocumentPanelHost {
@@ -52,6 +66,7 @@ export class StudioSidebar extends HTMLElement implements IDocumentPanelHost {
     private active?: DocumentPanelId;
     private width = 480;
     private stopResize?: () => void;
+    private railRefreshQueued = false;
 
     constructor(private readonly app: IApplication) {
         super();
@@ -112,6 +127,7 @@ export class StudioSidebar extends HTMLElement implements IDocumentPanelHost {
         PubSub.default.sub("activeViewChanged", this.viewChanged);
         PubSub.default.sub("documentClosed", this.documentClosed);
         this.setDocument(this.app.activeView?.document);
+        this.updateRail();
     }
     disconnectedCallback() {
         if (DocumentPanels.host === this) DocumentPanels.host = undefined;
@@ -119,6 +135,7 @@ export class StudioSidebar extends HTMLElement implements IDocumentPanelHost {
         PubSub.default.remove("documentClosed", this.documentClosed);
         this.stopResize?.();
         this.unmount();
+        this.stopDocumentWatch();
         this.currentDocument = undefined;
     }
 
@@ -131,8 +148,11 @@ export class StudioSidebar extends HTMLElement implements IDocumentPanelHost {
     setDocument(document: IDocument | undefined) {
         if (document === this.currentDocument) return;
         this.unmount();
+        this.stopDocumentWatch();
         this.currentDocument = document;
-        for (const button of this.buttons.values()) button.disabled = !document;
+        document?.history.onChanged(this.documentChanged);
+        document?.modelManager.addNodeObserver(this.documentChanged);
+        this.updateRail();
         if (document && this.active) this.show(this.active);
         else this.close();
     }
@@ -177,6 +197,28 @@ export class StudioSidebar extends HTMLElement implements IDocumentPanelHost {
     private readonly documentClosed = (document: IDocument) => {
         if (this.currentDocument === document) this.setDocument(undefined);
     };
+    private stopDocumentWatch() {
+        this.currentDocument?.history.removeChanged(this.documentChanged);
+        this.currentDocument?.modelManager.removeNodeObserver(this.documentChanged);
+    }
+    private readonly documentChanged = () => {
+        if (this.railRefreshQueued) return;
+        this.railRefreshQueued = true;
+        queueMicrotask(() => {
+            this.railRefreshQueued = false;
+            this.updateRail();
+        });
+    };
+    private updateRail() {
+        for (const [id, button] of this.buttons) {
+            const definition = DocumentPanels.definitions.get(id);
+            button.disabled = !this.currentDocument;
+            button.hidden =
+                !!definition?.isVisible &&
+                (!this.currentDocument || !definition.isVisible(this.currentDocument));
+            if (button.hidden && this.active === id) this.close();
+        }
+    }
     private setWidth(width: number) {
         this.width = Math.max(340, Math.min(window.innerWidth * 0.6, width));
         this.style.width = `${this.width}px`;
@@ -201,7 +243,7 @@ export class StudioSidebar extends HTMLElement implements IDocumentPanelHost {
     private navigateRail(event: KeyboardEvent) {
         if (!["ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) return;
         event.preventDefault();
-        const buttons = [...this.buttons.values()];
+        const buttons = [...this.buttons.values()].filter((button) => !button.hidden && !button.disabled);
         const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
         const next =
             event.key === "Home"

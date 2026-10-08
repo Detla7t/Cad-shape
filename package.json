@@ -10,6 +10,8 @@
         "build:wasm": "cd cpp && cmake --preset release && cmake --build --preset release && node ../scripts/wasm-provenance.mjs",
         "check:wasm": "node scripts/wasm-provenance.mjs --verify",
         "audit:onshape": "node scripts/audit-onshape-tools.mjs",
+        "test:onshape": "rstest packages/parametric/test/featurescript/onshapeConformance.kernel.test.ts packages/parametric/test/featurescript/onshapeConformance.test.ts packages/parametric/test/featurescript/standardFeatures.kernel.test.ts",
+        "compare:onshape": "node scripts/onshape-conformance.mjs compare",
         "build:types": "node scripts/generate_types.mjs",
         "check": "biome check --write",
         "check:ci": "biome check --diagnostic-level=error",

@@ -3,6 +3,7 @@
 
 import {
     type CommitEntry,
+    Config,
     DocumentVersionControl,
     type GraphRow,
     graphWidth,
@@ -224,7 +225,9 @@ export class VersionsPanel extends HTMLElement {
                     span({
                         className: style.time,
                         textContent: formatTime(commit.time),
-                        title: new Date(commit.time).toLocaleString(),
+                        title: new Date(commit.time).toLocaleString([], {
+                            hour12: Config.instance.preferences.timeFormat === "12",
+                        }),
                     }),
                 ),
             ),
@@ -287,7 +290,7 @@ export class VersionsPanel extends HTMLElement {
         const title = button({
             className: style.operationTitle,
             textContent: commit.message,
-            title: `${commit.message} · ${new Date(commit.time).toLocaleString()}`,
+            title: `${commit.message} · ${new Date(commit.time).toLocaleString([], { hour12: Config.instance.preferences.timeFormat === "12" })}`,
             onclick: () => {
                 if (expanded) this.expanded.delete(commit.id);
                 else this.expanded.add(commit.id);
@@ -507,7 +510,11 @@ function formatTime(time: number): string {
     const elapsed = now.getTime() - time;
     if (elapsed < 60_000) return "now";
     if (date.toDateString() === now.toDateString()) {
-        return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+        return date.toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: Config.instance.preferences.timeFormat === "12",
+        });
     }
     return date.toLocaleDateString();
 }

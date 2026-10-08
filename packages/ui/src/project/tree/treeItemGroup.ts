@@ -26,7 +26,12 @@ export class TreeGroup extends TreeItem {
             this.warningBadge,
         );
         super.append(this.createRootContainer());
-        if (isFeatureListNode(node)) this.items.append(new FeatureListProperty(document, node));
+        if (isFeatureListNode(node)) {
+            this.items.append(new FeatureListProperty(document, node, undefined, true));
+            this.header.hidden = true;
+            this.header.style.display = "none";
+            this.items.classList.remove(style.left16px);
+        }
         this.refreshExpander();
     }
 

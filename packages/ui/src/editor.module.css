@@ -59,7 +59,8 @@
         border-right: 1px solid var(--border-color);
     }
 
-    & .partStudio[data-viewport-only] .sidebar {
+    & .partStudio[data-viewport-only] .sidebar,
+    & .partStudio[data-tabs-open] .sidebar {
         display: none;
     }
 
@@ -200,6 +201,7 @@
 }
 
 .utilityRail {
+    order: -3;
     flex: 0 0 34px;
     width: 34px;
     border-right: 1px solid var(--border-color);

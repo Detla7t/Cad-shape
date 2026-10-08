@@ -49,6 +49,7 @@
 #include <gp_Dir.hxx>
 #include <gp_Pnt.hxx>
 
+#include "measurement.hpp"
 #include "shared.hpp"
 #include "utils.hpp"
 #include <BRepCheck_Analyzer.hxx>
@@ -82,6 +83,32 @@ public:
             Vector3::fromPnt(obx.CornerMin()),
             Vector3::fromPnt(obx.CornerMax())
         };
+    }
+
+    static BoundingBox exactBoundingBox(const TopoDS_Shape& shape)
+    {
+        Bnd_Box bounds;
+        BRepBndLib::AddOptimal(shape, bounds, false, false);
+        if (bounds.IsVoid())
+            return { { 0, 0, 0 }, { 0, 0, 0 } };
+        return { Vector3::fromPnt(bounds.CornerMin()), Vector3::fromPnt(bounds.CornerMax()) };
+    }
+
+    static std::vector<int> seamEdges(const TopoDS_Shape& shape)
+    {
+        NCollection_IndexedMap<TopoDS_Shape, TopTools_ShapeMapHasher> edges;
+        TopExp::MapShapes(shape, TopAbs_EDGE, edges);
+        std::vector<int> seams;
+        for (int i = 1; i <= edges.Extent(); ++i) {
+            const auto edge = TopoDS::Edge(edges.FindKey(i));
+            for (TopExp_Explorer faces(shape, TopAbs_FACE); faces.More(); faces.Next()) {
+                if (BRep_Tool::IsClosed(edge, TopoDS::Face(faces.Current()))) {
+                    seams.push_back(i - 1);
+                    break;
+                }
+            }
+        }
+        return seams;
     }
 
     static OrientedBoundingBox orientedBoundingBox(const TopoDS_Shape& shape, bool useTriangulation)
@@ -388,9 +415,25 @@ public:
 
     static double curveLength(const TopoDS_Edge& edge)
     {
-        GProp_GProps props;
-        BRepGProp::LinearProperties(edge, props);
-        return props.Mass();
+        if (!BRep_Tool::IsGeometric(edge) || BRep_Tool::Degenerated(edge))
+            return 0.0;
+        BRepAdaptor_Curve curve(edge);
+        return GCPnts_AbscissaPoint::Length(curve, 1e-9);
+    }
+
+    static double arcLengthParameter(const TopoDS_Edge& edge, double fraction)
+    {
+        if (!std::isfinite(fraction) || fraction < 0 || fraction > 1)
+            throw Standard_Failure("Arc length fraction must be between zero and one");
+        BRepAdaptor_Curve curve(edge);
+        if (fraction == 0)
+            return curve.FirstParameter();
+        if (fraction == 1)
+            return curve.LastParameter();
+        GCPnts_AbscissaPoint point(1e-9, curve, fraction * GCPnts_AbscissaPoint::Length(curve, 1e-9), curve.FirstParameter());
+        if (!point.IsDone())
+            throw Standard_Failure("Arc length parameter evaluation failed");
+        return point.Parameter();
     }
 
     static double firstParameter(const TopoDS_Edge& edge)
@@ -686,8 +729,11 @@ EMSCRIPTEN_BINDINGS(Shape)
     class_<Shape>("Shape")
         .class_function("ptr", &Shape::ptr)
         .class_function("boundingBox", &Shape::boundingBox)
+        .class_function("exactBoundingBox", &Shape::exactBoundingBox)
+        .class_function("seamEdges", &Shape::seamEdges)
         .class_function("orientedBoundingBox", &Shape::orientedBoundingBox)
         .class_function("extremaDistance", &Shape::extremaDistance)
+        .class_function("distanceMeasure", &Measurement::distance)
         .class_function("clean", &Shape::clean)
         .class_function("clone", &Shape::clone)
         .class_function("transformed", &Shape::transformed)
@@ -711,6 +757,7 @@ EMSCRIPTEN_BINDINGS(Shape)
         .class_function("fromCurve", &Edge::fromCurve, allow_raw_pointers())
         .class_function("curve", &Edge::curve)
         .class_function("curveLength", &Edge::curveLength)
+        .class_function("arcLengthParameter", &Edge::arcLengthParameter)
         .class_function("firstParameter", &Edge::firstParameter)
         .class_function("lastParameter", &Edge::lastParameter)
         .class_function("pointAt", &Edge::pointAt)

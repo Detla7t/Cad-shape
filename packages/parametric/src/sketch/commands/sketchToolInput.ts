@@ -41,6 +41,7 @@ export function sketchToolInput(
         form.append(h);
         const inputs: Record<string, HTMLInputElement> = {};
         const units = new Map<string, UnitSpec>();
+        const initialText = new Map<string, string>();
         for (const [label, value] of Object.entries(fields)) {
             const row = document.createElement("label"),
                 input = document.createElement("input");
@@ -63,6 +64,7 @@ export function sketchToolInput(
             input.setAttribute("aria-label", displayLabel);
             input.oninput = () => input.setCustomValidity("");
             inputs[label] = input;
+            initialText.set(label, input.value);
             row.style.padding = "6px 10px";
             input.style.width = "110px";
             row.append(input);
@@ -83,6 +85,10 @@ export function sketchToolInput(
                 const unit = units.get(key);
                 if (!unit) {
                     values[key] = input.value;
+                    continue;
+                }
+                if (input.value === initialText.get(key)) {
+                    values[key] = String(fields[key]);
                     continue;
                 }
                 const scope = view.document.variables.evaluate().scope,
