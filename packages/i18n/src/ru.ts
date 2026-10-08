@@ -113,7 +113,7 @@ export default {
         "command.create.sweep": "Развертка",
         "command.create.thickSolid": "Толщина линии",
         "command.dimension.angle": "Угол",
-        "command.dimension.distance": "Расстояние",
+        "command.dimension.distance": "Размер",
         "command.dimension.horizontalDistance": "Горизонтальное расстояние",
         "command.dimension.pointLineDistance": "Расстояние точка-линия",
         "command.dimension.radius": "Радиус",
@@ -340,6 +340,8 @@ export default {
         "prompt.pickArcHeight": "введите высоту дуги, ESC для отмены",
         "prompt.pickArcMid": "выберите точку на дуге, ESC для отмены",
         "prompt.pickCircleCenter": "выберите центр, ESC для отмены",
+        "prompt.pickDimensionOrEntity":
+            "Выберите другой объект или щёлкните в пустом месте для размещения размера; ESC — отмена",
         "prompt.pickDimensionPosition": "выберите позицию размера, ESC для отмены",
         "prompt.pickExternalRef":
             "выберите внешнюю ссылку (фиолетовую) для переключения роли, ESC для завершения",

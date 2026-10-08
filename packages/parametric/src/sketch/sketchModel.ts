@@ -150,7 +150,19 @@ export type DimensionAnchor =
     /** Signed perpendicular offset from the measured segment (P2PDistance). */
     | { readonly kind: "offset"; readonly offset: number }
     /** Label vector from the circle center (Radius). */
-    | { readonly kind: "vector"; readonly dx: number; readonly dy: number };
+    | { readonly kind: "vector"; readonly dx: number; readonly dy: number; readonly diameter?: boolean };
+
+/** Radius stays in solver units; a diameter annotation and its editor use twice that value. */
+export function dimensionDisplaySource(source: ParameterValue, anchor?: DimensionAnchor): ParameterValue {
+    if (anchor?.kind !== "vector" || !anchor.diameter) return source;
+    if (typeof source === "number") return source * 2;
+    return source.startsWith("(") && source.endsWith(") / 2") ? source.slice(1, -5) : `2 * (${source})`;
+}
+
+export function dimensionInputSource(source: ParameterValue, anchor?: DimensionAnchor): ParameterValue {
+    if (anchor?.kind !== "vector" || !anchor.diameter) return source;
+    return typeof source === "number" ? source / 2 : `(${source}) / 2`;
+}
 
 /** Datum label anchor bound to a constraint id (ids are stable across sessions). */
 export interface SketchDimensionAnchor {

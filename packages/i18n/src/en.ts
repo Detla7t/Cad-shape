@@ -446,7 +446,7 @@ export default {
         "command.create.sweep": "Sweep",
         "command.create.thickSolid": "Thick Solid",
         "command.dimension.angle": "Angle",
-        "command.dimension.distance": "Distance",
+        "command.dimension.distance": "Dimension",
         "command.dimension.horizontalDistance": "Horizontal Distance",
         "command.dimension.pointLineDistance": "Point-Line Distance",
         "command.dimension.radius": "Radius",
@@ -727,6 +727,8 @@ export default {
         "prompt.pickArcHeight": "input arc height, ESC key to cancel",
         "prompt.pickArcMid": "pick point on arc, ESC key to cancel",
         "prompt.pickCircleCenter": "pick center, ESC key to cancel",
+        "prompt.pickDimensionOrEntity":
+            "Select another entity or click empty space to place the dimension, ESC to cancel",
         "prompt.pickDimensionPosition": "pick dimension position, ESC key to cancel",
         "prompt.pickExternalRef": "pick an external reference (purple) to toggle its role, ESC key to finish",
         "prompt.pickFistPoint": "Pick first point, ESC key to cancel",

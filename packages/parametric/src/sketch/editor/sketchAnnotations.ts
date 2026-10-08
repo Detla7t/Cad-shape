@@ -15,6 +15,7 @@ import {
 import {
     arcAngles,
     ConstraintKind,
+    dimensionDisplaySource,
     entityRadius,
     isDatumEntityId,
     pointRefKey,
@@ -32,6 +33,7 @@ import {
     axisDistanceDimension,
     type DimensionAnchor,
     type DimensionGeometry,
+    diameterDimension,
     distanceDimension,
     formatDatum,
     lineIntersection,
@@ -118,6 +120,7 @@ export type DimensionPreview =
           readonly kind: "radius";
           readonly center: [number, number];
           readonly radius: number;
+          readonly diameter?: boolean;
           readonly position: [number, number];
       }
     | {
@@ -481,7 +484,13 @@ export class SketchAnnotationManager implements IDisposable {
         const geometry = this.dimensionGeometry(constraint, px);
         if (geometry === undefined) return;
         segments.push(...geometry.segments);
-        const prefix = constraint.kind === ConstraintKind.Radius ? "R" : "";
+        const anchor = this.anchors.get(constraint.id);
+        const prefix =
+            constraint.kind === ConstraintKind.Radius
+                ? anchor?.kind === "vector" && anchor.diameter
+                    ? "Ø"
+                    : "R"
+                : "";
         const source = constraint.datum ?? 0;
         const resolved =
             typeof source === "string" && !this.expressions
@@ -490,7 +499,7 @@ export class SketchAnnotationManager implements IDisposable {
         const datum = resolved?.isOk ? resolved.value : source;
         // An expression reads as written — that is the whole point of naming it.
         this.addBadge(
-            `${prefix}${formatDatum(constraint.kind, datum, this.view.document)}`,
+            `${prefix}${formatDatum(constraint.kind, dimensionDisplaySource(datum, anchor), this.view.document)}`,
             ...geometry.textPosition,
             constraint,
             constraint.refs,
@@ -603,7 +612,7 @@ export class SketchAnnotationManager implements IDisposable {
         segments: DimensionGeometry["segments"],
     ): void {
         const [cx, cy] = preview.center;
-        const geometry = radiusDimension(
+        const geometry = (preview.diameter ? diameterDimension : radiusDimension)(
             preview.center,
             preview.radius,
             preview.position[0] - cx,
@@ -612,7 +621,7 @@ export class SketchAnnotationManager implements IDisposable {
         );
         segments.push(...geometry.segments);
         this.addPreviewBadge(
-            `R${formatDatum(ConstraintKind.Radius, preview.radius, this.view.document)}`,
+            `${preview.diameter ? "Ø" : "R"}${formatDatum(ConstraintKind.Radius, preview.radius * (preview.diameter ? 2 : 1), this.view.document)}`,
             geometry.textPosition,
         );
     }
@@ -651,7 +660,7 @@ export class SketchAnnotationManager implements IDisposable {
         segments.push(...geometry.segments);
         const value = preview.axis === "h" ? preview.p2[0] - preview.p1[0] : preview.p2[1] - preview.p1[1];
         this.addPreviewBadge(
-            formatDatum(ConstraintKind.P2PDistance, value, this.view.document),
+            formatDatum(ConstraintKind.P2PDistance, Math.abs(value), this.view.document),
             geometry.textPosition,
         );
     }
@@ -730,7 +739,13 @@ export class SketchAnnotationManager implements IDisposable {
         const radius = entityRadius(entity);
         const anchor = this.anchors.get(constraint.id);
         const [dx, dy] = anchor?.kind === "vector" ? [anchor.dx, anchor.dy] : [radius, radius];
-        return radiusDimension(center, radius, dx, dy, px);
+        return (anchor?.kind === "vector" && anchor.diameter ? diameterDimension : radiusDimension)(
+            center,
+            radius,
+            dx,
+            dy,
+            px,
+        );
     }
 
     /** World units per screen pixel at the view center (falls back to 1). */
@@ -975,7 +990,12 @@ export class SketchAnnotationManager implements IDisposable {
             case ConstraintKind.Radius: {
                 const entity = this.solver.entity(constraint.refs[0].entityId);
                 if (entity === undefined) return undefined;
-                return { kind: "vector", dx: uv[0] - entity.params[0], dy: uv[1] - entity.params[1] };
+                return {
+                    ...this.anchors.get(constraint.id),
+                    kind: "vector",
+                    dx: uv[0] - entity.params[0],
+                    dy: uv[1] - entity.params[1],
+                };
             }
             case ConstraintKind.Angle: {
                 const vertex = lineIntersection(points[0], points[1], points[2], points[3]) ?? [

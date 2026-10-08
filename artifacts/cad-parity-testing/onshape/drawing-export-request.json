@@ -1,0 +1,16 @@
+{
+    "documentId": "bcf2b0f57a114bba79c81ac1",
+    "workspaceId": "f824c55ae3e3a7f33d2eb028",
+    "elementId": "4f3b4a27c9a4818bd3f28ead",
+    "format": "DXF",
+    "featureIds": "FOPxVmSevFe2jK9_0",
+    "flatten": true,
+    "includeSketches": true,
+    "version": "12",
+    "units": "millimeter",
+    "scale": 1,
+    "zipSingleFileOutput": false,
+    "storeInDocument": false,
+    "destinationName": "drawing",
+    "splinesAsPolylines": false
+}

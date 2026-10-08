@@ -128,6 +128,9 @@ test("the full toolset button opens ordered tabs and context switching restores 
         ribbon.openTab("ribbon.tab.sketch");
         expect(toolbar.dataset["tab"]).toBe("ribbon.tab.sketch");
         expect(toolbar.querySelector("[data-command='constraint.vertical']")).not.toBeNull();
+        expect(toolbar.querySelectorAll("[data-command^='dimension.']")).toHaveLength(1);
+        expect(toolbar.querySelector("[data-command='dimension.distance']")).not.toBeNull();
+        expect(toolbar.querySelector("[aria-label='Dimensions']")).toBeNull();
         ribbon.closeTab("ribbon.tab.sketch");
         expect(toolbar.dataset["tab"]).toBe("ribbon.tab.model");
         expect(toolbar.querySelector("[data-command='create.line']")).not.toBeNull();

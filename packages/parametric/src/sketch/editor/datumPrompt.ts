@@ -42,6 +42,7 @@ export function promptDatum(
     onCancel?: () => void,
     options?: {
         positiveOnly?: boolean;
+        onAccepted?: () => void;
         inlineAt?: { x: number; y: number };
         initialText?: string;
         parse?: (text: string) => Result<ParameterValue>;
@@ -72,6 +73,7 @@ export function promptDatum(
             showDatumError(error, result.error);
             return false;
         }
+        options?.onAccepted?.();
         return true;
     };
     if (options?.inlineAt) {

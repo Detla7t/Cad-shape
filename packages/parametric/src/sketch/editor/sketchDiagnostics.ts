@@ -2,7 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import { sketchProfiles } from "../../features/profileBuilder";
-import { ConstraintKind, resolveDatumSource, type SketchData } from "../sketchModel";
+import { ConstraintKind, dimensionDisplaySource, resolveDatumSource, type SketchData } from "../sketchModel";
 import { SketchSolver } from "../solver";
 import { formatDatum } from "./dimensionLayout";
 import type { SketchEditor } from "./sketchEditor";
@@ -169,5 +169,11 @@ export function displayConstraintDatum(editor: SketchEditor, id: number): string
     const c = editor.solver.toData().constraints.find((c) => c.id === id);
     if (!c) return "";
     const resolved = resolveDatumSource(c.kind, c.datum ?? 0, editor.document.variables.evaluate().scope);
-    return resolved.isOk ? formatDatum(c.kind, resolved.value, editor.document) : String(c.datum ?? 0);
+    return resolved.isOk
+        ? formatDatum(
+              c.kind,
+              dimensionDisplaySource(resolved.value, editor.dimensionAnchors.get(id)),
+              editor.document,
+          )
+        : String(c.datum ?? 0);
 }

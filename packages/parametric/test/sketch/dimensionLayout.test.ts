@@ -4,6 +4,7 @@
 import {
     angleDimension,
     axisDistanceDimension,
+    diameterDimension,
     distanceDimension,
     lineIntersection,
     pointLineDistance,
@@ -107,10 +108,10 @@ describe("radiusDimension", () => {
         expect(tip[2]).toBeLessThan(tip[0]);
     });
 
-    test("keeps the label outside the circle when the anchor is inside", () => {
+    test("keeps an inside label at the cursor and its arrow on the rim", () => {
         const geometry = radiusDimension([0, 0], 10, 1, 0, PX);
-        const label = geometry.textPosition;
-        expect(Math.hypot(label[0], label[1])).toBeGreaterThan(10);
+        expect(geometry.textPosition).toEqual([1, 0]);
+        expect(geometry.segments[0]).toEqual([0, 0, 10, 0]);
     });
 
     test("follows the circle center", () => {
@@ -295,5 +296,15 @@ describe("angleDimension", () => {
     test("returns undefined for a zero-length direction or zero sweep", () => {
         expect(angleDimension([0, 0], [0, 0], [0, 1], 10, 1)).toBeUndefined();
         expect(angleDimension([0, 0], [1, 0], [2, 0], 10, 1)).toBeUndefined();
+    });
+});
+
+describe("diameterDimension", () => {
+    test.each([5, 30])("places label at cursor distance %s with arrows on both rims", (dx) => {
+        const geometry = diameterDimension([2, 3], 10, dx, 0, 0.1);
+        expect(geometry.textPosition).toEqual([2 + dx, 3]);
+        expect(geometry.segments[0]).toEqual([-8, 3, 2 + Math.max(10, dx), 3]);
+        expect(geometry.segments[1].slice(0, 2)).toEqual([-8, 3]);
+        expect(geometry.segments[3].slice(0, 2)).toEqual([12, 3]);
     });
 });

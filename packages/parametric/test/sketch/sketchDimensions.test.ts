@@ -785,7 +785,7 @@ test("distance dimensions accept a whole line followed by label placement", asyn
         const run = new DistanceDimensionCommand().execute(app);
         handler.pointerDown(view, pointerEvent(450, 300));
         await tick();
-        expect(editor.activePick?.kind).toBe("position");
+        expect(editor.activePick?.kind).toBe("dimension");
         handler.pointerDown(view, pointerEvent(450, 250));
         await run;
         expect(confirmDialog(dialog, "80")).toBe(true);
@@ -801,7 +801,7 @@ test("distance dimensions accept a whole line followed by label placement", asyn
     }
 });
 
-test("D on an unsized circle starts sizing it and selects the current radius", async () => {
+test("D on an unsized circle starts sizing it and selects the current diameter", async () => {
     const { app, doc, view, dialog, restorePub, restoreFactory } = setup();
     try {
         const editor = SketchEditor.enter(new SketchNode({ document: doc, plane: Plane.XY }));
@@ -811,12 +811,12 @@ test("D on an unsized circle starts sizing it and selects the current radius", a
             run = new DistanceDimensionCommand().execute(app);
         handler.pointerDown(view, pointerEvent(450, 300));
         await tick();
-        expect(editor.activePick?.kind).toBe("position");
+        expect(editor.activePick?.kind).toBe("dimension");
         handler.pointerDown(view, pointerEvent(470, 250));
         await run;
-        expect(Number(dialogInput(dialog).value)).toBe(50);
+        expect(Number(dialogInput(dialog).value)).toBe(100);
         expect(confirmDialog(dialog, "30")).toBe(true);
-        expect(editor.solver.entity(circle)?.params[2]).toBeCloseTo(30);
+        expect(editor.solver.entity(circle)?.params[2]).toBeCloseTo(15);
     } finally {
         SketchEditor.exit();
         restorePub();
@@ -850,6 +850,214 @@ test("D distinguishes a sized circle edge from its center and cancels helper geo
         expect(Math.abs(Number(dialogInput(dialog).value))).toBeCloseTo(50);
         cancelDialog(dialog);
         expect(editor.solver.toData()).toEqual(before);
+    } finally {
+        SketchEditor.exit();
+        restorePub();
+        restoreFactory();
+    }
+});
+
+// These use the actual pointer picker and solver, not a mocked choice of dimension kind.
+describe("combined Dimension tool", () => {
+    test.each([
+        { label: "horizontal", cursor: [440, 190], kind: ConstraintKind.HorizontalDistance, value: 80 },
+        { label: "vertical", cursor: [540, 270], kind: ConstraintKind.VerticalDistance, value: 60 },
+        { label: "aligned", cursor: [530, 160], kind: ConstraintKind.P2PDistance, value: 100 },
+    ])("infers $label from cursor placement and commits that preview", async ({ cursor, kind, value }) => {
+        const { app, doc, view, dialog, restorePub, restoreFactory } = setup();
+        try {
+            const editor = SketchEditor.enter(new SketchNode({ document: doc, plane: Plane.XY }));
+            editor.solver.addLine(0, 0, 80, 60);
+            editor.solve(true);
+            const handler = doc.visual.eventHandler as SketchEventHandler;
+            const preview = rs.spyOn(editor.annotations, "setDimensionPreview");
+            const run = new DistanceDimensionCommand().execute(app);
+            handler.pointerDown(view, pointerEvent(440, 270));
+            await tick();
+            handler.pointerMove(view, pointerEvent(cursor[0], cursor[1]));
+            expect(preview.mock.calls.at(-1)?.[0]?.kind).toBe(
+                kind === ConstraintKind.P2PDistance ? "distance" : "axisDistance",
+            );
+            handler.pointerDown(view, pointerEvent(cursor[0], cursor[1]));
+            await run;
+            expect(Number(dialogInput(dialog).value)).toBe(value);
+            expect(confirmDialog(dialog, String(value / 2))).toBe(true);
+            const constraint = editor.node.data.constraints[0];
+            expect(constraint.kind).toBe(kind);
+            expect(constraint.datum).toBeCloseTo(value / 2);
+            expect(editor.solve(true).result).toMatch(/^Ok/);
+        } finally {
+            SketchEditor.exit();
+            restorePub();
+            restoreFactory();
+        }
+    });
+
+    test.each([
+        { cursor: [475, 280], value: 45 },
+        { cursor: [390, 235], value: 135 },
+        { cursor: [335, 325], value: 45 },
+        { cursor: [410, 365], value: 135 },
+    ])("second line makes the angle in the chosen quadrant ($value degrees)", async ({ cursor, value }) => {
+        const { app, doc, view, dialog, restorePub, restoreFactory } = setup();
+        try {
+            const editor = SketchEditor.enter(new SketchNode({ document: doc, plane: Plane.XY }));
+            editor.solver.addLine(0, 0, 100, 0);
+            editor.solver.addLine(0, 0, 100, 100);
+            editor.solve(true);
+            const handler = doc.visual.eventHandler as SketchEventHandler;
+            const run = new DistanceDimensionCommand().execute(app);
+            handler.pointerDown(view, pointerEvent(470, 300));
+            await tick();
+            handler.pointerDown(view, pointerEvent(450, 250));
+            await tick();
+            expect(editor.activePick?.kind).toBe("position");
+            handler.pointerDown(view, pointerEvent(cursor[0], cursor[1]));
+            await run;
+            expect(Number(dialogInput(dialog).value)).toBe(value);
+            expect(confirmDialog(dialog, String(value - 5))).toBe(true);
+            const constraint = editor.node.data.constraints[0];
+            expect(constraint.kind).toBe(ConstraintKind.Angle);
+            expect((Math.abs(Number(constraint.datum)) * 180) / Math.PI).toBeCloseTo(value - 5);
+            expect(editor.solve(true).result).toMatch(/^Ok/);
+        } finally {
+            SketchEditor.exit();
+            restorePub();
+            restoreFactory();
+        }
+    });
+
+    test("second parallel line creates a separation that preserves parallelism", async () => {
+        const { app, doc, view, dialog, restorePub, restoreFactory } = setup();
+        try {
+            const editor = SketchEditor.enter(new SketchNode({ document: doc, plane: Plane.XY }));
+            const a = editor.solver.addLine(0, 0, 100, 0),
+                b = editor.solver.addLine(0, 40, 100, 40);
+            editor.solve(true);
+            const handler = doc.visual.eventHandler as SketchEventHandler;
+            const run = new DistanceDimensionCommand().execute(app);
+            handler.pointerDown(view, pointerEvent(450, 300));
+            await tick();
+            handler.pointerDown(view, pointerEvent(450, 260));
+            await tick();
+            handler.pointerDown(view, pointerEvent(520, 280));
+            await run;
+            expect(Math.abs(Number(dialogInput(dialog).value))).toBe(40);
+            const sign = Math.sign(Number(dialogInput(dialog).value));
+            expect(confirmDialog(dialog, String(sign * 60))).toBe(true);
+            const pa = editor.solver.entity(a)!.params,
+                pb = editor.solver.entity(b)!.params;
+            const cross = (pa[2] - pa[0]) * (pb[3] - pb[1]) - (pa[3] - pa[1]) * (pb[2] - pb[0]);
+            expect(cross).toBeCloseTo(0, 4);
+            expect(editor.node.data.constraints.some((c) => c.kind === ConstraintKind.P2LDistance)).toBe(
+                true,
+            );
+            expect(editor.solve(true).result).toMatch(/^Ok/);
+        } finally {
+            SketchEditor.exit();
+            restorePub();
+            restoreFactory();
+        }
+    });
+
+    test("circle diameter persists, edits in document units, accepts expressions, and cancels cleanly", async () => {
+        const { app, doc, view, dialog, restorePub, restoreFactory } = setup();
+        try {
+            setDocumentUnits(doc, { length: "in", lengthPrecision: 3, angle: "deg", anglePrecision: 1 });
+            const node = new SketchNode({ document: doc, plane: Plane.XY });
+            let editor = SketchEditor.enter(node);
+            const circle = editor.solver.addCircle(0, 0, 50.8);
+            editor.solve(true);
+            expect(editor.solver.entity(circle)!.params[2]).toBeCloseTo(50.8);
+            const handler = doc.visual.eventHandler as SketchEventHandler;
+            const run = new DistanceDimensionCommand().execute(app);
+            handler.pointerDown(view, pointerEvent(450.8, 300));
+            await tick();
+            handler.pointerDown(view, pointerEvent(475, 245));
+            await run;
+            expect(Number(dialogInput(dialog).value)).toBe(4);
+            expect(confirmDialog(dialog, "2 in + 2 in")).toBe(true);
+            expect(editor.solver.entity(circle)!.params[2]).toBeCloseTo(50.8);
+            const id = node.data.constraints[0].id;
+            editor.exit();
+            editor = SketchEditor.enter(node);
+            editor.editDatum(id);
+            expect(dialogInput(dialog).value).toBe("2 in + 2 in");
+            expect(confirmDialog(dialog, "3")).toBe(true);
+            expect(editor.solver.entity(circle)!.params[2]).toBeCloseTo(38.1);
+            editor.editDatum(id);
+            expect(Number(dialogInput(dialog).value)).toBe(3);
+            cancelDialog(dialog);
+            expect(editor.solver.entity(circle)!.params[2]).toBeCloseTo(38.1);
+            expect(editor.setDimension(id, 101.6).isOk).toBe(true);
+            expect(editor.solver.entity(circle)!.params[2]).toBeCloseTo(50.8);
+        } finally {
+            SketchEditor.exit();
+            restorePub();
+            restoreFactory();
+        }
+    });
+
+    test("clicking an arc uses radius, while clicking a circle center measures position", async () => {
+        const { app, doc, view, dialog, restorePub, restoreFactory } = setup();
+        try {
+            const editor = SketchEditor.enter(new SketchNode({ document: doc, plane: Plane.XY }));
+            const arc = editor.solver.addArc(0, 0, 50, 0, 0, 50);
+            const circle = editor.solver.addCircle(120, 0, 20);
+            editor.solve(true);
+            const handler = doc.visual.eventHandler as SketchEventHandler;
+            let run = new DistanceDimensionCommand().execute(app);
+            handler.pointerDown(view, pointerEvent(435, 265));
+            await tick();
+            handler.pointerDown(view, pointerEvent(470, 230));
+            await run;
+            expect(Number(dialogInput(dialog).value)).toBe(50);
+            expect(confirmDialog(dialog, "60")).toBe(true);
+            expect(
+                editor.node.data.constraints.find((c) => c.kind === ConstraintKind.Radius)?.refs[0].entityId,
+            ).toBe(arc);
+            run = new DistanceDimensionCommand().execute(app);
+            handler.pointerDown(view, pointerEvent(520, 300));
+            await tick();
+            handler.pointerDown(view, pointerEvent(400, 300));
+            await tick();
+            handler.pointerDown(view, pointerEvent(460, 200));
+            await run;
+            expect(Number(dialogInput(dialog).value)).toBeCloseTo(120);
+            expect(confirmDialog(dialog, "120")).toBe(true);
+            expect(editor.node.data.constraints.filter((c) => c.kind === ConstraintKind.Radius)).toHaveLength(
+                1,
+            );
+            expect(editor.solver.entity(circle)!.params[2]).toBeCloseTo(20);
+        } finally {
+            SketchEditor.exit();
+            restorePub();
+            restoreFactory();
+        }
+    });
+});
+
+test("D treats a datum axis as a reference, never a one-unit line to size", async () => {
+    const { app, doc, view, dialog, restorePub, restoreFactory } = setup();
+    try {
+        const editor = SketchEditor.enter(new SketchNode({ document: doc, plane: Plane.XY }));
+        editor.solver.addLine(20, 20, 100, 100);
+        editor.solve(true);
+        const handler = doc.visual.eventHandler as SketchEventHandler;
+        const run = new DistanceDimensionCommand().execute(app);
+        handler.pointerDown(view, pointerEvent(470, 300));
+        await tick();
+        expect(editor.activePick?.kind).toBe("pointOrEntity");
+        handler.pointerDown(view, pointerEvent(450, 250));
+        await tick();
+        handler.pointerDown(view, pointerEvent(470, 275));
+        await run;
+        expect(Number(dialogInput(dialog).value)).toBe(45);
+        expect(confirmDialog(dialog, "30")).toBe(true);
+        const dimension = editor.node.data.constraints[0];
+        expect(dimension.kind).toBe(ConstraintKind.Angle);
+        expect(dimension.refs.some((ref) => ref.entityId === SKETCH_X_AXIS_ID)).toBe(true);
+        expect((Number(dimension.datum) * 180) / Math.PI).toBeCloseTo(30);
     } finally {
         SketchEditor.exit();
         restorePub();

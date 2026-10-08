@@ -281,19 +281,7 @@ export class ContextToolbar extends HTMLElement {
                 this.family(["sketch.importDrawing", "sketch.insertImage"], "Insert sketch content"),
             );
             this.separator(row);
-            row.append(
-                this.family(
-                    [
-                        "dimension.distance",
-                        "dimension.radius",
-                        "dimension.angle",
-                        "dimension.horizontalDistance",
-                        "dimension.verticalDistance",
-                        "dimension.pointLineDistance",
-                    ],
-                    "Dimensions",
-                ),
-            );
+            row.append(this.tool("dimension.distance"));
             this.separator(row);
             row.append(
                 this.family(["constraint.coincident", "constraint.pointOn"], "Coincident tools"),

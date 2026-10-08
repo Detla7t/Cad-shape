@@ -181,3 +181,12 @@ describe("formatShortcutKey", () => {
         expect(formatShortcutKey("ctrl+m+v")).toBe("M then Ctrl+V");
     });
 });
+
+test("every navigation profile binds unmodified D to the combined Dimension tool", () => {
+    for (const [profile, map] of profileEntries()) {
+        expect(
+            shortcutsOf(map).filter(([, key]) => key.toLowerCase() === "d"),
+            profile,
+        ).toEqual([["dimension.distance", "d"]]);
+    }
+});

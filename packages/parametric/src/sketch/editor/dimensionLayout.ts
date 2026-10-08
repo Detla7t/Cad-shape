@@ -47,7 +47,6 @@ const ARROW_HALF_ANGLE = (20 * Math.PI) / 180;
 const EXTENSION_GAP_PX = 3;
 const EXTENSION_OVERSHOOT_PX = 4;
 const MIN_OFFSET_PX = 14;
-const RADIUS_LABEL_MARGIN_PX = 20;
 const MIN_ANGLE_RADIUS_PX = 24;
 const ANGLE_LABEL_MARGIN_PX = 14;
 
@@ -109,13 +108,31 @@ export function radiusDimension(
 ): DimensionGeometry {
     const length = Math.hypot(dx, dy);
     const dir: Vec2 = length < 1e-9 ? [Math.SQRT1_2, Math.SQRT1_2] : [dx / length, dy / length];
-    // respect the chosen label position; only push it out when placed inside the circle
-    const labelDistance = length < radius ? radius + RADIUS_LABEL_MARGIN_PX * px : length;
-    const label: Vec2 = [center[0] + dir[0] * labelDistance, center[1] + dir[1] * labelDistance];
+    const label: Vec2 = [center[0] + dx, center[1] + dy];
     const rim: Vec2 = [center[0] + dir[0] * radius, center[1] + dir[1] * radius];
 
     return {
-        segments: [[center[0], center[1], label[0], label[1]], ...arrowhead(rim, dir, px)],
+        segments: [[center[0], center[1], ...(length < radius ? rim : label)], ...arrowhead(rim, dir, px)],
+        textPosition: label,
+    };
+}
+
+/** Diameter spans both rims; the label can be placed inside or outside the circle. */
+export function diameterDimension(
+    center: Vec2,
+    radius: number,
+    dx: number,
+    dy: number,
+    px: number,
+): DimensionGeometry {
+    const length = Math.hypot(dx, dy);
+    const dir: Vec2 = length < 1e-9 ? [Math.SQRT1_2, Math.SQRT1_2] : [dx / length, dy / length];
+    const a = addDir(center, dir, -radius),
+        b = addDir(center, dir, radius);
+    const label: Vec2 = [center[0] + dx, center[1] + dy];
+    const end = length > radius ? label : b;
+    return {
+        segments: [[...a, ...end], ...arrowhead(a, [-dir[0], -dir[1]], px), ...arrowhead(b, dir, px)],
         textPosition: label,
     };
 }

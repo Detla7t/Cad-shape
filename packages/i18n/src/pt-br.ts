@@ -172,7 +172,7 @@ export default {
         "command.constraint.vertical": "Vertical",
         "command.constraint.verticalAlign": "Alinhar Verticalmente",
         "command.dimension.angle": "Ângulo",
-        "command.dimension.distance": "Distância",
+        "command.dimension.distance": "Dimensão",
         "command.dimension.horizontalDistance": "Distância Horizontal",
         "command.dimension.pointLineDistance": "Distância Ponto-Linha",
         "command.dimension.radius": "Raio",
@@ -215,6 +215,8 @@ export default {
         "command.sketch.rectangle": "Retângulo",
         "command.sketch.toggleExternal": "Alternar Função Externa",
         "dialog.title.enterValue": "Insira o valor",
+        "prompt.pickDimensionOrEntity":
+            "Selecione outra entidade ou clique no espaço vazio para posicionar a dimensão, ESC para cancelar",
         "prompt.pickDimensionPosition": "escolha a posição da dimensão, ESC para cancelar",
         "prompt.pickExternalRef":
             "escolha uma referência externa (roxa) para alternar sua função, ESC para concluir",

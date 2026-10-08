@@ -26,6 +26,8 @@ import { type DragSnap, SKETCH_SNAP_PIXELS } from "../autoConstraints";
 import {
     ConstraintKind,
     datumUnitSpec,
+    dimensionDisplaySource,
+    dimensionInputSource,
     isExternalEntityId,
     type SketchData,
     type SketchEntityType,
@@ -68,7 +70,7 @@ import { SketchPanel } from "./sketchPanel";
  * `sketchAnnotations.ts` (constraint badges and dimension graphics).
  */
 
-export type SketchPickKind = "point" | "entity" | "position" | "pointOrEntity";
+export type SketchPickKind = "point" | "entity" | "position" | "pointOrEntity" | "dimension";
 export type SketchPickTarget = { kind: "point"; ref: SketchPointRef } | { kind: "entity"; entityId: number };
 
 /** Entity type filter for picks: a single type or a set of acceptable types. */
@@ -601,6 +603,25 @@ export class SketchEditor implements IDisposable {
         return this.startPick("pointOrEntity", prompt, undefined, true, undefined, controller, exclude);
     }
 
+    /** A second entity changes the measurement; blank space places the single-entity dimension. */
+    pickDimensionTarget(
+        preview: SketchPickPreview,
+        controller: AsyncController,
+        exclude: SketchPickTarget,
+    ): Promise<SketchPickTarget | { kind: "position"; position: [number, number] } | undefined> {
+        if (this.preselected.length)
+            return this.pickPointOrEntity("prompt.pickSketchPointOrEntity", controller, exclude);
+        return this.startPick(
+            "dimension",
+            "prompt.pickDimensionOrEntity",
+            undefined,
+            true,
+            preview,
+            controller,
+            exclude,
+        );
+    }
+
     pickEntity(
         prompt: I18nKeys,
         type?: SketchEntityTypeFilter,
@@ -656,14 +677,18 @@ export class SketchEditor implements IDisposable {
 
         this.lastPickPosition = this.eventHandler.pointerToUV(view, event);
         let value: unknown;
-        if (request.kind === "pointOrEntity") {
+        if (request.kind === "pointOrEntity" || request.kind === "dimension") {
             const ref = this.eventHandler.hitTestPoint(view, event, request.exclude);
             const entityId = ref ? undefined : this.eventHandler.hitTestEntity(view, event, undefined, true);
             value = ref
                 ? { kind: "point", ref }
                 : entityId !== undefined
                   ? { kind: "entity", entityId }
-                  : undefined;
+                  : request.kind === "dimension" && this.lastPickPosition
+                    ? { kind: "position", position: this.lastPickPosition }
+                    : undefined;
+            if (request.exclude?.kind === "entity" && entityId === request.exclude.entityId)
+                value = undefined;
         } else if (request.kind === "point") {
             value = this.eventHandler.hitTestPoint(view, event, request.exclude);
         } else if (request.kind === "entity") {
@@ -673,7 +698,11 @@ export class SketchEditor implements IDisposable {
         }
 
         if (value !== undefined) {
-            if (request.kind === "pointOrEntity") this.rememberPick(value as SketchPickTarget);
+            if (
+                request.kind === "pointOrEntity" ||
+                (request.kind === "dimension" && (value as { kind: string }).kind !== "position")
+            )
+                this.rememberPick(value as SketchPickTarget);
             if (request.kind === "point") this.rememberPick({ kind: "point", ref: value as SketchPointRef });
             if (request.kind === "entity") this.rememberPick({ kind: "entity", entityId: value as number });
             this.pickRequest = undefined;
@@ -795,7 +824,7 @@ export class SketchEditor implements IDisposable {
         apply: (value: ParameterValue) => void,
         unit: UnitSpec,
         onCancel?: () => void,
-        options?: { positiveOnly?: boolean; constraintId?: number },
+        options?: { positiveOnly?: boolean; constraintId?: number; onAccepted?: () => void },
     ): void {
         this.closeDatum?.();
         const before = this.solver.toData();
@@ -844,7 +873,10 @@ export class SketchEditor implements IDisposable {
     /** Applies an inline table edit through the same solve/rollback path as a dimension edit. */
     setDimension(id: number, value: ParameterValue): Result<void> {
         const before = this.solver.toData();
-        const result = this.solver.setDatumSource(id, value);
+        const result = this.solver.setDatumSource(
+            id,
+            dimensionInputSource(value, this.dimensionAnchors.get(id)),
+        );
         if (!result.isOk) return result;
         return this.applyDatum(before);
     }
@@ -872,13 +904,15 @@ export class SketchEditor implements IDisposable {
             constraint.kind === ConstraintKind.HorizontalDistance ||
             constraint.kind === ConstraintKind.VerticalDistance;
         // An expression reopens as written; a literal as its display value (the dialog's units).
-        const initial =
-            typeof constraint.datum === "number"
-                ? toDisplayDatum(constraint.kind, constraint.datum)
-                : constraint.datum;
+        const source = dimensionDisplaySource(constraint.datum, this.dimensionAnchors.get(constraintId));
+        const initial = typeof source === "number" ? toDisplayDatum(constraint.kind, source) : source;
         this.promptDatum(
             initial,
-            (value) => this.solver.setDatumSource(constraintId, value),
+            (value) =>
+                this.solver.setDatumSource(
+                    constraintId,
+                    dimensionInputSource(value, this.dimensionAnchors.get(constraintId)),
+                ),
             unit,
             undefined,
             { positiveOnly: !signed, constraintId },

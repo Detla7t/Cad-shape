@@ -927,6 +927,7 @@ export const I18N_KEYS = [
     "prompt.pickArcHeight",
     "prompt.pickArcMid",
     "prompt.pickCircleCenter",
+    "prompt.pickDimensionOrEntity",
     "prompt.pickDimensionPosition",
     "prompt.pickExternalRef",
     "prompt.pickFistPoint",

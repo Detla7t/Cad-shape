@@ -402,8 +402,9 @@ export class SketchEventHandler implements IEventHandler {
             consider(entity.id, entityDistance(uv, entity));
         }
         // datum axes are infinite lines, pickable only when the pick opts in;
-        // checked last so real geometry wins ties (e.g. a line lying on an axis)
-        if (datum && (types === undefined || types.includes("line"))) {
+        // Real geometry within the pick aperture wins over reference axes.
+        // Otherwise a circle picked near an axis becomes a dimension of the unit axis.
+        if (best === undefined && datum && (types === undefined || types.includes("line"))) {
             consider(SKETCH_X_AXIS_ID, Math.abs(uv[1]));
             consider(SKETCH_Y_AXIS_ID, Math.abs(uv[0]));
         }
@@ -924,7 +925,12 @@ export class SketchEventHandler implements IEventHandler {
         }
         const pick = this.editor.activePick;
 
-        if (pick === undefined || pick.kind === "point" || pick.kind === "pointOrEntity") {
+        if (
+            pick === undefined ||
+            pick.kind === "point" ||
+            pick.kind === "pointOrEntity" ||
+            pick.kind === "dimension"
+        ) {
             const ref = this.hitTestPoint(view, event);
             if (ref !== undefined) {
                 const [u, v] = this.editor.solver.pointOf(ref);
@@ -939,7 +945,12 @@ export class SketchEventHandler implements IEventHandler {
             }
         }
 
-        if (pick === undefined || pick.kind === "entity" || pick.kind === "pointOrEntity") {
+        if (
+            pick === undefined ||
+            pick.kind === "entity" ||
+            pick.kind === "pointOrEntity" ||
+            pick.kind === "dimension"
+        ) {
             const entityId = this.hitTestEntity(view, event, pick?.entityType, pick?.datum ?? false);
             if (entityId !== undefined && isDatumEntityId(entityId)) {
                 return {

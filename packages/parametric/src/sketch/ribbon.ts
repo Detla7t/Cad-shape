@@ -76,14 +76,7 @@ export const SketchRibbonProfiles: RibbonProfileExtra[] = [
             },
             {
                 groupName: "ribbon.group.dimension",
-                items: [
-                    "dimension.distance",
-                    "dimension.radius",
-                    "dimension.pointLineDistance",
-                    "dimension.angle",
-                    "dimension.horizontalDistance",
-                    "dimension.verticalDistance",
-                ],
+                items: ["dimension.distance"],
             },
             {
                 groupName: "ribbon.group.other",
