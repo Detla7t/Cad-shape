@@ -31,7 +31,9 @@ function setup() {
     const selection = createMockDocument().selection;
     selection.getSelectedNodes = () => selected;
     selection.setSelectedNodes = (nodes, toggle) => {
-        selected = toggle ? [...selected, ...nodes.filter((n) => !selected.includes(n))] : nodes;
+        selected = toggle
+            ? [...selected.filter((n) => !nodes.includes(n)), ...nodes.filter((n) => !selected.includes(n))]
+            : nodes;
         selection.onNodeChanged.emit(selected);
         return selected.length;
     };
@@ -130,6 +132,9 @@ test("Parts selection, visibility and context actions address the original node"
         expect(rows).toHaveLength(2);
         rows[0].click();
         expect(doc.selection.getSelectedNodes()).toEqual([a]);
+        rows[0].click();
+        expect(doc.selection.getSelectedNodes()).toEqual([]);
+        rows[0].click();
         rows[1].dispatchEvent(new MouseEvent("click", { bubbles: true, shiftKey: true }));
         expect(doc.selection.getSelectedNodes()).toEqual([a, b]);
         doc.selection.setSelectedNodes([b], false);

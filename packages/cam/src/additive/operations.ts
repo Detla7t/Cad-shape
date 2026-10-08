@@ -298,6 +298,7 @@ export const prusaSlicerOperation: CamOperationHandler = {
                 typeof operation.params["bridgeUrl"] === "string" ? operation.params["bridgeUrl"] : undefined,
             arrange: operation.params["arrange"] === true,
             label: operation.name,
+            signal: context.signal,
         });
     },
 };

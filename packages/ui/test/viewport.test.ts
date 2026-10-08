@@ -182,4 +182,29 @@ describe("Viewport right-drag arbitration", () => {
         send("pointermove", 90, 40);
         expect(eventHandler.pointerMove).toHaveBeenCalledTimes(1);
     });
+
+    test("left-button selection keeps receiving a drag and release beyond the viewport", () => {
+        const { viewport, eventHandler } = setup();
+        const send = (type: string, x: number) =>
+            viewport.dispatchEvent(
+                new PointerEvent(type, {
+                    bubbles: true,
+                    isPrimary: true,
+                    pointerId: 2,
+                    pointerType: "mouse",
+                    button: 0,
+                    buttons: type === "pointerup" ? 0 : 1,
+                    clientX: x,
+                    clientY: 30,
+                }),
+            );
+        send("pointerdown", 100);
+        send("pointerout", -20);
+        send("pointermove", -20);
+        expect(eventHandler.pointerOut).not.toHaveBeenCalled();
+        send("pointerup", -20);
+        expect(eventHandler.pointerUp).toHaveBeenCalledTimes(1);
+        send("pointerout", -30);
+        expect(eventHandler.pointerOut).toHaveBeenCalledTimes(1);
+    });
 });

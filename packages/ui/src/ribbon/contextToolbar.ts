@@ -290,7 +290,7 @@ export class ContextToolbar extends HTMLElement {
             row.append(
                 this.tool("sketch.normal"),
                 this.family(
-                    ["sketch.projectEdges", "sketch.toggleExternal", "sketch.export"],
+                    ["sketch.projectEdges", "sketch.toggleExternal", "sketch.export", "feature.variable"],
                     "Sketch utilities",
                     false,
                 ),

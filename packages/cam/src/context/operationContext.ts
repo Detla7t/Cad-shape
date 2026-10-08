@@ -8,7 +8,7 @@ import type { CamLoop, CamOperationContext } from "../model/operation";
 import type { CamOperationData, GeometrySelection } from "../model/setup";
 import { flatPatternLoops, sketchLoops } from "./loopSources";
 import { DEFAULT_LOOP_TOLERANCE } from "./loops";
-import { findShapeNode, type SetupGeometry } from "./setupGeometry";
+import { findShapeNode, type SetupGeometry, shapeInputError } from "./setupGeometry";
 import { operationTool } from "./tools";
 
 /**
@@ -25,9 +25,11 @@ function subShapeIndexes(
     node: ShapeNode,
     pick: Extract<GeometrySelection, { kind: "face" | "edge" }>,
 ): number[] {
-    if (pick.id !== undefined && isBodyTrackingNode(node)) {
-        const indexes = pick.kind === "face" ? node.faceIndexesOfId(pick.id) : node.edgeIndexesOfId(pick.id);
-        if (indexes.length > 0) return indexes;
+    if (pick.id !== undefined) {
+        // A lost tracked reference must not silently select a different face/edge
+        // that happens to occupy the old index after a topology change.
+        if (!isBodyTrackingNode(node)) return [];
+        return pick.kind === "face" ? node.faceIndexesOfId(pick.id) : node.edgeIndexesOfId(pick.id);
     }
     return pick.index === undefined ? [] : [pick.index];
 }
@@ -76,11 +78,15 @@ export function resolveLoops(
         if (pick.kind === "sketch") {
             if (!(node instanceof SketchNode))
                 throw new Error("The picked sketch is no longer in the document");
+            const error = shapeInputError(node);
+            if (error !== undefined) throw new Error(error);
             loops.push(...sketchLoops(node, geometry.modelToWcs, tolerance));
             continue;
         }
         if (!(node instanceof ParametricBodyNode))
             throw new Error("The picked sheet metal part is no longer in the document");
+        const error = shapeInputError(node);
+        if (error !== undefined) throw new Error(error);
         const flat = flatPatternLoops(node, geometry.modelToWcs, tolerance);
         if (!flat.isOk) throw new Error(flat.error);
         loops.push(...flat.value);
@@ -98,6 +104,7 @@ export function createOperationContext(
     machine: MachineProfileData,
     operation: CamOperationData,
     tolerance = DEFAULT_LOOP_TOLERANCE,
+    signal?: AbortSignal,
 ): CamOperationContext {
     let faces: IFace[] | undefined;
     let edges: IEdge[] | undefined;
@@ -105,12 +112,13 @@ export function createOperationContext(
     const setup = geometry.setup;
     return {
         document: geometry.document,
+        signal,
         setup,
         machine,
         tool: operationTool(setup, machine, operation),
         parts: geometry.parts,
         stock: geometry.stock,
-        partMesh: () => geometry.partMesh(),
+        partMesh: (linearDeflection) => geometry.partMesh(linearDeflection),
         selectedFaces: () => {
             faces ??= resolveSubShapes(geometry, operation.selection, "face") as IFace[];
             return faces;

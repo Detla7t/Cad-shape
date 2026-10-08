@@ -164,7 +164,7 @@ export async function generateWaterline(
     if (!setupResult.isOk) return Result.err(setupResult.error);
     const setup = setupResult.value;
     const params = operation.params;
-    const yielder = new Yielder();
+    const yielder = new Yielder(15, context.signal);
     const spacing = Math.max(num(params, "sampling", gridSpacing(setup.cutter.radius)), 0.01);
     const field = await HeightField.build(setup.drop, unbounded(), spacing, yielder);
     const levels = await waterlineLevels(field, setup, params, context, yielder);

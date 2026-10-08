@@ -12,7 +12,7 @@ import {
     isNodeWarning,
     Transaction,
 } from "@chili3d/core";
-import { label, setSVGIcon, span, svg } from "@chili3d/element";
+import { createCadIcon, label, setSVGIcon, span, svg } from "@chili3d/element";
 import style from "./treeItem.module.css";
 
 export abstract class TreeItem extends HTMLElement {
@@ -119,6 +119,18 @@ export abstract class TreeItem extends HTMLElement {
      */
     protected createTypeIcon(): SVGSVGElement | undefined {
         if (!isNodeIcon(this.node)) return undefined;
+        const mapped: Record<string, string> = {
+            "icon-setWorkingPlane": "plane",
+            "icon-sketchEdit": "sketch",
+            "icon-box": "part",
+            "icon-tag": "variable",
+            "icon-folder": "folder",
+        };
+        if (mapped[this.node.icon]) {
+            const icon = createCadIcon(mapped[this.node.icon]) as SVGSVGElement;
+            icon.classList.add(style.typeIcon);
+            return icon;
+        }
         return svg({ className: style.typeIcon, icon: this.node.icon });
     }
 

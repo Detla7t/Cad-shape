@@ -109,7 +109,7 @@ export class SketchEventHandler implements IEventHandler {
     private hoverMeshId?: number;
     private hoverKey?: string;
     private readonly selectedEntities = new Set<number>();
-    private boxSelection?: { x: number; y: number; element: HTMLDivElement; additive: boolean };
+    private boxSelection?: { x: number; y: number; element: HTMLDivElement };
     private selectionMeshId?: number;
     private constraintMeshId?: number;
     private datumDisplayId?: number;
@@ -528,7 +528,6 @@ export class SketchEventHandler implements IEventHandler {
                 x: event.offsetX,
                 y: event.offsetY,
                 element,
-                additive: event.shiftKey || event.ctrlKey || event.metaKey,
             };
             return;
         }
@@ -562,6 +561,14 @@ export class SketchEventHandler implements IEventHandler {
             this.selectedEntities.add(entityId);
         }
         this.updateSelectionHighlight(view);
+    }
+
+    pointerOut(view: IView, event: PointerEvent): void {
+        this.clearHover(view);
+        if (event.type === "pointercancel" || event.type === "lostpointercapture") {
+            this.boxSelection?.element.remove();
+            this.boxSelection = undefined;
+        }
     }
 
     pointerUp(view: IView, event: PointerEvent): void {
@@ -679,6 +686,11 @@ export class SketchEventHandler implements IEventHandler {
 
     /** Escape peels off one layer at a time: label placement, pick, constraint selection, entity selection, session. */
     private handleEscape(view: IView): void {
+        if (this.boxSelection) {
+            this.boxSelection.element.remove();
+            this.boxSelection = undefined;
+            return;
+        }
         if (this.draggingRef || this.entityDrag) {
             this.draggingRef = undefined;
             this.entityDrag = undefined;

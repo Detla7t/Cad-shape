@@ -167,7 +167,10 @@ export class DocumentVersionControl {
         try {
             archive = await options.persistence?.load(document.id);
         } catch (error) {
-            Logger.warn(`version history of ${document.name} could not be read; starting a new one`, error);
+            // Starting an empty repository here would overwrite recoverable history
+            // on the next save. Leave attachment retryable and preserve stored data.
+            DocumentVersionControl.registry.delete(document);
+            throw error;
         }
         if (control.disposed) return control;
         control.start(archive, "Synchronized with the saved document");
@@ -935,15 +938,15 @@ export class DocumentVersionControl {
     async persist(persistence = this.options.persistence): Promise<void> {
         if (persistence === undefined) return;
         this.flush();
+        const refs = this.repository.refs();
+        const records = this.reachableRecords();
         const unsaved = this.store.takeUnsaved();
         const added = unsaved.flatMap((hash) => {
             const record = this.store.record(hash);
             return record === undefined ? [] : [[hash, record] as const];
         });
         try {
-            await persistence.save(this.document.id, this.repository.refs(), added, () =>
-                this.reachableRecords(),
-            );
+            await persistence.save(this.document.id, refs, added, () => records);
         } catch (error) {
             this.store.restoreUnsaved(unsaved);
             throw error;

@@ -54,7 +54,12 @@ export function activeInputControl(
     };
     return input({
         className,
-        title: item.name,
+        title:
+            (item.min !== undefined || item.max !== undefined) &&
+            configurationVisible(item.rangeVisibility, content.inputs, content.active)
+                ? `${item.name} · Range: ${item.min ?? "−∞"} – ${item.max ?? "∞"}`
+                : item.name,
+        ariaLabel: item.name,
         value: String(current ?? ""),
         spellcheck: false,
         onblur: (e: FocusEvent) => commit(e.target as HTMLInputElement),

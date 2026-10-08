@@ -23,6 +23,21 @@ const SHAPE_UNDEFINED = "Shape not initialized";
 
 export abstract class ShapeNode extends GeometryNode {
     protected _shape: Result<IShape> = Result.err(SHAPE_UNDEFINED);
+    private _evaluationError: string | undefined;
+
+    /**
+     * Failure of the latest rebuild, even while `shape` retains the last good geometry.
+     * Derived state: consumers must check this before using geometry for manufacturing.
+     */
+    get evaluationError(): string | undefined {
+        return this._evaluationError ?? (this._shape.isOk ? undefined : this._shape.error);
+    }
+
+    protected setEvaluationError(error: string | undefined): void {
+        const previous = this.evaluationError;
+        this._evaluationError = error;
+        if (this.evaluationError !== previous) this.emitPropertyChanged("evaluationError", previous);
+    }
     get shape(): Result<IShape> {
         return this._shape;
     }
@@ -50,16 +65,19 @@ export abstract class ShapeNode extends GeometryNode {
 
     protected setShape(shape: Result<IShape>) {
         if (this._shape.isOk && shape.isOk && this._shape.value.isEqual(shape.value)) {
+            this.setEvaluationError(undefined);
             return;
         }
 
         if (!shape.isOk) {
+            this.setEvaluationError(shape.error);
             PubSub.default.pub("displayError", shape.error);
             return;
         }
 
         this._mesh = undefined;
         this.setProperty("shape", shape);
+        this.setEvaluationError(undefined);
     }
 
     protected override createMesh(): IShapeMeshData {
@@ -189,6 +207,7 @@ export abstract class ParameterShapeNode extends ShapeNode {
     override get shape(): Result<IShape> {
         if (!this._shape.isOk) {
             this._shape = this.generateShape();
+            this.setEvaluationError(this._shape.isOk ? undefined : this._shape.error);
         }
         return this._shape;
     }

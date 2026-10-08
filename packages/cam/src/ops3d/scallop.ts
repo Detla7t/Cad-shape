@@ -140,7 +140,7 @@ export async function generateScallop(
     const setup = setupResult.value;
     const params = operation.params;
     const { cutter, tolerance } = setup;
-    const yielder = new Yielder();
+    const yielder = new Yielder(15, context.signal);
     const boundary = await containmentRegion(params, context, setup, undefined, yielder);
     if (boundary.length === 0) return Result.err("The machining boundary is empty");
     const stepover =

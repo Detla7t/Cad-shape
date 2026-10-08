@@ -169,7 +169,8 @@ export class PartsList extends HTMLElement {
                 to = nodes.indexOf(node);
             selected = nodes.slice(Math.min(from, to), Math.max(from, to) + 1);
         }
-        this.model?.selection.setSelectedNodes(selected, event.ctrlKey || event.metaKey);
+        const alreadySelected = !event.shiftKey && this.model?.selection.getSelectedNodes().includes(node);
+        this.model?.selection.setSelectedNodes(selected, event.ctrlKey || event.metaKey || !!alreadySelected);
         this.anchor = node;
     }
 

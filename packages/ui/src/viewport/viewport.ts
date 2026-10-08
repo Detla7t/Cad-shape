@@ -265,6 +265,8 @@ export class Viewport extends HTMLElement {
     }
 
     connectedCallback() {
+        this.addEventListener("pointerdown", this.activate, true);
+        this.addEventListener("wheel", this.activate, true);
         this.initEvent();
         this.appendChild(this._flyout);
         this.view.document.acts.onCollectionChanged(this.onActCollectionChanged);
@@ -272,6 +274,8 @@ export class Viewport extends HTMLElement {
     }
 
     disconnectedCallback() {
+        this.removeEventListener("pointerdown", this.activate, true);
+        this.removeEventListener("wheel", this.activate, true);
         this.removeEvents();
         this._flyout.remove();
         this.view.document.acts.removeCollectionChanged(this.onActCollectionChanged);
@@ -281,7 +285,13 @@ export class Viewport extends HTMLElement {
         this.removeEvents();
     }
 
+    private readonly activate = () => {
+        if (this.view.document.application.activeView !== this.view)
+            this.view.document.application.activeView = this.view;
+    };
+
     private rightGesture?: { down: PointerEvent; moved: boolean };
+    private selectionPointer?: number;
 
     private initEvent() {
         const events: [keyof HTMLElementEventMap, (e: any) => any][] = [
@@ -310,6 +320,7 @@ export class Viewport extends HTMLElement {
 
     private removeEvents() {
         if (this.rightGesture) this.pointerCancel(this.rightGesture.down);
+        this.selectionPointer = undefined;
         this._eventCaches.forEach((x) => {
             this.removeEventListener(x[0], x[1]);
         });
@@ -364,6 +375,14 @@ export class Viewport extends HTMLElement {
                 this.view.document.visual.viewHandler.pointerDown(this.view, event);
             return;
         }
+        if (event.button === 0 && event.isPrimary) {
+            this.selectionPointer = event.pointerId;
+            try {
+                this.setPointerCapture?.(event.pointerId);
+            } catch {
+                /* Synthetic pointers have no capture. */
+            }
+        }
         this.handleEvent("pointerDown", event);
     };
 
@@ -381,9 +400,18 @@ export class Viewport extends HTMLElement {
             return;
         }
         this.handleEvent("pointerUp", event);
+        if (this.selectionPointer === event.pointerId) {
+            this.selectionPointer = undefined;
+            if (this.hasPointerCapture?.(event.pointerId)) this.releasePointerCapture(event.pointerId);
+        }
     };
 
     private readonly pointerCancel = (event: PointerEvent) => {
+        if (this.selectionPointer === event.pointerId) {
+            this.selectionPointer = undefined;
+            this.handleEvent("pointerOut", event);
+            if (this.hasPointerCapture?.(event.pointerId)) this.releasePointerCapture(event.pointerId);
+        }
         if (!this.rightGesture) return;
         this.rightGesture = undefined;
         this.view.document.visual.viewHandler.pointerUp(this.view, event);
@@ -391,7 +419,7 @@ export class Viewport extends HTMLElement {
     };
 
     private readonly pointerOut = (event: PointerEvent) => {
-        if (this.rightGesture) return;
+        if (this.rightGesture || this.selectionPointer !== undefined) return;
         this.handleEvent("pointerOut", event);
     };
 

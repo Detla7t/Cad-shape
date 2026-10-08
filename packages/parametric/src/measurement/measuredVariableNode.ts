@@ -10,9 +10,11 @@ import {
     type IVariableFeatureNode,
     Node,
     Result,
+    resolveUnitSpec,
     selectConfiguredBoolean,
     serializable,
     serialize,
+    UNITLESS,
     type VariableData,
 } from "@chili3d/core";
 import { syncNodeWatches } from "../nodeWatch";
@@ -114,7 +116,11 @@ export class MeasuredVariableNode extends Node implements INodeIcon, INodeScenel
                 this.sourceChanged,
             );
             const scope = this.document.variables.scope;
-            const suppression = selectConfiguredBoolean(data.suppression ?? false, scope);
+            let suppression = selectConfiguredBoolean(data.suppression ?? false, scope);
+            if (!suppression.isOk && typeof data.suppression === "string") {
+                const value = resolveUnitSpec(data.suppression, scope, UNITLESS);
+                if (value.isOk) suppression = Result.ok(value.value !== 0);
+            }
             this.suppressed = suppression.isOk && suppression.value;
             this.measured = !suppression.isOk
                 ? Result.err(suppression.error)

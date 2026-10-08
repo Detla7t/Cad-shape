@@ -104,9 +104,10 @@ export function tiltedContext(context: CamOperationContext, frame: Mat3, origin:
         },
     };
     let parts: readonly IShape[] | undefined;
-    let mesh: CamMesh | undefined;
+    const meshes = new Map<number | undefined, CamMesh>();
     return {
         document: context.document,
+        signal: context.signal,
         setup,
         machine: context.machine,
         tool: context.tool,
@@ -115,9 +116,10 @@ export function tiltedContext(context: CamOperationContext, frame: Mat3, origin:
             return parts;
         },
         stock: { min, max },
-        partMesh() {
+        partMesh(linearDeflection) {
+            let mesh = meshes.get(linearDeflection);
             if (mesh === undefined) {
-                const source = context.partMesh();
+                const source = context.partMesh(linearDeflection);
                 const positions = new Float32Array(source.positions.length);
                 for (let i = 0; i < positions.length; i += 3) {
                     positions.set(
@@ -126,6 +128,7 @@ export function tiltedContext(context: CamOperationContext, frame: Mat3, origin:
                     );
                 }
                 mesh = { positions, indices: source.indices };
+                meshes.set(linearDeflection, mesh);
             }
             return mesh;
         },

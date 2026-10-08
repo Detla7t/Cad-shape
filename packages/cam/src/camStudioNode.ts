@@ -37,6 +37,20 @@ export interface CamStudioNodeOptions {
  */
 @serializable()
 export class CamStudioNode extends Node implements INodeIcon, INodeSceneless {
+    private readonly disposalListeners = new Set<() => void>();
+
+    /** Runtime services share the studio's lifetime, independently of its open views. */
+    onDispose(listener: () => void): () => void {
+        this.disposalListeners.add(listener);
+        return () => this.disposalListeners.delete(listener);
+    }
+
+    override disposeInternal(): void {
+        for (const listener of [...this.disposalListeners]) listener();
+        this.disposalListeners.clear();
+        super.disposeInternal();
+    }
+
     get icon(): string {
         return "icon-cog";
     }

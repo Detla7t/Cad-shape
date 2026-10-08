@@ -2,7 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import { Constants } from "../constants";
-import type { IStorage } from "../foundation/storage";
+import { type IStorage, type StorageOperation, writeStorageBatch } from "../foundation/storage";
 import { MemoryObjectStore, type StoredRecord } from "./objectStore";
 import type { ObjectHash } from "./objects";
 import type { RefsData } from "./repository";
@@ -59,17 +59,26 @@ export class StorageHistoryPersistence implements IHistoryPersistence {
         private readonly storage: IStorage,
         private readonly database = Constants.DBName,
         private readonly table = Constants.HistoryTable,
+        private readonly additionalWrites: readonly StorageOperation[] = [],
     ) {}
 
     async load(documentId: string): Promise<HistoryArchive | undefined> {
         const manifest = (await this.storage.get(this.database, this.table, documentId)) as
             | HistoryManifest
             | undefined;
-        if (manifest?.format !== HISTORY_FORMAT || typeof manifest.packs !== "number") return undefined;
+        if (manifest === undefined) return undefined;
+        if (
+            manifest.format !== HISTORY_FORMAT ||
+            manifest.version !== HISTORY_FORMAT_VERSION ||
+            !Number.isSafeInteger(manifest.packs) ||
+            manifest.packs < 1
+        )
+            throw new Error("The saved version history has an unsupported or invalid manifest");
         const records: (readonly [ObjectHash, StoredRecord])[] = [];
         for (let i = 0; i < manifest.packs; i++) {
             const pack = await this.storage.get(this.database, this.table, packKey(documentId, i));
-            if (Array.isArray(pack)) records.push(...(pack as [ObjectHash, StoredRecord][]));
+            if (!Array.isArray(pack)) throw new Error(`The saved version history is missing pack ${i}`);
+            records.push(...(pack as [ObjectHash, StoredRecord][]));
         }
         return { refs: manifest.refs, records };
     }
@@ -84,13 +93,19 @@ export class StorageHistoryPersistence implements IHistoryPersistence {
             | HistoryManifest
             | undefined;
         const previous = manifest?.format === HISTORY_FORMAT ? manifest.packs : 0;
+        const writes: StorageOperation[] = [];
         let packs = previous;
         if (previous === 0 || previous >= MAX_PACKS) {
             // First save, or compaction: one pack with everything reachable.
-            await this.storage.put(this.database, this.table, packKey(documentId, 0), all());
+            writes.push({ type: "put", table: this.table, id: packKey(documentId, 0), value: all() });
             packs = 1;
         } else if (added.length > 0) {
-            await this.storage.put(this.database, this.table, packKey(documentId, packs), [...added]);
+            writes.push({
+                type: "put",
+                table: this.table,
+                id: packKey(documentId, packs),
+                value: [...added],
+            });
             packs++;
         }
         const next: HistoryManifest = {
@@ -100,10 +115,13 @@ export class StorageHistoryPersistence implements IHistoryPersistence {
             packs,
             savedAt: Date.now(),
         };
-        await this.storage.put(this.database, this.table, documentId, next);
+        writes.push({ type: "put", table: this.table, id: documentId, value: next });
         for (let i = packs; i < previous; i++) {
-            await this.storage.delete(this.database, this.table, packKey(documentId, i));
+            writes.push({ type: "delete", table: this.table, id: packKey(documentId, i) });
         }
+        // On IndexedDB this includes the document snapshot and recent-file entry
+        // in the same transaction as the history packs and manifest.
+        await writeStorageBatch(this.storage, this.database, [...writes, ...this.additionalWrites]);
     }
 
     async remove(documentId: string): Promise<void> {

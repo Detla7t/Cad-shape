@@ -14,6 +14,8 @@ export interface IShape extends IDisposable {
     readonly shapeType: ShapeType;
     get id(): string;
     get mesh(): IShapeMeshData;
+    /** Borrowed mesh with an absolute linear deflection in model units, owned by the shape. */
+    tessellate?(linearDeflection: number): IShapeMeshData;
     transformed(matrix: Matrix4): IShape;
     transformedMul(matrix: Matrix4): IShape;
     edgesMeshPosition(): EdgeMeshData;

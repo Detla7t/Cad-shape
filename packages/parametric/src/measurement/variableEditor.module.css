@@ -1,0 +1,79 @@
+.root {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    padding: 9px;
+    font-size: 12px;
+}
+.root input {
+    border: 0;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--panel-background-color);
+    color: var(--foreground-color);
+    padding: 7px 4px;
+    min-width: 0;
+}
+.root button {
+    font: inherit;
+    color: inherit;
+    background: var(--panel-background-color);
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    padding: 5px;
+}
+.header {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+}
+.header strong {
+    flex: 1;
+    font-size: 13px;
+}
+.header button:first-of-type {
+    background: #15932e;
+    color: white;
+}
+.header button:disabled {
+    opacity: 0.4;
+}
+.header button:last-of-type {
+    color: #c33;
+}
+.tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border-color);
+}
+.tabs button {
+    flex: 1;
+    border: 0;
+    border-bottom: 2px solid transparent;
+}
+.tabs button[aria-pressed="true"] {
+    border-color: #1651b0;
+    color: #1651b0;
+}
+.entities {
+    background: #dceffa;
+    color: #333;
+    min-height: 35px;
+    padding: 6px;
+    border: 1px solid #81b7d5;
+}
+.entities > div {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.entities button {
+    margin-left: auto;
+    background: transparent;
+    border: 0;
+}
+.status {
+    color: var(--foreground-secondary-color);
+    font-size: 11px;
+}
+.root [hidden] {
+    display: none;
+}

@@ -62,7 +62,7 @@ export const SketchRibbonProfiles: RibbonProfileExtra[] = [
             },
             {
                 groupName: "ribbon.group.other",
-                items: ["sketch.projectEdges", "sketch.toggleExternal", "sketch.export"],
+                items: ["sketch.projectEdges", "sketch.toggleExternal", "sketch.export", "feature.variable"],
             },
         ],
     },

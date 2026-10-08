@@ -239,7 +239,9 @@ public:
         } else {
             this->lineDeflection = lineDeflection;
         }
-        BRepMesh_IncrementalMesh mesh(shape, lineDeflection, true, ANGLE_DEFLECTION, true);
+        // The absolute path is used for machining: its tolerance must not grow
+        // with edge length. The display path retains OCCT's relative meshing.
+        BRepMesh_IncrementalMesh mesh(shape, lineDeflection, useBoxRatio, ANGLE_DEFLECTION, true);
     }
 
     NumberArray edgesMeshPosition()

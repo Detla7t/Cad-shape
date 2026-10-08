@@ -1105,6 +1105,63 @@ describe("ParametricBodyNode", () => {
         expect(mocks.filletedShape.dispose).not.toHaveBeenCalled();
     });
 
+    test("replaced derived final shapes are released once and undo regenerates them", () => {
+        const body = bodyWith([extrudeFeature(sketch.id)]);
+        expect(body.shape.isOk).toBe(true);
+        const first = body.shape.value;
+        Transaction.execute(doc, "deepen", () => body.setFeatureParameter("f1", "depth", 12));
+        expect(body.shape.value).not.toBe(first);
+        expect(first.dispose).toHaveBeenCalledTimes(1);
+        const second = body.shape.value;
+        doc.history.undo();
+        expect(body.features).toEqual([extrudeFeature(sketch.id)]);
+        expect(body.shape.value).not.toBe(first);
+        expect(body.shape.value).not.toBe(second);
+        expect(second.dispose).toHaveBeenCalledTimes(1);
+        doc.history.redo();
+        expect(body.features).toEqual([extrudeFeature(sketch.id, 12)]);
+        body.dispose();
+        for (const shape of mocks.prismShapes) expect(shape.dispose).toHaveBeenCalledTimes(1);
+    });
+
+    test("appending a feature retains the previous final shape as a cached prefix", () => {
+        const body = bodyWith([extrudeFeature(sketch.id)]);
+        expect(body.shape.isOk).toBe(true);
+        const prefix = body.shape.value;
+        body.setFeaturesEmitShapeChanged([
+            ...body.features,
+            { id: "f2", type: "fillet", radius: 2, edges: [EDGE_REF] },
+        ]);
+        expect(body.shape.value).toBe(mocks.filletedShape);
+        expect(prefix.dispose).not.toHaveBeenCalled();
+        expect(body.setRollbackIndex(1)).toBe(true);
+        expect(body.shape.value).toBe(prefix);
+        expect(prefix.dispose).not.toHaveBeenCalled();
+        body.dispose();
+        expect(prefix.dispose).toHaveBeenCalledTimes(1);
+        expect(mocks.filletedShape.dispose).toHaveBeenCalledTimes(1);
+    });
+
+    test("a failed replay releases new intermediates and preserves the displayed result", () => {
+        const body = bodyWith([extrudeFeature(sketch.id)]);
+        expect(body.shape.isOk).toBe(true);
+        const previous = body.shape.value;
+        body.setFeaturesEmitShapeChanged([
+            extrudeFeature(sketch.id, 12),
+            { id: "missing", type: "extrude", sketchId: "gone", depth: 1 },
+        ]);
+        expect(body.evaluationError).toBeTruthy();
+        expect(body.shape.value).toBe(previous);
+        expect(previous.dispose).not.toHaveBeenCalled();
+        expect(mocks.prismShapes).toHaveLength(2);
+        expect(mocks.prismShapes[1].dispose).toHaveBeenCalledTimes(1);
+        body.setFeaturesEmitShapeChanged([extrudeFeature(sketch.id)]);
+        expect(body.shape.value).toBe(previous);
+        expect(body.evaluationError).toBeUndefined();
+        body.dispose();
+        expect(previous.dispose).toHaveBeenCalledTimes(1);
+    });
+
     test("a document reload resolves sketch references after the tree is attached", async () => {
         bodyWith([extrudeFeature(sketch.id, 9)]);
         const data = doc.modelManager.serialize();

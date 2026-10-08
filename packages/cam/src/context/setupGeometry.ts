@@ -26,14 +26,25 @@ export interface Box3 {
     readonly max: Vec3;
 }
 
+/** A displayed last-good shape or a temporary timeline preview is not machining input. */
+export function shapeInputError(node: ShapeNode): string | undefined {
+    const shape = node.shape;
+    if (!shape.isOk) return `"${node.name}" has no valid shape: ${shape.error}`;
+    if (node.evaluationError !== undefined)
+        return `"${node.name}" failed to rebuild: ${node.evaluationError}`;
+    if ((node as ShapeNode & { rollbackIndex?: number }).rollbackIndex !== undefined)
+        return `"${node.name}" is showing a temporary feature rollback`;
+    return undefined;
+}
+
 /** The nodes a setup machines, in its `partIds` order; an error names a missing or broken part. */
 export function setupPartNodes(document: IDocument, setup: SetupData): Result<ShapeNode[]> {
     const nodes: ShapeNode[] = [];
     for (const id of setup.partIds) {
         const node = findShapeNode(document, id);
         if (node === undefined) return Result.err(`Part ${id} is no longer in the document`);
-        if (!node.shape.isOk)
-            return Result.err(`Part "${node.name}" has no valid shape: ${node.shape.error}`);
+        const error = shapeInputError(node);
+        if (error !== undefined) return Result.err(`Part ${error}`);
         nodes.push(node);
     }
     return Result.ok(nodes);
@@ -97,10 +108,14 @@ export function stockBox(stock: StockData, parts: Box3 | undefined, stockBody?: 
 }
 
 /** Triangles of shapes, concatenated (each shape's own location applied). */
-export function shapesMesh(shapes: readonly IShape[]): CamMesh {
+export function shapesMesh(shapes: readonly IShape[], linearDeflection = 0.01): CamMesh {
+    if (!Number.isFinite(linearDeflection) || linearDeflection <= 0)
+        throw new Error("Machining mesh deflection must be a finite positive length");
     const chunks: { positions: ArrayLike<number>; indices: Uint32Array }[] = [];
     for (const shape of shapes) {
-        const faces = shape.mesh.faces;
+        if (shape.tessellate === undefined)
+            throw new Error("The shape kernel does not support machining tessellation");
+        const faces = shape.tessellate(linearDeflection).faces;
         if (faces === undefined || faces.index.length === 0) continue;
         const matrix = shape.matrix;
         const positions = isIdentity(matrix) ? faces.position : matrix.ofPoints(faces.position);
@@ -130,7 +145,7 @@ function isIdentity(matrix: Matrix4): boolean {
 export class SetupGeometry implements IDisposable {
     private readonly transformed = new Map<string, IShape>();
     private readonly owned: IShape[] = [];
-    private _mesh: CamMesh | undefined;
+    private readonly meshes = new Map<number, CamMesh>();
     private _partsBox: Box3 | undefined | null = null;
     readonly modelToWcs: Matrix4;
 
@@ -157,7 +172,8 @@ export class SetupGeometry implements IDisposable {
     shapeInWcs(node: ShapeNode): IShape | undefined {
         const cached = this.transformed.get(node.id);
         if (cached !== undefined) return cached;
-        if (!node.shape.isOk) return undefined;
+        const error = shapeInputError(node);
+        if (error !== undefined) throw new Error(error);
         const shape = node.shape.value.transformedMul(node.worldTransform().multiply(this.modelToWcs));
         this.transformed.set(node.id, shape);
         this.owned.push(shape);
@@ -180,15 +196,21 @@ export class SetupGeometry implements IDisposable {
         let body: Box3 | undefined;
         if (stock.kind === "body") {
             const node = findShapeNode(this.document, stock.nodeId);
-            const shape = node === undefined ? undefined : this.shapeInWcs(node);
-            body = shape === undefined ? undefined : shapesBox([shape]);
+            if (node === undefined) throw new Error(`Stock ${stock.nodeId} is no longer in the document`);
+            const shape = this.shapeInWcs(node);
+            if (shape === undefined) throw new Error(`Stock "${node.name}" has no valid shape`);
+            body = shapesBox([shape]);
         }
         return stockBox(stock, this.partsBox, body);
     }
 
-    partMesh(): CamMesh {
-        this._mesh ??= shapesMesh(this.parts);
-        return this._mesh;
+    partMesh(linearDeflection = 0.01): CamMesh {
+        let mesh = this.meshes.get(linearDeflection);
+        if (mesh === undefined) {
+            mesh = shapesMesh(this.parts, linearDeflection);
+            this.meshes.set(linearDeflection, mesh);
+        }
+        return mesh;
     }
 
     dispose(): void {
@@ -201,6 +223,6 @@ export class SetupGeometry implements IDisposable {
         }
         this.owned.length = 0;
         this.transformed.clear();
-        this._mesh = undefined;
+        this.meshes.clear();
     }
 }

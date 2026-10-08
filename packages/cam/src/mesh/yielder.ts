@@ -10,14 +10,22 @@ export class Yielder {
     private last = now();
     yields = 0;
 
-    constructor(readonly budgetMs = 15) {}
+    constructor(
+        readonly budgetMs = 15,
+        private readonly signal?: AbortSignal,
+    ) {}
 
     tick(): Promise<void> | undefined {
+        this.signal?.throwIfAborted();
         const time = now();
         if (time - this.last < this.budgetMs) return undefined;
         this.yields++;
-        return new Promise((resolve) =>
+        return new Promise((resolve, reject) =>
             setTimeout(() => {
+                if (this.signal?.aborted) {
+                    reject(this.signal.reason);
+                    return;
+                }
                 this.last = now();
                 resolve();
             }, 0),

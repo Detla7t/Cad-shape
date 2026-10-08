@@ -25,7 +25,9 @@ import {
     type Serialized,
     Serializer,
     StorageHistoryPersistence,
+    type StorageOperation,
     VariableTable,
+    writeStorageBatch,
 } from "@chili3d/core";
 import { Picker } from "./picker";
 import { SelectionManager } from "./selectionManager";
@@ -40,6 +42,8 @@ export class Document extends Observable implements IDocument {
     /** Document-wide parameters shared by every body and sketch. */
     readonly variables: IVariableTable;
     userData: Record<string, unknown> = {};
+    private saveQueue: Promise<void> = Promise.resolve();
+    private versioningError: unknown;
 
     static readonly version = __DOCUMENT_VERSION__;
 
@@ -99,18 +103,50 @@ export class Document extends Observable implements IDocument {
         this.acts.clear();
     }
 
-    async save() {
-        const data = this.serialize();
-        await this.application.storage.put(Constants.DBName, Constants.DocumentTable, this.id, data);
-        // The version history is saved with the document — never ahead of it.
-        await DocumentVersionControl.of(this)?.persist();
-        const image = this.application.activeView?.toImage();
-        await this.application.storage.put(Constants.DBName, Constants.RecentTable, this.id, {
-            id: this.id,
-            name: this.name,
-            date: Date.now(),
-            image,
-        });
+    save(): Promise<void> {
+        // A later save cannot overtake an earlier one and replace it with an older
+        // snapshot. Failure must not poison the queue or lose unsaved history objects.
+        const save = this.saveQueue.then(() => this.saveCurrent());
+        this.saveQueue = save.catch(() => {});
+        return save;
+    }
+
+    private async saveCurrent(): Promise<void> {
+        if (this._isDisposed) throw new Error("The document is closed");
+        if (this.versioningError !== undefined)
+            throw new Error("The version history could not be loaded; saving would risk losing it", {
+                cause: this.versioningError,
+            });
+        const data = structuredClone(this.serialize());
+        const view = this.application.activeView;
+        const image = view?.document === this ? view.toImage() : undefined;
+        const writes: StorageOperation[] = [
+            { type: "put", table: Constants.DocumentTable, id: this.id, value: data },
+            {
+                type: "put",
+                table: Constants.RecentTable,
+                id: this.id,
+                value: {
+                    id: this.id,
+                    name: data["name"],
+                    date: Date.now(),
+                    image,
+                },
+            },
+        ];
+        const control = DocumentVersionControl.of(this);
+        if (control !== undefined) {
+            await control.persist(
+                new StorageHistoryPersistence(
+                    this.application.storage,
+                    Constants.DBName,
+                    Constants.HistoryTable,
+                    writes,
+                ),
+            );
+        } else {
+            await writeStorageBatch(this.application.storage, Constants.DBName, writes);
+        }
         PubSub.default.pub("documentSaved", this);
     }
 
@@ -122,6 +158,7 @@ export class Document extends Observable implements IDocument {
         const views = this.application.views.filter((x) => x.document === this);
         this.application.views.remove(...views);
         this.application.activeView = this.application.views.at(0);
+        views.forEach((view) => view.dispose());
         this.application.documents.delete(this);
 
         PubSub.default.pub("documentClosed", this);
@@ -180,7 +217,9 @@ export class Document extends Observable implements IDocument {
             await DocumentVersionControl.attach(document, {
                 persistence: new StorageHistoryPersistence(document.application.storage),
             });
+            if (document instanceof Document) document.versioningError = undefined;
         } catch (error) {
+            if (document instanceof Document) document.versioningError = error;
             Logger.warn(`version control could not start for ${document.name}`, error);
         }
     }

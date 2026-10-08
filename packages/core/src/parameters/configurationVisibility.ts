@@ -48,6 +48,11 @@ export function configurationVisible(
                     return delta > 0 || equal;
             }
         }
+        if (
+            input.kind === "list" &&
+            condition.values.some((id) => !input.options.some((option) => option.id === id))
+        )
+            return false;
         const key = input.kind === "list" ? input.options.find((option) => option.name === value)?.id : value;
         const equal = condition.values.includes(key as string | boolean);
         return condition.operator === "is" ? equal : condition.operator === "isNot" && !equal;

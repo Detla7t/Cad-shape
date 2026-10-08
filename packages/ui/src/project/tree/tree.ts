@@ -241,7 +241,10 @@ export class Tree extends HTMLElement {
         if (event.shiftKey) {
             this.handleShiftClick(item);
         } else {
-            this.document.selection.setSelectedNodes([item], event.ctrlKey);
+            this.document.selection.setSelectedNodes(
+                [item],
+                event.ctrlKey || event.metaKey || this.document.selection.getSelectedNodes().includes(item),
+            );
         }
 
         this.handleLastClickItem(item);

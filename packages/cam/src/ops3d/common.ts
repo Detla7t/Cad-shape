@@ -78,10 +78,12 @@ export function surfacingSetup(
     const cutterResult = cutterForTool(context.tool);
     if (!cutterResult.isOk) return Result.err(cutterResult.error);
     const cutter = cutterResult.value;
-    const mesh = context.partMesh();
+    const tolerance = Math.max(num(params, "tolerance", defaults.tolerance), 1e-4);
+    // Reserve part of the operation tolerance for tessellation; display meshes
+    // use relative precision and cannot establish an absolute machining budget.
+    const mesh = context.partMesh(tolerance / 4);
     const index = triangleIndexOf(mesh);
     if (index.count === 0) return Result.err("The setup has no part geometry to machine");
-    const tolerance = Math.max(num(params, "tolerance", defaults.tolerance), 1e-4);
     const stockToLeave = Math.max(0, num(params, "stockToLeave", defaults.stockToLeave));
     const axialStockToLeave = Math.max(0, num(params, "axialStockToLeave", stockToLeave));
     const holder = bool(params, "holderCheck", true) ? holderForTool(context.tool) : undefined;

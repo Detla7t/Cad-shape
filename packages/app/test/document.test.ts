@@ -10,7 +10,7 @@ import {
     ObservableCollection,
     unpackProject,
 } from "@chili3d/core";
-import { createMockApplication } from "@chili3d/core/test-utils";
+import { createMockApplication, createMockView } from "@chili3d/core/test-utils";
 import { afterEach, beforeEach, describe, expect, rs, test } from "@rstest/core";
 import { Document } from "../src/document";
 import { buildProjectFiles } from "../src/project/projectFile";
@@ -270,6 +270,28 @@ describe("Document", () => {
     });
 
     describe("dispose", () => {
+        test("closing a document disposes every split viewport and keeps other documents open", async () => {
+            const confirm = rs.spyOn(window, "confirm").mockReturnValue(false);
+            const first = createMockView({ document });
+            const second = createMockView({ document });
+            const other = createMockView();
+            const firstDispose = rs.spyOn(first, "dispose");
+            const secondDispose = rs.spyOn(second, "dispose");
+            const otherDispose = rs.spyOn(other, "dispose");
+            mockApp.views.push(first, second, other);
+            mockApp.activeView = first;
+            try {
+                await document.close();
+                expect(firstDispose).toHaveBeenCalledTimes(1);
+                expect(secondDispose).toHaveBeenCalledTimes(1);
+                expect(otherDispose).not.toHaveBeenCalled();
+                expect(mockApp.views.map((view) => view)).toEqual([other]);
+                expect(mockApp.activeView).toBe(other);
+            } finally {
+                confirm.mockRestore();
+            }
+        });
+
         test("should dispose modelManager, visual, history and selection", () => {
             const modelManagerSpy = rs.spyOn(document.modelManager, "dispose");
             const visualSpy = rs.spyOn(document.visual, "dispose");

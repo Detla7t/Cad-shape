@@ -70,6 +70,50 @@ function pointerEvent(x: number, y: number, shiftKey = false): PointerEvent {
 // mock view maps world (x, y, 0) -> screen (400 + x, 300 - y): a line (0,0)-(100,0)
 // spans screen x 400..500 at y 300; clicking (450, 300) hits the line 50px from both ends
 describe("SketchEditor entity selection", () => {
+    test("clicking the same line twice deselects it without moving the pointer", () => {
+        const { doc, view, restoreFactory } = setup();
+        try {
+            const editor = SketchEditor.enter(new SketchNode({ document: doc, plane: Plane.XY }));
+            editor.solver.addLine(0, 0, 100, 0);
+            editor.solve(true);
+            const handler = doc.visual.eventHandler as SketchEventHandler;
+            handler.pointerDown(view, pointerEvent(450, 300));
+            handler.pointerUp(view, pointerEvent(450, 300));
+            expect(handler.selectedEntityIds).toEqual([1]);
+            handler.pointerDown(view, pointerEvent(450, 300));
+            handler.pointerUp(view, pointerEvent(450, 300));
+            expect(handler.selectedEntityIds).toEqual([]);
+            editor.exit();
+        } finally {
+            restoreFactory();
+        }
+    });
+
+    test.each([
+        { start: 475, end: 425, expected: [1, 2] },
+        { start: 425, end: 475, expected: [2] },
+    ])("box direction $start → $end selects crossed or fully enclosed entities", ({
+        start,
+        end,
+        expected,
+    }) => {
+        const { doc, view, restoreFactory } = setup();
+        try {
+            const editor = SketchEditor.enter(new SketchNode({ document: doc, plane: Plane.XY }));
+            editor.solver.addLine(0, 0, 100, 0);
+            editor.solver.addCircle(50, 0, 10);
+            editor.solve(true);
+            const handler = doc.visual.eventHandler as SketchEventHandler;
+            handler.pointerDown(view, pointerEvent(start, 280));
+            handler.pointerMove(view, pointerEvent(end, 320));
+            handler.pointerUp(view, pointerEvent(end, 320));
+            expect(handler.selectedEntityIds).toEqual(expected);
+            editor.exit();
+        } finally {
+            restoreFactory();
+        }
+    });
+
     test("clicking an entity selects it and shows its constraints without hover", () => {
         const { doc, view, htmlTexts, displayed, restoreFactory } = setup();
         try {

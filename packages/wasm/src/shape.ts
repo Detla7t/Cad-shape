@@ -103,9 +103,21 @@ export class OccShape implements IShape {
 
     readonly shapeType: ShapeType;
     protected _mesh: IShapeMeshData | undefined;
+    private readonly machiningMeshes = new Map<number, Mesher>();
     get mesh(): IShapeMeshData {
         this._mesh ??= new Mesher(this);
         return this._mesh;
+    }
+
+    tessellate(linearDeflection: number): IShapeMeshData {
+        if (!Number.isFinite(linearDeflection) || linearDeflection <= 0)
+            throw new Error("Mesh deflection must be a finite positive length");
+        let mesh = this.machiningMeshes.get(linearDeflection);
+        if (mesh === undefined) {
+            mesh = new Mesher(this, linearDeflection, false);
+            this.machiningMeshes.set(linearDeflection, mesh);
+        }
+        return mesh;
     }
 
     protected _shape: TopoDS_Shape;
@@ -210,8 +222,11 @@ export class OccShape implements IShape {
     protected onTransformChanged(): void {
         if (this._mesh) {
             Logger.warn("Shape matrix changed, mesh will be recreated");
+            if (isDisposable(this._mesh)) this._mesh.dispose();
             this._mesh = undefined;
         }
+        for (const mesh of this.machiningMeshes.values()) mesh.dispose();
+        this.machiningMeshes.clear();
     }
 
     edgesMeshPosition(): EdgeMeshData {
@@ -381,6 +396,8 @@ export class OccShape implements IShape {
     };
 
     protected disposeInternal(): void {
+        for (const mesh of this.machiningMeshes.values()) mesh.dispose();
+        this.machiningMeshes.clear();
         this._shape.nullify();
         this._shape.delete();
         this._shape = null as any;
@@ -873,7 +890,11 @@ export class Mesher implements IShapeMeshData, IDisposable {
         this._points = value;
     }
 
-    constructor(private shape: OccShape) {}
+    constructor(
+        private shape: OccShape,
+        private readonly linearDeflection = 0.001,
+        private readonly relative = true,
+    ) {}
 
     private mesh() {
         if (this._isMeshed) {
@@ -882,7 +903,7 @@ export class Mesher implements IShapeMeshData, IDisposable {
         this._isMeshed = true;
 
         gc((c) => {
-            const occMesher = c(new wasm.Mesher(this.shape.shape, 0.001, true));
+            const occMesher = c(new wasm.Mesher(this.shape.shape, this.linearDeflection, this.relative));
             const meshData = c(occMesher.mesh());
             const faceMeshData = c(meshData.faceMeshData);
             const edgeMeshData = c(meshData.edgeMeshData);

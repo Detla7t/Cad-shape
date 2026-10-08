@@ -69,3 +69,16 @@ test("numeric visibility resolves expressions and units; invalid/deleted sources
         ),
     ).toBe(false);
 });
+
+test("a deleted list option does not turn an is-not rule into an always-visible input", () => {
+    expect(
+        configurationVisible(
+            {
+                match: "all",
+                conditions: [{ inputId: "shape", operator: "isNot", values: ["deleted-option"] }],
+            },
+            inputs,
+            {},
+        ),
+    ).toBe(false);
+});

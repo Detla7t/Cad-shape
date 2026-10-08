@@ -1,173 +1,148 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type IStorage, Logger } from "@chili3d/core";
+import { type IStorage, Logger, type StorageOperation } from "@chili3d/core";
 
 export class IndexedDBStorage implements IStorage {
     async createDBIfNeeded(database: string, tables: string[]): Promise<void> {
-        let db = await this.openOrCreateDB(database, tables);
-        let shouldUpgrade = false;
-        for (const table of tables) {
-            if (!db.objectStoreNames.contains(table)) {
-                shouldUpgrade = true;
-                break;
+        let db = await this.open(database, tables);
+        try {
+            if (tables.some((table) => !db.objectStoreNames.contains(table))) {
+                const version = db.version + 1;
+                db.close();
+                db = await this.open(database, tables, version);
             }
-        }
-        if (shouldUpgrade) {
-            const newVersion = db.version + 1;
+        } finally {
             db.close();
-            db = await this.openOrCreateDB(database, tables, newVersion);
         }
-        db.close();
-    }
-
-    private openOrCreateDB(database: string, tables: string[], version?: number): Promise<IDBDatabase> {
-        return new Promise((resolve, reject) => {
-            const request = window.indexedDB.open(database, version);
-            request.onsuccess = (e) => {
-                Logger.info(`open ${database} success`);
-                resolve((e.target as unknown as any).result);
-            };
-            request.onerror = (e) => {
-                Logger.error(`open ${database} error`);
-                reject(e);
-            };
-            request.onupgradeneeded = (e) => {
-                Logger.info(`upgrade ${database}`);
-                const db: IDBDatabase = (e.target as unknown as any).result;
-                tables.forEach((store) => {
-                    if (!db.objectStoreNames.contains(store)) {
-                        Logger.info(`create store ${store}`);
-                        db.createObjectStore(store);
-                    }
-                });
-            };
-        });
     }
 
     async get(database: string, table: string, id: string): Promise<any> {
         const db = await this.open(database);
-        return Promise.try(IndexedDBStorage.get, db, table, id).finally(() => {
+        try {
+            const transaction = db.transaction(table, "readonly");
+            const completed = transactionCompletion(transaction);
+            let request: IDBRequest;
+            try {
+                request = transaction.objectStore(table).get(id);
+            } catch (error) {
+                transaction.abort();
+                await completed.catch(() => {});
+                throw error;
+            }
+            await completed;
+            return request.result;
+        } finally {
             db.close();
-        });
+        }
     }
 
-    async put(database: string, table: string, id: string, value: any): Promise<boolean> {
-        const db = await this.open(database);
-        return Promise.try(IndexedDBStorage.put, db, table, id, value).finally(() => {
-            db.close();
-        });
+    put(database: string, table: string, id: string, value: unknown): Promise<boolean> {
+        return this.writeBatch(database, [{ type: "put", table, id, value }]);
     }
 
-    async delete(database: string, table: string, id: string): Promise<boolean> {
+    delete(database: string, table: string, id: string): Promise<boolean> {
+        return this.writeBatch(database, [{ type: "delete", table, id }]);
+    }
+
+    async writeBatch(database: string, operations: readonly StorageOperation[]): Promise<boolean> {
+        if (operations.length === 0) return true;
         const db = await this.open(database);
-        return Promise.try(IndexedDBStorage.delete, db, table, id).finally(() => {
+        try {
+            const transaction = db.transaction([...new Set(operations.map((op) => op.table))], "readwrite");
+            const completed = transactionCompletion(transaction);
+            try {
+                // Queue every request synchronously: an IndexedDB transaction may close
+                // as soon as control yields with no outstanding request.
+                for (const operation of operations) {
+                    const store = transaction.objectStore(operation.table);
+                    if (operation.type === "put") store.put(operation.value, operation.id);
+                    else store.delete(operation.id);
+                }
+            } catch (error) {
+                // Clone or key errors can throw before a request exists. Abort the
+                // earlier queued writes too, and observe the abort rejection.
+                transaction.abort();
+                await completed.catch(() => {});
+                throw error;
+            }
+            await completed;
+            return true;
+        } finally {
             db.close();
-        });
+        }
     }
 
     async page(database: string, table: string, page: number): Promise<any[]> {
+        const count = 20;
+        if (!Number.isSafeInteger(page) || page < 0 || page * count > 0xffffffff)
+            throw new Error("Page must be a non-negative integer within the cursor range");
         const db = await this.open(database);
-        return Promise.try(IndexedDBStorage.getPage, db, table, page).finally(() => {
-            db.close();
-        });
-    }
-
-    private open(dbName: string): Promise<IDBDatabase> {
-        const request = window.indexedDB.open(dbName);
-        return new Promise((resolve, reject) => {
-            request.onsuccess = (e) => {
-                Logger.info(`open ${dbName} success`);
-                resolve((e.target as unknown as any).result);
-            };
-
-            request.onerror = (e) => {
-                Logger.error(`open ${dbName} error`);
-                reject(e);
-            };
-        });
-    }
-
-    private static get(db: IDBDatabase, storeName: string, key: string) {
-        const request = db.transaction([storeName], "readonly").objectStore(storeName).get(key);
-        return new Promise((resolve, reject) => {
-            request.onsuccess = (e) => {
-                Logger.info(`${storeName} store get object success`);
-                resolve((e.target as unknown as any).result);
-            };
-            request.onerror = (e) => {
-                Logger.error(`${storeName} store get object error`);
-                reject(e);
-            };
-        });
-    }
-
-    /**
-     *
-     * @param db IDBDatabase
-     * @param storeName store name
-     * @param page page, start with 0
-     * @param count items per page
-     * @returns
-     */
-    private static getPage(
-        db: IDBDatabase,
-        storeName: string,
-        page: number,
-        count: number = 20,
-    ): Promise<any[]> {
-        const result: any[] = [];
-        let index = 0;
-        let isAdvanced = false;
-        const request = db.transaction([storeName], "readonly").objectStore(storeName).openCursor();
-
-        return new Promise((resolve, reject) => {
-            request.onsuccess = (e) => {
-                const cursor: IDBCursorWithValue = (e.target as unknown as any).result;
-                if (!cursor || index === count) {
-                    Logger.info(`${storeName} store get objects success`);
-                    resolve(result);
-                } else if (!isAdvanced && page * count > 0) {
-                    isAdvanced = true;
+        try {
+            const transaction = db.transaction(table, "readonly");
+            const completed = transactionCompletion(transaction);
+            const request = transaction.objectStore(table).openCursor();
+            const result: unknown[] = [];
+            let advanced = false;
+            request.onsuccess = () => {
+                const cursor = request.result;
+                if (cursor === null || result.length === count) return;
+                if (!advanced && page > 0) {
+                    advanced = true;
                     cursor.advance(page * count);
                 } else {
                     result.push(cursor.value);
-                    index++;
                     cursor.continue();
                 }
             };
-            request.onerror = (e) => {
-                Logger.error(`${storeName} store get objects error`);
-                reject(e);
-            };
-        });
+            await completed;
+            return result;
+        } finally {
+            db.close();
+        }
     }
 
-    private static delete(db: IDBDatabase, storeName: string, key: string): Promise<boolean> {
-        const request = db.transaction([storeName], "readwrite").objectStore(storeName).delete(key);
+    private open(database: string, tables: readonly string[] = [], version?: number): Promise<IDBDatabase> {
         return new Promise((resolve, reject) => {
+            const request = window.indexedDB.open(database, version);
+            let blocked = false;
             request.onsuccess = () => {
-                Logger.info(`${storeName} store delete object success`);
-                resolve(true);
+                const db = request.result;
+                if (blocked) {
+                    // A rejected blocked request may still finish after another tab closes.
+                    // Do not leak the connection or resume an abandoned save.
+                    db.close();
+                    return;
+                }
+                db.onversionchange = () => db.close();
+                resolve(db);
             };
-            request.onerror = (e) => {
-                Logger.error(`${storeName} store delete object error`);
-                reject(e);
+            request.onerror = () => reject(request.error ?? new Error(`Could not open ${database}`));
+            request.onblocked = () => {
+                blocked = true;
+                reject(new Error(`Storage upgrade for ${database} is blocked by another open tab`));
+            };
+            request.onupgradeneeded = () => {
+                const db = request.result;
+                for (const table of tables) {
+                    if (!db.objectStoreNames.contains(table)) db.createObjectStore(table);
+                }
             };
         });
     }
+}
 
-    private static put(db: IDBDatabase, storeName: string, key: IDBValidKey, value: any): Promise<boolean> {
-        const request = db.transaction([storeName], "readwrite").objectStore(storeName).put(value, key);
-        return new Promise((resolve, reject) => {
-            request.onsuccess = () => {
-                Logger.info(`${storeName} store put object success`);
-                resolve(true);
-            };
-            request.onerror = (e) => {
-                Logger.error(`${storeName} store put object error`);
-                reject(e);
-            };
-        });
-    }
+/** Request success precedes commit; only complete means a write actually succeeded. */
+function transactionCompletion(transaction: IDBTransaction): Promise<void> {
+    return new Promise((resolve, reject) => {
+        transaction.oncomplete = () => resolve();
+        transaction.onabort = () => {
+            const error = transaction.error ?? new DOMException("Storage transaction aborted", "AbortError");
+            Logger.error("Storage transaction aborted", error);
+            reject(error);
+        };
+        // Request errors bubble before their default action aborts the transaction.
+        // Wait for abort before releasing the connection.
+        transaction.onerror = () => {};
+    });
 }

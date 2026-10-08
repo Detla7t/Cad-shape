@@ -98,7 +98,7 @@ describe("TreeGroup", () => {
             expect(group.header.children[0]).toBe(group.expanderIcon);
             const icon = group.header.children[1] as SVGSVGElement;
             expect(icon.classList.contains("ti-type-icon")).toBe(true);
-            expect(icon.getAttribute("icon")).toBe("icon-folder");
+            expect(icon.getAttribute("icon")).toBe("folder");
             expect(group.header.children[2]).toBe(group.name);
         });
 

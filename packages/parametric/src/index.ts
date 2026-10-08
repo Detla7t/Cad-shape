@@ -4,6 +4,7 @@
 export * from "./drawing";
 export * from "./features";
 export * from "./featurescript";
+export * from "./measurement";
 export * from "./parametricBodyNode";
 export * from "./program";
 export * from "./sheetMetal";

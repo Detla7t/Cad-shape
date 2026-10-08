@@ -55,7 +55,9 @@ class ViewActiveConverter implements IConverter<IView> {
     ) {}
 
     convert(value: IView): Result<string> {
-        return Result.ok(this.target === value ? `${this.style} ${this.activeStyle}` : this.style);
+        return Result.ok(
+            this.target.document === value?.document ? `${this.style} ${this.activeStyle}` : this.style,
+        );
     }
 }
 
@@ -196,6 +198,7 @@ export class RibbonUI extends HTMLElement {
                     "activeView",
                     new ViewActiveConverter(view, style.tab, style.active),
                 ),
+                dataset: { viewDocument: view.document.id },
                 onclick: () => {
                     this.app.activeView = view;
                 },
@@ -206,7 +209,7 @@ export class RibbonUI extends HTMLElement {
                 icon: "icon-times",
                 onclick: (e) => {
                     e.stopPropagation();
-                    view.close();
+                    void view.document.close();
                 },
             }),
         );
@@ -254,6 +257,8 @@ export class RibbonUI extends HTMLElement {
     }
 
     connectedCallback(): void {
+        this.app.views.onCollectionChanged?.(this.syncDocumentTabs);
+        this.syncDocumentTabs();
         this.customization.start();
         Config.instance.onPropertyChanged(this.handleConfigChanged);
         this.dataContent.onPropertyChanged(this.syncContext);
@@ -262,6 +267,7 @@ export class RibbonUI extends HTMLElement {
     }
 
     disconnectedCallback(): void {
+        this.app.views.removeCollectionChanged?.(this.syncDocumentTabs);
         this.customization.dispose();
         Config.instance.removePropertyChanged(this.handleConfigChanged);
         this.dataContent.removePropertyChanged(this.syncContext);
@@ -276,6 +282,19 @@ export class RibbonUI extends HTMLElement {
         legacy?.querySelectorAll<HTMLElement>("[data-ribbon-tab]").forEach((element) => {
             const tab = this.dataContent.tabs.find((tab) => tab.tabName === element.dataset["ribbonTab"]);
             element.hidden = !!tab && !this.dataContent.isTabAvailable(tab);
+        });
+    };
+
+    private readonly syncDocumentTabs = () => {
+        queueMicrotask(() => {
+            for (const group of this.querySelectorAll(`.${style.views}`)) {
+                const seen = new Set<string>();
+                for (const tab of group.querySelectorAll<HTMLElement>("[data-view-document]")) {
+                    const id = tab.dataset["viewDocument"]!;
+                    tab.style.display = seen.has(id) ? "none" : "";
+                    seen.add(id);
+                }
+            }
         });
     };
 

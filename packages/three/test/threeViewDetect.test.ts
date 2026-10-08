@@ -136,7 +136,7 @@ class TestPanelFace implements ISubShape {
         throw new Error("Method not implemented.");
     }
     get mesh(): IShapeMeshData {
-        throw new Error("Method not implemented.");
+        return this.parent.mesh;
     }
 }
 
@@ -445,15 +445,15 @@ describe("ThreeView detect — rectangle selection", () => {
     test("detectVisualRect hits panels inside the rect and applies nodeFilter", () => {
         const { view, visual, near, far, side, center, sideCenter, empty } = createSceneWithPanels();
 
-        const atCenter = view.detectVisualRect(center.x - 10, center.y - 10, center.x + 10, center.y + 10);
+        const atCenter = view.detectVisualRect(center.x + 10, center.y - 10, center.x - 10, center.y + 10);
         expect(atCenter.length).toBe(2);
         expect(atCenter).toContain(visual.context.getVisual(near));
         expect(atCenter).toContain(visual.context.getVisual(far));
 
         const atSide = view.detectVisualRect(
-            sideCenter.x - 8,
-            sideCenter.y - 8,
             sideCenter.x + 8,
+            sideCenter.y - 8,
+            sideCenter.x - 8,
             sideCenter.y + 8,
         );
         expect(atSide.length).toBe(1);
@@ -474,9 +474,9 @@ describe("ThreeView detect — rectangle selection", () => {
 
         const shapes = view.detectShapesRect(
             ShapeTypes.shape,
-            center.x - 10,
-            center.y - 10,
             center.x + 10,
+            center.y - 10,
+            center.x - 10,
             center.y + 10,
         );
         expect(shapes.length).toBe(2);
@@ -510,14 +510,14 @@ describe("ThreeView detect — rectangle selection", () => {
         expect(nodeFiltered[0].shape).toBe(far.panel);
     });
 
-    test("detectShapesRect returns the sub face whose center is inside the rect", () => {
+    test("detectShapesRect returns the sub face intersected by a crossing box", () => {
         const { view, near, far, side, center, sideCenter, empty } = createSceneWithPanels();
 
         const atSide = view.detectShapesRect(
             ShapeTypes.face,
-            sideCenter.x - 8,
-            sideCenter.y - 8,
             sideCenter.x + 8,
+            sideCenter.y - 8,
+            sideCenter.x - 8,
             sideCenter.y + 8,
         );
         expect(atSide.length).toBe(1);
@@ -525,9 +525,9 @@ describe("ThreeView detect — rectangle selection", () => {
 
         const atCenter = view.detectShapesRect(
             ShapeTypes.face,
-            center.x - 10,
-            center.y - 10,
             center.x + 10,
+            center.y - 10,
+            center.x - 10,
             center.y + 10,
         );
         expect(atCenter.length).toBe(2);

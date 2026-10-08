@@ -84,6 +84,7 @@ export abstract class SelectionHandler implements IEventHandler {
     pointerDown(view: IView, event: PointerEvent): void {
         event.preventDefault();
         if (event.button === 0 && event.isPrimary) {
+            this.setHighlight(view, event);
             this.mouse = { isDown: true, x: event.offsetX, y: event.offsetY };
             if (this.multiMode && this.showRect) {
                 this.rect = this.initRect(event);

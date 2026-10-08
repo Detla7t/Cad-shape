@@ -51,6 +51,8 @@ export interface CamLoop {
 /** Everything an operation needs to generate, resolved in the setup's WCS. */
 export interface CamOperationContext {
     readonly document: IDocument;
+    /** Aborted when a job is cancelled, superseded, invalidated, or its studio is disposed. */
+    readonly signal?: AbortSignal;
     readonly setup: SetupData;
     readonly machine: MachineProfileData;
     /** The operation's tool (the operation's `toolId`, else the machine's first suitable tool). */
@@ -59,8 +61,8 @@ export interface CamOperationContext {
     readonly parts: readonly IShape[];
     /** The stock's bounding box in WCS. */
     readonly stock: { readonly min: Vec3; readonly max: Vec3 };
-    /** The parts' triangulation in WCS, built on first use. */
-    partMesh(): CamMesh;
+    /** Machining triangulation in WCS, cached by absolute deflection in mm (default 0.01). */
+    partMesh(linearDeflection?: number): CamMesh;
     /** The operation's picked faces / edges, in WCS. */
     selectedFaces(): IFace[];
     selectedEdges(): IEdge[];

@@ -110,7 +110,7 @@ export async function generatePencil(
     if (!setupResult.isOk) return Result.err(setupResult.error);
     const setup = setupResult.value;
     const params = operation.params;
-    const yielder = new Yielder();
+    const yielder = new Yielder(15, context.signal);
     const { cutter, drop, tolerance } = setup;
     const spacing = Math.max(num(params, "sampling", gridSpacing(cutter.radius)), 0.01);
     const angle = (Math.min(Math.max(num(params, "creaseAngle", 20), 1), 179) * Math.PI) / 180;

@@ -31,7 +31,7 @@ test("edge presentation masks tangents, draws boundary and hidden overlays, then
     expect(geometry).toBeInstanceOf(ThreeGeometry);
     const visual = geometry as ThreeGeometry;
     const original = visual.edges()!.geometry;
-    const display = new ViewDisplay({ content: context } as ThreeView);
+    const display = new ViewDisplay({ content: context, document: doc } as unknown as ThreeView);
     Object.assign(display.options, { tangentEdges: "phantom", boundaryEdges: true, hiddenEdges: true });
     let rendered: { end: number; lines: number; hidden: number } | undefined;
     try {

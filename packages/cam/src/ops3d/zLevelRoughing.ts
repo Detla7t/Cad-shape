@@ -146,7 +146,7 @@ export async function generateZLevelRoughing(
     if (!setupResult.isOk) return Result.err(setupResult.error);
     const setup = setupResult.value;
     const params = operation.params;
-    const yielder = new Yielder();
+    const yielder = new Yielder(15, context.signal);
     const levels = await roughingLevels(setup, params, yielder);
     if (!levels.isOk) return Result.err(levels.error);
 

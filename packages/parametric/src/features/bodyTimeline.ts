@@ -17,6 +17,8 @@ import { idIsShared, indexesOfOverlappingId } from "./trackedId";
 /** Snapshot of one referenced node, used to decide whether a cached entry is still valid. */
 export interface RefSnapshot {
     readonly shape: Result<IShape> | undefined;
+    /** Last-good geometry must not hide a failed upstream evaluation. */
+    readonly error?: string;
     /** World transform at capture time — moving a reference must bust the cache too. */
     readonly transform: Matrix4 | undefined;
 }
@@ -87,14 +89,19 @@ export class BodyTimeline {
         return this._cache[index];
     }
 
+    /** A previous final shape can remain live as the input of a later feature. */
+    owns(shape: IShape): boolean {
+        return this._cache.some((entry) => entry.shape === shape);
+    }
+
     /**
      * Installs a completed run, disposing the shapes it evicted. `currentShape` — the
      * node's own shape — is never disposed here; its lifecycle belongs to the node.
      */
     commit(next: FeatureCacheEntry[], timeline: FeatureTimelineState[], currentShape?: IShape): void {
         const reused = new Set(next.map((entry) => entry.shape));
-        for (const entry of this._cache) {
-            if (!reused.has(entry.shape) && entry.shape !== currentShape) entry.shape.dispose();
+        for (const shape of new Set(this._cache.map((entry) => entry.shape))) {
+            if (!reused.has(shape) && shape !== currentShape) shape.dispose();
         }
         this._cache = next;
         this._committed = timeline;
@@ -106,15 +113,15 @@ export class BodyTimeline {
      */
     discard(next: FeatureCacheEntry[], currentShape?: IShape): void {
         const kept = new Set(this._cache.map((entry) => entry.shape));
-        for (const entry of next) {
-            if (!kept.has(entry.shape) && entry.shape !== currentShape) entry.shape.dispose();
+        for (const shape of new Set(next.map((entry) => entry.shape))) {
+            if (!kept.has(shape) && shape !== currentShape) shape.dispose();
         }
     }
 
     /** Drops everything, disposing tracked shapes except `currentShape`. */
     dispose(currentShape?: IShape): void {
-        for (const entry of this._cache) {
-            if (entry.shape !== currentShape) entry.shape.dispose();
+        for (const shape of new Set(this._cache.map((entry) => entry.shape))) {
+            if (shape !== currentShape) shape.dispose();
         }
         this._cache = [];
         this._committed = [];

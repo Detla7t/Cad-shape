@@ -14,15 +14,19 @@ export function syncNodeWatches(
     wantedIds: ReadonlySet<string>,
     handler: (property: string) => void,
 ): void {
+    const resolved = new Map<string, INode>();
+    for (const id of wantedIds) {
+        const node = document.modelManager.findNode((candidate) => candidate.id === id);
+        if (node !== undefined) resolved.set(id, node);
+    }
     for (const [nodeId, node] of watched) {
-        if (wantedIds.has(nodeId)) continue;
+        if (resolved.get(nodeId) === node) continue;
         if (isPropertyChanged(node)) node.removePropertyChanged(handler);
         watched.delete(nodeId);
     }
-    for (const nodeId of wantedIds) {
+    for (const [nodeId, node] of resolved) {
         if (watched.has(nodeId)) continue;
-        const node = document.modelManager.findNode((n) => n.id === nodeId);
-        if (node !== undefined && isPropertyChanged(node)) {
+        if (isPropertyChanged(node)) {
             node.onPropertyChanged(handler);
             watched.set(nodeId, node);
         }

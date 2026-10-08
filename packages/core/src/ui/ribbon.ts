@@ -120,7 +120,7 @@ export class Ribbon extends Observable {
 
     isCommandAvailable(command: CommandKeys): boolean {
         const sketch = this.contextTab?.tabName === "ribbon.tab.sketch";
-        if (command === "sketch.export") return true;
+        if (command === "sketch.export" || command === "feature.variable") return true;
         if (command === "sketch.create" || command === "sketch.enter") return !sketch;
         if (/^(sketch|constraint|dimension)\./.test(command)) return sketch;
         if (/^(create|modify|boolean|convert|feature|plane|assembly|cam|sheetMetal|link)\./.test(command))

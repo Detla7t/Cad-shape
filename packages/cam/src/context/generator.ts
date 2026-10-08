@@ -1,11 +1,19 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type IDisposable, type INode, Logger, Result } from "@chili3d/core";
+import {
+    type IDisposable,
+    type IDocument,
+    type INode,
+    Logger,
+    Result,
+    ShapeNode,
+    VisualNode,
+} from "@chili3d/core";
 import type { CamStudioNode } from "../camStudioNode";
 import { resolveMachine } from "../machines";
 import type { MachineProfileData } from "../model/machine";
-import { camOperation } from "../model/operation";
+import { type CamOperationContext, camOperation } from "../model/operation";
 import { type CamProgram, type PostProcessor, postProcessor } from "../model/post";
 import type { CamOperationData, SetupData } from "../model/setup";
 import type { ToolData } from "../model/tool";
@@ -43,6 +51,12 @@ interface StoredResult {
     readonly status: OperationStatus;
 }
 
+interface GenerationJob {
+    readonly operation: CamOperationData;
+    readonly key: string;
+    readonly controller: AbortController;
+}
+
 export interface CamGeneratorOptions {
     readonly autoRegenerate?: boolean;
     readonly debounceMs?: number;
@@ -58,16 +72,32 @@ export interface PostedProgram {
 const shapeTokens = new WeakMap<object, number>();
 let nextShapeToken = 1;
 
-function shapeToken(node: INode | undefined): string {
-    const shape = (node as { shape?: { isOk: boolean; value?: object } } | undefined)?.shape;
-    if (shape === undefined) return "none";
-    if (!shape.isOk || shape.value === undefined) return "error";
+function shapeToken(node: INode | undefined): unknown {
+    if (!(node instanceof ShapeNode)) return "none";
+    const shape = node.shape;
+    if (!shape.isOk) return ["error", shape.error];
     let token = shapeTokens.get(shape.value);
     if (token === undefined) {
         token = nextShapeToken++;
         shapeTokens.set(shape.value, token);
     }
-    return String(token);
+    return [
+        token,
+        node.evaluationError,
+        (node as ShapeNode & { rollbackIndex?: number }).rollbackIndex,
+        node.worldTransform().toArray(),
+        // Include local/ancestor placements too: a visual may update its matrix
+        // after our property observer runs, depending on subscription order.
+        ancestorPlacements(node),
+    ];
+}
+
+function ancestorPlacements(node: INode): (readonly number[])[] {
+    const placements: (readonly number[])[] = [];
+    for (let current: INode | undefined = node; current !== undefined; current = current.parent) {
+        if (current instanceof VisualNode) placements.push(current.transform.toArray());
+    }
+    return placements;
 }
 
 /** The node ids a setup's results depend on: parts, a stock body, picked nodes. */
@@ -81,12 +111,13 @@ export function setupNodeIds(setup: SetupData): string[] {
 
 export class CamGenerator implements IDisposable {
     private readonly results = new Map<string, StoredResult>();
-    private readonly running = new Map<string, number>();
+    private readonly running = new Map<string, GenerationJob>();
     private readonly listeners = new Set<(operationId?: string) => void>();
     private readonly watched = new Map<string, INode>();
     private timer: ReturnType<typeof setTimeout> | undefined;
     private disposed = false;
-    private runCounter = 0;
+    readonly document: IDocument;
+    private readonly removeDisposeListener: () => void;
     readonly autoRegenerate: boolean;
     private readonly debounceMs: number;
 
@@ -96,12 +127,11 @@ export class CamGenerator implements IDisposable {
     ) {
         this.autoRegenerate = options.autoRegenerate ?? true;
         this.debounceMs = options.debounceMs ?? 250;
+        this.document = studio.document;
+        this.removeDisposeListener = studio.onDispose(() => this.dispose());
         studio.onPropertyChanged(this.onStudioChanged);
+        this.document.modelManager.addNodeObserver(this.onTreeChanged);
         this.refreshWatches();
-    }
-
-    get document() {
-        return this.studio.document;
     }
 
     // ------------------------------------------------------------------ Lookup
@@ -116,6 +146,7 @@ export class CamGenerator implements IDisposable {
 
     /** The operation's current status: its last result (marked `stale` when its inputs changed). */
     status(operationId: string): OperationStatus {
+        if (this.disposed) return { state: "pending" };
         const found = this.find(operationId);
         if (found === undefined) return { state: "pending" };
         if (found.operation.suppressed) return { state: "suppressed" };
@@ -130,7 +161,7 @@ export class CamGenerator implements IDisposable {
     /** The operation's toolpath when it has an up-to-date result. */
     toolpath(operationId: string): ToolpathData | undefined {
         const status = this.status(operationId);
-        return status.state === "ok" ? status.toolpath : undefined;
+        return status.state === "ok" && !status.stale ? status.toolpath : undefined;
     }
 
     /** Toolpath of the last result even if stale (what the preview keeps showing while regenerating). */
@@ -178,39 +209,107 @@ export class CamGenerator implements IDisposable {
 
     private async run(setup: SetupData, operations: readonly CamOperationData[]): Promise<void> {
         if (this.disposed || operations.length === 0) return;
-        const runId = ++this.runCounter;
-        const live = operations.filter((operation) => !operation.suppressed);
-        for (const operation of live) this.running.set(operation.id, runId);
+        const jobs: GenerationJob[] = operations
+            .filter((operation) => !operation.suppressed)
+            .map((operation) => ({
+                operation,
+                key: this.inputsKey(setup, operation),
+                controller: new AbortController(),
+            }));
+        for (const job of jobs) {
+            this.running.get(job.operation.id)?.controller.abort();
+            this.running.set(job.operation.id, job);
+        }
         for (const operation of operations) this.emit(operation.id);
-        const machine = this.machineOf(setup);
-        const finish = (operation: CamOperationData, status: OperationStatus) => {
-            if (this.running.get(operation.id) !== runId) return;
-            this.running.delete(operation.id);
-            this.results.set(operation.id, { key: this.inputsKey(setup, operation), status });
-            this.emit(operation.id);
-        };
-        if (machine === undefined) {
-            for (const operation of live)
-                finish(operation, { state: "error", error: `Unknown machine "${setup.machineId}"` });
-            return;
-        }
-        const geometry = SetupGeometry.build(this.document, setup);
-        if (!geometry.isOk) {
-            for (const operation of live) finish(operation, { state: "error", error: geometry.error });
-            return;
-        }
-        try {
-            for (const operation of live) {
-                if (this.disposed) return;
-                finish(operation, await this.generateOne(geometry.value, machine, operation));
+        const finish = (job: GenerationJob, status: OperationStatus) => {
+            const id = job.operation.id;
+            if (this.disposed || this.running.get(id) !== job) return;
+            this.running.delete(id);
+            const current = this.find(id);
+            if (current === undefined || current.operation.suppressed) return;
+            if (
+                job.controller.signal.aborted ||
+                this.inputsKey(current.setup, current.operation) !== job.key
+            ) {
+                // Keep an existing preview, but never publish newly computed output
+                // against inputs it did not use. A first run still needs a retry marker.
+                if (!this.results.has(id))
+                    this.results.set(id, { key: job.key, status: { state: "pending", stale: true } });
+                this.emit(id);
+                this.schedule();
+                return;
             }
+            this.results.set(id, { key: job.key, status });
+            this.emit(id);
+        };
+        let geometry: SetupGeometry | undefined;
+        try {
+            const profile = this.machineOf(setup);
+            if (profile === undefined) {
+                for (const job of jobs)
+                    finish(job, { state: "error", error: `Unknown machine "${setup.machineId}"` });
+                return;
+            }
+            const machine = structuredClone(profile);
+            const built = SetupGeometry.build(this.document, setup);
+            if (!built.isOk) {
+                for (const job of jobs) finish(job, { state: "error", error: built.error });
+                return;
+            }
+            geometry = built.value;
+            // Resolve all operations' geometry before the first asynchronous handler.
+            // Otherwise later operations or lazy picks could mix two model revisions.
+            const contexts = jobs.map((job): Result<CamOperationContext> => {
+                try {
+                    const context = createOperationContext(
+                        built.value,
+                        machine,
+                        job.operation,
+                        undefined,
+                        job.controller.signal,
+                    );
+                    context.selectedFaces();
+                    context.selectedEdges();
+                    context.selectedLoops();
+                    return Result.ok(context);
+                } catch (error) {
+                    return Result.err(error instanceof Error ? error.message : String(error));
+                }
+            });
+            for (let index = 0; index < jobs.length; index++) {
+                const job = jobs[index];
+                if (this.disposed) return;
+                if (job.controller.signal.aborted) {
+                    finish(job, { state: "pending" });
+                    continue;
+                }
+                const context = contexts[index];
+                finish(
+                    job,
+                    context.isOk
+                        ? await this.generateOne(context.value, machine, job.operation)
+                        : { state: "error", error: context.error },
+                );
+            }
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            for (const job of jobs) finish(job, { state: "error", error: message });
         } finally {
-            geometry.value.dispose();
+            geometry?.dispose();
         }
     }
 
+    /** Cancels publication immediately; cooperative handlers also stop their work. */
+    cancelOperation(operationId: string): void {
+        const job = this.running.get(operationId);
+        if (job === undefined) return;
+        this.running.delete(operationId);
+        job.controller.abort();
+        this.emit(operationId);
+    }
+
     private async generateOne(
-        geometry: SetupGeometry,
+        context: CamOperationContext,
         machine: MachineProfileData,
         operation: CamOperationData,
     ): Promise<OperationStatus> {
@@ -225,7 +324,6 @@ export class CamGenerator implements IDisposable {
         }
         const started = now();
         try {
-            const context = createOperationContext(geometry, machine, operation);
             const result = await handler.generate(operation, context);
             const ms = now() - started;
             if (!result.isOk) return { state: "error", error: result.error, ms };
@@ -244,6 +342,7 @@ export class CamGenerator implements IDisposable {
 
     /** The setup's program from its up-to-date results, in operation order. */
     program(setupId: string): Result<CamProgram> {
+        if (this.disposed) return Result.err("The CAM generator is disposed");
         const setup = this.setup(setupId);
         if (setup === undefined) return Result.err("No such setup");
         const machine = this.machineOf(setup);
@@ -325,42 +424,68 @@ export class CamGenerator implements IDisposable {
         const { name: _name, ...data } = operation;
         const nodes = [...setup.partIds, ...selectionNodeIds(operation.selection)];
         if (setup.stock.kind === "body") nodes.push(setup.stock.nodeId);
-        const tokens = nodes.map((id) => `${id}:${shapeToken(this.findNode(id))}`);
+        const tokens = nodes.map((id) => [id, shapeToken(this.findNode(id))]);
         const tool = machine === undefined ? undefined : operationTool(setup, machine, operation);
         return JSON.stringify([data, frame, machine, tool, tokens]);
     }
 
     private findNode(id: string): INode | undefined {
-        const watched = this.watched.get(id);
-        if (watched !== undefined) return watched;
-        return this.document.modelManager.findNodes((node) => node.id === id)[0];
+        return this.document.modelManager.findNode((node) => node.id === id);
     }
 
     private readonly onStudioChanged = (property: string) => {
         if (property !== "setupsJson" && property !== "machinesJson") return;
         this.refreshWatches();
+        this.invalidateRunning();
+        for (const id of this.results.keys()) {
+            if (this.find(id) === undefined) this.results.delete(id);
+        }
         this.emit();
         this.schedule();
     };
 
     private readonly onNodeChanged = (property: string) => {
-        if (property !== "shape") return;
+        if (property !== "shape" && property !== "transform" && property !== "evaluationError") return;
+        this.invalidateRunning();
         this.emit();
         this.schedule();
     };
 
+    private readonly onTreeChanged = () => {
+        this.refreshWatches();
+        this.invalidateRunning();
+        this.emit();
+        this.schedule();
+    };
+
+    private invalidateRunning(): void {
+        for (const [id, job] of this.running) {
+            const current = this.find(id);
+            if (current === undefined || current.operation.suppressed) {
+                this.running.delete(id);
+                job.controller.abort();
+            } else if (this.inputsKey(current.setup, current.operation) !== job.key) {
+                job.controller.abort();
+            }
+        }
+    }
+
     private refreshWatches(): void {
         const ids = new Set(this.studio.setups.flatMap(setupNodeIds));
+        const wanted = new Map<string, INode>();
+        for (const id of ids) {
+            for (let node = this.findNode(id); node !== undefined; node = node.parent) {
+                wanted.set(node.id, node);
+            }
+        }
         for (const [id, node] of [...this.watched]) {
-            if (!ids.has(id)) {
+            if (wanted.get(id) !== node) {
                 node.removePropertyChanged(this.onNodeChanged);
                 this.watched.delete(id);
             }
         }
-        for (const id of ids) {
+        for (const [id, node] of wanted) {
             if (this.watched.has(id)) continue;
-            const [node] = this.document.modelManager.findNodes((candidate) => candidate.id === id);
-            if (node === undefined) continue;
             node.onPropertyChanged(this.onNodeChanged);
             this.watched.set(id, node);
         }
@@ -371,12 +496,13 @@ export class CamGenerator implements IDisposable {
         if (this.timer !== undefined) clearTimeout(this.timer);
         this.timer = setTimeout(() => {
             this.timer = undefined;
-            void this.regenerateStale();
+            void this.regenerateStale().catch((error) => Logger.warn("CAM: regeneration failed", error));
         }, this.debounceMs);
     }
 
     /** Regenerates every result whose inputs changed (operations never generated stay pending). */
     async regenerateStale(): Promise<void> {
+        if (this.disposed) return;
         for (const setup of this.studio.setups) {
             const stale = setup.operations.filter((operation) => {
                 if (!this.results.has(operation.id) || this.running.has(operation.id)) return false;
@@ -398,13 +524,18 @@ export class CamGenerator implements IDisposable {
     }
 
     dispose(): void {
+        if (this.disposed) return;
         this.disposed = true;
         if (this.timer !== undefined) clearTimeout(this.timer);
+        this.removeDisposeListener();
+        this.document.modelManager.removeNodeObserver(this.onTreeChanged);
         this.studio.removePropertyChanged(this.onStudioChanged);
         for (const node of this.watched.values()) node.removePropertyChanged(this.onNodeChanged);
         this.watched.clear();
         this.listeners.clear();
         this.results.clear();
+        for (const job of this.running.values()) job.controller.abort();
+        this.running.clear();
     }
 }
 

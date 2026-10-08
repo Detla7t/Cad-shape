@@ -513,8 +513,14 @@ export class ParametricBodyNode
         const history = this.document.history;
         const disabled = history.disabled;
         history.disabled = true;
+        const previous = this.currentShape();
         try {
             super.setShape(shape);
+            // Unlike editable shapes, derived results are not kept by undo records.
+            // Release the evicted final shape after observers have replaced their view,
+            // unless a cached prefix still owns it (e.g. when appending a feature).
+            if (previous !== undefined && previous !== this.currentShape() && !this._timeline.owns(previous))
+                previous.dispose();
         } finally {
             history.disabled = disabled;
         }
@@ -533,6 +539,7 @@ export class ParametricBodyNode
         if (this._evaluating) return this._shape;
         if (!this._shape.isOk && (!this._evaluated || this.hasNewReferences())) {
             this._shape = this.generateShape();
+            this.setEvaluationError(this._shape.isOk ? undefined : this._shape.error);
         }
         return this._shape;
     }
@@ -553,7 +560,11 @@ export class ParametricBodyNode
         this._featureWarnings.clear();
         this._evaluating = true;
         try {
-            return this.evaluateChain();
+            const result = this.evaluateChain();
+            // Watch-triggered failures deliberately keep the last good shape without
+            // calling setShape. They must still invalidate consumers of that geometry.
+            if (!result.isOk) this.setEvaluationError(result.error);
+            return result;
         } finally {
             this._evaluating = false;
         }
@@ -903,6 +914,17 @@ export class ParametricBodyNode
         edgeIds: string[] | undefined,
         nextCache: FeatureCacheEntry[],
     ): Result<FeatureStepOutput> {
+        for (const id of featureHandler(feature.type)?.nodeIds(feature) ?? []) {
+            if (id === this.id) continue;
+            const node = this.document.modelManager.findNode((candidate) => candidate.id === id);
+            if (!(node instanceof ShapeNode)) continue;
+            // Consumed tools may read this run's in-flight timeline; an older
+            // failure on that owner does not describe the prefix being evaluated.
+            if (node instanceof ParametricBodyNode && node._evaluating) continue;
+            void node.shape;
+            if (node.evaluationError !== undefined)
+                return Result.err(`Referenced "${node.name}" failed to rebuild: ${node.evaluationError}`);
+        }
         const key = this.cacheKey(feature, scope);
         const cached = this.validCacheEntry(key, input, nextCache.length);
         if (cached !== undefined) {
@@ -987,6 +1009,7 @@ export class ParametricBodyNode
         for (const [id, snapshot] of entry.refs) {
             const current = this.snapshotNode(id);
             if (current.shape !== snapshot.shape) return undefined;
+            if (current.error !== snapshot.error) return undefined;
             if (!sameTransform(current.transform, snapshot.transform)) return undefined;
         }
         return entry;
@@ -1006,12 +1029,12 @@ export class ParametricBodyNode
     private snapshotNode(id: string): RefSnapshot {
         const node = this.document.modelManager.findNode((n) => n.id === id);
         if (!(node instanceof ShapeNode)) return { shape: undefined, transform: undefined };
-        return { shape: node.shape, transform: node.worldTransform() };
+        return { shape: node.shape, error: node.evaluationError, transform: node.worldTransform() };
     }
 
     /**
      * The shape currently on display, which `BodyTimeline` must never dispose — its
-     * lifecycle belongs to `ShapeNode.disposeInternal`.
+     * lifecycle belongs to `setShape` and `ShapeNode.disposeInternal`.
      */
     private currentShape(): IShape | undefined {
         return this._shape.isOk ? this._shape.value : undefined;
@@ -1079,7 +1102,13 @@ export class ParametricBodyNode
     // of toasting per change.
     private readonly handleWatchedNodeChanged = (property: string) => {
         // `source` is a Feature Studio's code: the custom features it defines re-run.
-        if (property !== "shape" && property !== "transform" && property !== "source") return;
+        if (
+            property !== "shape" &&
+            property !== "transform" &&
+            property !== "source" &&
+            property !== "evaluationError"
+        )
+            return;
         this.rebuildFromUpstream();
     };
 
