@@ -54,7 +54,7 @@ export class Transaction {
             action();
             trans.commit();
         } catch (e) {
-            trans.rollback();
+            trans.rollback(e);
             throw e;
         }
     }
@@ -71,7 +71,7 @@ export class Transaction {
             await action();
             trans.commit();
         }).catch((e) => {
-            trans.rollback();
+            trans.rollback(e);
             throw e;
         });
     }
@@ -97,17 +97,16 @@ export class Transaction {
         Transaction._transactionMap.delete(this.document);
         this.operation?.add({
             recordCount: arrayRecord.records.length,
-            undoCount: this.document.history.undoCount(),
         });
         this.operation?.finish("success");
     }
 
-    rollback() {
+    rollback(error?: unknown) {
         const transaction = Transaction._transactionMap.get(this.document);
         Transaction._transactionMap.delete(this.document);
 
         transaction?.undo();
         this.operation?.add({ recordCount: transaction?.records.length ?? 0 });
-        this.operation?.finish("rolled_back");
+        this.operation?.finish("rolled_back", error);
     }
 }

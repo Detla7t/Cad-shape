@@ -18,6 +18,7 @@ import {
     Precision,
     PubSub,
     Result,
+    selectConfiguredBoolean,
     serializable,
     serialize,
     VisualConfig,
@@ -57,6 +58,25 @@ export interface SketchNodeOptions {
 
 @serializable()
 export class SketchNode extends ParameterShapeNode {
+    @serialize()
+    get suppression(): boolean | string {
+        return this.getPrivateValue("suppression", false);
+    }
+    set suppression(value: boolean | string) {
+        this.setPropertyEmitShapeChanged("suppression", value);
+    }
+    get suppressed(): boolean {
+        const result = selectConfiguredBoolean(this.suppression, this.document.variables.evaluate().scope);
+        return result.isOk && result.value;
+    }
+    @serialize()
+    get comment(): string {
+        return this.getPrivateValue("comment", "");
+    }
+    set comment(value: string) {
+        this.setProperty("comment", value);
+    }
+
     override display(): I18nKeys {
         return "body.sketch";
     }
@@ -178,7 +198,8 @@ export class SketchNode extends ParameterShapeNode {
     }
 
     protected override createMesh(): IShapeMeshData {
-        if (this._editingSession) return { edges: undefined, faces: undefined, vertexs: undefined };
+        if (this._editingSession || this.suppressed)
+            return { edges: undefined, faces: undefined, vertexs: undefined };
         const mesh = this.sketchMesh();
         const data = this.data;
         if (
@@ -271,6 +292,7 @@ export class SketchNode extends ParameterShapeNode {
     }
 
     generateShape(): Result<IShape> {
+        if (this.suppressed) return shapeFactory.combine([]);
         // Take-and-clear FIRST: the flag belongs to this one evaluation — a throw
         // further down must not leak it into the next evaluation, which would then
         // wrongly skip refreshExternalRefs.
@@ -603,11 +625,10 @@ export class SketchNode extends ParameterShapeNode {
         if (this._variableRevision === revision) return;
         this._variableRevision = revision;
         const solved = this.solveWithScope(this.data);
-        if (solved === undefined) return;
         this.withoutHistory(() => {
             // setProperty, not the shape-changing variant: the regeneration below
             // already reports the change, and this only persists the solved entities.
-            this.setProperty("dataJson", JSON.stringify(solved));
+            if (solved !== undefined) this.setProperty("dataJson", JSON.stringify(solved));
             this.setShape(this.generateShape());
         });
     }

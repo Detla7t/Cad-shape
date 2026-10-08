@@ -109,10 +109,31 @@ export class Ribbon extends Observable {
     readonly tabs = new ObservableCollection<RibbonTab>();
     private preTab?: RibbonTab;
 
+    /** Editing context is independent of a user's preferred modeling toolset. */
+    get contextTab(): RibbonTab | undefined {
+        return this.getPrivateValue("contextTab");
+    }
+
+    isTabAvailable(tab: RibbonTab): boolean {
+        return tab.visible && (!this.contextTab || tab === this.contextTab);
+    }
+
+    isCommandAvailable(command: CommandKeys): boolean {
+        const sketch = this.contextTab?.tabName === "ribbon.tab.sketch";
+        if (command === "sketch.export") return true;
+        if (command === "sketch.create" || command === "sketch.enter") return !sketch;
+        if (/^(sketch|constraint|dimension)\./.test(command)) return sketch;
+        if (/^(create|modify|boolean|convert|feature|plane|assembly|cam|sheetMetal|link)\./.test(command))
+            return !sketch;
+        if (command === "featurescript.insert") return !sketch;
+        return true;
+    }
+
     get activeTab() {
         return this.getPrivateValue("activeTab");
     }
     set activeTab(value: RibbonTab) {
+        if (this.contextTab && value !== this.contextTab) return;
         this.setProperty("activeTab", value);
     }
 
@@ -165,7 +186,9 @@ export class Ribbon extends Observable {
         const tab = this.tabs.find((x) => x.tabName === tabName);
         if (!tab) return;
 
+        if (this.contextTab === tab) return;
         this.preTab = this.activeTab;
+        if (tab.contextual) this.setProperty("contextTab", tab);
         if (!tab.visible) tab.visible = true;
         this.activeTab = tab;
     }
@@ -174,10 +197,14 @@ export class Ribbon extends Observable {
         const tab = this.tabs.find((x) => x.tabName === tabName);
         if (!tab) return;
 
+        if (this.contextTab && this.contextTab !== tab) return;
+        if (tab.contextual && this.contextTab !== tab) return;
+        this.setProperty("contextTab", undefined);
         tab.visible = !tab.contextual;
         this.activeTab =
             this.preTab?.visible && this.tabs.contains(this.preTab)
                 ? this.preTab
                 : this.tabs.find((x) => x.visible)!;
+        this.preTab = undefined;
     }
 }

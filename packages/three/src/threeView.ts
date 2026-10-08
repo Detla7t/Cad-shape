@@ -501,6 +501,8 @@ export class ThreeView extends Observable implements IView {
             node = threeObject.componentNode;
         } else if (threeObject instanceof ThreeRefSegmentAnnotation) {
             node = threeObject.annotation;
+        } else if (threeObject instanceof ThreeVisualObject) {
+            node = threeObject.node;
         }
         return node;
     }

@@ -22,6 +22,7 @@ export default defineConfig({
             },
         },
         rules: [
+            { test: /\.svg$/, type: "asset/source" },
             {
                 test: /\.css$/,
                 type: "css/auto",

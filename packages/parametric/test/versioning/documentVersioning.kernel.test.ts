@@ -34,7 +34,7 @@ import type { FeatureData } from "../../src/features/feature";
 import { captureProfileRef } from "../../src/features/profileRef";
 import { FeatureStudioNode } from "../../src/featurescript/featureStudioNode";
 import { ParametricBodyNode } from "../../src/parametricBodyNode";
-import type { SketchData } from "../../src/sketch/sketchModel";
+import { ConstraintKind, type SketchData } from "../../src/sketch/sketchModel";
 import { SketchNode } from "../../src/sketch/sketchNode";
 import "../../src/versioning";
 import "../sketch/setup";
@@ -162,6 +162,73 @@ describe("document version control (kernel)", () => {
     afterEach(() => {
         vc.dispose();
         doc.dispose();
+    });
+
+    test("each sketch commit exposes dimensions, constraint changes, deletion and dragged geometry", async () => {
+        const sketch = new SketchNode({
+            document: doc,
+            plane: Plane.XY,
+            data: {
+                entities: [
+                    { id: 1, type: "circle", params: [0, 0, 10] },
+                    { id: 2, type: "line", params: [30, 0, 30, 20] },
+                ],
+                constraints: [
+                    { id: 1, kind: ConstraintKind.Radius, refs: [{ entityId: 1, pointIndex: 0 }], datum: 10 },
+                    { id: 2, kind: ConstraintKind.Vertical, refs: [{ entityId: 2, pointIndex: 0 }] },
+                ],
+            },
+        });
+        Transaction.execute(doc, "create sketch", () => doc.modelManager.addNode(sketch));
+        await settle();
+        const initial = sketch.data;
+        const originalCommit = vc.head;
+        const change = async (name: string, edit: (data: SketchData) => void) => {
+            const data = sketch.data;
+            edit(data);
+            Transaction.execute(doc, name, () => sketch.setDataEmitShapeChanged(data));
+            await settle();
+            const commit = vc.headCommit();
+            return vc.diff(commit.parents[0], commit.id).nodes.find((n) => n.id === sketch.id)!.changes;
+        };
+        const dimension = await change("edit radius", (data) => {
+            data.constraints[0].datum = 12;
+            data.entities[0].params[2] = 12;
+        });
+        expect(dimension).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({ kind: "changed", id: "1", label: "Radius constraint 1" }),
+            ]),
+        );
+        const constraint = await change("change constraint", (data) => {
+            data.constraints[1].kind = ConstraintKind.Horizontal;
+            data.entities[1].params = [30, 0, 50, 0];
+        });
+        expect(constraint).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({ kind: "changed", id: "2", label: "Horizontal constraint 2" }),
+            ]),
+        );
+        const removed = await change("delete constraint", (data) => {
+            data.constraints.pop();
+        });
+        expect(removed).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({ kind: "removed", id: "2", label: "Horizontal constraint 2" }),
+            ]),
+        );
+        const dragged = await change("drag endpoint", (data) => {
+            data.entities[1].params = [30, 0, 45, 20];
+        });
+        expect(dragged).toEqual(
+            expect.arrayContaining([expect.objectContaining({ kind: "changed", id: "2", label: "Line 2" })]),
+        );
+        const final = sketch.data;
+        expect(vc.restore(originalCommit).errors).toEqual([]);
+        expect(sketch.data).toEqual(initial);
+        doc.history.undo();
+        await settle();
+        expect(sketch.data).toEqual(final);
     });
 
     test("records a microversion per edit, and per undo and redo", async () => {

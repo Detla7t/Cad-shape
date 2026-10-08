@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type ModelParameter, Result, registerModelParameters, Transaction } from "@chili3d/core";
+import { type ModelParameter, Result, registerModelParameters, Transaction, UNITLESS } from "@chili3d/core";
 import { SketchEditor } from "./editor/sketchEditor";
 import { ConstraintKind, datumUnitSpec, toDisplayDatum } from "./sketchModel";
 import { SketchNode } from "./sketchNode";
@@ -11,6 +11,21 @@ registerModelParameters((document) => {
     const slots: ModelParameter[] = [];
     for (const node of document.modelManager.findNodes()) {
         if (!(node instanceof SketchNode)) continue;
+        slots.push({
+            id: `${node.id}:suppressed`,
+            node,
+            label: "Unsuppressed",
+            value: String(node.suppression),
+            unit: UNITLESS,
+            boolean: true,
+            inverted: true,
+            apply(value) {
+                Transaction.execute(document, "Configure sketch suppression", () => {
+                    node.suppression = value === "true" ? true : value === "false" ? false : String(value);
+                });
+                return Result.ok(undefined);
+            },
+        });
         for (const constraint of node.data.constraints) {
             if (constraint.datum === undefined) continue;
             slots.push({
@@ -39,7 +54,7 @@ registerModelParameters((document) => {
                         Transaction.execute(
                             document,
                             "Edit sketch dimension",
-                            () => (node.dataJson = JSON.stringify(solver.toData())),
+                            () => (node.dataJson = JSON.stringify({ ...node.data, ...solver.toData() })),
                         );
                         return Result.ok(undefined);
                     } finally {

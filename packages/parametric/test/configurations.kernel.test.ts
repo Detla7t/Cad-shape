@@ -113,6 +113,29 @@ function rows(body: ParametricBodyNode) {
 }
 
 describe("configured built-in features", () => {
+    test("configured sketch suppression removes profiles and construction display, then restores them", () => {
+        const doc = newDoc();
+        const { sketch } = squareSketch(doc, 10);
+        const data = sketch.data;
+        data.entities.push({ id: 5, type: "line", params: [0, 0, 10, 10], construction: true });
+        sketch.setDataEmitShapeChanged(data);
+        Transaction.execute(doc, "configure sketch suppression", () => {
+            sketch.suppression = "configure(Holes, true: true, false: false)";
+        });
+        expect(sketch.mesh.edges!.position.length).toBeGreaterThan(0);
+        activate(doc, { Holes: true });
+        expect(sketch.suppressed).toBe(true);
+        expect(sketch.mesh.edges).toBeUndefined();
+        expect(sketch.shape.value.findSubShapes(ShapeTypes.edge)).toHaveLength(0);
+        activate(doc, { Holes: false });
+        expect(sketch.mesh.edges!.position.length).toBeGreaterThan(0);
+        expect(sketch.shape.value.findSubShapes(ShapeTypes.edge)).toHaveLength(4);
+        doc.history.undo();
+        activate(doc, { Holes: true });
+        expect(sketch.suppressed).toBe(false);
+        expect(sketch.mesh.edges!.position.length).toBeGreaterThan(0);
+    });
+
     test("a configured extrude depth follows the active configuration; S → L → S is identical", () => {
         const doc = newDoc();
         const { sketch, profile } = squareSketch(doc, 10);

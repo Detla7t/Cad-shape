@@ -458,6 +458,7 @@ export class RibbonCustomization {
         const render = () => {
             results.replaceChildren();
             for (const command of CommandStore.getAllCommands()
+                .filter((item) => this.ribbon.isCommandAvailable(item.key))
                 .filter((item) =>
                     I18n.translate(`command.${item.key}`).toLowerCase().includes(query.value.toLowerCase()),
                 )

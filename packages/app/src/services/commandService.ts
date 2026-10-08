@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    CancelableCommand,
     type CommandKeys,
     CommandStore,
     type IApplication,
@@ -81,10 +82,16 @@ export class CommandService implements IService {
             })
             .finally(() => {
                 operation.add({
-                    undoCount: document?.history.undoCount(),
-                    nodeCount: document?.modelManager.findNodes().length,
+                    nodeCount: document?.modelManager?.findNodes?.().length,
                 });
-                operation.finish(failure === undefined ? "success" : "error", failure);
+                operation.finish(
+                    failure !== undefined
+                        ? "error"
+                        : command instanceof CancelableCommand && command.isCanceled
+                          ? "cancelled"
+                          : "success",
+                    failure,
+                );
                 this.app.lastCommand = commandName;
                 this.app.executingCommand = undefined;
             });

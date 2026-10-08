@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import type { CommandIcon } from "@chili3d/core";
+import { createConstraintIcon } from "./constraintIcon";
 import { createIcon } from "./elements";
 
 /** Original 20 px CAD symbols: neutral geometry, blue editable handles. */
@@ -96,6 +97,8 @@ const handles: Record<string, number[][]> = {
 };
 
 export function createCadIcon(command: string, fallback?: CommandIcon): Element {
+    const constraint = createConstraintIcon(command);
+    if (constraint) return constraint;
     const leaf = command.split(".").at(-1)!;
     const key = command === "plane.create" ? "plane" : (aliases[leaf] ?? leaf);
     if (!paths[key] && fallback) {

@@ -17,7 +17,7 @@ import {
     PubSub,
     Result,
 } from "@chili3d/core";
-import { createIcon, label } from "@chili3d/element";
+import { createCadIcon, createIcon, label } from "@chili3d/element";
 import style from "./ribbonButton.module.css";
 
 export class RibbonPushButton extends HTMLElement {
@@ -68,7 +68,9 @@ export class RibbonPushButton extends HTMLElement {
     }
 
     private initHTML(display: I18nKeys, icon: CommandIcon, size: ButtonSize) {
-        const image = createIcon(icon);
+        const image = this.commandName.startsWith("constraint.")
+            ? createCadIcon(this.commandName, icon)
+            : createIcon(icon);
         this.className = size === "large" ? style.normal : style.small;
         image.classList.add(size === "large" ? style.icon : style.smallIcon);
         const text = label({

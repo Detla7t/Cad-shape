@@ -151,6 +151,8 @@ export class ContextToolbar extends HTMLElement {
     }
 
     private family(tools: Tool[], name?: string, remember = true): HTMLElement {
+        tools = tools.filter((tool) => this.ribbon.isCommandAvailable(keyOf(tool)));
+        if (!tools.length) return document.createElement("span");
         tools.forEach((tool) => this.included.add(keyOf(tool)));
         const family = document.createElement("div");
         family.className = style.family;
@@ -189,9 +191,9 @@ export class ContextToolbar extends HTMLElement {
             typeof command === "string" ||
             (!(command instanceof ObservableCollection) && command.type === "push")
         ) {
-            parent.append(this.tool(command));
+            if (this.ribbon.isCommandAvailable(keyOf(command))) parent.append(this.tool(command));
         } else if (command instanceof ObservableCollection) {
-            const tools = command.items();
+            const tools = command.items().filter((key) => this.ribbon.isCommandAvailable(key));
             if (tools.length > 1) parent.append(this.family(tools));
             else if (tools[0]) parent.append(this.tool(tools[0]));
         } else {
@@ -223,7 +225,7 @@ export class ContextToolbar extends HTMLElement {
             this.openMenu(
                 workspace,
                 this.ribbon.tabs
-                    .filter((item) => item.visible)
+                    .filter((item) => this.ribbon.isTabAvailable(item))
                     .map((item) => {
                         const row = button(this.workspaceName(item), () => {
                             this.closeMenu();
@@ -274,29 +276,15 @@ export class ContextToolbar extends HTMLElement {
                 ),
             );
             this.separator(row);
-            for (const key of [
-                "coincident",
-                "horizontal",
-                "vertical",
-                "perpendicular",
-                "parallel",
-                "tangent",
-                "equal",
-                "fix",
-            ] as const)
+            row.append(
+                this.family(["constraint.coincident", "constraint.pointOn"], "Coincident tools"),
+                this.family(["constraint.horizontal", "constraint.horizontalAlign"], "Horizontal tools"),
+                this.family(["constraint.vertical", "constraint.verticalAlign"], "Vertical tools"),
+            );
+            for (const key of ["perpendicular", "parallel", "tangent", "equal", "fix"] as const)
                 row.append(this.tool(`constraint.${key}`));
             row.append(
-                this.family(
-                    [
-                        "constraint.midpoint",
-                        "constraint.symmetric",
-                        "constraint.pointOn",
-                        "constraint.horizontalAlign",
-                        "constraint.verticalAlign",
-                    ],
-                    "More constraints",
-                    false,
-                ),
+                this.family(["constraint.midpoint", "constraint.symmetric"], "More constraints", false),
             );
             this.separator(row);
             row.append(
@@ -360,7 +348,7 @@ export class ContextToolbar extends HTMLElement {
                 this.separator(row);
             }
         }
-        const extras = pinned.filter((key) => !quick.includes(key));
+        const extras = pinned.filter((key) => !quick.includes(key) && this.ribbon.isCommandAvailable(key));
         if (extras.length) {
             this.separator(row);
             for (const key of extras) row.append(this.tool(key));

@@ -63,6 +63,7 @@ export interface SketchProfileSet {
  *   applies on that path.
  */
 export function sketchProfiles(sketch: SketchNode): Result<SketchProfileSet> {
+    if (sketch.suppressed) return Result.err("The sketch is suppressed in this configuration");
     const shape = sketch.shape;
     if (!shape.isOk) return Result.err(shape.error);
 

@@ -137,7 +137,7 @@ describe("SketchRibbonProfiles", () => {
         expect(tab).toBeDefined();
         expect(tab!.contextual).toBeUndefined();
         const allItems = flattenItems(tab!.groups.flatMap((g) => g.items));
-        expect(allItems).toEqual(["sketch.create", "sketch.enter"]);
+        expect(allItems).toEqual(["sketch.create", "sketch.enter", "plane.create"]);
     });
 
     test("sketch tab should be contextual and contain sketch, draw, constraint, dimension groups", () => {
@@ -180,6 +180,7 @@ describe("ParametricRibbonProfiles", () => {
         expect(allItems).toEqual([
             "sketch.create",
             "sketch.enter",
+            "plane.create",
             "feature.extrude",
             "feature.revolve",
             "feature.fillet",

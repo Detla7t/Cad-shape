@@ -7,6 +7,7 @@ export * from "./dialog";
 export * from "./documentElements";
 export * from "./documentPanels";
 export * from "./floatPanel";
+export * from "./nodeActions";
 export * from "./ribbon";
 export * from "./ribbonPreferences";
 export * from "./window";

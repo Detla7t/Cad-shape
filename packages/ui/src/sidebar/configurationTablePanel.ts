@@ -102,7 +102,9 @@ export class ConfigurationTablePanel {
             const choose = document.createElement("select");
             choose.setAttribute("aria-label", `Configure ${input.name} parameter`);
             choose.add(new Option("Choose a dimension or feature parameter…", ""));
-            slots.forEach((s) => choose.add(new Option(`${s.node.name} / ${s.label}`, s.id)));
+            slots
+                .filter((s) => !configured.some((item) => item.id === s.id))
+                .forEach((s) => choose.add(new Option(`${s.node.name} / ${s.label}`, s.id)));
             const add = document.createElement("button");
             add.textContent = "Configure";
             add.onclick = () => {

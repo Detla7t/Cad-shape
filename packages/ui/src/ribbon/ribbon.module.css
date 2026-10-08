@@ -401,3 +401,6 @@
 .documentHeader .new:hover {
     background: var(--hover-background-color);
 }
+.root [hidden] {
+    display: none !important;
+}

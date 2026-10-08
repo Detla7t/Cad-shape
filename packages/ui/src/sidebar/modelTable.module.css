@@ -67,3 +67,7 @@
     border: 1px solid #acd5ef;
     line-height: 1.6;
 }
+
+.root [hidden] {
+    display: none;
+}

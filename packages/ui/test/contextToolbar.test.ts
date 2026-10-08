@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { CommandStore, PubSub, Ribbon, RibbonGroup, RibbonTab } from "@chili3d/core";
+import { CommandStore, ObservableCollection, PubSub, Ribbon, RibbonGroup, RibbonTab } from "@chili3d/core";
 import { createMockApplication } from "@chili3d/core/test-utils";
 import { ContextToolbar } from "../src/ribbon/contextToolbar";
 import { RibbonCustomization } from "../src/ribbon/customization";
@@ -101,6 +101,44 @@ test("new group commands appear after customization without reentering collectio
         custom.items.push("create.rect");
         await Promise.resolve();
         expect(toolbar.querySelector("[data-command='create.rect']")).not.toBeNull();
+    } finally {
+        toolbar.remove();
+    }
+});
+
+test("editing context filters pins, copied families and toolsets, then restores modeling tools", () => {
+    const model = new RibbonTab("ribbon.tab.model", new RibbonGroup("ribbon.group.draw", ["create.box"]));
+    const sketch = RibbonTab.fromProfile({ tabName: "ribbon.tab.sketch", contextual: true, groups: [] });
+    sketch.groups.push(
+        new RibbonGroup("ribbon.group.custom", [
+            new ObservableCollection("feature.extrude", "feature.revolve"),
+            { type: "split", items: ["plane.create", "sketch.create"] },
+        ]),
+    );
+    const ribbon = new Ribbon(["feature.extrude", "sketch.line", "doc.save"], [model, sketch]);
+    const toolbar = new ContextToolbar(createMockApplication(), ribbon, new RibbonCustomization(ribbon));
+    document.body.append(toolbar);
+    try {
+        expect(toolbar.querySelector("[data-command='sketch.line']")).toBeNull();
+        ribbon.openTab("ribbon.tab.sketch");
+        ribbon.openTab("ribbon.tab.sketch");
+        ribbon.activeTab = model;
+        expect(toolbar.dataset["tab"]).toBe("ribbon.tab.sketch");
+        expect(toolbar.querySelector("[data-command='sketch.line']")).not.toBeNull();
+        expect(toolbar.querySelector("[data-command='doc.save']")).not.toBeNull();
+        expect(toolbar.querySelector("[data-command='feature.extrude']")).toBeNull();
+        expect(toolbar.querySelector("[data-command='plane.create']")).toBeNull();
+        click(toolbar, "[aria-label='Choose toolset']");
+        expect(
+            Array.from(document.querySelectorAll<HTMLElement>("[role='menuitemradio']")).map(
+                (e) => e.dataset["ribbonTab"],
+            ),
+        ).toEqual(["ribbon.tab.sketch"]);
+        ribbon.closeTab("ribbon.tab.sketch");
+        expect(document.querySelector("[role='menu']")).toBeNull();
+        expect(toolbar.dataset["tab"]).toBe("ribbon.tab.model");
+        expect(toolbar.querySelector("[data-command='feature.extrude']")).not.toBeNull();
+        expect(toolbar.querySelector("[data-command='sketch.line']")).toBeNull();
     } finally {
         toolbar.remove();
     }

@@ -84,12 +84,18 @@ export class PlanePickHandler extends ShapeSelectionHandler {
 
     protected override setHighlight(view: IView, event: PointerEvent): void {
         super.setHighlight(view, event);
+        const previous = this.hoveredPlane;
         this.hoveredPlane = view
             .detectVisual(event.offsetX, event.offsetY, {
                 allow: (node) => node instanceof ReferencePlaneNode,
             })
             .map((visual) => this.document.visual.context.getNode(visual))
             .find((node) => node instanceof ReferencePlaneNode) as ReferencePlaneNode | undefined;
+        if (previous !== this.hoveredPlane) {
+            this.highlightReference(previous, false);
+            this.highlightReference(this.hoveredPlane, true);
+            view.update();
+        }
         const hovered =
             this._highlights?.length || this.hoveredPlane || !this._datumMeshIds.length
                 ? -1
@@ -99,8 +105,20 @@ export class PlanePickHandler extends ShapeSelectionHandler {
 
     override pointerOut(view: IView, event: PointerEvent): void {
         super.pointerOut(view, event);
+        this.highlightReference(this.hoveredPlane, false);
         this.hoveredPlane = undefined;
         this.setHoveredDatum(view, -1);
+    }
+
+    private highlightReference(node: ReferencePlaneNode | undefined, add: boolean) {
+        if (!node) return;
+        const visual = this.document.visual.context.getVisual(node);
+        if (visual)
+            this.document.visual.highlighter[add ? "addState" : "removeState"](
+                visual,
+                VisualStates.faceHighlight,
+                ShapeTypes.shape,
+            );
     }
 
     private detectDatum(ray: Ray): number {
@@ -145,6 +163,7 @@ export class PlanePickHandler extends ShapeSelectionHandler {
     }
 
     protected override disposeInternal(): void {
+        this.highlightReference(this.hoveredPlane, false);
         super.disposeInternal();
         const context = this.document.visual.context;
         this._datumMeshIds.forEach((id) => {

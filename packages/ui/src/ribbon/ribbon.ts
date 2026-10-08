@@ -256,12 +256,28 @@ export class RibbonUI extends HTMLElement {
     connectedCallback(): void {
         this.customization.start();
         Config.instance.onPropertyChanged(this.handleConfigChanged);
+        this.dataContent.onPropertyChanged(this.syncContext);
+        this.dataContent.quickCommands.onCollectionChanged(this.syncContext);
+        this.syncContext();
     }
 
     disconnectedCallback(): void {
         this.customization.dispose();
         Config.instance.removePropertyChanged(this.handleConfigChanged);
+        this.dataContent.removePropertyChanged(this.syncContext);
+        this.dataContent.quickCommands.removeCollectionChanged(this.syncContext);
     }
+
+    private readonly syncContext = () => {
+        const legacy = this.querySelector(`.${style.legacy}`);
+        legacy?.querySelectorAll<HTMLElement>("[data-command]").forEach((element) => {
+            element.hidden = !this.dataContent.isCommandAvailable(element.dataset["command"] as CommandKeys);
+        });
+        legacy?.querySelectorAll<HTMLElement>("[data-ribbon-tab]").forEach((element) => {
+            const tab = this.dataContent.tabs.find((tab) => tab.tabName === element.dataset["ribbonTab"]);
+            element.hidden = !!tab && !this.dataContent.isTabAvailable(tab);
+        });
+    };
 
     private readonly handleConfigChanged = (prop: keyof Config) => {
         if (prop === "ribbonPreferences") {

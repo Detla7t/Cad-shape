@@ -165,6 +165,7 @@ async function pickPlane(document: IDocument, controller: AsyncController): Prom
     const selected = document.selection.getSelectedNodes().find((n) => n instanceof ReferencePlaneNode);
     if (selected instanceof ReferencePlaneNode) {
         controller.dispose();
+        document.selection.clearSelection();
         return resolvePlane(document, { kind: "reference", node: selected });
     }
     document.selection.clearSelection();
@@ -186,11 +187,14 @@ async function pickPlane(document: IDocument, controller: AsyncController): Prom
     hint.textContent = "Select a plane or planar face";
     hint.className = panelStyle.plane;
     panel.append(header, hint);
-    for (const [name, plane] of [
-        ["Top (XY)", Plane.XY],
-        ["Front (XZ)", Plane.ZX],
-        ["Right (YZ)", Plane.YZ],
-    ] as const) {
+    const storedPlanes = document.modelManager.findNodes().filter((n) => n instanceof ReferencePlaneNode);
+    for (const [name, plane] of storedPlanes.length
+        ? []
+        : ([
+              ["Top (XY)", Plane.XY],
+              ["Front (XZ)", Plane.ZX],
+              ["Right (YZ)", Plane.YZ],
+          ] as const)) {
         const choice = globalThis.document.createElement("button");
         choice.textContent = name;
         choice.onclick = () => {
@@ -212,14 +216,11 @@ async function pickPlane(document: IDocument, controller: AsyncController): Prom
     panel.addEventListener("pointerdown", (event) => event.stopPropagation());
     panel.addEventListener("pointermove", (event) => event.stopPropagation());
     view?.dom?.append(panel);
-    const ribbon = document.application.mainWindow?.ribbon;
-    ribbon?.openTab("ribbon.tab.sketch");
     try {
         await document.picker.pickAsync(handler, "prompt.select.plane", controller, false, "select.default");
         return resolvePlane(document, handler.result);
     } finally {
         panel.remove();
-        ribbon?.closeTab("ribbon.tab.sketch");
         controller.dispose();
         handler.dispose();
         document.selection.clearSelection();

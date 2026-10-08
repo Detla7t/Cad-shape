@@ -26,6 +26,8 @@ export class InspectionPanel {
     private readonly watches = new Set<INode>();
     private rows: string[][] = [];
     private writing = false;
+    private queued = false;
+    private disposed = false;
     constructor(private readonly doc: IDocument) {
         this.element.className = style.root;
         this.output.className = style.scroll;
@@ -53,7 +55,12 @@ export class InspectionPanel {
         this.render();
     }
     private readonly changed = () => {
-        if (!this.writing) this.render();
+        if (this.writing || this.queued || this.disposed) return;
+        this.queued = true;
+        queueMicrotask(() => {
+            this.queued = false;
+            if (!this.disposed) this.render();
+        });
     };
     private render() {
         for (const n of this.watches) n.removePropertyChanged(this.changed);
@@ -82,14 +89,15 @@ export class InspectionPanel {
             head.append(th);
         }
         for (const slot of slots) {
+            if (slot.boolean) continue;
             const node = slot.node;
             if (!(node instanceof GeometryNode)) continue;
             const resolved = resolveUnitSpec(slot.value, this.doc.variables.evaluate().scope, slot.unit);
             if (!resolved.isOk) continue;
             const value = resolved.value,
-                unit = slot.unit.angle ? "°" : "mm";
+                unit = slot.unit.angle ? "°" : slot.unit.length ? "mm" : "";
             const t = tolerances(node)[slot.id] ?? { minus: 0, plus: 0 };
-            const formatted = (v: number) => `${Number(v.toFixed(5))} ${unit}`;
+            const formatted = (v: number) => `${Number(v.toFixed(5))} ${unit}`.trim();
             const texts = [
                 `${node.name} / ${slot.label}`,
                 formatted(value),
@@ -148,6 +156,7 @@ export class InspectionPanel {
         } else this.output.replaceChildren(table);
     }
     dispose() {
+        this.disposed = true;
         this.doc.modelManager.removeNodeObserver(this.changed);
         this.doc.variables.removePropertyChanged(this.changed);
         for (const n of this.watches) n.removePropertyChanged(this.changed);

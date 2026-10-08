@@ -19,6 +19,7 @@
 import { type IDisposable, notifyDataTablesChanged, registerDataTableProvider } from "@chili3d/core";
 import { DOCUMENT_TABLE_PROVIDER, onDocumentTablesChanged } from "./api";
 import "./commands";
+import "./sketchActions";
 import { installDocumentIcons } from "./documentIcons";
 import { registerDocumentImporters } from "./importers";
 import { registerDocumentElements } from "./ui/documentElements";

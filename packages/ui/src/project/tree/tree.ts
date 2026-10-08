@@ -15,6 +15,7 @@ import {
     ShapeTypes,
     Transaction,
 } from "@chili3d/core";
+import { showNodeContextMenu } from "../nodeContextMenu";
 import style from "./tree.module.css";
 import { TreeItem } from "./treeItem";
 import { TreeGroup } from "./treeItemGroup";
@@ -201,6 +202,7 @@ export class Tree extends HTMLElement {
         item.addEventListener("dragend", this.onDragEnd);
         item.addEventListener("drop", this.onDrop);
         item.addEventListener("click", this.onClick);
+        item.addEventListener("contextmenu", this.onContextMenu);
         item.addEventListener("dblclick", this.onDoubleClick);
     }
 
@@ -211,6 +213,7 @@ export class Tree extends HTMLElement {
         item.removeEventListener("dragend", this.onDragEnd);
         item.removeEventListener("drop", this.onDrop);
         item.removeEventListener("click", this.onClick);
+        item.removeEventListener("contextmenu", this.onContextMenu);
         item.removeEventListener("dblclick", this.onDoubleClick);
     }
 
@@ -219,6 +222,14 @@ export class Tree extends HTMLElement {
         if (item instanceof TreeItem) return item;
         return this.getTreeItem(item.parentElement);
     }
+
+    private readonly onContextMenu = (event: MouseEvent) => {
+        const node = this.getTreeItem(event.target as HTMLElement)?.node;
+        if (!node) return;
+        event.preventDefault();
+        event.stopPropagation();
+        showNodeContextMenu(node, event.clientX, event.clientY);
+    };
 
     private readonly onClick = (event: MouseEvent) => {
         if (!this.canSelect()) return;
