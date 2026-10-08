@@ -244,6 +244,7 @@ export class ThreeVisualContext implements IVisualContext {
         } else if (
             obj instanceof ThreeGeometry ||
             obj instanceof ThreeMeshObject ||
+            obj instanceof ThreeReferencePlane ||
             obj instanceof ThreeComponentObject ||
             obj instanceof ThreeRefSegmentAnnotation
         ) {

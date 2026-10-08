@@ -390,10 +390,28 @@ describe("ParametricBodyNode", () => {
         expect(items[0].display).toBe("command.feature.extrude");
         expect(items[0].icon).toBe("icon-prism");
         expect(items[0].error).toBeUndefined();
-        expect(items[0].parameters).toEqual([
-            { key: "depth", display: "option.command.depth", value: 7, unit: LENGTH_UNITS },
-            { key: "startOffset", display: "option.command.startOffset", value: 0, unit: LENGTH_UNITS },
-            { key: "symmetric", display: "option.command.symmetric", value: false },
+        expect(items[0].parameters).toMatchObject([
+            {
+                key: "operation",
+                value: "new",
+                configurable: true,
+                options: [{ value: "new" }, { value: "fuse" }, { value: "cut" }, { value: "common" }],
+            },
+            {
+                key: "depth",
+                display: "option.command.depth",
+                value: 7,
+                unit: LENGTH_UNITS,
+                configurable: true,
+            },
+            {
+                key: "startOffset",
+                display: "option.command.startOffset",
+                value: 0,
+                unit: LENGTH_UNITS,
+                configurable: true,
+            },
+            { key: "symmetric", display: "option.command.symmetric", value: false, configurable: true },
         ]);
     });
 

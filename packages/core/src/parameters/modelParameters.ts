@@ -4,12 +4,12 @@
 import type { IDocument } from "../document";
 import { Result, Transaction } from "../foundation";
 import { I18n } from "../i18n";
-import { type INode, isFeatureListNode } from "../model";
+import { type FeatureParameterOption, type INode, isFeatureListNode } from "../model";
 import type { ParameterValue } from "./expression";
 import type { UnitSpec } from "./unitSpec";
 import { UNITLESS } from "./unitSpec";
 
-/** Numeric model slots shared by configuration grids and inspection tables. Values use display units. */
+/** Typed model slots shared by configuration grids and inspection tables. Numbers use display units. */
 export interface ModelParameter {
     id: string;
     node: INode;
@@ -19,6 +19,8 @@ export interface ModelParameter {
     /** Checkbox cells, optionally displayed as the inverse (Unsuppressed). */
     boolean?: boolean;
     inverted?: boolean;
+    options?: readonly FeatureParameterOption[];
+    text?: boolean;
     apply(value: ParameterValue): Result<void>;
 }
 const providers = new Set<(document: IDocument) => ModelParameter[]>();
@@ -51,11 +53,9 @@ export function modelParameters(document: IDocument): ModelParameter[] {
             for (const parameter of feature.parameters) {
                 const boolean = typeof parameter.value === "boolean";
                 if (
-                    (!parameter.unit && !boolean) ||
-                    parameter.options ||
-                    parameter.text ||
                     parameter.pick ||
-                    parameter.configurable === false
+                    parameter.configurable === false ||
+                    (!parameter.unit && parameter.configurable !== true)
                 )
                     continue;
                 result.push({
@@ -67,6 +67,8 @@ export function modelParameters(document: IDocument): ModelParameter[] {
                         (boolean ? String(parameter.value) : (parameter.value as ParameterValue)),
                     unit: parameter.unit ?? UNITLESS,
                     boolean,
+                    options: parameter.options,
+                    text: parameter.text,
                     apply(value) {
                         Transaction.execute(document, "Edit configured parameter", () =>
                             node.setFeatureParameter(

@@ -9,6 +9,8 @@ export interface NodeMenuAction {
     run?: () => void | Promise<void>;
     children?: NodeMenuAction[];
     disabled?: boolean;
+    icon?: string;
+    separatorBefore?: boolean;
 }
 const providers = new Set<(node: INode) => NodeMenuAction[]>();
 export const NodeActions = {

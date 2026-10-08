@@ -231,6 +231,54 @@ describe("document version control (kernel)", () => {
         expect(sketch.data).toEqual(final);
     });
 
+    test("selected sketch changes restore a dimension while retaining a dragged line, then undo", async () => {
+        const sketch = new SketchNode({
+            document: doc,
+            plane: Plane.XY,
+            data: {
+                entities: [
+                    { id: 1, type: "circle", params: [0, 0, 10] },
+                    { id: 2, type: "line", params: [30, 0, 30, 20] },
+                ],
+                constraints: [
+                    { id: 1, kind: ConstraintKind.Radius, refs: [{ entityId: 1, pointIndex: 0 }], datum: 10 },
+                ],
+            },
+        });
+        Transaction.execute(doc, "create sketch", () => doc.modelManager.addNode(sketch));
+        vc.flush();
+        const data = sketch.data;
+        data.entities[0].params[2] = 12;
+        data.constraints[0].datum = 12;
+        data.entities[1].params = [30, 0, 45, 25];
+        Transaction.execute(doc, "dimension and drag", () => sketch.setDataEmitShapeChanged(data));
+        vc.flush();
+        const changes = vc.changes(vc.head);
+        expect(changes.some((c) => c.label.endsWith("Line 2 › geometry"))).toBe(true);
+        expect(changes.some((c) => c.label.endsWith("Radius constraint 1 › dimension"))).toBe(true);
+        const radius = changes.filter(
+            (c) => c.label.includes("Circle 1") || c.label.includes("Radius constraint 1"),
+        );
+        expect(radius).toHaveLength(2);
+        const preview = vc.previewChanges(
+            vc.head,
+            radius.map((c) => c.id),
+            "revert",
+        );
+        expect(preview.isOk).toBe(true);
+        const result = vc.applyChanges(preview.value);
+        expect(result.isOk).toBe(true);
+        expect(result.value.errors).toEqual([]);
+        expect(sketch.data.entities[0].params[2]).toBe(10);
+        expect(sketch.data.constraints[0].datum).toBe(10);
+        expect(sketch.data.entities[1].params).toEqual([30, 0, 45, 25]);
+        expect(sketch.shape.isOk).toBe(true);
+        doc.history.undo();
+        expect(sketch.data.entities[0].params[2]).toBe(12);
+        expect(sketch.data.constraints[0].datum).toBe(12);
+        expect(sketch.data.entities[1].params).toEqual([30, 0, 45, 25]);
+    });
+
     test("records a microversion per edit, and per undo and redo", async () => {
         await buildPart(doc);
         const log = vc.log();

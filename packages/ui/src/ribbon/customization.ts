@@ -9,19 +9,44 @@ import {
     formatShortcutKey,
     I18n,
     normalizeShortcut,
+    ObservableCollection,
     PubSub,
     type Ribbon,
+    type RibbonCommand,
     RibbonGroup,
     RibbonTab,
     type RibbonTabKeys,
     type RibbonTabPreference,
 } from "@chili3d/core";
-import { button, div, input, label, option, select } from "@chili3d/element";
+import { button, createCadIcon, div, input, label, option, select, span } from "@chili3d/element";
 import style from "./customization.module.css";
 import { DropdownController } from "./dropdownController";
 
 export function tabLabel(tab: RibbonTab): string {
     return tab.label || I18n.translate(tab.tabName);
+}
+
+/** Includes nested variants and customized tabs, rather than guessing from command names. */
+function toolCategories(ribbon: Ribbon): Map<CommandKeys, Set<string>> {
+    const result = new Map<CommandKeys, Set<string>>();
+    const add = (item: RibbonCommand, categories: string[]) => {
+        if (item instanceof ObservableCollection) item.forEach((key) => add(key, categories));
+        else if (typeof item !== "string" && item.type !== "push")
+            item.items.forEach((child) => add(child, categories));
+        else {
+            const key = typeof item === "string" ? item : item.command;
+            const names = result.get(key) ?? new Set<string>();
+            categories.forEach((name) => names.add(name));
+            result.set(key, names);
+        }
+    };
+    for (const tab of ribbon.tabs)
+        for (const group of tab.groups) {
+            const names = [tabLabel(tab), I18n.translate(group.groupName)];
+            group.items.forEach((item) => add(item, names));
+            group.collapsedItems.forEach((item) => add(item, names));
+        }
+    return result;
 }
 
 /** Owns the menus/dialogs and persists only user overrides, preserving module contributions. */
@@ -452,31 +477,63 @@ export class RibbonCustomization {
 
     searchTools(): void {
         const { content, close } = this.openDialog("Search tools");
-        const query = input({ placeholder: "Search tools…", type: "search" });
+        const query = input({ placeholder: "Search tools or categories…", type: "search" });
         query.setAttribute("aria-label", "Search tools");
         const results = div({ className: style.searchResults });
+        const categories = toolCategories(this.ribbon);
+        const commands = CommandStore.getAllCommands().filter((item) =>
+            this.ribbon.isCommandAvailable(item.key),
+        );
+        const names = [...new Set(commands.flatMap((item) => [...(categories.get(item.key) ?? [])]))].sort();
+        const category = select(
+            {},
+            option({ value: "", textContent: "All categories" }),
+            ...names.map((name) => option({ value: name, textContent: name })),
+        );
+        category.setAttribute("aria-label", "Tool category");
+        const count = div({ className: style.hint, role: "status" });
         const render = () => {
             results.replaceChildren();
-            for (const command of CommandStore.getAllCommands()
-                .filter((item) => this.ribbon.isCommandAvailable(item.key))
-                .filter((item) =>
-                    I18n.translate(`command.${item.key}`).toLowerCase().includes(query.value.toLowerCase()),
-                )
-                .slice(0, 80)) {
+            const words = query.value.toLowerCase().trim().split(/\s+/).filter(Boolean);
+            const matching = commands.filter((item) => {
+                const groups = [...(categories.get(item.key) ?? [])];
+                const text =
+                    `${I18n.translate(`command.${item.key}`)} ${groups.join(" ")} ${item.key}`.toLowerCase();
+                return (
+                    (!category.value || groups.includes(category.value)) &&
+                    words.every((word) => text.includes(word))
+                );
+            });
+            for (const command of matching) {
                 results.append(
-                    button({
-                        textContent: I18n.translate(`command.${command.key}`),
-                        dataset: { command: command.key },
-                        onclick: () => {
-                            close();
-                            PubSub.default.pub("executeCommand", command.key);
+                    button(
+                        {
+                            className: style.searchResult,
+                            dataset: { command: command.key },
+                            onclick: () => {
+                                close();
+                                PubSub.default.pub("executeCommand", command.key);
+                            },
                         },
-                    }),
+                        createCadIcon(command.key, command.icon),
+                        span({
+                            className: style.toolName,
+                            textContent: I18n.translate(`command.${command.key}`),
+                        }),
+                        span({
+                            className: style.toolCategory,
+                            textContent: [...(categories.get(command.key) ?? [])].join(" · "),
+                        }),
+                    ),
                 );
             }
+            count.textContent = matching.length
+                ? `${matching.length} tools`
+                : "No tools match this category and search.";
         };
         query.addEventListener("input", render);
-        content.append(query, results);
+        category.addEventListener("change", render);
+        content.append(query, category, count, results);
         render();
         query.focus();
     }

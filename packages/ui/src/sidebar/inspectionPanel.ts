@@ -91,7 +91,7 @@ export class InspectionPanel {
             head.append(th);
         }
         for (const slot of slots) {
-            if (slot.boolean) continue;
+            if (slot.boolean || slot.options || slot.text) continue;
             const node = slot.node;
             if (!(node instanceof GeometryNode)) continue;
             const resolved = resolveUnitSpec(slot.value, this.doc.variables.evaluate().scope, slot.unit);

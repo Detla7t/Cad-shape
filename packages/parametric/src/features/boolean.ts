@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    I18n,
     type I18nKeys,
     type IDocument,
     type IShape,
@@ -42,11 +43,30 @@ const booleanHandler: FeatureHandler<BooleanFeatureData> = {
     nodeIds: (feature) => feature.toolIds,
 
     parameters: (feature) => [
-        { key: "consumeTools", display: "features.consumeTools", value: feature.consumeTools ?? true },
+        {
+            key: "operation",
+            display: "option.command.operation",
+            value: feature.operation,
+            options: Object.entries(DISPLAYS).map(([value, display]) => ({
+                value,
+                label: I18n.translate(display),
+            })),
+        },
+        // This changes tree ownership; it is a document edit, not a rebuild parameter.
+        {
+            key: "consumeTools",
+            display: "features.consumeTools",
+            value: feature.consumeTools ?? true,
+            configurable: false,
+        },
     ],
 
     setParameter: (feature, key, value) =>
-        key === "consumeTools" ? { ...feature, consumeTools: value === true || value === "true" } : feature,
+        key === "operation" && (value === "fuse" || value === "cut" || value === "common")
+            ? { ...feature, operation: value }
+            : key === "consumeTools"
+              ? { ...feature, consumeTools: value === true || value === "true" }
+              : feature,
 
     evaluate(feature, context): Result<IShape> {
         if (context.input === undefined) {

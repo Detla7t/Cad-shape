@@ -2,7 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import { I18n, type I18nKeys, Localize, PubSub } from "@chili3d/core";
-import { button, div, input, span, svg } from "@chili3d/element";
+import { button, createCadIcon, div, input, span, svg } from "@chili3d/element";
 import { type ElementMenuItem, showElementMenu } from "./elementMenu";
 import style from "./elements.module.css";
 import type { ElementTab, ElementWorkspace } from "./elementWorkspace";
@@ -87,7 +87,7 @@ export class ElementTabStrip extends HTMLElement {
                     this.openContextMenu(tab, e.clientX, e.clientY);
                 },
             },
-            svg({ className: style.icon, icon: tab.icon }),
+            createCadIcon(tab.kind, tab.icon),
             this.renaming === tab.id ? this.nameEditor(tab) : this.label(tab),
         );
         element.dataset["elementId"] = tab.id;
@@ -160,6 +160,7 @@ export class ElementTabStrip extends HTMLElement {
             this.workspace.creatableKinds().map((kind) => ({
                 label: `command.${kind.newCommand}` as I18nKeys,
                 icon: kind.icon,
+                cadIcon: kind.kind,
                 onSelect: () => {
                     if (kind.newCommand !== undefined) PubSub.default.pub("executeCommand", kind.newCommand);
                 },

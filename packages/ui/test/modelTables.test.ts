@@ -2,12 +2,14 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    type FeatureParameterOption,
     GeometryNode,
     type IShapeMeshData,
     LENGTH_UNITS,
     parseConfiguredValue,
     Result,
     registerModelParameters,
+    selectConfiguredArm,
     Transaction,
     UNITLESS,
 } from "@chili3d/core";
@@ -29,6 +31,10 @@ class ParameterNode extends GeometryNode {
         this.setProperty("value", value);
     }
     unit = LENGTH_UNITS;
+    options?: readonly FeatureParameterOption[];
+    text?: boolean;
+    boolean?: boolean;
+    inverted?: boolean;
 }
 registerModelParameters((doc) =>
     doc.modelManager
@@ -40,6 +46,10 @@ registerModelParameters((doc) =>
             label: "Depth",
             value: node.value,
             unit: node.unit,
+            options: node.options,
+            text: node.text,
+            boolean: node.boolean,
+            inverted: node.inverted,
             apply(value) {
                 Transaction.execute(doc, "Edit depth", () => (node.value = value));
                 return Result.ok(undefined);
@@ -96,6 +106,61 @@ test("configuration grid edits separate arms without losing other cells; undo re
         expect(activate).not.toBeUndefined();
         activate!.click();
         expect(doc.variables.activeConfiguration).toEqual({ Size: "Large" });
+    } finally {
+        panel.dispose();
+        doc.dispose();
+    }
+});
+
+test("configuration columns use typed editors for operations, text, and unsuppressed states", async () => {
+    const { doc, node } = fixture();
+    node.options = [
+        { value: "cut", label: "Cut" },
+        { value: "fuse", label: "Join" },
+    ];
+    node.value = 'configure(Size, "Small": "cut", "Large": "fuse")';
+    const label = new ParameterNode({ document: doc, name: "Label" });
+    label.text = true;
+    label.value = 'configure(Size, "Small": "Circle, 10", "Large": "Square")';
+    const suppression = new ParameterNode({ document: doc, name: "Unsuppressed" });
+    suppression.boolean = true;
+    suppression.inverted = true;
+    suppression.value = 'configure(Size, "Small": false, "Large": true)';
+    doc.modelManager.addNode(label);
+    doc.modelManager.addNode(suppression);
+    const panel = new ConfigurationTablePanel(doc);
+    try {
+        const operation = panel.element.querySelector<HTMLSelectElement>(
+            'select[aria-label="Small: Extrude / Depth"]',
+        );
+        expect(operation).not.toBeNull();
+        expect(operation!.value).toBe("cut");
+        operation!.value = "fuse";
+        operation!.dispatchEvent(new Event("change"));
+        expect(selectConfiguredArm(node.value, doc.variables.scope).value).toBe("fuse");
+        const name = field(panel.element, "Small: Label / Depth");
+        expect(name.value).toBe("Circle, 10");
+        change(name, 'Round, "special" (20)');
+        expect(selectConfiguredArm(label.value, doc.variables.scope).value).toBe('Round, "special" (20)');
+        const enabled = field(panel.element, "Small: Unsuppressed / Depth");
+        expect(enabled.type).toBe("checkbox");
+        expect(enabled.checked).toBe(true);
+        enabled.checked = false;
+        enabled.dispatchEvent(new Event("change"));
+        expect(selectConfiguredArm(suppression.value, doc.variables.scope).value).toBe("true");
+        doc.history.undo();
+        await Promise.resolve();
+        expect(field(panel.element, "Small: Unsuppressed / Depth").checked).toBe(true);
+        const remove = panel.element.querySelector<HTMLButtonElement>(
+            '[aria-label="Stop configuring Extrude / Depth"]',
+        );
+        expect(remove).not.toBeNull();
+        remove!.click();
+        expect(node.value).toBe("fuse");
+        expect(panel.element.querySelector('select[aria-label="Small: Extrude / Depth"]')).toBeNull();
+        doc.history.undo();
+        await Promise.resolve();
+        expect(panel.element.querySelector('select[aria-label="Small: Extrude / Depth"]')).not.toBeNull();
     } finally {
         panel.dispose();
         doc.dispose();

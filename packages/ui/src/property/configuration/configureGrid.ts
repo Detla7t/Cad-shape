@@ -36,7 +36,7 @@ export interface ConfigureGridTarget {
 }
 
 /** An arm value as the grid shows it: the source of an expression, the text of a literal. */
-function armDisplay(kind: ConfigureGridKind, source: string): string | boolean {
+export function armDisplay(kind: ConfigureGridKind, source: string): string | boolean {
     const trimmed = source.trim();
     if (kind === "expression") return trimmed;
     const literal = /^"(?:[^"\\]|\\.)*"$/.test(trimmed)

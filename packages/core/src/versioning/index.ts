@@ -4,6 +4,7 @@
 import "./roles";
 
 export * from "./apply";
+export * from "./changes";
 export * from "./diff";
 export * from "./graph";
 export * from "./hash";

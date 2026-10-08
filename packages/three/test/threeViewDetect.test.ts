@@ -15,7 +15,8 @@ import {
     type Orientation,
     type OrientedBoundingBox,
     ParameterShapeNode,
-    type Plane,
+    Plane,
+    ReferencePlaneNode,
     Result,
     type ShapeType,
     ShapeTypes,
@@ -324,6 +325,29 @@ function createSceneWithPanels() {
 }
 
 describe("ThreeView detect — positive hits with real geometry", () => {
+    test.each([
+        "solid",
+        "wireframe",
+        "solidAndWireframe",
+    ] as const)("a reference plane is ray-pickable in %s mode and respects visibility", (mode) => {
+        const { doc, visual, view } = createSceneWithPanels();
+        const plane = new ReferencePlaneNode({ document: doc, basePlane: Plane.XY, name: "Top", size: 200 });
+        visual.context.addNode([plane]);
+        visual.context.scene.updateMatrixWorld(true);
+        view.mode = mode;
+        const point = view.worldToScreen(new XYZ({ x: 20, y: 20, z: 0 }));
+        const filter = { allow: (node: unknown) => node === plane };
+        const hits = view.detectVisual(point.x, point.y, filter);
+        expect(hits).toHaveLength(1);
+        expect(visual.context.getNode(hits[0])).toBe(plane);
+        expect(
+            view.detectShapes(ShapeTypes.face, point.x, point.y).some((hit) => hit.owner === hits[0]),
+        ).toBe(false);
+        plane.visible = false;
+        expect(view.detectVisual(point.x, point.y, filter)).toHaveLength(0);
+        view.dispose();
+        visual.dispose();
+    });
     test("detectShapes hits the nearest panel and returns its shape identity", () => {
         const { view, near, center } = createSceneWithPanels();
 

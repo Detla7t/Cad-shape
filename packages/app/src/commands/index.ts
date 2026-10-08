@@ -18,3 +18,4 @@ export * from "./redo";
 export * from "./undo";
 export * from "./variableStudio";
 export * from "./workingPlane";
+import "./partActions";

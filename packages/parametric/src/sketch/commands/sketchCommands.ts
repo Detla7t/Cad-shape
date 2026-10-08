@@ -162,6 +162,17 @@ function capturePlaneOwner(
 }
 
 async function pickPlane(document: IDocument, controller: AsyncController): Promise<PickedPlane | undefined> {
+    const face = document.selection
+        .getSelectedShapes()
+        .find(
+            (data) => data.shape.shapeType === ShapeTypes.face && (data.shape as IFace).surface().isPlanar(),
+        );
+    if (face) {
+        const picked = resolvePlane(document, { kind: "face", data: face });
+        controller.dispose();
+        document.selection.clearSelection();
+        return picked;
+    }
     const selected = document.selection.getSelectedNodes().find((n) => n instanceof ReferencePlaneNode);
     if (selected instanceof ReferencePlaneNode) {
         controller.dispose();

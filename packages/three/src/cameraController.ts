@@ -46,6 +46,39 @@ export class CameraController extends Observable implements ICameraController {
     private _position: Vector3 = new Vector3(1500, 1500, 1500);
     private _rotateCenter: Vector3 | undefined;
     private _camera: PerspectiveCamera | OrthographicCamera;
+    private previous?: { eye: Vector3; target: Vector3; up: Vector3; type: CameraType };
+
+    rememberView() {
+        this.previous = {
+            eye: this._position.clone(),
+            target: this._target.clone(),
+            up: this.camera.up.clone(),
+            type: this.cameraType,
+        };
+    }
+
+    get hasPreviousView() {
+        return this.previous !== undefined;
+    }
+
+    restorePreviousView() {
+        const previous = this.previous;
+        if (!previous) return;
+        this.rememberView();
+        this.cameraType = previous.type;
+        this.lookAt(previous.eye, previous.target, previous.up);
+    }
+
+    zoomWindow(x1: number, y1: number, x2: number, y2: number) {
+        const ratio = Math.max(Math.abs(x2 - x1) / this._width, Math.abs(y2 - y1) / this._height);
+        if (ratio < 0.01) return;
+        this.rememberView();
+        const direction = this._target.clone().sub(this._position);
+        let center = this.mouseToWorld((x1 + x2) / 2, (y1 + y2) / 2);
+        if (this.camera instanceof PerspectiveCamera)
+            center = this.caculePerspectiveCameraMouse(direction, center);
+        this.lookAt(center.clone().sub(direction.multiplyScalar(ratio)), center, this.camera.up);
+    }
 
     get cameraType(): CameraType {
         return this.getPrivateValue("cameraType", "perspective");
@@ -161,6 +194,7 @@ export class CameraController extends Observable implements ICameraController {
     }
 
     startRotate(x: number, y: number): void {
+        this.rememberView();
         this._rotateCenter = this.selectedNodesCenter();
         if (this._rotateCenter) {
             return;
@@ -351,6 +385,7 @@ export class CameraController extends Observable implements ICameraController {
         this._position.set(eye.x, eye.y, eye.z);
         this._target.set(target.x, target.y, target.z);
         this.camera.up.set(up.x, up.y, up.z);
+        if (this._camera instanceof OrthographicCamera) this.updateOrthographicCamera(this._camera);
         this.updateCameraPosionTarget();
     }
 

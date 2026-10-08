@@ -121,6 +121,97 @@ function rows(body: ParametricBodyNode) {
 }
 
 describe("configured built-in features", () => {
+    test("one input changes extrusion operation and expressions while a checkbox changes symmetry", () => {
+        const doc = newDoc();
+        const { sketch } = squareSketch(doc, 10);
+        const cutter = new SketchNode({ document: doc, plane: Plane.XY, data: rect(0, 0, 5, 10) });
+        doc.modelManager.addNode(cutter);
+        const body = addBody(doc, [
+            { id: "base", type: "extrude", sketchId: sketch.id, depth: 10 },
+            { id: "edit", type: "extrude", sketchId: cutter.id, depth: 20, operation: "cut" },
+        ]);
+        const slot = (key: string) => {
+            const found = modelParameters(doc).find((p) => p.id === `${body.id}:edit:${key}`);
+            expect(found).not.toBeUndefined();
+            return found!;
+        };
+        expect(slot("operation").options?.map((o) => o.value)).toEqual(["new", "fuse", "cut", "common"]);
+        expect(slot("operation").apply('configure(Size, "S": "cut", "L": "fuse")').isOk).toBe(true);
+        expect(slot("depth").apply('configure(Size, "S": Thickness * 5, "L": Thickness * 5)').isOk).toBe(
+            true,
+        );
+        expect(slot("symmetric").apply("configure(Holes, true: true, false: false)").isOk).toBe(true);
+        expect(volume(body)).toBeCloseTo(500, 6);
+        activate(doc, { Size: "L" });
+        expect(volume(body)).toBeCloseTo(1500, 6);
+        activate(doc, { Holes: true });
+        expect(volume(body)).toBeCloseTo(2500, 6);
+        expect(slot("operation").value).toContain("configure(Size");
+        expect(body.featureItems()[1].parameters.find((p) => p.key === "symmetric")?.value).toBe(true);
+        expect(slot("operation").apply("cut").isOk).toBe(true);
+        expect(volume(body)).toBeCloseTo(500, 6);
+        doc.history.undo();
+        expect(volume(body)).toBeCloseTo(2500, 6);
+        activate(doc, { Size: "S", Holes: false });
+        expect(volume(body)).toBeCloseTo(500, 6);
+        doc.dispose();
+    });
+
+    test("a Shape list alternates circle and square operations from one sketch using suppression columns", () => {
+        const doc = newDoc([
+            {
+                kind: "list",
+                id: "shape",
+                name: "Shape",
+                options: [
+                    { id: "circle", name: "Circle" },
+                    { id: "square", name: "Square" },
+                ],
+            },
+        ]);
+        const data = rect(20, 0, 40, 20);
+        data.entities.push({ id: 5, type: "circle", params: [0, 0, 5] });
+        const sketch = new SketchNode({ document: doc, plane: Plane.XY, data });
+        doc.modelManager.addNode(sketch);
+        const faces =
+            sketch.mesh.faces?.range
+                .filter((r) => r.shape.shapeType === ShapeTypes.face)
+                .map((r) => r.shape as unknown as IFace) ?? [];
+        expect(faces).toHaveLength(2);
+        const circle = faces.find((f) => Math.abs(f.area() - Math.PI * 25) < 0.001);
+        const square = faces.find((f) => Math.abs(f.area() - 400) < 0.001);
+        expect(circle).not.toBeUndefined();
+        expect(square).not.toBeUndefined();
+        const body = addBody(doc, [
+            {
+                id: "circle",
+                type: "extrude",
+                sketchId: sketch.id,
+                depth: 10,
+                profiles: [captureProfileRef(circle!)],
+            },
+            {
+                id: "square",
+                type: "extrude",
+                sketchId: sketch.id,
+                depth: 10,
+                profiles: [captureProfileRef(square!)],
+            },
+        ]);
+        const columns = modelParameters(doc).filter((p) => p.node === body && p.id.endsWith(":suppressed"));
+        expect(columns).toHaveLength(2);
+        expect(columns[0].apply('configure(Shape, "Circle": false, "Square": true)').isOk).toBe(true);
+        expect(columns[1].apply('configure(Shape, "Circle": true, "Square": false)').isOk).toBe(true);
+        expect(volume(body)).toBeCloseTo(Math.PI * 25 * 10, 6);
+        activate(doc, { Shape: "Square" });
+        expect(volume(body)).toBeCloseTo(4000, 6);
+        expect(body.featureItems().map((f) => f.suppressed)).toEqual([true, false]);
+        activate(doc, { Shape: "Circle" });
+        expect(volume(body)).toBeCloseTo(Math.PI * 25 * 10, 6);
+        expect(sketch.data.entities).toHaveLength(5);
+        doc.dispose();
+    });
+
     test("table edits preserve dimension labels and expose reversible sketch suppression", () => {
         const doc = newDoc();
         const sketch = new SketchNode({

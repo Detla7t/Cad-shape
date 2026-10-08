@@ -51,6 +51,14 @@ export class Config extends Observable {
 
     readonly SnapDistance: number = 10;
 
+    @serialize()
+    get orientNormalOnSketchEdit(): boolean {
+        return this.getPrivateValue("orientNormalOnSketchEdit", true);
+    }
+    set orientNormalOnSketchEdit(value: boolean) {
+        this.setProperty("orientNormalOnSketchEdit", value);
+    }
+
     get snapType() {
         return this.getPrivateValue(
             "snapType",

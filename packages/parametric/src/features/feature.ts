@@ -18,6 +18,7 @@ import {
     type XYZLike,
 } from "@chili3d/core";
 import type { EdgeRef } from "./edgeRef";
+import { resolveFeatureConfiguration } from "./featureConfiguration";
 import { completeEdgeHistory, completeFaceHistory } from "./historyCompletion";
 import type { ProfileRef } from "./profileRef";
 
@@ -32,6 +33,8 @@ export interface FeatureBase {
     readonly suppressed?: boolean | string;
     /** User-assigned display name, overriding the kind's default in the feature panel. */
     readonly name?: string;
+    /** Per-input bindings for declared scalar parameters; the original values remain as defaults. */
+    readonly configuredParameters?: Readonly<Record<string, string>>;
 }
 
 /** Union of all feature payloads; grows as new feature kinds are added. */
@@ -450,7 +453,8 @@ export function featureHandler(type: string): FeatureHandler | undefined {
 export function evaluateFeature(feature: FeatureData, context: FeatureContext): Result<IShape> {
     const handler = handlers.get(feature.type);
     if (handler === undefined) return Result.err(`Unknown feature type: ${feature.type}`);
-    return handler.evaluate(feature, context);
+    const configured = resolveFeatureConfiguration(feature, handler, context.document);
+    return configured.isOk ? handler.evaluate(configured.value, context) : Result.err(configured.error);
 }
 
 /**

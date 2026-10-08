@@ -1,10 +1,44 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { download, NodeActions, openElement, PubSub, Transaction } from "@chili3d/core";
+import { download, NodeActions, openElement, PubSub, ShapeNode, Transaction } from "@chili3d/core";
 import { SketchNode, sketchDrawing, writeDxf } from "@chili3d/parametric";
 import { writeDwg } from "./cad/dwg";
+import { projectionDrawing } from "./cad/projection";
 import { DocumentFileNode } from "./documentFileNode";
+
+NodeActions.register((node) => {
+    if (!(node instanceof ShapeNode) || node instanceof SketchNode) return [];
+    return [
+        {
+            id: "drawing",
+            order: 55,
+            icon: "drawing",
+            label: `Create Drawing of ${node.name}…`,
+            run: () => {
+                if (!node.shape.isOk) {
+                    PubSub.default.pub("displayError", node.shape.error);
+                    return;
+                }
+                const shape = node.shape.value.transformedMul(node.worldTransform());
+                try {
+                    const drawing = projectionDrawing([shape], { angle: "third", iso: true });
+                    const file = new DocumentFileNode({
+                        document: node.document,
+                        fileName: `${node.name}.dxf`,
+                        text: writeDxf(drawing),
+                    });
+                    Transaction.execute(node.document, "Create part drawing", () =>
+                        node.document.modelManager.addNode(file),
+                    );
+                    openElement(node.document, file);
+                } finally {
+                    shape.dispose();
+                }
+            },
+        },
+    ];
+});
 
 NodeActions.register((node) => {
     if (!(node instanceof SketchNode)) return [];

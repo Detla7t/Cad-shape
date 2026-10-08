@@ -4,13 +4,16 @@
 import {
     activeInputValue,
     type ConfigurationVariableInputData,
+    configuredArmSource,
     formatConfiguredValue,
     type IDocument,
     type INode,
+    isConfiguredValue,
     isSelectorInput,
     type ModelParameter,
     modelParameters,
     parseConfiguredValue,
+    selectConfiguredArm,
     selectorOptions,
     unitSpecEquals,
     unitSpecOfType,
@@ -19,6 +22,7 @@ import { option as makeOption } from "@chili3d/element";
 import { activeInputControl } from "../property/configuration/activeControls";
 import { ConfigurationDataContent } from "../property/configuration/configurationDataContent";
 import { ConfigurationEditor } from "../property/configuration/configurationEditor";
+import { armDisplay } from "../property/configuration/configureGrid";
 import { ConfigurationInputMenu } from "./configurationInputMenu";
 import style from "./modelTable.module.css";
 
@@ -123,7 +127,7 @@ export class ConfigurationTablePanel {
         choose.setAttribute("aria-label", `Use ${input.name} for parameter`);
         choose.append(makeOption({ textContent: "Choose a dimension or feature parameter…", value: "" }));
         const eligible = slots.filter(
-            (s) => !s.boolean && unitSpecEquals(s.unit, unitSpecOfType(input.type)),
+            (s) => !s.boolean && !s.options && !s.text && unitSpecEquals(s.unit, unitSpecOfType(input.type)),
         );
         for (const slot of eligible)
             choose.append(makeOption({ textContent: `${slot.node.name} / ${slot.label}`, value: slot.id }));
@@ -188,9 +192,9 @@ export class ConfigurationTablePanel {
             title.textContent = input.name;
             const choose = document.createElement("select");
             choose.setAttribute("aria-label", `Configure ${input.name} parameter`);
-            choose.append(makeOption({ textContent: "Choose a dimension or feature parameter…", value: "" }));
+            choose.append(makeOption({ textContent: "Choose a parameter or suppression state…", value: "" }));
             slots
-                .filter((s) => !configured.some((item) => item.id === s.id))
+                .filter((s) => !isConfiguredValue(s.value))
                 .forEach((s) =>
                     choose.append(makeOption({ textContent: `${s.node.name} / ${s.label}`, value: s.id })),
                 );
@@ -201,7 +205,10 @@ export class ConfigurationTablePanel {
                 if (!slot) return;
                 const value = formatConfiguredValue({
                     input: input.name,
-                    arms: selectorOptions(input).map((option) => ({ option, value: String(slot.value) })),
+                    arms: selectorOptions(input).map((option) => ({
+                        option,
+                        value: configuredArmSource(slot.value, { text: slot.text || !!slot.options }),
+                    })),
                 });
                 this.apply(slot, value);
                 this.render();
@@ -210,9 +217,34 @@ export class ConfigurationTablePanel {
             const table = document.createElement("table");
             table.className = style.table;
             const head = table.createTHead().insertRow();
-            for (const name of ["Name", ...configured.map((s) => `${s.node.name} / ${s.label}`)]) {
+            for (const [index, name] of [
+                "Name",
+                ...configured.map((s) => `${s.node.name} / ${s.label}`),
+            ].entries()) {
                 const th = document.createElement("th");
                 th.textContent = name;
+                if (index > 0) {
+                    const slot = configured[index - 1];
+                    const remove = document.createElement("button");
+                    remove.textContent = "×";
+                    remove.title = `Stop configuring ${slot.node.name} / ${slot.label}`;
+                    remove.setAttribute("aria-label", remove.title);
+                    remove.onclick = () => {
+                        const fresh = modelParameters(this.doc).find((s) => s.id === slot.id);
+                        if (!fresh) return;
+                        const selected = selectConfiguredArm(
+                            fresh.value,
+                            this.doc.variables.evaluate().scope,
+                        );
+                        if (!selected.isOk) {
+                            this.status.textContent = selected.error;
+                            return;
+                        }
+                        this.apply(fresh, String(selected.value));
+                        this.render();
+                    };
+                    th.append(remove);
+                }
                 head.append(th);
             }
             for (const option of selectorOptions(input)) {
@@ -225,13 +257,28 @@ export class ConfigurationTablePanel {
                     this.data.setActive(input.name, input.kind === "checkbox" ? option === "true" : option);
                 row.insertCell().append(activate);
                 for (const slot of configured) {
-                    const field = document.createElement("input");
                     const parsed = parseConfiguredValue(String(slot.value));
                     if (!parsed.isOk) continue;
-                    field.value = parsed.value.arms.find((a) => a.option === option)?.value ?? "";
+                    const source = parsed.value.arms.find((a) => a.option === option)?.value ?? "";
+                    const kind = slot.boolean
+                        ? "boolean"
+                        : slot.options
+                          ? "options"
+                          : slot.text
+                            ? "text"
+                            : "expression";
+                    const field = slot.options
+                        ? document.createElement("select")
+                        : document.createElement("input");
+                    if (slot.options) {
+                        for (const choice of slot.options)
+                            field.append(makeOption({ textContent: choice.label, value: choice.value }));
+                    }
+                    field.value = String(armDisplay(kind, source));
                     if (slot.boolean) {
-                        field.type = "checkbox";
-                        field.checked = (field.value === "true") !== (slot.inverted === true);
+                        (field as HTMLInputElement).type = "checkbox";
+                        (field as HTMLInputElement).checked =
+                            (armDisplay(kind, source) === true) !== (slot.inverted === true);
                     }
                     field.setAttribute("aria-label", `${option}: ${slot.node.name} / ${slot.label}`);
                     field.onchange = () => {
@@ -244,8 +291,8 @@ export class ConfigurationTablePanel {
                         arms.push({
                             option,
                             value: slot.boolean
-                                ? String(field.checked !== (slot.inverted === true))
-                                : field.value,
+                                ? String((field as HTMLInputElement).checked !== (slot.inverted === true))
+                                : configuredArmSource(field.value, { text: slot.text || !!slot.options }),
                         });
                         this.apply(fresh, formatConfiguredValue({ ...current.value, arms }));
                     };

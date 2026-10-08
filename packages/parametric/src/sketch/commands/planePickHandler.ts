@@ -141,7 +141,10 @@ export class PlanePickHandler extends ShapeSelectionHandler {
         view.update();
     }
 
-    protected override select(_view: IView, _event: PointerEvent): number {
+    protected override select(view: IView, event: PointerEvent): number {
+        // A click/tap may arrive without a preceding pointer move. Pick at the release
+        // position instead of requiring a stale hover (or a hover from another plane).
+        this.setHighlight(view, event);
         const face = this._highlights?.[0];
         if (face !== undefined) {
             this.result = { kind: "face", data: face };

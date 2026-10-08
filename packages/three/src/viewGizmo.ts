@@ -7,6 +7,7 @@ import type { CameraController } from "./cameraController";
 import type { ThreeView } from "./threeView";
 import { createCubeRegions } from "./viewCubeGeometry";
 import style from "./viewGizmo.module.css";
+import { ViewMenu } from "./viewMenu";
 
 function svg<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, string> = {}) {
     const node = document.createElementNS("http://www.w3.org/2000/svg", tag);
@@ -38,10 +39,12 @@ export class ViewGizmo extends HTMLElement implements IViewGizmo {
     private drag?: { id: number; x: number; y: number; startX: number; startY: number; moved: boolean };
     private suppressClick = false;
     private lastRotation?: Quaternion;
+    private readonly menu: ViewMenu;
 
     constructor(readonly view: ThreeView) {
         super();
         this.cameraController = view.cameraController;
+        this.menu = new ViewMenu(view, (direction) => this.orient(direction));
         this.className = style.root;
         this.drawing.append(this.axes, this.cube);
         this.append(this.drawing);
@@ -71,6 +74,7 @@ export class ViewGizmo extends HTMLElement implements IViewGizmo {
     }
 
     disconnectedCallback() {
+        this.menu.dispose();
         this.removeEventListener("pointerdown", this.pointerDown);
         this.removeEventListener("pointermove", this.pointerMove);
         this.removeEventListener("pointerup", this.pointerUp);
@@ -152,7 +156,8 @@ export class ViewGizmo extends HTMLElement implements IViewGizmo {
                 "stroke-width": "0.7",
             }),
         );
-        this.button(home, "Isometric view", () => this.orient(new Vector3(1, -1, 1)));
+        home.append(svg("path", { d: "m143 142 3 4 3-4Z" }));
+        this.button(home, "View options", () => this.menu.open(home));
         this.drawing.append(home);
     }
 

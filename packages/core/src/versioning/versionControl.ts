@@ -16,6 +16,7 @@ import { Material, Texture } from "../material";
 import { type INode, Node, NodeUtils } from "../model/node";
 import { Serializer } from "../serialize";
 import { applySnapshot, collectFeatureErrors, type FeatureErrorReport } from "./apply";
+import { type CommitChange, treeChanges } from "./changes";
 import { type DocumentDiff, diffTrees, summarizeDiff } from "./diff";
 import { toJsonValue } from "./hash";
 import {
@@ -66,6 +67,26 @@ export interface VersionControlOptions {
     /** Where the history is persisted; omitted keeps it in memory only. */
     readonly persistence?: IHistoryPersistence;
     readonly author?: string;
+}
+
+export interface ChangePreview {
+    readonly head: ObjectHash;
+    readonly source: ObjectHash;
+    readonly selected: readonly string[];
+    readonly direction: "apply" | "revert";
+    readonly baseTree: ObjectHash;
+    readonly incomingTree: ObjectHash;
+    readonly conflicts: readonly MergeConflict[];
+    readonly mergedTree: ObjectHash;
+}
+
+export interface RebasePreview {
+    readonly head: ObjectHash;
+    readonly source: ObjectHash;
+    readonly onto: ObjectHash;
+    readonly omitted: readonly string[];
+    readonly steps: readonly { original: ObjectHash; tree: ObjectHash }[];
+    readonly conflicts: readonly MergeConflict[];
 }
 
 /** A pending merge, as previewed: the conflicts to settle and what the other side brings in. */
@@ -504,6 +525,200 @@ export class DocumentVersionControl {
     }
 
     // ------------------------------------------------------------------ Versions and branches
+
+    /** An explicit named checkpoint; automatic operation commits remain available beneath it. */
+    createCommit(message: string): Result<ObjectHash> {
+        if (!message.trim()) return Result.err("A commit needs a message");
+        this.flush();
+        return Result.ok(
+            this.commitTree(this.headCommit().tree, { kind: "checkpoint", message: message.trim() }),
+        );
+    }
+
+    /** Operations recorded since the previous named commit, version, merge or branch boundary. */
+    operations(commit: ObjectHash): CommitEntry[] {
+        const entry = this.repository.getCommit(commit);
+        if (entry.kind !== "checkpoint" && entry.kind !== "version") return [];
+        const boundaries = new Set([
+            ...this.branches().map((b) => b.head),
+            ...this.versions().map((v) => v.commit),
+        ]);
+        const operations: CommitEntry[] = [];
+        let cursor = entry.parents[0];
+        while (cursor && !boundaries.has(cursor)) {
+            const operation = this.repository.getCommit(cursor);
+            if (
+                operation.kind !== "micro" ||
+                operation.parents.length !== 1 ||
+                operation.branch !== entry.branch
+            )
+                break;
+            operations.push({ ...operation, id: cursor });
+            cursor = operation.parents[0];
+        }
+        return operations;
+    }
+
+    /** Individual fields, sketch entities, constraints and operations changed by a commit. */
+    changes(commit: ObjectHash): readonly CommitChange[] {
+        const entry = this.repository.getCommit(commit);
+        const parent = entry.parents[0];
+        return parent
+            ? treeChanges(this.store, this.repository.getCommit(parent).tree, entry.tree).changes
+            : [];
+    }
+
+    previewChanges(
+        source: ObjectHash,
+        selected: readonly string[],
+        direction: "apply" | "revert",
+    ): Result<ChangePreview> {
+        this.flush();
+        const entry = this.repository.getCommit(source);
+        if (!entry.parents[0] || selected.length === 0)
+            return Result.err("Select at least one change in a commit");
+        const parentTree = this.repository.getCommit(entry.parents[0]).tree;
+        const partial = treeChanges(this.store, parentTree, entry.tree).select(selected);
+        if (!partial.isOk) return Result.err(partial.error);
+        const baseTree = direction === "apply" ? parentTree : partial.value;
+        const incomingTree = direction === "apply" ? partial.value : parentTree;
+        const result = mergeTrees(this.store, baseTree, this.headCommit().tree, incomingTree);
+        return Result.ok({
+            head: this.head,
+            source,
+            selected: [...selected],
+            direction,
+            baseTree,
+            incomingTree,
+            conflicts: result.conflicts,
+            mergedTree: result.tree,
+        });
+    }
+
+    /** Partial apply/revert is a new undoable commit, never a rewrite of its source commit. */
+    applyChanges(
+        preview: ChangePreview,
+        resolutions: ReadonlyMap<string, ConflictResolution> = new Map(),
+    ): Result<ApplyOutcome> {
+        this.flush();
+        if (this.head !== preview.head)
+            return Result.err("The branch changed since these changes were previewed");
+        const result = mergeTrees(
+            this.store,
+            preview.baseTree,
+            this.headCommit().tree,
+            preview.incomingTree,
+            resolutions,
+        );
+        if (result.conflicts.some((c) => !resolutions.has(c.id)))
+            return Result.err("Review each conflict before applying changes");
+        const message = `${preview.direction === "apply" ? "Applied" : "Reverted"} ${preview.selected.length} changes from ${this.label(preview.source)}`;
+        this.pending = { kind: "micro", message };
+        try {
+            applySnapshot(this.document, readTree(this.store, result.tree), {
+                undoable: true,
+                name: message,
+            });
+            this.document.visual.update();
+            return Result.ok({ commit: this.flush(), errors: collectFeatureErrors(this.document) });
+        } finally {
+            this.pending = undefined;
+        }
+    }
+
+    /**
+     * Replays the first-parent history from source through head onto a chosen point, omitting
+     * selected changes from source. Merge commits replay their net first-parent patch. The
+     * preview is read-only; the result is created on a new branch so the original stays intact.
+     */
+    previewRebase(
+        source: ObjectHash,
+        omitted: readonly string[],
+        onto: ObjectHash,
+        resolutions: ReadonlyMap<string, ConflictResolution> = new Map(),
+    ): Result<RebasePreview> {
+        this.flush();
+        if (!this.repository.hasCommit(onto)) return Result.err("The rebase target is not a commit");
+        const chain: ObjectHash[] = [];
+        let cursor: ObjectHash | undefined = this.head;
+        while (cursor) {
+            chain.unshift(cursor);
+            if (cursor === source) break;
+            cursor = this.repository.getCommit(cursor).parents[0];
+        }
+        if (!cursor) return Result.err("Choose a commit on this branch's first-parent history");
+        const entry = this.repository.getCommit(source);
+        if (!entry.parents[0]) return Result.err("The initial document cannot be rebased as a change");
+        const delta = treeChanges(this.store, this.repository.getCommit(entry.parents[0]).tree, entry.tree);
+        if (omitted.some((id) => !delta.changes.some((c) => c.id === id)))
+            return Result.err("A selected change is not in this commit");
+        const filtered = delta.select(delta.changes.filter((c) => !omitted.includes(c.id)).map((c) => c.id));
+        if (!filtered.isOk) return Result.err(filtered.error);
+        let tree = this.repository.getCommit(onto).tree;
+        const conflicts: MergeConflict[] = [];
+        const steps: { original: ObjectHash; tree: ObjectHash }[] = [];
+        for (const original of chain) {
+            const commit = this.repository.getCommit(original);
+            const prefix = `${original}:`;
+            const choices = new Map(
+                [...resolutions]
+                    .filter(([key]) => key.startsWith(prefix))
+                    .map(([key, value]) => [key.slice(prefix.length), value]),
+            );
+            const result = mergeTrees(
+                this.store,
+                this.repository.getCommit(commit.parents[0]).tree,
+                tree,
+                original === source ? filtered.value : commit.tree,
+                choices,
+            );
+            conflicts.push(
+                ...result.conflicts.map((c) => ({
+                    ...c,
+                    id: prefix + c.id,
+                    location: `${commit.message} › ${c.location}`,
+                    textId: c.textId ? prefix + c.textId : undefined,
+                })),
+            );
+            tree = result.tree;
+            steps.push({ original, tree });
+        }
+        return Result.ok({ head: this.head, source, onto, omitted: [...omitted], steps, conflicts });
+    }
+
+    rebase(
+        preview: RebasePreview,
+        branchName: string,
+        resolutions: ReadonlyMap<string, ConflictResolution> = new Map(),
+    ): Result<ApplyOutcome> {
+        this.flush();
+        if (this.head !== preview.head)
+            return Result.err("The branch changed since the rebase was previewed");
+        const checked = this.previewRebase(preview.source, preview.omitted, preview.onto, resolutions);
+        if (!checked.isOk) return Result.err(checked.error);
+        if (checked.value.conflicts.some((c) => !resolutions.has(c.id)))
+            return Result.err("Review each conflict before rebasing");
+        const branch = this.repository.createBranch(branchName, preview.onto);
+        if (!branch.isOk) return Result.err(branch.error);
+        let head = preview.onto;
+        for (const step of checked.value.steps) {
+            const previous = this.repository.getCommit(head);
+            if (previous.tree === step.tree) continue;
+            head = this.repository.commit({
+                tree: step.tree,
+                parents: [head],
+                kind: "micro",
+                message: `Rebased: ${this.repository.getCommit(step.original).message}`,
+                summary: summarizeDiff(diffTrees(this.store, previous.tree, step.tree)),
+                branch: branch.value.name,
+                author: this.options.author,
+            });
+        }
+        this.repository.setHead(branch.value.name, head);
+        const switched = this.switchBranch(branch.value.name);
+        if (!switched.isOk) return Result.err(switched.error);
+        return Result.ok({ commit: head, errors: collectFeatureErrors(this.document) });
+    }
 
     /**
      * Names a commit (default: the current state). Naming the head adds a version commit the

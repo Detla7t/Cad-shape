@@ -1,7 +1,15 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { CommandStore, ObservableCollection, PubSub, Ribbon, RibbonGroup, RibbonTab } from "@chili3d/core";
+import {
+    CommandStore,
+    I18n,
+    ObservableCollection,
+    PubSub,
+    Ribbon,
+    RibbonGroup,
+    RibbonTab,
+} from "@chili3d/core";
 import { createMockApplication } from "@chili3d/core/test-utils";
 import { ContextToolbar } from "../src/ribbon/contextToolbar";
 import { RibbonCustomization } from "../src/ribbon/customization";
@@ -19,6 +27,50 @@ class Line {
 class Circle {
     async execute() {}
 }
+
+test("tool search shows icons and filters nested variants by category and words together", () => {
+    CommandStore.registerCommand(Line, { key: "create.line", icon: "icon-line" });
+    CommandStore.registerCommand(Circle, { key: "create.circle", icon: "icon-circle" });
+    const ribbon = new Ribbon(
+        [],
+        [
+            new RibbonTab(
+                "ribbon.tab.model",
+                new RibbonGroup("ribbon.group.draw", [
+                    { type: "split", items: ["create.line", "create.circle"] },
+                ]),
+            ),
+        ],
+    );
+    const customization = new RibbonCustomization(ribbon);
+    const commands: string[] = [];
+    const onCommand = (key: string) => commands.push(key);
+    PubSub.default.sub("executeCommand", onCommand);
+    try {
+        customization.searchTools();
+        const dialog = document.querySelector<HTMLDialogElement>('dialog[aria-label="Search tools"]');
+        expect(dialog).not.toBeNull();
+        const category = dialog!.querySelector<HTMLSelectElement>('[aria-label="Tool category"]');
+        expect(category).not.toBeNull();
+        category!.value = I18n.translate("ribbon.group.draw");
+        category!.dispatchEvent(new Event("change"));
+        expect(dialog!.querySelectorAll("[data-command]")).toHaveLength(2);
+        expect(dialog!.querySelector('[data-command="create.circle"] svg')).not.toBeNull();
+        const query = dialog!.querySelector<HTMLInputElement>('input[aria-label="Search tools"]');
+        expect(query).not.toBeNull();
+        query!.value = `${I18n.translate("ribbon.group.draw")} ${I18n.translate("command.create.circle")}`;
+        query!.dispatchEvent(new Event("input"));
+        expect(dialog!.querySelectorAll("[data-command]")).toHaveLength(1);
+        click(dialog!, '[data-command="create.circle"]');
+        expect(commands).toEqual(["create.circle"]);
+        expect(document.querySelector('dialog[aria-label="Search tools"]')).toBeNull();
+    } finally {
+        customization.dispose();
+        PubSub.default.remove("executeCommand", onCommand);
+        CommandStore.unregisterCommand("create.line");
+        CommandStore.unregisterCommand("create.circle");
+    }
+});
 
 test("a family remembers the last chosen tool and executes its real command", () => {
     CommandStore.registerCommand(Line, { key: "create.line", icon: "icon-line" });

@@ -95,7 +95,7 @@ export interface TreeObj {
  * `micro`: captured automatically after an undoable change (Onshape's microversion).
  * `version`: a named, immutable snapshot the user created. `merge`: joins two lines of work.
  */
-export type CommitKind = "micro" | "version" | "merge";
+export type CommitKind = "micro" | "checkpoint" | "version" | "merge";
 
 export interface CommitObj {
     readonly t: "commit";

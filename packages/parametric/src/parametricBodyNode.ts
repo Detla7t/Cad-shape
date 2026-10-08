@@ -50,6 +50,7 @@ import {
     featureSuppression,
     isFeatureSuppressed,
 } from "./features/feature";
+import { configuredFeatureParameters, setConfiguredFeatureParameter } from "./features/featureConfiguration";
 import type { ProfileRef } from "./features/profileRef";
 import { syncNodeWatches } from "./nodeWatch";
 import { danglingProfileRefs, SketchNode } from "./sketch/sketchNode";
@@ -312,7 +313,7 @@ export class ParametricBodyNode
                 warning: this._featureWarnings.get(feature.id),
                 reselectable: handler?.reselectable === true,
                 references: this.featureReferences(feature),
-                parameters: handler?.parameters(feature, this.document) ?? [],
+                parameters: handler ? configuredFeatureParameters(feature, handler, this.document) : [],
             };
         });
     }
@@ -352,7 +353,10 @@ export class ParametricBodyNode
     setFeatureParameter(featureId: string, key: string, value: number | string | boolean): void {
         const features = this.features.map((feature) => {
             if (feature.id !== featureId) return feature;
-            return featureHandler(feature.type)?.setParameter(feature, key, value, this.document) ?? feature;
+            const handler = featureHandler(feature.type);
+            return handler
+                ? setConfiguredFeatureParameter(feature, handler, key, value, this.document)
+                : feature;
         });
         this.setFeaturesEmitShapeChanged(features);
     }

@@ -64,6 +64,7 @@ import type { ThreeHighlighter } from "./threeHighlighter";
 import style from "./threeView.module.css";
 import type { ThreeVisualContext } from "./threeVisualContext";
 import { ThreeComponentObject, ThreeMeshObject, ThreeVisualObject } from "./threeVisualObject";
+import { ViewDisplay } from "./viewDisplay";
 import { ViewGizmo } from "./viewGizmo";
 
 /** One sub-shape a hit resolved to, and the indexes it occupies in its own node's shape list. */
@@ -98,6 +99,10 @@ function keepsSubShape(shapeType: ShapeType, subType: ShapeType): boolean {
 }
 
 export class ThreeView extends Observable implements IView {
+    private readonly display = new ViewDisplay(this);
+    get displayOptions() {
+        return this.display.options;
+    }
     private _dom?: HTMLElement;
     private _needsUpdate: boolean = false;
     private _workplane: Plane;
@@ -287,7 +292,7 @@ export class ThreeView extends Observable implements IView {
     }
 
     toImage(): string {
-        this._renderer.render(this._scene, this.camera);
+        this.display.render(() => this._renderer.render(this._scene, this.camera));
         return this.renderer.domElement.toDataURL();
     }
 
@@ -316,7 +321,7 @@ export class ThreeView extends Observable implements IView {
 
         const dir = this.camera.position.clone().sub(this.cameraController.target);
         this.dynamicLight.position.copy(dir);
-        this._renderer.render(this._scene, this.camera);
+        this.display.render(() => this._renderer.render(this._scene, this.camera));
         this._cssRenderer.render(this._scene, this.camera);
         this._gizmo?.update();
 

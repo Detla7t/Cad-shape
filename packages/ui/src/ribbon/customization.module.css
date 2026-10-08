@@ -103,3 +103,22 @@
     max-height: 50vh;
     overflow: auto;
 }
+.searchResult {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.searchResult svg {
+    width: 20px;
+    height: 20px;
+    flex: 0 0 20px;
+}
+.toolName {
+    flex: 1;
+}
+.toolCategory {
+    color: var(--foreground-secondary-color);
+    font-size: 11px;
+    max-width: 160px;
+    text-align: right;
+}

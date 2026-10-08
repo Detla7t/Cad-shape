@@ -554,8 +554,9 @@ describe("feature evaluation", () => {
             expect(tool.parent).toBe(body);
             expect(tool.parentVisible).toBe(false);
             expect(body.shape.isOk).toBe(true);
-            expect(body.featureItems()[1].parameters).toEqual([
-                { key: "consumeTools", display: "features.consumeTools", value: true },
+            expect(body.featureItems()[1].parameters).toMatchObject([
+                { key: "operation", value: "fuse", configurable: true },
+                { key: "consumeTools", display: "features.consumeTools", value: true, configurable: false },
             ]);
         });
 
@@ -1057,6 +1058,7 @@ describe("feature evaluation", () => {
             expect((mocks.prism.mock.calls[0] as unknown as [any, XYZ])[1].z).toBeCloseTo(5);
             expect(body.featureItems()[0].parameters).toContainEqual({
                 key: "startOffset",
+                configurable: true,
                 display: "option.command.startOffset",
                 value: 3,
                 unit: LENGTH_UNITS,

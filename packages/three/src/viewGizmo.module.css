@@ -74,3 +74,70 @@
         stroke: none;
     }
 }
+.menu {
+    position: fixed;
+    z-index: 10000;
+    width: 245px;
+    padding: 4px 0;
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    background: var(--panel-background-color);
+    color: var(--foreground-color);
+    box-shadow: 0 4px 12px #0003;
+    font-size: 12px;
+    & button {
+        display: block;
+        width: 100%;
+        border: 0;
+        background: transparent;
+        color: inherit;
+        text-align: left;
+        font: inherit;
+        padding: 5px 12px;
+        cursor: pointer;
+    }
+    & button:hover,
+    & button:focus-visible {
+        background: var(--hover-background-color);
+    }
+    & button:disabled {
+        opacity: 0.4;
+    }
+    & hr {
+        margin: 2px 0;
+        border: 0;
+        border-top: 1px solid var(--border-color);
+    }
+}
+.dialog {
+    border: 1px solid var(--border-color);
+    background: var(--panel-background-color);
+    color: var(--foreground-color);
+    padding: 16px;
+    max-width: 360px;
+    & strong,
+    & label {
+        display: block;
+        margin-bottom: 12px;
+    }
+    & input,
+    & select,
+    & button {
+        margin: 5px;
+    }
+    &::backdrop {
+        background: #0004;
+    }
+}
+.zoomOverlay {
+    position: absolute;
+    inset: 0;
+    z-index: 100;
+    cursor: crosshair;
+    & div {
+        position: absolute;
+        border: 1px solid #448cce;
+        background: #71b7e533;
+        pointer-events: none;
+    }
+}

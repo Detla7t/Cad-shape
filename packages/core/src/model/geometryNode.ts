@@ -40,6 +40,14 @@ export interface GeometryNodeOptions {
 const NoneName = "$$_NONE_$$";
 
 export abstract class GeometryNode extends VisualNode {
+    @serialize()
+    get partComment(): string {
+        return this.getPrivateValue("partComment", "");
+    }
+    set partComment(value: string) {
+        this.setProperty("partComment", value);
+    }
+
     /** Inspection tolerances keyed by stable dimension/feature slot ids. */
     @serialize()
     get inspectionJson(): string {

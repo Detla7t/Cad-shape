@@ -4,6 +4,7 @@
 import {
     type AsyncController,
     type CameraType,
+    Config,
     type I18nKeys,
     type IDisposable,
     type IDocument,
@@ -229,7 +230,8 @@ export class SketchEditor implements IDisposable {
             this.savedHandler = document.visual.eventHandler;
             // queued before the camera move, so a throw mid-move still restores it
             teardown.push(() => this.restoreViewState());
-            this.lockCameraOntoPlane(this.view);
+            if (Config.instance.orientNormalOnSketchEdit) this.lockCameraOntoPlane(this.view);
+            else this.view.workplane = this.node.plane;
 
             this.eventHandler = this.installEventHandler();
             teardown.push(() => this.restoreEventHandler());

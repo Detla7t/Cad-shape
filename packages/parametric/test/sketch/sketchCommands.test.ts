@@ -8,6 +8,7 @@ import {
     Matrix4,
     Plane,
     Ray,
+    ReferencePlaneNode,
     ShapeTypes,
     type VisualShapeData,
     XYZ,
@@ -124,6 +125,35 @@ describe("PlanePickHandler", () => {
 
         expect(handler.result).toEqual({ kind: "datum", plane: Plane.XY });
         expect(isCompleted()).toBe(true);
+    });
+
+    test("a tap without a preceding hover picks the datum under the click", () => {
+        const { handler, view, isCompleted } = setup(hitXY);
+        handler.pointerDown(view, event(10, 10));
+        handler.pointerUp(view, event(10, 10));
+        expect(handler.result).toEqual({ kind: "datum", plane: Plane.XY });
+        expect(isCompleted()).toBe(true);
+        handler.dispose();
+    });
+
+    test("a viewport click picks a persistent reference plane without a prior hover", () => {
+        const document = new TestDocument();
+        const plane = new ReferencePlaneNode({ document, name: "Front", basePlane: Plane.ZX });
+        const visual = {} as any;
+        document.visual = createMockVisualWithDocument(document, {
+            context: { getNode: () => plane, getVisual: () => visual },
+        });
+        document.modelManager.addNode(plane);
+        const controller = new AsyncController();
+        const completed = rs.fn();
+        controller.onCompleted(completed);
+        const handler = new PlanePickHandler(document, controller);
+        const view = createMockView({ document, detectVisual: () => [visual] });
+        handler.pointerDown(view, event(10, 10));
+        handler.pointerUp(view, event(10, 10));
+        expect(handler.result).toEqual({ kind: "reference", node: plane });
+        expect(completed).toHaveBeenCalledTimes(1);
+        handler.dispose();
     });
 
     test("the ZX quad sits in the positive quadrant and resolves to the Z-up plane", () => {
@@ -256,7 +286,7 @@ describe("EnterSketch", () => {
 });
 
 describe("CreateSketch", () => {
-    function setup(rollbackIndex: number | undefined) {
+    function setup(rollbackIndex: number | undefined, preselected = false) {
         const app = createMockApplication();
         const clearSelection = rs.fn();
         // a planar world face with no boundary edges: the pick resolves a plane and
@@ -266,6 +296,8 @@ describe("CreateSketch", () => {
             dispose: rs.fn(),
         } as unknown as IFace;
         const pickedFace = {
+            shapeType: ShapeTypes.face,
+            surface: () => ({ isPlanar: () => true }),
             transformedMul: () => worldFace,
             findSubShapes: () => [],
         } as unknown as IFace;
@@ -280,7 +312,11 @@ describe("CreateSketch", () => {
         });
         const document = new TestDocument({
             application: app,
-            selection: { clearSelection, getSelectedNodes: () => [] } as any,
+            selection: {
+                clearSelection,
+                getSelectedNodes: () => [],
+                getSelectedShapes: () => (preselected ? [data] : []),
+            } as any,
             picker: { pickAsync } as any,
         });
         let body!: ParametricBodyNode;
@@ -301,7 +337,7 @@ describe("CreateSketch", () => {
         }
         (app as any).activeView = { document };
         const enter = rs.spyOn(SketchEditor, "enter").mockImplementation(() => ({}) as any);
-        return { app, body, enter };
+        return { app, body, enter, pickAsync, clearSelection };
     }
 
     test.each([
@@ -316,6 +352,21 @@ describe("CreateSketch", () => {
             const node = enter.mock.calls[0][0] as SketchNode;
             expect(body.features.length).toBe(2);
             expect(node.data.refPositions).toEqual({ [body.id]: expected });
+        } finally {
+            enter.mockRestore();
+        }
+    });
+
+    test("a face selected before New Sketch starts on that face without prompting again", async () => {
+        const { app, body, enter, pickAsync, clearSelection } = setup(undefined, true);
+        try {
+            await new CreateSketch().execute(app);
+            expect(pickAsync).not.toHaveBeenCalled();
+            expect(enter).toHaveBeenCalledTimes(1);
+            const node = enter.mock.calls[0][0] as SketchNode;
+            expect(node.plane.normal).toEqual(XYZ.unitZ);
+            expect(node.planeRef?.nodeId).toBe(body.id);
+            expect(clearSelection).toHaveBeenCalled();
         } finally {
             enter.mockRestore();
         }

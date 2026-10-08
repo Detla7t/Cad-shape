@@ -9,11 +9,13 @@ import {
     Float32BufferAttribute,
     LineBasicMaterial,
     LineLoop,
+    Matrix4,
     Mesh,
     MeshBasicMaterial,
-    Sprite,
-    SpriteMaterial,
+    PlaneGeometry,
+    Vector3,
 } from "three";
+import { Constants } from "./constants";
 import { ThreeVisualObject } from "./threeVisualObject";
 
 /** Bounded translucent datum with a name; intentionally has no kernel sub-shapes. */
@@ -28,11 +30,27 @@ export class ThreeReferencePlane extends ThreeVisualObject {
     private readonly edgeMaterial = new LineBasicMaterial({ color: 0x91b6db });
     private readonly fill = new Mesh(new BufferGeometry(), this.fillMaterial);
     private readonly outline = new LineLoop(new BufferGeometry(), this.edgeMaterial);
-    private readonly label = new Sprite(new SpriteMaterial({ transparent: true, depthTest: false }));
+    private readonly label = new Mesh(
+        new PlaneGeometry(1, 1),
+        new MeshBasicMaterial({
+            transparent: true,
+            side: DoubleSide,
+            depthWrite: false,
+            polygonOffset: true,
+            polygonOffsetFactor: -1,
+            polygonOffsetUnits: -1,
+        }),
+    );
 
     constructor(readonly planeNode: ReferencePlaneNode) {
         super(planeNode);
+        this.label.name = "plane-label";
         this.add(this.fill, this.outline, this.label);
+        // Reference planes remain available as sketch supports in every display mode.
+        for (const visual of [this.fill, this.outline, this.label]) {
+            visual.layers.enable(Constants.Layers.Solid);
+            visual.layers.enable(Constants.Layers.Wireframe);
+        }
         this.rebuild();
         planeNode.onPropertyChanged(this.changed);
         this.label.raycast = () => {};
@@ -65,11 +83,20 @@ export class ThreeReferencePlane extends ThreeVisualObject {
             this.label.material.needsUpdate = true;
         }
         const size = this.planeNode.size;
-        const p = corners[3]
-            .add(this.planeNode.basePlane.xvec.multiply(size * 0.24))
-            .sub(this.planeNode.basePlane.yvec.multiply(size * 0.035));
+        const { xvec, yvec, normal } = this.planeNode.basePlane;
+        const width = size * 0.5,
+            height = size / 16,
+            inset = size * 0.015;
+        const p = corners[3].add(xvec.multiply(inset + width / 2)).sub(yvec.multiply(inset + height / 2));
         this.label.position.set(p.x, p.y, p.z);
-        this.label.scale.set(size * 0.5, size / 16, 1);
+        this.label.quaternion.setFromRotationMatrix(
+            new Matrix4().makeBasis(
+                new Vector3(xvec.x, xvec.y, xvec.z),
+                new Vector3(yvec.x, yvec.y, yvec.z),
+                new Vector3(normal.x, normal.y, normal.z),
+            ),
+        );
+        this.label.scale.set(width, height, 1);
     }
 
     highlight() {
@@ -98,6 +125,7 @@ export class ThreeReferencePlane extends ThreeVisualObject {
         this.fillMaterial.dispose();
         this.edgeMaterial.dispose();
         this.label.material.map?.dispose();
+        this.label.geometry.dispose();
         this.label.material.dispose();
         super.dispose();
     }

@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    I18n,
     type IDocument,
     type IEdge,
     type IFace,
@@ -54,6 +55,17 @@ const extrudeHandler: FeatureHandler<ExtrudeFeatureData> = {
             : [{ key: "sketchId", display: "body.sketch", nodeId: feature.sketchId }],
 
     parameters: (feature) => [
+        {
+            key: "operation",
+            display: "option.command.operation",
+            value: feature.operation ?? "new",
+            options: [
+                { value: "new", label: I18n.translate("option.command.operation.new") },
+                { value: "fuse", label: I18n.translate("option.command.operation.join") },
+                { value: "cut", label: I18n.translate("option.command.operation.cut") },
+                { value: "common", label: I18n.translate("option.command.operation.intersect") },
+            ],
+        },
         { key: "depth", display: "option.command.depth", value: feature.depth, unit: LENGTH_UNITS },
         {
             key: "startOffset",
@@ -65,9 +77,19 @@ const extrudeHandler: FeatureHandler<ExtrudeFeatureData> = {
     ],
 
     setParameter: (feature, key, value) =>
-        key === "symmetric"
-            ? { ...feature, symmetric: value === true || value === "true" }
-            : { ...feature, [key]: value },
+        key === "operation"
+            ? {
+                  ...feature,
+                  operation:
+                      value === "new"
+                          ? undefined
+                          : value === "fuse" || value === "cut" || value === "common"
+                            ? value
+                            : feature.operation,
+              }
+            : key === "symmetric"
+              ? { ...feature, symmetric: value === true || value === "true" }
+              : { ...feature, [key]: value },
 
     applyResolvedRefs: (feature, { resolvedProfiles }) =>
         resolvedProfiles === undefined

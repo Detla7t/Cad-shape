@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import { type INode, NodeActions, type NodeMenuAction, PubSub } from "@chili3d/core";
+import { createCadIcon } from "@chili3d/element";
 import style from "./nodeContextMenu.module.css";
 
 let closeMenu: (() => void) | undefined;
@@ -28,9 +29,11 @@ export function showNodeContextMenu(node: INode, x: number, y: number): void {
             menu.append(b);
         }
         for (const action of items) {
+            if (action.separatorBefore) menu.append(document.createElement("hr"));
             const b = document.createElement("button");
             b.type = "button";
             b.textContent = action.label + (action.children ? "  ›" : "");
+            if (action.icon) b.prepend(createCadIcon(action.icon));
             b.disabled = action.disabled ?? false;
             b.setAttribute("role", "menuitem");
             b.onclick = () => {

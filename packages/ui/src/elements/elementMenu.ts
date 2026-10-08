@@ -2,12 +2,13 @@
 // See LICENSE file in the project root for full license information.
 
 import { type I18nKeys, Localize } from "@chili3d/core";
-import { div, span, svg } from "@chili3d/element";
+import { createCadIcon, div, span, svg } from "@chili3d/element";
 import style from "./elements.module.css";
 
 export interface ElementMenuItem {
     readonly label: I18nKeys;
     readonly icon?: string;
+    readonly cadIcon?: string;
     readonly disabled?: boolean;
     /** Why a disabled item is disabled. */
     readonly tooltip?: I18nKeys;
@@ -45,7 +46,9 @@ export function showElementMenu(
                         item.onSelect();
                     },
                 },
-                svg({ className: style.menuIcon, icon: item.icon ?? "icon-check" }),
+                item.cadIcon
+                    ? createCadIcon(item.cadIcon, item.icon)
+                    : svg({ className: style.menuIcon, icon: item.icon ?? "icon-check" }),
                 span({ textContent: new Localize(item.label) }),
             ),
         ),
