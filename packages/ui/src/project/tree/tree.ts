@@ -73,6 +73,7 @@ export class Tree extends HTMLElement {
     }
 
     disconnectedCallback() {
+        this.historyBar?.dispose();
         this.document.modelManager.removeNodeObserver(this.handleNodeChanged);
         this.document.modelManager.removePropertyChanged(this.handleCurrentNodeChanged);
         this.document.selection.onNodeChanged.remove(this.handleSelectionChanged);
@@ -116,6 +117,7 @@ export class Tree extends HTMLElement {
     }
 
     dispose(): void {
+        this.historyBar?.dispose();
         this.lastClicked = undefined;
         this.dragging = undefined;
         this.highlightedGroup = undefined;

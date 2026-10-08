@@ -4,6 +4,10 @@
 import style from "./historyBar.module.css";
 /** A rollback marker sits between feature rows; down advances, up rewinds. */
 export class HistoryBar {
+    private stopDrag?: () => void;
+    dispose(): void {
+        this.stopDrag?.();
+    }
     readonly element = document.createElement("div");
     constructor(
         private readonly rows: () => HTMLElement[],
@@ -44,13 +48,16 @@ export class HistoryBar {
         this.element.ariaValueNow = String(position);
         this.element.ariaValueText =
             position === rows.length ? "End of history" : `Before feature ${position + 1}`;
+        const focused = document.activeElement === this.element;
         parent.insertBefore(this.element, rows[position] ?? null);
+        if (focused) this.element.focus();
         rows.forEach((row, i) => row.classList.toggle(style.future, i >= position));
     }
     private readonly down = (event: PointerEvent) => {
         if (event.button !== 0) return;
         event.preventDefault();
         event.stopPropagation();
+        this.stopDrag?.();
         this.element.focus();
         let position = this.read();
         const move = (e: PointerEvent) => {
@@ -70,10 +77,12 @@ export class HistoryBar {
             this.refresh();
         };
         const cleanup = () => {
+            this.stopDrag = undefined;
             window.removeEventListener("pointermove", move);
             window.removeEventListener("pointerup", up);
             window.removeEventListener("pointercancel", cancel);
         };
+        this.stopDrag = cleanup;
         window.addEventListener("pointermove", move);
         window.addEventListener("pointerup", up, { once: true });
         window.addEventListener("pointercancel", cancel, { once: true });

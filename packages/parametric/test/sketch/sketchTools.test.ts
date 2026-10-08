@@ -236,3 +236,46 @@ test("pasting an arc installs its structural constraint only once", () => {
         solver.dispose();
     }
 });
+
+test("trimming a dimensioned circle preserves its radius and fixed center", () => {
+    const data = blank(),
+        id = appendEntity(data, "circle", [0, 0, 10]);
+    line(data, [0, -20, 0, 20]);
+    data.constraints.push(
+        { id: 1, kind: ConstraintKind.Fix, refs: [{ entityId: id, pointIndex: 0 }], datums: [0, 0] },
+        { id: 2, kind: ConstraintKind.Radius, refs: [{ entityId: id, pointIndex: 0 }], datum: 10 },
+    );
+    trimOrSplit(data, id, [10, 0], "trim");
+    expect(data.constraints.filter((c) => c.kind === ConstraintKind.Radius)).toHaveLength(1);
+    const solver = new SketchSolver(Plane.XY, data);
+    try {
+        expect(solver.solve(true).result.startsWith("Ok")).toBe(true);
+        expect(solver.entity(id)?.params[3]).toBeCloseTo(10);
+    } finally {
+        solver.dispose();
+    }
+});
+test("a fillet remains tangent and connected when its radius is edited", () => {
+    const data = blank(),
+        a = line(data, [0, 0, 40, 0]),
+        b = line(data, [40, 0, 40, 30]);
+    roundCorner(data, a, b, 5, true);
+    const radius = data.constraints.find((c) => c.kind === ConstraintKind.Radius)!;
+    expect(radius).not.toBeUndefined();
+    const solver = new SketchSolver(Plane.XY, data);
+    try {
+        solver.setDatumSource(radius.id, 8);
+        expect(solver.solve(true).result.startsWith("Ok")).toBe(true);
+        const arc = solver.entity(radius.refs[0].entityId)!;
+        expect(Math.hypot(arc.params[2] - arc.params[0], arc.params[3] - arc.params[1])).toBeCloseTo(8, 4);
+        const end = solver.entity(a)!.params.slice(2);
+        expect(
+            Math.min(
+                Math.hypot(end[0] - arc.params[2], end[1] - arc.params[3]),
+                Math.hypot(end[0] - arc.params[4], end[1] - arc.params[5]),
+            ),
+        ).toBeLessThan(1e-5);
+    } finally {
+        solver.dispose();
+    }
+});

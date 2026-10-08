@@ -424,6 +424,7 @@ for (const [operation, title] of Object.entries(registrations)) {
                 PubSub.default.pub("displayError", error instanceof Error ? error.message : String(error));
             } finally {
                 editor.powerTrim = false;
+                editor.highlightEntities([]);
                 clear();
             }
         }

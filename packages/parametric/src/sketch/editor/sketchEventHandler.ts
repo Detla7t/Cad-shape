@@ -356,6 +356,27 @@ export class SketchEventHandler implements IEventHandler {
         );
     }
 
+    selectEntities(ids: number[]): void {
+        this.pointSelection.clear();
+        this.selectedEntities.clear();
+        for (const id of ids)
+            if (this.pickableEntities().some((e) => e.id === id)) this.selectedEntities.add(id);
+        this.updateSelectionHighlight(this.editor.view);
+        this.editor.refreshPanel();
+    }
+
+    entitiesAt(event: PointerEvent): number[] {
+        const view = this.editor.view,
+            uv = this.pointerToUV(view, event),
+            tolerance = this.worldTolerance(view, event);
+        if (!uv || tolerance === undefined) return [];
+        return this.pickableEntities()
+            .map((e) => ({ id: e.id, distance: entityDistance(uv, e) }))
+            .filter((e) => e.distance <= tolerance)
+            .sort((a, b) => a.distance - b.distance)
+            .map((e) => e.id);
+    }
+
     hitTestEntity(
         view: IView,
         event: PointerEvent,

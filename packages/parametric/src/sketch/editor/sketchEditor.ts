@@ -138,6 +138,13 @@ export class SketchEditor implements IDisposable {
         ];
     }
 
+    selectEntities(ids: number[]): void {
+        this.eventHandler.selectEntities(ids);
+    }
+    entitiesAt(event: PointerEvent): number[] {
+        return this.eventHandler.entitiesAt(event);
+    }
+
     clearSelection(): void {
         this.eventHandler.clearSelection(this.view);
         this.highlightEntities([]);

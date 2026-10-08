@@ -8,14 +8,17 @@ import { showSketchDiagnostics } from "./sketchDiagnostics";
 import type { SketchEditor } from "./sketchEditor";
 import style from "./sketchPanel.module.css";
 
+let closeCurrentMenu: (() => void) | undefined;
+
 export function showSketchContextMenu(editor: SketchEditor, event: PointerEvent): void {
-    document.querySelector("[data-sketch-context-menu]")?.remove();
+    closeCurrentMenu?.();
     const menu = document.createElement("div");
     menu.className = style.contextMenu;
     menu.dataset["sketchContextMenu"] = "true";
     menu.setAttribute("role", "menu");
     const close = () => {
         menu.remove();
+        closeCurrentMenu = undefined;
         document.removeEventListener("pointerdown", outside, true);
         document.removeEventListener("keydown", key, true);
     };
@@ -40,6 +43,37 @@ export function showSketchContextMenu(editor: SketchEditor, event: PointerEvent)
             run();
         };
         menu.append(button);
+    };
+    closeCurrentMenu = close;
+    const submenu = (label: string, choices: [string, () => void][]) => {
+        const group = document.createElement("div"),
+            trigger = document.createElement("button"),
+            contents = document.createElement("div");
+        trigger.textContent = `${label} ▸`;
+        trigger.type = "button";
+        trigger.role = "menuitem";
+        trigger.setAttribute("aria-haspopup", "menu");
+        trigger.setAttribute("aria-expanded", "false");
+        contents.hidden = true;
+        contents.role = "menu";
+        contents.style.paddingLeft = "14px";
+        trigger.onclick = () => {
+            contents.hidden = !contents.hidden;
+            trigger.setAttribute("aria-expanded", String(!contents.hidden));
+        };
+        for (const [text, run] of choices) {
+            const child = document.createElement("button");
+            child.type = "button";
+            child.role = "menuitem";
+            child.textContent = text;
+            child.onclick = () => {
+                close();
+                run();
+            };
+            contents.append(child);
+        }
+        group.append(trigger, contents);
+        menu.append(group);
     };
     const separator = () => menu.append(document.createElement("hr"));
     item(`Confirm ${editor.node.name}`, () => editor.exit());
@@ -71,6 +105,30 @@ export function showSketchContextMenu(editor: SketchEditor, event: PointerEvent)
         editor.view.dom?.querySelector<HTMLButtonElement>('[aria-label="Show analysis tools"]')?.click(),
     );
     separator();
+    submenu("Select", [
+        ["All sketch entities", () => editor.selectEntities(editor.solver.entities().map((e) => e.id))],
+        [
+            "Construction geometry",
+            () =>
+                editor.selectEntities(
+                    editor.solver
+                        .entities()
+                        .filter((e) => e.construction)
+                        .map((e) => e.id),
+                ),
+        ],
+        ["Clear selection", () => editor.clearSelection()],
+    ]);
+    const candidates = editor.entitiesAt(event);
+    if (candidates.length)
+        submenu(
+            "Select other…",
+            candidates.map((id) => [
+                `${editor.solver.entity(id)?.type ?? "Entity"} ${id}`,
+                () => editor.selectEntities([id]),
+            ]),
+        );
+    else item("Select other…", () => {}, false);
     item("Zoom to fit", () => editor.view.cameraController.fitContent());
     item("View normal to sketch plane", () => editor.normalView());
     menu.style.left = `${event.clientX}px`;
