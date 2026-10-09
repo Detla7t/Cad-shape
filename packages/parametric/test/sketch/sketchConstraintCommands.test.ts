@@ -5,16 +5,19 @@ import { type I18nKeys, type ICommand, Plane, PubSub } from "@chili3d/core";
 import { rs } from "@rstest/core";
 import {
     CoincidentConstraintCommand,
+    ConcentricConstraintCommand,
+    CurvatureConstraintCommand,
     EqualConstraintCommand,
     FixConstraintCommand,
-    HorizontalAlignConstraintCommand,
+    HorizontalConstraintCommand,
     MidpointConstraintCommand,
+    NormalConstraintCommand,
     ParallelConstraintCommand,
     PerpendicularConstraintCommand,
     PointOnConstraintCommand,
     SymmetricConstraintCommand,
     TangentConstraintCommand,
-    VerticalAlignConstraintCommand,
+    VerticalConstraintCommand,
 } from "../../src/sketch/commands/sketchConstraints";
 import { SketchEditor, type SketchEntityTypeFilter } from "../../src/sketch/editor/sketchEditor";
 import {
@@ -42,9 +45,14 @@ function fakeEditor() {
         pickSequence: 0,
         lastPickCancelled: false,
         endConstraintSelection: rs.fn(),
+        // a queued point first, else a queued entity (point-or-entity tools)
         pickPointOrEntity: rs.fn(() => {
             const ref = pointQueue.shift();
-            return Promise.resolve(ref ? { kind: "point" as const, ref } : undefined);
+            if (ref) return Promise.resolve({ kind: "point" as const, ref });
+            const entityId = entityQueue.shift();
+            return Promise.resolve(
+                entityId === undefined ? undefined : { kind: "entity" as const, entityId },
+            );
         }),
         solve: rs.fn((_fine: boolean) => {}),
         commit: rs.fn(() => {}),
@@ -401,19 +409,21 @@ describe("SymmetricConstraintCommand", () => {
     });
 });
 
-describe("HorizontalAlign/VerticalAlignConstraintCommand", () => {
+describe("Horizontal/VerticalConstraintCommand (one tool for a line or two points)", () => {
     test.each([
         {
-            name: "horizontalAlign",
-            command: () => new HorizontalAlignConstraintCommand(),
-            kind: ConstraintKind.HorizontalAlign,
+            name: "horizontal",
+            command: () => new HorizontalConstraintCommand(),
+            line: ConstraintKind.Horizontal,
+            align: ConstraintKind.HorizontalAlign,
         },
         {
-            name: "verticalAlign",
-            command: () => new VerticalAlignConstraintCommand(),
-            kind: ConstraintKind.VerticalAlign,
+            name: "vertical",
+            command: () => new VerticalConstraintCommand(),
+            line: ConstraintKind.Vertical,
+            align: ConstraintKind.VerticalAlign,
         },
-    ])("$name aligns two picked points", async ({ command, kind }) => {
+    ])("$name on two picked points aligns them", async ({ command, align }) => {
         const editor = fakeEditor();
         try {
             const anchor = editor.solver.addLine(0, 0, 10, 3);
@@ -423,10 +433,161 @@ describe("HorizontalAlign/VerticalAlignConstraintCommand", () => {
 
             await runCommand(command(), editor);
 
-            const found = constraintsOf(editor, kind);
+            const found = constraintsOf(editor, align);
             expect(found.length).toBe(1);
             expect(found[0].refs).toEqual([p1, p2]);
             expect(editor.commit).toHaveBeenCalledTimes(1);
+        } finally {
+            editor.solver.dispose();
+        }
+    });
+
+    test.each([
+        {
+            name: "horizontal",
+            command: () => new HorizontalConstraintCommand(),
+            line: ConstraintKind.Horizontal,
+        },
+        { name: "vertical", command: () => new VerticalConstraintCommand(), line: ConstraintKind.Vertical },
+    ])("$name on a picked line constrains the line", async ({ command, line }) => {
+        const editor = fakeEditor();
+        try {
+            const id = editor.solver.addLine(0, 0, 10, 3);
+            editor.entityQueue.push(id);
+
+            await runCommand(command(), editor);
+
+            expect(constraintsOf(editor, line).map((c) => c.refs)).toEqual([[ref(id, 0), ref(id, 1)]]);
+        } finally {
+            editor.solver.dispose();
+        }
+    });
+
+    test("pre-selected lines all become horizontal in one commit", async () => {
+        const editor = fakeEditor();
+        try {
+            const a = editor.solver.addLine(0, 0, 10, 3);
+            const b = editor.solver.addLine(0, 5, 10, 9);
+            editor.selectedWholeEntityIds = [a, b];
+
+            await runCommand(new HorizontalConstraintCommand(), editor);
+
+            expect(constraintsOf(editor, ConstraintKind.Horizontal)).toHaveLength(2);
+            expect(editor.commit).toHaveBeenCalledTimes(1);
+        } finally {
+            editor.solver.dispose();
+        }
+    });
+});
+
+describe("Concentric, Normal and Curvature", () => {
+    const solved = (editor: ReturnType<typeof fakeEditor>) => {
+        expect(editor.solver.solve(true).result).toMatch(/^Ok/);
+        return editor.solver.toData();
+    };
+
+    test("concentric puts a circle and an arc on one center, as a concentric constraint", async () => {
+        const editor = fakeEditor();
+        try {
+            const circle = editor.solver.addCircle(0, 0, 5);
+            const arc = editor.solver.addArc(3, 2, 11, 2, 3, 10);
+            editor.entityQueue.push(circle, arc);
+
+            await runCommand(new ConcentricConstraintCommand(), editor);
+
+            const [found] = constraintsOf(editor, ConstraintKind.P2PCoincident);
+            expect(found).toMatchObject({ role: "concentric", refs: [ref(circle, 0), ref(arc, 0)] });
+            const data = solved(editor);
+            const c = data.entities.find((e) => e.id === circle)!.params;
+            const a = data.entities.find((e) => e.id === arc)!.params;
+            expect(Math.hypot(c[0] - a[0], c[1] - a[1])).toBeLessThan(1e-6);
+        } finally {
+            editor.solver.dispose();
+        }
+    });
+
+    test("normal makes a line run through a circle's center", async () => {
+        const editor = fakeEditor();
+        try {
+            const circle = editor.solver.addCircle(0, 0, 5);
+            const line = editor.solver.addLine(-10, 3, 10, 4);
+            editor.entityQueue.push(line, circle);
+
+            await runCommand(new NormalConstraintCommand(), editor);
+
+            const [found] = constraintsOf(editor, ConstraintKind.PointOnLine);
+            expect(found).toMatchObject({
+                role: "normal",
+                refs: [ref(circle, 0), ref(line, 0), ref(line, 1)],
+            });
+            const data = solved(editor);
+            const [cx, cy] = data.entities.find((e) => e.id === circle)!.params;
+            const [x1, y1, x2, y2] = data.entities.find((e) => e.id === line)!.params;
+            const cross = (x2 - x1) * (cy - y1) - (y2 - y1) * (cx - x1);
+            expect(Math.abs(cross) / Math.hypot(x2 - x1, y2 - y1)).toBeLessThan(1e-6);
+        } finally {
+            editor.solver.dispose();
+        }
+    });
+
+    test("curvature between two arcs makes them one circle (one undoable constraint of two parts)", async () => {
+        const editor = fakeEditor();
+        try {
+            const a1 = editor.solver.addArc(0, 0, 5, 0, 0, 5);
+            const a2 = editor.solver.addArc(1, 1, 1, 7, -5, 1);
+            editor.entityQueue.push(a1, a2);
+
+            await runCommand(new CurvatureConstraintCommand(), editor);
+
+            const found = editor.solver.toData().constraints.filter((c) => c.role === "curvature");
+            expect(found).toHaveLength(1);
+            const data = solved(editor);
+            const p1 = data.entities.find((e) => e.id === a1)!.params;
+            const p2 = data.entities.find((e) => e.id === a2)!.params;
+            expect(Math.hypot(p1[0] - p2[0], p1[1] - p2[1])).toBeLessThan(1e-6);
+            const r = (p: number[]) => Math.hypot(p[2] - p[0], p[3] - p[1]);
+            expect(r(p1)).toBeCloseTo(r(p2), 6);
+            // removing the one constraint removes both halves
+            editor.solver.removeConstraint(found[0].id);
+            expect(editor.solver.toData().constraints.filter((c) => c.role === "curvature")).toHaveLength(0);
+        } finally {
+            editor.solver.dispose();
+        }
+    });
+
+    test("curvature is refused for a pair it cannot express", async () => {
+        const editor = fakeEditor();
+        const pub = rs.spyOn(PubSub.default, "pub").mockImplementation(() => {});
+        try {
+            const l1 = editor.solver.addLine(0, 0, 10, 0);
+            const l2 = editor.solver.addLine(0, 5, 10, 5);
+            editor.entityQueue.push(l1, l2);
+
+            await runCommand(new CurvatureConstraintCommand(), editor);
+
+            expect(pub).toHaveBeenCalledWith("displayError", expect.stringContaining("Curvature applies to"));
+            expect(editor.solver.toData().constraints).toEqual([]);
+        } finally {
+            pub.mockRestore();
+            editor.solver.dispose();
+        }
+    });
+});
+
+describe("FixConstraintCommand (Fix)", () => {
+    test("fixing a picked line pins both its endpoints", async () => {
+        const editor = fakeEditor();
+        try {
+            const line = editor.solver.addLine(3, 4, 8, 9);
+            editor.entityQueue.push(line);
+
+            await runCommand(new FixConstraintCommand(), editor);
+
+            const found = constraintsOf(editor, ConstraintKind.Fix);
+            expect(found.map((c) => [c.refs, c.datums])).toEqual([
+                [[ref(line, 0)], [3, 4]],
+                [[ref(line, 1)], [8, 9]],
+            ]);
         } finally {
             editor.solver.dispose();
         }

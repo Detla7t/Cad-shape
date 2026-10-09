@@ -103,8 +103,6 @@
     "pointLineDistance": "sketch-dimension-button",
     "toggleExternal": "sketch-use-button",
     "constraint.pointOn": "sketch-coincident-button",
-    "constraint.horizontalAlign": "sketch-horizontal-button",
-    "constraint.verticalAlign": "sketch-vertical-button",
     "configurationVisibility": "configuration-visibiliity",
     "measure-details": "measure-button",
     "analysis-tools": "sketch-analysis-tools",

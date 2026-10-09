@@ -7,9 +7,7 @@ const symbols: Record<string, string> = {
     coincident: "coincident",
     pointOn: "coincident",
     horizontal: "horizontal",
-    horizontalAlign: "horizontal",
     vertical: "vertical",
-    verticalAlign: "vertical",
     perpendicular: "perpendicular",
     parallel: "parallel",
     equal: "equal",
@@ -17,6 +15,9 @@ const symbols: Record<string, string> = {
     midpoint: "midpoint",
     symmetric: "symmetric",
     fix: "fix",
+    concentric: "concentric",
+    normal: "normal",
+    curvature: "curvature",
 };
 let source: Document | undefined;
 

@@ -6,13 +6,11 @@ import { rs } from "@rstest/core";
 import {
     CoincidentConstraintCommand,
     FixConstraintCommand,
-    HorizontalAlignConstraintCommand,
     HorizontalConstraintCommand,
     MidpointConstraintCommand,
     ParallelConstraintCommand,
     PointOnConstraintCommand,
     SymmetricConstraintCommand,
-    VerticalAlignConstraintCommand,
     VerticalConstraintCommand,
 } from "../../src/sketch/commands/sketchConstraints";
 import {
@@ -70,9 +68,14 @@ function fakeEditor() {
         pickSequence: 0,
         lastPickCancelled: false,
         endConstraintSelection: rs.fn(),
+        // a queued point first, else a queued entity (point-or-entity tools)
         pickPointOrEntity: rs.fn(() => {
             const ref = pointQueue.shift();
-            return Promise.resolve(ref ? { kind: "point" as const, ref } : undefined);
+            if (ref) return Promise.resolve({ kind: "point" as const, ref });
+            const entityId = entityQueue.shift();
+            return Promise.resolve(
+                entityId === undefined ? undefined : { kind: "entity" as const, entityId },
+            );
         }),
         annotations: { setDimensionPreview: rs.fn(() => {}) },
         solve: rs.fn((_fine: boolean) => {}),
@@ -223,13 +226,13 @@ describe("non-associative constraint commands reject external references", () =>
 
     test.each([
         {
-            name: "horizontalAlign",
-            command: () => new HorizontalAlignConstraintCommand(),
+            name: "horizontal (two points)",
+            command: () => new HorizontalConstraintCommand(),
             kind: ConstraintKind.HorizontalAlign,
         },
         {
-            name: "verticalAlign",
-            command: () => new VerticalAlignConstraintCommand(),
+            name: "vertical (two points)",
+            command: () => new VerticalConstraintCommand(),
             kind: ConstraintKind.VerticalAlign,
         },
     ])("$name on an external point pubs the tip and adds nothing", async ({ command, kind }) => {

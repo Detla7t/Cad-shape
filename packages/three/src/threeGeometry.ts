@@ -318,32 +318,19 @@ export class ThreeGeometry extends ThreeVisualObject implements IVisualGeometry 
     }
 
     override getSubShapeAndIndex(shapeType: "face" | "edge" | "vertex", subVisualIndex: number) {
-        let subShape: ISubShape | undefined;
-        let transform: Matrix4 | undefined;
-        let index: number = -1;
-        let groups: ShapeMeshRange[] | undefined;
-        if (shapeType === "vertex") {
-            groups = this.geometryNode.mesh.vertexs?.range;
-            if (groups) {
-                index = ThreeHelper.findGroupIndex(groups, subVisualIndex)!;
-                subShape = groups[index].shape;
-                transform = groups[index].transform;
-            }
-        } else if (shapeType === "edge") {
-            groups = this.geometryNode.mesh.edges?.range;
-            if (groups) {
-                index = ThreeHelper.findGroupIndex(groups, subVisualIndex)!;
-                subShape = groups[index].shape;
-                transform = groups[index].transform;
-            }
-        } else {
-            groups = this.geometryNode.mesh.faces?.range;
-            if (groups) {
-                index = ThreeHelper.findGroupIndex(groups, subVisualIndex)!;
-                subShape = groups[index].shape;
-                transform = groups[index].transform;
-            }
-        }
+        const mesh = this.geometryNode.mesh;
+        const groups =
+            shapeType === "vertex"
+                ? mesh.vertexs?.range
+                : shapeType === "edge"
+                  ? mesh.edges?.range
+                  : mesh.faces?.range;
+        // A hit outside every range — display-only geometry such as a construction line's dash
+        // pattern, or a mesh replaced since the ray was cast — picks nothing rather than throwing.
+        const found = groups === undefined ? undefined : ThreeHelper.findGroupIndex(groups, subVisualIndex);
+        const index = found ?? -1;
+        const subShape: ISubShape | undefined = found === undefined ? undefined : groups![found].shape;
+        const transform: Matrix4 | undefined = found === undefined ? undefined : groups![found].transform;
 
         let shape: IShape | undefined = subShape;
         if (this.geometryNode instanceof ShapeNode) {

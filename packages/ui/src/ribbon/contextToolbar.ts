@@ -283,12 +283,22 @@ export class ContextToolbar extends HTMLElement {
             this.separator(row);
             row.append(this.tool("dimension.distance"));
             this.separator(row);
+            // Onshape's constraint row: Horizontal/Vertical take a line or two points (one tool each).
             row.append(
                 this.family(["constraint.coincident", "constraint.pointOn"], "Coincident tools"),
-                this.family(["constraint.horizontal", "constraint.horizontalAlign"], "Horizontal tools"),
-                this.family(["constraint.vertical", "constraint.verticalAlign"], "Vertical tools"),
+                this.tool("constraint.concentric"),
+                this.tool("constraint.horizontal"),
+                this.tool("constraint.vertical"),
             );
-            for (const key of ["perpendicular", "parallel", "tangent", "equal", "fix"] as const)
+            for (const key of [
+                "perpendicular",
+                "parallel",
+                "tangent",
+                "equal",
+                "normal",
+                "fix",
+                "curvature",
+            ] as const)
                 row.append(this.tool(`constraint.${key}`));
             row.append(
                 this.family(["constraint.midpoint", "constraint.symmetric"], "More constraints", false),

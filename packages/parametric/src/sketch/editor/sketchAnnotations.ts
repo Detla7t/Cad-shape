@@ -21,6 +21,7 @@ import {
     pointRefKey,
     resolveDatumSource,
     type SketchConstraintData,
+    type SketchConstraintRole,
     type SketchEntityData,
     type SketchPointRef,
     toUV,
@@ -70,16 +71,24 @@ const CONSTRAINT_BADGES: Partial<Record<ConstraintKind, { label: string; command
     [ConstraintKind.PointOnArc]: { label: "⊙", command: "constraint.pointOn" },
     [ConstraintKind.Midpoint]: { label: "M", command: "constraint.midpoint" },
     [ConstraintKind.Symmetric]: { label: "S", command: "constraint.symmetric" },
-    [ConstraintKind.HorizontalAlign]: { label: "⬌", command: "constraint.horizontalAlign" },
-    [ConstraintKind.VerticalAlign]: { label: "⬍", command: "constraint.verticalAlign" },
+    // point alignment is the Horizontal / Vertical tool applied to two points
+    [ConstraintKind.HorizontalAlign]: { label: "H", command: "constraint.horizontal" },
+    [ConstraintKind.VerticalAlign]: { label: "V", command: "constraint.vertical" },
     [ConstraintKind.Fix]: { label: "⚓", command: "constraint.fix" },
+};
+
+/** Badges of the constraints garlic has no kind for (`SketchConstraintRole`). */
+const ROLE_BADGES: Record<SketchConstraintRole, { label: string; command: CommandKeys }> = {
+    concentric: { label: "◎", command: "constraint.concentric" },
+    normal: { label: "⊾", command: "constraint.normal" },
+    curvature: { label: "κ", command: "constraint.curvature" },
 };
 
 export type BadgeSymbol = { label: string; icon?: string };
 
-/** Badge content for a constraint kind; the icon comes from the command's `@command` decorator. */
-export function badgeSymbol(kind: ConstraintKind): BadgeSymbol | undefined {
-    const entry = CONSTRAINT_BADGES[kind];
+/** Badge content for a constraint kind (or its role); the icon comes from the command's `@command` decorator. */
+export function badgeSymbol(kind: ConstraintKind, role?: SketchConstraintRole): BadgeSymbol | undefined {
+    const entry = role === undefined ? CONSTRAINT_BADGES[kind] : ROLE_BADGES[role];
     if (entry === undefined) return undefined;
     const icon = CommandStore.getComandData(entry.command)?.icon;
     return { label: entry.label, icon: typeof icon === "string" ? icon : undefined };
@@ -313,6 +322,11 @@ export class SketchAnnotationManager implements IDisposable {
     private addConstraintGraphics(px: number, segments: DimensionGeometry["segments"]): void {
         const coincidentGroups = new Set<string>();
         for (const constraint of this.solver.toData().constraints) {
+            if (constraint.role !== undefined) {
+                // concentric, normal, curvature: a symbol beside each constrained entity
+                this.addSymbolBadge(constraint, px);
+                continue;
+            }
             switch (constraint.kind) {
                 case ConstraintKind.Horizontal:
                 case ConstraintKind.Vertical:
@@ -353,7 +367,7 @@ export class SketchAnnotationManager implements IDisposable {
      * constrained entities are.
      */
     private addSymbolBadge(constraint: SketchConstraintData, px: number): void {
-        const symbol = badgeSymbol(constraint.kind);
+        const symbol = badgeSymbol(constraint.kind, constraint.role);
         if (symbol === undefined) return;
         // an arc's structural PointOnArc (all refs on the arc itself) stays invisible —
         // it is part of the entity, deleting it would break the arc geometry
@@ -376,7 +390,7 @@ export class SketchAnnotationManager implements IDisposable {
 
     /** Per-entity (or per-point) badge anchors of a symbol constraint. */
     private symbolAnchors(constraint: SketchConstraintData, px: number): [number, number][] {
-        switch (constraint.kind) {
+        switch (constraint.role === undefined ? constraint.kind : undefined) {
             case ConstraintKind.PointOnLine:
             case ConstraintKind.PointOnCircle:
             case ConstraintKind.PointOnArc:

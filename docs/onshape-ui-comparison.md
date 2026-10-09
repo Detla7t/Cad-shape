@@ -328,3 +328,15 @@ Not yet: press-pull extrudes (from body faces) show no arrow; revolve shows no a
 ## Equal between a circle and an arc
 
 Onshape's Equal accepts any two round entities: a circle and an arc (a trimmed circle) get the same radius. Chili3D's Equal refused that pair ("Equal requires two entities of the same type"); it now applies the solver's mixed equal-radius constraint, in either pick order. Lines still pair with lines; a line and a circle or arc is refused with "Equal requires two lines, or two circles or arcs".
+
+## Constraint set: Concentric, Normal, Curvature, Fix, one Horizontal and one Vertical
+
+| Onshape | Chili3D before | Chili3D now |
+| --- | --- | --- |
+| Concentric (circles, arcs, points share a center) | Missing | Concentric: the two centers coincide; ◎ badge on each entity |
+| Normal (a line meets a curve at right angles) | Missing | Normal: line and circle/arc — the line runs through the center |
+| Curvature (G2 continuity) | Missing | Curvature: two arcs become one circle; a line and a Bézier keep the curve's end straight. Other pairs (arc or Bézier with a Bézier) are refused with a message — their G2 condition is not one the solver can express |
+| Fix (a point or a whole entity) | "Fix Point" | Fix: a picked point, or a picked/selected entity (all its points, and a circle's radius) |
+| Horizontal / Vertical: one tool, a line or two points | Horizontal/Vertical for lines plus separate Align Horizontally/Vertically for points | One Horizontal and one Vertical tool: a line (or every pre-selected line) is made horizontal/vertical, two points are aligned; existing align constraints show the H/V badge |
+
+The sketch toolbar's constraint row follows Onshape's: Coincident, Concentric, Horizontal, Vertical, Perpendicular, Parallel, Tangent, Equal, Normal, Fix, Curvature (Midpoint and Symmetric under More). Concentric, Normal and Curvature are stored as solver constraints with a `role`, so dragging and the solver treat them like the coincident/incidence constraints they reduce to, and one delete removes a two-part curvature constraint.

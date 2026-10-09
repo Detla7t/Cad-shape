@@ -71,7 +71,12 @@ export const SketchRibbonProfiles: RibbonProfileExtra[] = [
                     ["constraint.fix", "constraint.horizontal", "constraint.vertical"],
                     ["constraint.parallel", "constraint.perpendicular", "constraint.equal"],
                     ["constraint.tangent", "constraint.symmetric", "constraint.midpoint"],
-                    ["constraint.pointOn", "constraint.horizontalAlign", "constraint.verticalAlign"],
+                    [
+                        "constraint.pointOn",
+                        "constraint.concentric",
+                        "constraint.normal",
+                        "constraint.curvature",
+                    ],
                 ],
             },
             {

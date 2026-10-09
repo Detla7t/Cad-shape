@@ -245,6 +245,18 @@ describe("ThreeGeometry", () => {
             expect(result.index).toBe(0);
         });
 
+        test.each([
+            "face",
+            "edge",
+            "vertex",
+        ] as const)("a %s hit outside every range (dash pattern, stale mesh) picks nothing instead of throwing", (type) => {
+            const node = createTestGeometryNode();
+            const geo = new ThreeGeometry(node, context);
+            const result = geo.getSubShapeAndIndex(type, 10_000);
+            expect(result.subShape).toBeUndefined();
+            expect(result.index).toBe(-1);
+        });
+
         test("getSubShapeAndIndex returns empty when no edge range", () => {
             const node = createTestGeometryNode({ hasEdges: false });
             const geo = new ThreeGeometry(node, context);

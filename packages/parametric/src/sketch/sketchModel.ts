@@ -76,10 +76,27 @@ export function entityPointCount(type: SketchEntityType, params?: readonly numbe
     return ENTITY_POINT_COUNTS[type];
 }
 
+/**
+ * Onshape constraints garlic has no kind for, expressed through its kinds (`solver.ts`):
+ *
+ * - **concentric**: `P2PCoincident` of two circle/arc centers;
+ * - **normal**: `PointOnLine` of a circle/arc center onto a line — the line meets the curve
+ *   at right angles;
+ * - **curvature** (G2): two arcs — `EqualArcRadius` plus their centers coincident (one
+ *   circle through the joint); a line and a Bézier — `PointOnLine` of the curve's two inner
+ *   control points (refs `[ctrl, lineStart, lineEnd, ctrl]`), so it leaves the line straight.
+ *
+ * The kind stays the garlic kind that drives dragging and incidence projection; the role is
+ * what the badge, the command and duplicate detection go by.
+ */
+export type SketchConstraintRole = "concentric" | "normal" | "curvature";
+
 export interface SketchConstraintData {
     id: number;
     kind: ConstraintKind;
     refs: SketchPointRef[];
+    /** Set for the constraints of `SketchConstraintRole`; absent for a plain garlic constraint. */
+    role?: SketchConstraintRole;
     /**
      * A literal in solver-storage units, or an expression written in display units
      * that resolves against the document's parameters (`resolveDatumSource`).

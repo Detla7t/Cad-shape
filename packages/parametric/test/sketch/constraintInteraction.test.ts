@@ -7,7 +7,7 @@ import {
     CoincidentConstraintCommand,
     FixConstraintCommand,
     HorizontalConstraintCommand,
-    VerticalAlignConstraintCommand,
+    VerticalConstraintCommand,
 } from "../../src/sketch/commands/sketchConstraints";
 import { SketchEditor, type SketchPickTarget } from "../../src/sketch/editor/sketchEditor";
 import { ConstraintKind, originRef, type SketchPointRef } from "../../src/sketch/sketchModel";
@@ -135,7 +135,7 @@ test("Vertical Align applies to a selected whole line, then an endpoint attaches
         const id = solver.addLine(20, 10, 40, 80);
         const editor = harness(solver);
         editor.selectedWholeEntityIds = [id];
-        await run(new VerticalAlignConstraintCommand(), editor);
+        await run(new VerticalConstraintCommand(), editor);
         expect(solver.entity(id)!.params[0]).toBeCloseTo(solver.entity(id)!.params[2], 7);
         const attach = harness(solver, [
             { kind: "point", ref: point(id, 0) },

@@ -28,6 +28,7 @@ import {
     SKETCH_X_AXIS_ID,
     SKETCH_Y_AXIS_ID,
     type SketchConstraintData,
+    type SketchConstraintRole,
     type SketchData,
     type SketchEntityData,
     type SketchEntityType,
@@ -77,6 +78,8 @@ interface ConstraintParams {
     datumSources?: ParameterValue[];
     /** garlic kind when it differs from the sketch-level kind (arc radius → P2PDistance). */
     garlicKind?: ConstraintKind;
+    /** Further garlic constraints the one sketch constraint stands for (a curvature constraint's second half). */
+    extra?: { garlicKind: ConstraintKind; params: number[] }[];
 }
 
 /** The kinds whose value arrives through a datum param rather than from the geometry. */
@@ -94,7 +97,9 @@ interface ConstraintRecord {
     id: number;
     kind: ConstraintKind;
     refs: SketchPointRef[];
-    garlicId: number;
+    role?: SketchConstraintRole;
+    /** The garlic constraints this one stands for — one, or more for a composite role. */
+    garlicIds: number[];
     datumParamIds?: number[];
     /**
      * What each `datumParamIds` entry was written from, in the same order: a number
@@ -300,7 +305,7 @@ export class SketchSolver implements ExternalEntityHost {
         // whose constraint was cascaded away untransacted by syncExternalRefs), and
         // a no-op beats throwing from a delete handler.
         if (record === undefined) return;
-        this.system.remove_constraint(record.garlicId);
+        for (const garlicId of record.garlicIds) this.system.remove_constraint(garlicId);
         for (const datumParamId of record.datumParamIds ?? []) {
             this.system.remove_param(datumParamId);
         }
@@ -409,11 +414,11 @@ export class SketchSolver implements ExternalEntityHost {
         );
     }
 
-    /** Whether an identical constraint (same kind and refs, order-insensitive) already exists. */
-    hasConstraint(kind: ConstraintKind, refs: SketchPointRef[]): boolean {
+    /** Whether an identical constraint (same kind, role and refs, order-insensitive) already exists. */
+    hasConstraint(kind: ConstraintKind, refs: SketchPointRef[], role?: SketchConstraintRole): boolean {
         const key = refs.map(pointRefKey).sort().join("|");
         return [...this.constraints.values()].some(
-            (c) => c.kind === kind && c.refs.map(pointRefKey).sort().join("|") === key,
+            (c) => c.kind === kind && c.role === role && c.refs.map(pointRefKey).sort().join("|") === key,
         );
     }
 
@@ -815,6 +820,7 @@ export class SketchSolver implements ExternalEntityHost {
                 id: record.id,
                 kind: record.kind,
                 refs: record.refs.map((r) => ({ ...r })),
+                ...(record.role === undefined ? {} : { role: record.role }),
             };
             const sources = this.persistedDatums(record);
             if (sources !== undefined) {
@@ -1043,22 +1049,22 @@ export class SketchSolver implements ExternalEntityHost {
     }
 
     private addConstraintWithId(id: number, constraint: Omit<SketchConstraintData, "id">): void {
-        const { params, datumParamIds, datumSources, garlicKind } = this.buildConstraintParams(
+        const { params, datumParamIds, datumSources, garlicKind, extra } = this.buildConstraintParams(
             constraint,
             id,
         );
-        const garlicId = this.system.add_constraint(
-            garlicKind ?? constraint.kind,
-            new Uint32Array(params),
-            null,
-            true,
-            0,
-        );
+        const add = (kind: ConstraintKind, values: number[]) =>
+            this.system.add_constraint(kind, new Uint32Array(values), null, true, 0);
+        const garlicIds = [
+            add(garlicKind ?? constraint.kind, params),
+            ...(extra ?? []).map((part) => add(part.garlicKind, part.params)),
+        ];
         this.constraints.set(id, {
             id,
             kind: constraint.kind,
             refs: constraint.refs.map((r) => ({ ...r })),
-            garlicId,
+            ...(constraint.role === undefined ? {} : { role: constraint.role }),
+            garlicIds,
             datumParamIds,
             datumSources,
         });
@@ -1070,6 +1076,7 @@ export class SketchSolver implements ExternalEntityHost {
         id: number,
     ): ConstraintParams {
         if (DATUM_CONSTRAINTS.has(constraint.kind)) return this.datumConstraintParams(constraint, id);
+        if (constraint.role === "curvature") return this.curvatureParams(constraint);
         if (constraint.kind === ConstraintKind.EqualRadius) {
             const [a, b] = constraint.refs;
             const aArc = this.entityTypes.get(a.entityId) === "arc";
@@ -1095,6 +1102,29 @@ export class SketchSolver implements ExternalEntityHost {
             }
         }
         return { params: this.geometricConstraintParams(constraint) };
+    }
+
+    /** A curvature (G2) constraint: two garlic constraints (see `SketchConstraintRole`). */
+    private curvatureParams(constraint: Omit<SketchConstraintData, "id">): ConstraintParams {
+        const { refs } = constraint;
+        if (constraint.kind === ConstraintKind.EqualArcRadius) {
+            // [c1, s1, c2, s2]: equal radii, and the centers coincide — one circle through the joint
+            return {
+                params: this.arcParams(refs[0], refs[1], refs[2], refs[3]),
+                extra: [
+                    { garlicKind: ConstraintKind.P2PCoincident, params: this.pointParams(refs[0], refs[2]) },
+                ],
+            };
+        }
+        // [ctrlA, lineStart, lineEnd, ctrlB]: both inner control points on the line
+        const line = this.lineParams(refs[1], refs[2]);
+        return {
+            garlicKind: ConstraintKind.PointOnLine,
+            params: [...this.pointParams(refs[0]), ...line],
+            extra: [
+                { garlicKind: ConstraintKind.PointOnLine, params: [...this.pointParams(refs[3]), ...line] },
+            ],
+        };
     }
 
     /**
