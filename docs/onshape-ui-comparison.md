@@ -282,22 +282,25 @@ Validation: **8,167 tests passed across 513 files**, TypeScript passed, and prod
 
 ## Part Studio tools that are Onshape's own features
 
-The ten-tool UI parity run (`artifacts/cad-ui-parity-testing/run.json`) found Chili3D's Shell, Mirror, Array and Move to be one-shot commands with their own interaction models, and Shell discarded the feature history. The toolbar's **Fillet, Chamfer, Shell, Boolean, Transform, Linear pattern, Circular pattern and Mirror** now insert Onshape's own std features (`parametric/src/featurescript/onshapeTools.ts`): each is an alias of the std feature, and the dialog is built from std's precondition, so field names, order, defaults, conditional rows and results come from Onshape's code.
+The ten-tool UI parity run (`artifacts/cad-ui-parity-testing/run.json`) found Chili3D's Shell, Mirror, Array and Move to be one-shot commands with their own interaction models, and Shell discarded the feature history. The toolbar's **Fillet, Chamfer, Shell, Boolean, Transform, Linear pattern, Circular pattern and Mirror** now insert Onshape's own std features (`parametric/src/featurescript/onshapeTools.ts`): each is an alias of the std feature, and the dialog is built from std's precondition, so field names, order, defaults, conditional rows and results come from Onshape's code. The old `modify.*`/`boolean.*` commands remain in the Direct modeling toolset only.
 
 | Step | Onshape | Chili3D now |
 |---|---|---|
-| Start a tool | Toolbar click opens the feature dialog on a new feature; the first query box is active | Same; the feature is staged in the draft only (`FeatureEditOptions.insert`) |
-| Select entities | Click entities; the active box counts them live | Same (the box shows "1 edge", "2 parts"…); a part pick takes the solid under the cursor |
-| Change box | Click another query box | Same; the previous box keeps its picks |
-| Planes | Click Top/Front/Right in the viewport or feature tree | Same: viewport reference planes or the tree rows; default planes resolve to std's Top/Front/Right |
+| Start a tool | Toolbar click opens the feature dialog on a new feature; the first query box is active | Same; the feature is staged in the draft only (`FeatureEditOptions.insert`). Nothing else is added to the document: the tools' FeatureScript is a studio provided to the compiler (`ONSHAPE_TOOLS_STUDIO_ID`, `registerStudioProvider`), not a node, so there is no "Part Studio tools" tab, tree row or undo step |
+| Preselection | Entities selected before the click fill the first box | Same: sub-shapes of the body already selected (edges for Fillet/Chamfer, faces for Shell, parts for Boolean/Transform/patterns) are copied into the first box when it takes their kind, and the dialog opens with them selected and counted (`stagePartStudioTool`) |
+| Select entities | Click entities; the active box counts them live and the result previews at once | Same: the box shows "1 edge", "2 parts"…; a part pick takes the solid under the cursor; every selection change previews the feature's result as a temporary mesh over the see-through input (`previewQueryPick`), so a fillet, chamfer or shell is visible before ✓ |
+| Change box | Click another query box | Same; the previous box keeps its picks, and reopening a box re-selects its edges, faces and parts |
+| Planes | Click Top/Front/Right in the viewport or feature tree | Same: viewport reference planes or the tree rows (the tree accepts clicks while a plane box picks, `IEventHandler.treeSelection`); default planes resolve to std's Top/Front/Right |
 | Operation | New / Add / Remove / Intersect tabs | Same tabs (std `UIHint.HORIZONTAL_ENUM`) |
-| Opposite direction | Flip-arrow toggle | ⇄ toggle (std `UIHint.OPPOSITE_DIRECTION`) |
+| Opposite direction | Flip-arrow toggle | ⇄ toggle (std `UIHint.OPPOSITE_DIRECTION`); a pattern whose picked edge runs the other way flips the same way |
 | ✓ / ✗ | ✓ adds one history entry; ✗ leaves nothing | Same: one "Insert feature" undo step, or nothing |
-| History | Every tool is an editable feature | Same: a feature row with the tool's icon, re-editable and re-pickable |
+| History | Every tool is an editable feature | Same: a feature row with the tool's icon, re-editable and re-pickable; the rows survive save, autosave and reload without a studio node |
 
 Parts are the solids of a parametric body (a mirror or pattern with **New** adds solids to it), and part queries see each solid separately. The 1 mm inward shell of the filleted tray, which the kernel's thick-solid refused, now builds: when the wall swallows convex round blends, the cavity is taken from the part without those blends, which matches Onshape's sharp inner corner.
 
-Remaining differences: the toolbar features' source sits in a "Part Studio tools" Feature Studio tab; picks show the feature's input geometry rather than a live result preview; preselected entities are not yet copied into the first box; Extrude and Revolve keep Chili3D's own dialogs (they already have New/Add/Remove/Intersect); Feature-type patterns and mirrors are listed but have no feature-list picker.
+Verification: the kernel test `onshapeTools.kernel.test.ts` replays the ten-tool run in Onshape's order with Onshape's inputs (Extrude, Fillet 1 mm, Chamfer 1 mm, Shell 1 mm, Mirror about Front as New, Linear pattern 40 mm × 2, Circular pattern 2 over 360° about a vertical edge, Transform +Z 20, Boolean union, Revolve 360° then Transform +X 100), plus the no-studio-node, preselection and live-preview cases. The same sequence was then performed in the browser (9 October 2026, isolated build) with the toolbar dialogs only: fillet and chamfer previewed on edge pick, the 1 mm shell built, the mirror plane came from the tree row, the linear pattern's picked edge ran −X and was flipped with ⇄, the circular copy landed at (2 − x, −38 − y) about the picked cavity edge, and the document reopened from autosave with every tool feature intact and no studio tab.
+
+Remaining differences: a plain viewport click selects the part, not its face or edge, so a preselection for Fillet/Chamfer/Shell has to come from an earlier pick (Onshape selects entities on click); each tool works in one parametric body, so with several bodies the part has to be selected before the tool is started (Onshape's tools see the whole Part Studio); a single-pick axis or direction box stays active until ✓ or another box is clicked rather than advancing by itself; Extrude and Revolve keep Chili3D's own dialogs (they already have New/Add/Remove/Intersect; Revolve hides the consumed sketch, so a second use of the sketch needs it shown again); Feature-type patterns and mirrors are listed but have no feature-list picker.
 
 ## Editing an extrude in the history
 
