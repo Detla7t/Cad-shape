@@ -498,11 +498,9 @@ export class GeometryPanel {
             }
             if (this.kind === "measure" && shapes.length === 1 && shapes[0].shapeType === ShapeTypes.face) {
                 const radial = evaluateSelectionMeasurement(doc, "diameter");
-                if (radial.isOk && radial.value.measurement.mode === "diameter")
-                    rows.push(
-                        ["Radius", length(radial.value.measurement.value / 2)],
-                        ["Diameter", length(radial.value.measurement.value)],
-                    );
+                const measured = radial.isOk ? radial.value.measurement : undefined;
+                if (measured?.mode === "diameter")
+                    rows.push(["Radius", length(measured.value / 2)], ["Diameter", length(measured.value)]);
             }
             if (shapes.length === 2 && shapes.every((shape) => shape.shapeType === ShapeTypes.edge)) {
                 const curves = shapes.map((shape) => (shape as IEdge).curve);

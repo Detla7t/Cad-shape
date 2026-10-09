@@ -31,7 +31,7 @@ import {
     measureReferenceDetails,
     measureReferences,
 } from "../src/measurement/measurement";
-import { measureShapes } from "../src/measurement/measurementGeometry";
+import { measurementDetails, measureShapes } from "../src/measurement/measurementGeometry";
 import { measureSelection } from "../src/measurement/selectionMeasurement";
 import { editMeasuredVariable } from "../src/measurement/variableEditor";
 import { ParametricBodyNode } from "../src/parametricBodyNode";
@@ -137,11 +137,11 @@ test("quick measurement and a saved radius variable agree and survive source tra
     model.selection.getSelectedShapes = () => [pick];
     const quick = measureSelection(model);
     expect(quick.isOk).toBe(true);
-    expect(quick.value.measurement.mode).toBe("diameter");
-    expect(quick.value.measurement.value).toBeCloseTo(18);
+    expect(quick.value.measurement!.mode).toBe("diameter");
+    expect(quick.value.measurement!.value).toBeCloseTo(18);
     const radius = measureSelection(model, "radius");
     expect(radius.isOk).toBe(true);
-    expect(radius.value.measurement.value).toBeCloseTo(9);
+    expect(radius.value.measurement!.value).toBeCloseTo(9);
     const ref = captureMeasurement(pick);
     expect(ref.isOk).toBe(true);
     const measured = new MeasuredVariableNode({
@@ -266,13 +266,13 @@ test("an unchanged face selection resolves fresh tracked geometry after its old 
         indexes: [side],
     };
     model.selection.getSelectedShapes = () => [pick];
-    expect(measureSelection(model).value.measurement.value).toBeCloseTo(30);
+    expect(measureSelection(model).value.measurement!.value).toBeCloseTo(30);
     const data = sketch.data;
     data.entities[0].params[2] = 18;
     sketch.setDataEmitShapeChanged(data);
     const refreshed = measureSelection(model, "radius");
     expect(refreshed.isOk).toBe(true);
-    expect(refreshed.value.measurement.value).toBeCloseTo(18);
+    expect(refreshed.value.measurement!.value).toBeCloseTo(18);
     const fresh = body.mesh.faces!.range;
     const caps = fresh.flatMap((range, i) => {
         const surface = (range.shape as ISubFaceShape).surface();
@@ -290,7 +290,69 @@ test("an unchanged face selection resolves fresh tracked geometry after its old 
         farthest = measureSelection(model, "maxDistance");
     expect(gap.isOk).toBe(true);
     expect(farthest.isOk).toBe(true);
-    expect(gap.value.measurement.value).toBeCloseTo(40, 5);
-    expect(farthest.value.measurement.value).toBeCloseTo(Math.hypot(36, 40), 5);
-    expect(gap.value.measurement.segments[0].map((point) => point.z).sort((a, b) => a - b)).toEqual([10, 50]);
+    expect(gap.value.measurement!.value).toBeCloseTo(40, 5);
+    expect(farthest.value.measurement!.value).toBeCloseTo(Math.hypot(36, 40), 5);
+    expect(gap.value.measurement!.segments[0].map((point) => point.z).sort((a, b) => a - b)).toEqual([
+        10, 50,
+    ]);
+});
+
+describe("Onshape-style measurement details", () => {
+    test("a distance reports its ΔX/ΔY/ΔZ as an axis staircase between the witness points", () => {
+        const a = own(factory.point(new XYZ(1, 2, 3)));
+        const b = own(factory.point(new XYZ(4, -2, 15)));
+        const distance = measureShapes("distance", [a, b]);
+        expect(distance.value.value).toBeCloseTo(13, 9);
+        const details = measurementDetails([a, b], distance.value);
+        expect(details.map((d) => [d.label, d.axis, d.value])).toEqual([
+            ["ΔX", "x", 3],
+            ["ΔY", "y", 4],
+            ["ΔZ", "z", 12],
+        ]);
+        // the legs chain from the first point to the second
+        const legs = details.map((d) => d.segments![0]);
+        expect(new XYZ(legs[0][0]).isEqualTo(new XYZ(1, 2, 3))).toBe(true);
+        expect(new XYZ(legs[2][1]).isEqualTo(new XYZ(4, -2, 15))).toBe(true);
+    });
+
+    test("two straight edges report the angle between them; a lone face its area; a point its coordinates", () => {
+        const l1 = own(factory.line(new XYZ(0, 0, 0), new XYZ(10, 0, 0)));
+        const l2 = own(factory.line(new XYZ(0, 0, 0), new XYZ(10, 10, 0)));
+        expect(measurementDetails([l1, l2]).find((d) => d.label === "Angle")?.value).toBeCloseTo(45, 9);
+
+        const box = own(factory.box(Plane.XY, 10, 20, 30));
+        const faces = box.findSubShapes(ShapeTypes.face) as IFace[];
+        try {
+            const areas = faces.map(
+                (face) => measurementDetails([face]).find((d) => d.label === "Area")!.value,
+            );
+            expect(areas.sort((x, y) => x - y)).toEqual(
+                [200, 200, 300, 300, 600, 600].map((v) => expect.closeTo(v, 6)) as unknown as number[],
+            );
+            // one face against the other five: its opposite face is parallel, the four around it square
+            const angles = faces
+                .slice(1)
+                .map((face) =>
+                    Math.round(measurementDetails([faces[0], face]).find((d) => d.label === "Angle")!.value),
+                );
+            expect(angles.sort((x, y) => x - y)).toEqual([0, 90, 90, 90, 90]);
+        } finally {
+            faces.forEach((face) => face.dispose());
+        }
+
+        const point = own(factory.point(new XYZ(1, 2, 3)));
+        expect(measurementDetails([point]).map((d) => [d.label, d.value])).toEqual([
+            ["X", 1],
+            ["Y", 2],
+            ["Z", 3],
+        ]);
+    });
+
+    test("Center measures between the centers of two circles", () => {
+        const c1 = own(factory.circle(XYZ.unitZ, new XYZ(0, 0, 0), 5));
+        const c2 = own(factory.circle(XYZ.unitZ, new XYZ(30, 40, 0), 10));
+        expect(measureShapes("centerDistance", [c1, c2]).value.value).toBeCloseTo(50, 9);
+        // minimum distance between the circles themselves is center distance minus both radii
+        expect(measureShapes("distance", [c1, c2]).value.value).toBeCloseTo(35, 6);
+    });
 });

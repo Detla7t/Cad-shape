@@ -56,6 +56,50 @@
 .quickMeasure[hidden] {
     display: none;
 }
+.quickMeasure {
+    position: relative;
+}
+/* Onshape's measure panel: every value of the selection, stacked above the readout. */
+.measureCard {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 6px);
+    display: grid;
+    grid-template-columns: auto auto;
+    gap: 2px 12px;
+    margin: 0;
+    padding: 6px 10px;
+    min-width: 140px;
+    font-size: 11px;
+    white-space: nowrap;
+    background: var(--panel-background-color);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+.measureCard[hidden] {
+    display: none;
+}
+.measureCard dt {
+    color: var(--foreground-secondary-color);
+}
+.measureCard dd {
+    margin: 0;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+.measureCard dt[data-axis="x"],
+.axisX {
+    color: #d0312d;
+}
+.measureCard dt[data-axis="y"],
+.axisY {
+    color: #2e9d3a;
+}
+.measureCard dt[data-axis="z"],
+.axisZ {
+    color: #2f6fd6;
+}
 .toolbar .readout {
     width: auto;
     max-width: min(320px, 35vw);

@@ -114,3 +114,97 @@ test("the readout refines a measurement, creates that definition and clears its 
         host.remove();
     }
 });
+
+test("the card stacks a distance's ΔX/ΔY/ΔZ in axis colours; a lone point shows its coordinates", async () => {
+    let selected: INode[] = [];
+    let point = false;
+    const doc = createMockDocument({
+        application: createMockApplication(),
+        selection: { getSelectedNodes: () => selected },
+        history: { onChanged: () => {}, removeChanged: () => {} },
+        modelManager: { addNodeObserver: () => {}, removeNodeObserver: () => {} },
+    });
+    registerSelectionMeasurementProvider({
+        evaluate: (_doc, mode = "distance") =>
+            !selected.length
+                ? Result.err("Select geometry")
+                : point
+                  ? Result.ok({
+                        key: "point",
+                        modes: [],
+                        createVariable: async () => {},
+                        details: [
+                            { label: "X", value: 1, quantity: "length", axis: "x" },
+                            { label: "Y", value: 2, quantity: "length", axis: "y" },
+                            { label: "Z", value: 3, quantity: "length", axis: "z" },
+                        ],
+                    })
+                  : Result.ok({
+                        key: "pair",
+                        modes: ["distance", "maxDistance", "centerDistance"],
+                        createVariable: async () => {},
+                        measurement: {
+                            mode,
+                            label: "Minimum distance",
+                            value: 13,
+                            segments: [
+                                [
+                                    { x: 0, y: 0, z: 0 },
+                                    { x: 3, y: 4, z: 12 },
+                                ],
+                            ],
+                        },
+                        details: [
+                            { label: "ΔX", value: 3, quantity: "length", axis: "x" },
+                            { label: "ΔY", value: 4, quantity: "length", axis: "y" },
+                            { label: "ΔZ", value: 12, quantity: "length", axis: "z" },
+                            { label: "Angle", value: 90, quantity: "angle" },
+                            { label: "Area", value: 645.16, quantity: "area" },
+                        ],
+                    }),
+    });
+    const host = document.createElement("div");
+    document.body.append(host);
+    const view = createMockView({ document: doc, dom: host });
+    doc.visual.context.displayMesh = () => 1;
+    doc.visual.context.removeMesh = () => {};
+    view.htmlText = () => ({ dispose: () => {} });
+    const control = new SelectionMeasurementControl(view, () => control.close());
+    host.append(control.element, control.popup);
+    try {
+        selected = [new FolderNode({ document: doc, name: "Pair" })];
+        doc.selection.onNodeChanged.emit(selected);
+        await Promise.resolve();
+        expect(control.card.hidden).toBe(false);
+        const rows = [...control.card.querySelectorAll("dt")].map((dt) => [
+            dt.textContent,
+            dt.dataset["axis"] ?? null,
+            dt.nextElementSibling?.textContent,
+        ]);
+        expect(rows).toEqual([
+            ["ΔX", "x", "3.00 mm"],
+            ["ΔY", "y", "4.00 mm"],
+            ["ΔZ", "z", "12.00 mm"],
+            ["Angle", null, "90.0°"],
+            ["Area", null, "645.16 mm²"],
+        ]);
+        const options = [...control.popup.querySelectorAll("option")].map((o) => o.textContent);
+        expect(options).toEqual(["Minimum distance", "Maximum distance", "Center distance"]);
+
+        point = true;
+        doc.selection.onNodeChanged.emit([...selected]);
+        selected = [new FolderNode({ document: doc, name: "Point" })];
+        doc.selection.onNodeChanged.emit(selected);
+        await Promise.resolve();
+        expect(control.element.textContent).toContain("X 1.00 mm");
+        expect(control.element.textContent).toContain("Z 3.00 mm");
+        expect(control.card.hidden).toBe(true);
+        expect(
+            control.element.querySelector<HTMLButtonElement>('[aria-label="Create measured variable"]')!
+                .disabled,
+        ).toBe(true);
+    } finally {
+        control.dispose();
+        host.remove();
+    }
+});

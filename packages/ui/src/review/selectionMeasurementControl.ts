@@ -2,13 +2,17 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    ANGLE_UNITS,
+    documentUnit,
     evaluateSelectionMeasurement,
     formatDocumentValue,
+    formatPreferenceNumber,
     type IDocument,
     type INode,
     type IView,
     LENGTH_UNITS,
     MEASUREMENT_LABELS,
+    type MeasurementDetail,
     type MeasurementMode,
     type MeasurementResult,
     PubSub,
@@ -18,9 +22,27 @@ import { createCadIcon } from "@chili3d/element";
 import { MeasurementGuide } from "./measurementGuide";
 import style from "./viewportUtilities.module.css";
 
-/** One selection, one measurement definition shared by the readout, guide and variable editor. */
+/** A detail's value in the document's units (areas in the squared length unit). */
+export function formatMeasurementDetail(detail: MeasurementDetail, doc: IDocument): string {
+    if (detail.quantity === "angle") return formatDocumentValue(detail.value, doc, ANGLE_UNITS);
+    if (detail.quantity === "area") {
+        const unit = documentUnit(doc, LENGTH_UNITS);
+        return `${formatPreferenceNumber(detail.value / unit.factor ** 2, unit.precision)} ${unit.suffix}²`;
+    }
+    return formatDocumentValue(detail.value, doc, LENGTH_UNITS);
+}
+
+/**
+ * The selection measurement, Onshape style: select anything and the corner shows what it
+ * measures — the main value (a distance switchable between Minimum, Maximum and Center, a
+ * length, a diameter) with everything else beside it: a distance's ΔX/ΔY/ΔZ in the axis
+ * colours, the angle between straight edges or flat faces, an area, a point's coordinates. The
+ * viewport draws the same (see `MeasurementGuide`).
+ */
 export class SelectionMeasurementControl {
     readonly element = document.createElement("div");
+    /** The stacked values above the readout. */
+    readonly card = document.createElement("dl");
     readonly popup = document.createElement("section");
     readonly guide: MeasurementGuide;
     private readonly readout = document.createElement("button");
@@ -55,7 +77,10 @@ export class SelectionMeasurementControl {
         this.variable.title = "Create measured variable";
         this.variable.setAttribute("aria-label", "Create measured variable");
         this.variable.onclick = () => void this.create();
-        this.element.append(this.readout, this.variable);
+        this.card.className = style.measureCard;
+        this.card.setAttribute("aria-label", "Measurement values");
+        this.card.hidden = true;
+        this.element.append(this.card, this.readout, this.variable);
         this.popup.className = `${style.popup} ${style.measurePopup}`;
         this.popup.setAttribute("aria-label", "Selection measurement options");
         this.popup.hidden = true;
@@ -92,7 +117,7 @@ export class SelectionMeasurementControl {
         const captured = this.current;
         this.close();
         try {
-            await captured.createVariable(captured.measurement.mode);
+            if (captured.measurement) await captured.createVariable(captured.measurement.mode);
         } catch (error) {
             PubSub.default.pub("showToast", "error.default:{0}", String(error));
         }
@@ -103,7 +128,10 @@ export class SelectionMeasurementControl {
     private readonly previewChanged = (doc: IDocument, result?: MeasurementResult | null) => {
         if (doc !== this.view.document) return;
         this.preview = result;
-        this.guide.show(result === undefined ? this.current?.measurement : (result ?? undefined));
+        this.guide.show(
+            result === undefined ? this.current?.measurement : (result ?? undefined),
+            result === undefined ? this.current?.details : undefined,
+        );
     };
     private readonly schedule = () => {
         if (this.queued || this.disposed) return;
@@ -139,12 +167,13 @@ export class SelectionMeasurementControl {
                 node.onPropertyChanged(this.schedule);
             }
         const result = evaluateSelectionMeasurement(doc, this.mode);
-        this.variable.disabled = !result.isOk;
         if (!result.isOk) {
             this.current = undefined;
+            this.variable.disabled = true;
             this.element.hidden = this.mode === undefined;
             this.readout.textContent = "Measurement unavailable";
             this.status.textContent = result.error;
+            this.renderCard([]);
             this.guide.show(this.preview ?? undefined);
             if (!nodes.length) this.close();
             return;
@@ -152,7 +181,11 @@ export class SelectionMeasurementControl {
         this.current = result.value;
         this.element.hidden = false;
         const measured = result.value.measurement;
-        this.readout.textContent = `${measured.label}: ${formatDocumentValue(measured.value, doc, LENGTH_UNITS)}`;
+        const details = result.value.details ?? [];
+        this.variable.disabled = measured === undefined;
+        this.readout.textContent = measured
+            ? `${measured.label}: ${formatDocumentValue(measured.value, doc, LENGTH_UNITS)}`
+            : details.map((detail) => `${detail.label} ${formatMeasurementDetail(detail, doc)}`).join("  ");
         this.status.textContent = this.readout.textContent;
         this.method.replaceChildren(
             ...result.value.modes.map((mode) => {
@@ -162,9 +195,28 @@ export class SelectionMeasurementControl {
                 return option;
             }),
         );
-        this.method.value = measured.mode;
-        this.guide.show(this.preview === undefined ? measured : (this.preview ?? undefined));
+        this.method.hidden = result.value.modes.length < 2;
+        if (measured) this.method.value = measured.mode;
+        // a lone point's coordinates are the readout itself; otherwise the card lists the rest
+        this.renderCard(measured ? details : []);
+        this.guide.show(this.preview === undefined ? measured : (this.preview ?? undefined), details);
     }
+
+    private renderCard(details: readonly MeasurementDetail[]) {
+        const doc = this.view.document;
+        this.card.replaceChildren(
+            ...details.flatMap((detail) => {
+                const term = document.createElement("dt");
+                term.textContent = detail.label;
+                if (detail.axis) term.dataset["axis"] = detail.axis;
+                const value = document.createElement("dd");
+                value.textContent = formatMeasurementDetail(detail, doc);
+                return [term, value];
+            }),
+        );
+        this.card.hidden = details.length === 0;
+    }
+
     close() {
         this.popup.hidden = true;
         this.readout.setAttribute("aria-expanded", "false");

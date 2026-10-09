@@ -7,8 +7,11 @@ import {
     type IEdge,
     type IElementarySurface,
     type IFace,
+    type IPlaneSurface,
     type IShape,
+    type IVertex,
     MEASUREMENT_LABELS,
+    type MeasurementDetail,
     type MeasurementMode,
     type MeasurementResult,
     Result,
@@ -30,6 +33,13 @@ export function measureShapes(mode: MeasurementMode, shapes: readonly IShape[]):
             if (!measured.isOk) return Result.err(measured.error);
             value = measured.value.value;
             segments.push([new XYZ(measured.value.first), new XYZ(measured.value.second)]);
+        } else if (mode === "centerDistance") {
+            if (shapes.length !== 2) return Result.err("Distance needs two entities.");
+            const [a, b] = shapes.map(centerOf);
+            if (a === undefined || b === undefined)
+                return Result.err("Center distance needs points, circles, arcs or round faces.");
+            value = a.distanceTo(b);
+            segments.push([a, b]);
         } else if (mode === "diameter" || mode === "radius") {
             if (shapes.length !== 1) return Result.err("Select one circular edge or round face.");
             const radial = roundGeometry(shapes[0]);
@@ -75,6 +85,82 @@ export function measureShapes(mode: MeasurementMode, shapes: readonly IShape[]):
     } catch (error) {
         return Result.err(`Measurement failed: ${String(error)}`);
     }
+}
+
+/** A point's position, or the center of a circle, arc or round face — what "Center" measures from. */
+export function centerOf(shape: IShape): XYZ | undefined {
+    if (shape.shapeType === ShapeTypes.vertex) return (shape as IVertex).point();
+    return roundGeometry(shape)?.center;
+}
+
+/** A straight edge's direction, or a planar face's normal — what an angle is measured between. */
+function directionOf(shape: IShape): { vector: XYZ; kind: "line" | "plane" } | undefined {
+    if (shape.shapeType === ShapeTypes.edge) {
+        const curve = (shape as IEdge).curve.basisCurve;
+        return CurveUtils.isLine(curve) ? { vector: curve.direction.normalize()!, kind: "line" } : undefined;
+    }
+    if (shape.shapeType !== ShapeTypes.face) return undefined;
+    const surface = (shape as IFace).surface();
+    try {
+        if (!surface.isPlanar() || !("plane" in surface)) return undefined;
+        return { vector: (surface as IPlaneSurface).plane.normal, kind: "plane" };
+    } finally {
+        surface.dispose();
+    }
+}
+
+const DEG = 180 / Math.PI;
+
+/**
+ * The values Onshape's measure panel shows beside the main measurement: the ΔX/ΔY/ΔZ of a
+ * distance (a staircase from the first witness point to the second, one leg per axis), the angle
+ * between two straight edges or planar faces, a face's area, a single point's coordinates.
+ */
+export function measurementDetails(
+    shapes: readonly IShape[],
+    distance?: MeasurementResult,
+): MeasurementDetail[] {
+    const details: MeasurementDetail[] = [];
+    if (distance && distance.segments.length > 0) {
+        const [from, to] = distance.segments[0].map((p) => new XYZ(p));
+        const corner1 = new XYZ(to.x, from.y, from.z);
+        const corner2 = new XYZ(to.x, to.y, from.z);
+        const legs: [MeasurementDetail["axis"], number, XYZ, XYZ][] = [
+            ["x", Math.abs(to.x - from.x), from, corner1],
+            ["y", Math.abs(to.y - from.y), corner1, corner2],
+            ["z", Math.abs(to.z - from.z), corner2, to],
+        ];
+        for (const [axis, value, a, b] of legs)
+            details.push({
+                label: `Δ${axis!.toUpperCase()}`,
+                value,
+                quantity: "length",
+                axis,
+                segments: [[a, b]],
+            });
+    }
+    if (shapes.length === 2) {
+        const [a, b] = shapes.map(directionOf);
+        if (a && b) {
+            const cos = Math.min(1, Math.abs(a.vector.dot(b.vector)));
+            // lines have no orientation (0–90°); a line against a plane is measured against its surface
+            const between = Math.acos(cos) * DEG;
+            const angle = a.kind !== b.kind ? 90 - between : between;
+            details.push({ label: "Angle", value: angle, quantity: "angle" });
+        }
+    }
+    if (shapes.length === 1 && shapes[0].shapeType === ShapeTypes.face)
+        details.push({ label: "Area", value: (shapes[0] as IFace).area(), quantity: "area" });
+    if (shapes.length === 1 && shapes[0].shapeType === ShapeTypes.vertex) {
+        const point = (shapes[0] as IVertex).point();
+        for (const [axis, value] of [
+            ["x", point.x],
+            ["y", point.y],
+            ["z", point.z],
+        ] as const)
+            details.push({ label: axis.toUpperCase(), value, quantity: "length", axis });
+    }
+    return details;
 }
 
 function roundGeometry(shape: IShape): { center: XYZ; offset: XYZ; radius: number } | undefined {

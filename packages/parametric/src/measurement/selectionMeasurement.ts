@@ -12,7 +12,7 @@ import {
 } from "@chili3d/core";
 import { VariableCommand } from "../commands/variableCommand";
 import { captureMeasurement, type MeasurementReference, resolveMeasurementReference } from "./measurement";
-import { measureShapes } from "./measurementGeometry";
+import { centerOf, measurementDetails, measureShapes } from "./measurementGeometry";
 
 const capturedSelections = new WeakMap<IDocument, { key: string; refs: MeasurementReference[] }>();
 
@@ -61,22 +61,35 @@ export function measureSelection(
             shapes.push(resolved.value);
         }
         const modes: MeasurementMode[] = [];
-        if (shapes.length === 2) modes.push("distance", "maxDistance");
+        if (shapes.length === 2) {
+            modes.push("distance", "maxDistance");
+            if (shapes.every((shape) => centerOf(shape) !== undefined)) modes.push("centerDistance");
+        }
         const diameter = shapes.length === 1 ? measureShapes("diameter", shapes) : undefined;
         if (diameter?.isOk) modes.push("diameter", "radius");
         const length = measureShapes("length", shapes);
         if (length.isOk) modes.push("length");
-        if (!modes.length) return Result.err("Select an edge, round face, boundary, or two entities.");
+        const refs = selected.value;
+        const key = JSON.stringify(refs);
+        const createVariable = (mode: MeasurementMode) =>
+            VariableCommand.createMeasured(document, { mode, entities: refs });
+        if (!modes.length) {
+            // a lone point: Onshape shows its coordinates
+            const details = measurementDetails(shapes);
+            if (details.length) return Result.ok({ key, modes, details, createVariable });
+            return Result.err("Select an edge, round face, boundary, point, or two entities.");
+        }
         const mode = requested && modes.includes(requested) ? requested : modes[0];
         const result =
             mode === "length" ? length : mode === "diameter" ? diameter! : measureShapes(mode, shapes);
         if (!result.isOk) return Result.err(result.error);
-        const refs = selected.value;
+        const isDistance = mode === "distance" || mode === "maxDistance" || mode === "centerDistance";
         return Result.ok({
-            key: JSON.stringify(refs),
+            key,
             modes,
             measurement: result.value,
-            createVariable: (mode) => VariableCommand.createMeasured(document, { mode, entities: refs }),
+            details: measurementDetails(shapes, isDistance ? result.value : undefined),
+            createVariable,
         });
     } catch (error) {
         return Result.err(`Measurement unavailable: ${String(error)}`);
