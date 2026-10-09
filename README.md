@@ -101,13 +101,16 @@ element ──> core
 - **`builder`** — `AppBuilder` with a fluent `.useIndexedDB().useWasmOcc().useThree().useUI().build()` chain and default ribbon layout
 - **`i18n`** — Locale data (en, zh-cn, pt-br)
 - **`storage`** — IndexedDB persistence layer
-- **`web`** — Entry point: calls `AppBuilder`, shows loading screen, parses URL parameters
+- **`web`** — The Next.js app: the CAD workbench at `/` (boots `AppBuilder`, parses URL parameters) and the End Cap Configurator at `/endcap/`
+- **`react`** — React bindings: hooks over the reactive core, the application host, React islands inside the legacy UI, shared controls
+- **`drawing`** — 2D drawing model with DXF and SVG writers (no CAD dependencies)
+- **`fabrication`** — Shop templates as flat patterns (round duct end caps), their React configurator and the End Cap command
 
 ## Technology Stack
 
 - **Frontend**: TypeScript, Three.js (0.184)
 - **3D Kernel**: OpenCascade 8.0.0 (OCCT) compiled to WebAssembly via Emscripten
-- **Bundler**: Rspack 2
+- **App framework**: Next.js 16 (static export, webpack) with React 19; plugins still bundle with Rspack 2
 - **Linting & Formatting**: Biome (TypeScript), clang-format (C++)
 - **Testing**: Rstest + Happy-DOM
 - **Package Manager**: npm workspaces
@@ -153,7 +156,7 @@ npm run dev   # Launches at http://localhost:8080
 Build the application:
 
 ```bash
-npm run build
+npm run build     # static export in dist/ (also served by `npm run preview`)
 ```
 
 ### TypeScript compiler selection
@@ -162,7 +165,7 @@ Type checking and declaration generation prefer [ts-rust](https://github.com/pin
 (`tsc-rs` 0.1.0). Automatic failover tries Go TypeScript, then the retained TypeScript 6 compiler
 if a compiler is unavailable, crashes, or exceeds the two-minute timeout. TypeScript diagnostics
 fail the check immediately; automatic failover never hides type errors. Each run logs its compiler
-and any fallback reason. Rspack/SWC continues to bundle and emit browser JavaScript.
+and any fallback reason. Next.js (webpack + SWC) bundles and emits browser JavaScript.
 
 ```bash
 npm run typecheck          # Rust → Go → TypeScript 6, on compiler failure only
@@ -177,7 +180,7 @@ CHILI_TS_COMPILER=go npm run build   # Use Go for application and plugin builds
 
 `CHILI_TS_COMPILER=auto|rust|go|legacy` applies to checking, dev, builds, and declarations;
 the `--compiler` flag overrides it for `typecheck` and `build:types`. Use `npm run dev` for watched
-checking. The build waits for type checking and displays errors in Rspack's diagnostics/overlay.
+checking. The build waits for type checking and displays errors in the Next.js overlay.
 The watcher also tracks checked files outside the browser's module graph, such as tests.
 CI checks with all three compilers explicitly.
 

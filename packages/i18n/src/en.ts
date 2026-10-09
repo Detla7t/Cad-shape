@@ -464,6 +464,7 @@ export default {
         "command.sheetMetal.roll": "Roll",
         "command.sheetMetal.crimp": "Crimp",
         "command.sheetMetal.bead": "Bead",
+        "command.sheetMetal.endCap": "End Cap",
         "command.sheetMetal.flatten": "Flatten",
         "command.sheetMetal.exportFlat": "Export Flat Pattern",
         "command.create.folder": "Folder",

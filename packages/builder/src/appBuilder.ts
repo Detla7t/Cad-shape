@@ -24,6 +24,7 @@ import {
     CamRibbonProfiles,
     DataRibbonProfiles,
     DefaultRibbon,
+    FabricationRibbonProfiles,
     mergeRibbonProfiles,
     ParametricRibbonProfiles,
     type RibbonProfileExtra,
@@ -204,6 +205,22 @@ export class AppBuilder {
         return this;
     }
 
+    /**
+     * Fabrication templates (`@chili3d/fabrication`): the End Cap Configurator — round duct end
+     * caps and reducers as flat-pattern sketches, set up in a React dialog. Its ribbon entry
+     * joins the sheet metal tab, so it comes after `useParametric`.
+     */
+    useFabrication(): this {
+        this._inits.push(async () => {
+            Logger.info("initializing fabrication");
+
+            const fabrication = await import("@chili3d/fabrication/app");
+            (globalThis as Record<string, unknown>)["Chili3dFabrication"] = fabrication;
+            this._ribbonExtras.push(...FabricationRibbonProfiles);
+        });
+        return this;
+    }
+
     useThree(): this {
         this._inits.push(async () => {
             Logger.info("initializing three");
@@ -214,12 +231,16 @@ export class AppBuilder {
         return this;
     }
 
-    useUI(): this {
+    /**
+     * The main window, rendered into `container` — the host element of a page (the Next.js
+     * workbench passes its own); `#app` or the body when absent.
+     */
+    useUI(container?: HTMLElement): this {
         this._inits.push(async () => {
             Logger.info("initializing MainWindow");
 
             const ui = await import("@chili3d/ui");
-            const app = document.getElementById("app") as HTMLElement;
+            const app = container ?? (document.getElementById("app") as HTMLElement);
             this._window = new ui.MainWindow(await this.getRibbonTabs(), "iconfont.js", app);
         });
         return this;
@@ -257,6 +278,9 @@ export class AppBuilder {
             .filter((x) => x.length > 0);
         if (pathParts.at(-1)?.endsWith(".html")) pathParts.pop();
         urlObj.pathname = `${pathParts.join("/")}/`;
+        // Startup parameters (`?url=`, `?endcap=`) belong to the page, not the plugin folder.
+        urlObj.search = "";
+        urlObj.hash = "";
         const folderUrl = `${urlObj.href}plugins/`;
         try {
             const response = await fetch(`${folderUrl}plugins.json`);

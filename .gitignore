@@ -11,3 +11,8 @@ types
 rust/target/
 # Reusable offline dependency cache (platform-specific; do not commit npm tarballs).
 .offline/
+# Next.js (packages/web): build cache, export staging, generated types
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo

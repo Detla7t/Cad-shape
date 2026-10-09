@@ -12,11 +12,18 @@
         "noPropertyAccessFromIndexSignature": true,
         "useDefineForClassFields": true,
         "experimentalDecorators": true,
+        "jsx": "react-jsx",
         "forceConsistentCasingInFileNames": true,
 
         "plugins": [{ "name": "typescript-plugin-css-modules" }],
         "types": ["@rstest/core/globals"]
     },
     "include": ["packages", "plugins/*/src"],
-    "exclude": ["packages/chili-wasm/lib"]
+    "exclude": [
+        "packages/chili-wasm/lib",
+        "packages/web/.next",
+        "packages/web/out",
+        "packages/web/next-env.d.ts",
+        "packages/web/next.config.mjs"
+    ]
 }

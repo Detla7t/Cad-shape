@@ -1,0 +1,14 @@
+{
+    "extends": "../../tsconfig.json",
+    "compilerOptions": {
+        "rootDir": "../..",
+        "lib": ["dom", "dom.iterable", "esnext"],
+        "jsx": "preserve",
+        "noEmit": true,
+        "isolatedModules": true,
+        "skipLibCheck": true,
+        "plugins": [{ "name": "next" }]
+    },
+    "include": ["next-env.d.ts", "app", "src", "../global.d.ts", ".next/types/**/*.ts"],
+    "exclude": ["node_modules", ".next", "out"]
+}

@@ -15,9 +15,7 @@ import {
     property,
     readFilesAsync,
 } from "@chili3d/core";
-import type { Drawing } from "../drawing/drawing";
-import { writeDxf } from "../drawing/dxf";
-import { writeSvg } from "../drawing/svg";
+import { type Drawing, writeDxf, writeSvg } from "@chili3d/drawing";
 import { FEATURE_STUDIO_EXTENSION, FeatureStudioNode } from "../featurescript/featureStudioNode";
 import { documentStudios } from "../featurescript/studioCompiler";
 import { featureStudioFileName, importFeatureStudio } from "../featurescript/studioFiles";

@@ -7,7 +7,7 @@ import {
     type DrawingLayer,
     degreesOf,
     normalizeDegrees,
-} from "../drawing/drawing";
+} from "@chili3d/drawing";
 import { sampleCurve } from "./curveGeometry";
 import type { SketchData, SketchEntityType } from "./sketchModel";
 

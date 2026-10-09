@@ -11,7 +11,7 @@ import {
     ShapeNode,
     ShapeTypes,
 } from "@chili3d/core";
-import { arcThroughPoints } from "../../drawing/drawing";
+import { arcThroughPoints } from "@chili3d/drawing";
 import { type AutoConstraintOptions, applyAutoConstraints, sketchSnapOptions } from "../autoConstraints";
 import type { UV } from "../curveGeometry";
 import { editSketch } from "../editor/editSketch";

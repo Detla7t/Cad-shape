@@ -6,7 +6,7 @@ import packages from "./package.json" with { type: "json" };
 const configDir = import.meta.dirname;
 
 export default defineConfig({
-    exclude: ["**/cpp/**", "**/rust/**", "**/.claude/**"],
+    exclude: ["**/cpp/**", "**/rust/**", "**/.claude/**", "**/.next/**", "**/out/**"],
     coverage: {
         exclude: ["**/wasm/lib/**", "**/rs/lib/**", "**/test-utils/**"],
     },
@@ -17,6 +17,8 @@ export default defineConfig({
     ],
     testEnvironment: "happy-dom",
     tools: {
+        // React components (`.tsx`) compile with the automatic JSX runtime, as in Next.js.
+        swc: { jsc: { transform: { react: { runtime: "automatic" } } } },
         rspack: {
             plugins: [
                 new DefinePlugin({
@@ -28,7 +30,7 @@ export default defineConfig({
             module: {
                 rules: [
                     { test: /\.svg$/, type: "asset/source" },
-                    // Mirror rspack.config.ts: load .wasm as an asset URL instead of a
+                    // Mirror packages/web/next.config.mjs: load .wasm as an asset URL instead of a
                     // native webassembly module (which would instantiate at import time).
                     { test: /\.wasm$/, type: "asset" },
                     { test: /\.json\.gz$/, type: "asset/resource" },

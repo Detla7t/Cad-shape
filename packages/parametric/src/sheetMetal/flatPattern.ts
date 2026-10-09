@@ -9,7 +9,7 @@ import {
     type DrawingLayer,
     degreesOf,
     normalizeDegrees,
-} from "../drawing/drawing";
+} from "@chili3d/drawing";
 import type { Loop2, Segment2, SheetMetalModel, V2 } from "./model";
 import { stripSection } from "./section";
 

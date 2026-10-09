@@ -221,6 +221,15 @@ export const SheetMetalRibbonProfiles: RibbonProfileExtra[] = [
     },
 ];
 
+/** `useFabrication()`: shop templates beside the round duct tools (End Cap leads the group). */
+export const FabricationRibbonProfiles: RibbonProfileExtra[] = [
+    {
+        tabName: "ribbon.tab.sheetMetal",
+        before: "ribbon.tab.manager",
+        groups: [{ groupName: "ribbon.group.roundDuct", items: ["sheetMetal.endCap"] }],
+    },
+];
+
 /** `useData()`: Data Sources beside Variable Studios on the parametric tab. */
 export const DataRibbonProfiles: RibbonProfileExtra[] = [
     {

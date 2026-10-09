@@ -1,0 +1,15 @@
+{
+    "name": "@chili3d/react",
+    "version": "0.7.1",
+    "description": "React bindings for Chili3d: hooks over core's observables and PubSub, the application host, React islands inside the custom-element UI, and shared form and drawing components",
+    "main": "src/index.ts",
+    "type": "module",
+    "devDependencies": {
+        "@chili3d/core": "*",
+        "@chili3d/drawing": "*"
+    },
+    "peerDependencies": {
+        "react": "^19.2.0",
+        "react-dom": "^19.2.0"
+    }
+}

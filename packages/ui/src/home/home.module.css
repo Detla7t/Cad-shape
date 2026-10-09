@@ -424,6 +424,19 @@
 .table tbody tr[aria-selected="true"] {
     background: color-mix(in srgb, #b4dfef 45%, var(--panel-background-color));
 }
+.templateTable th:nth-child(1) {
+    width: 30%;
+}
+.templateTable th:nth-child(2) {
+    width: 38%;
+}
+.templateTable th:nth-child(3),
+.templateTable th:nth-child(4) {
+    width: 11%;
+}
+.templateDescription {
+    color: var(--foreground-secondary-color);
+}
 .documentName {
     display: flex;
     align-items: center;

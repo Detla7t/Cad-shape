@@ -5,7 +5,8 @@
     "main": "src/index.ts",
     "type": "module",
     "devDependencies": {
-        "@chili3d/core": "*"
+        "@chili3d/core": "*",
+        "@chili3d/drawing": "*"
     },
     "dependencies": {
         "@codemirror/autocomplete": "^6.20.3",

@@ -268,3 +268,14 @@ Remaining differences: section cuts are still uncapped, so **Section interferenc
 Captures: [Shading flyout](ui-comparison/chili-view-shading-menu.png), [tangent-edge flyout](ui-comparison/chili-view-tangent-menu.png), [General graphics preferences](ui-comparison/chili-graphics-general.png), [Sketch graphics preferences](ui-comparison/chili-graphics-sketch.png), [plane context menu](ui-comparison/chili-plane-context-menu.png).
 
 Validation: **8,167 tests passed across 513 files**, TypeScript passed, and production/plugin builds passed. The final menu/preference checks and sketch display regressions also passed after visual refinements. Scoped Biome checks reported warnings without errors; existing bundle-size warnings remain.
+
+## End Cap Configurator (Onshape document "End Cap Configurator")
+
+| Onshape | Chili3D |
+| --- | --- |
+| Part Studio configuration panel: `Endcap` checkbox, `OD`/`ID` lists (4"–24", Custom), `Wall Height` | The same controls, in the same order, in Sheet Metal ▸ Round Duct ▸ End Cap (a dialog) and on the `/endcap/` page |
+| "End Cap" / "Reducing End Cap" sketches, flats laid out below and above the origin | One sketch named like the export (`9.63in x 6.63in Reducing End Cap`), same layout; rim bend arcs as construction, each half and strip a pickable region |
+| Export as DXF (inch, `ModelSketch_Visible` layer); Order Library profile "End caps — all preset sizes" | Download DXF/SVG of one cap; "Download all (.zip)" writes the 253 preset files with the profile's names; geometry matches every Onshape export to 1e-6 in |
+| Configuration string (`Endcap=false;OD_Table=_9_5_8_;List_tBoS7KHF1hLsDf=_6_5_8_`) | Shown on the page for preset sizes |
+| Public document (globe icon) anyone can view and copy | Public template in the dashboard's Public section ("Open copy"), or the link `/?template=end-cap-configurator`; the copy holds both sketches and the reducer's DXF drawing tab |
+| Custom Crimp, Wall Inner Edge | Not modelled: every reference export used their defaults, so their effect on the flats is unknown |

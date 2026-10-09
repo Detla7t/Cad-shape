@@ -8,9 +8,7 @@
  */
 
 import { Plane } from "@chili3d/core";
-import { formatNumber } from "../../src/drawing/drawing";
-import { readDxf, writeDxf } from "../../src/drawing/dxf";
-import { writeSvg } from "../../src/drawing/svg";
+import { formatNumber, readDxf, writeDxf, writeSvg } from "@chili3d/drawing";
 import {
     bendLabel,
     clipLineToBlank,

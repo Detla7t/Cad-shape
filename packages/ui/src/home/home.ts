@@ -5,6 +5,8 @@ import {
     Config,
     DocumentLibrary,
     type DocumentLibrarySnapshot,
+    type DocumentTemplate,
+    documentTemplates,
     download,
     type IApplication,
     type IDocument,
@@ -254,6 +256,10 @@ export class Home extends HTMLElement {
         if (this.folder || this.label)
             heading.append(button("All documents", () => this.choose("owned"), style.textButton));
         this.results.append(heading);
+        if (this.filter === "public" && !this.folder && !this.label && this.publicTemplates().length) {
+            this.results.append(this.templateTable(this.publicTemplates()));
+            return;
+        }
         if (this.filter === "owned" && !this.folder && !this.label && !this.search.value.trim())
             this.results.append(this.recentSection(), this.folderSection());
         const items = this.visibleDocuments();
@@ -347,6 +353,80 @@ export class Home extends HTMLElement {
         this.results.append(table);
     }
 
+    /** Published templates (`registerDocumentTemplate`) matching the search box. */
+    private publicTemplates(): DocumentTemplate[] {
+        const query = this.search.value.trim().toLowerCase();
+        return documentTemplates().filter((template) =>
+            [template.name, template.description, template.owner, ...(template.tags ?? [])]
+                .join(" ")
+                .toLowerCase()
+                .includes(query),
+        );
+    }
+    private templateTable(templates: readonly DocumentTemplate[]) {
+        const table = el("table", `${style.table} ${style.templateTable}`);
+        table.setAttribute("aria-label", "Public templates");
+        const titles = el("tr");
+        for (const text of ["Name", "Description", "Owned by", "Visibility", ""]) {
+            const cell = el("th", "", text);
+            cell.scope = "col";
+            if (!text) cell.setAttribute("aria-label", "Template actions");
+            titles.append(cell);
+        }
+        const head = el("thead");
+        head.append(titles);
+        const body = el("tbody");
+        for (const template of templates) {
+            const row = el("tr");
+            row.tabIndex = 0;
+            row.dataset["templateId"] = template.id;
+            const open = () => this.run(() => this.openTemplate(template));
+            row.ondblclick = open;
+            row.onkeydown = (event) => {
+                if (event.target === row && event.key === "Enter") open();
+            };
+            const nameWrap = el("div", style.documentName);
+            const thumbnail = el("span", style.thumbnail);
+            if (template.thumbnail) {
+                const image = el("img");
+                image.src = template.thumbnail;
+                image.alt = "";
+                thumbnail.append(image);
+            } else thumbnail.append(createCadIcon("homeCreated"));
+            const name = button(template.name, open, style.nameButton);
+            name.title = template.name;
+            nameWrap.append(thumbnail, name);
+            const nameCell = el("td");
+            nameCell.append(nameWrap);
+            const description = el("td", style.templateDescription, template.description);
+            description.title = template.description;
+            const actionsCell = el("td");
+            actionsCell.append(button("Open copy", open, style.textButton));
+            row.append(
+                nameCell,
+                description,
+                el("td", style.owner, template.owner),
+                el("td", style.owner, "Public"),
+                actionsCell,
+            );
+            body.append(row);
+        }
+        table.append(head, body);
+        return table;
+    }
+    /** A new document from `template`, saved into the user's library like an import, then opened. */
+    private async openTemplate(template: DocumentTemplate) {
+        if (this.opening) return;
+        this.opening = true;
+        try {
+            const created = await template.create(this.app);
+            if (!created.isOk) throw new Error(created.error);
+            await this.saveImported(created.value);
+            PubSub.default.pub("displayHome", false);
+        } finally {
+            this.opening = false;
+        }
+    }
     private thumbnail(item: LibraryDocument, className: string) {
         const wrap = el("span", className);
         if (item.image) {

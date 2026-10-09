@@ -484,6 +484,7 @@ export const I18N_KEYS = [
     "command.sheetMetal.roll",
     "command.sheetMetal.crimp",
     "command.sheetMetal.bead",
+    "command.sheetMetal.endCap",
     "command.sheetMetal.flatten",
     "command.sheetMetal.exportFlat",
     "command.doc.new",

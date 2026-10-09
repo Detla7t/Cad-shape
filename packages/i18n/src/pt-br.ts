@@ -279,6 +279,7 @@ export default {
         "command.sheetMetal.roll": "Calandrar",
         "command.sheetMetal.crimp": "Crimpar",
         "command.sheetMetal.bead": "Friso",
+        "command.sheetMetal.endCap": "Tampa",
         "command.sheetMetal.flatten": "Planificar",
         "command.create.folder": "Criar Pasta",
         "command.create.group": "Agrupar",

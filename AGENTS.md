@@ -3,8 +3,9 @@
 ## Build & Test
 
 ```bash
-npm run dev            # Rspack dev server → localhost:8080
-npm run build          # Production build (Rspack + SWC)
+npm run dev            # Next.js dev server (webpack) → localhost:8080
+npm run build          # Static Next.js export → dist/, then plugins (Rspack) and asset checks
+npm run preview        # Serve dist/ offline (strict CSP) → 127.0.0.1:8096
 npm run test           # All tests (Rstest + Happy-DOM); npm run testc = with coverage
 npm run check          # Biome lint + auto-fix (run before commits)
 npm run format         # Biome + clang-format across all files
@@ -19,11 +20,13 @@ npx rstest -t "should handle error case"       # filter by name
 Browser-based parametric 3D CAD: OCCT C++ kernel compiled to WebAssembly, rendered with Three.js. npm workspace under `packages/`:
 
 ```
-web ──> builder ──> app ──> core
+web (Next.js) ──> react ──> core + drawing
+              ──> fabrication ──> drawing (+ react, core/parametric/documents for ./react, ./app)
+              ──> builder ──> app ──> core
                   ──> i18n / three / wasm ──> core
                   ──> rs (Rust → wasm, no deps)
                   ──> ui ──> core + element
-                  ──> parametric ──> core
+                  ──> parametric ──> core + drawing
                   ──> data ──> core + element
                   ──> assembly ──> core + element
                   ──> cam ──> core + element + parametric + rs
@@ -31,7 +34,11 @@ web ──> builder ──> app ──> core
                   ──> onshape-std (asset only)
 ```
 
-- **`core`** — Everything abstract: shape interfaces, math, document model, reactive data (`Observable`, `Binding`, `PubSub`), `Result<T,E>`, undo, commands, serialization, plugins, services, UI abstractions
+- **`web`** — The Next.js 16 app (App Router, static export, webpack mode; `next.config.mjs` mirrors the old Rspack rules: SVG as source, wasm/cur/jpg/`.json.gz` as asset URLs, the `__APP_VERSION__` defines, CSS modules in `local` mode so their element selectors stay legal, `TypecheckPlugin` on the client compiler). `/` is the workbench: `src/workbench/` boots `AppBuilder` inside `ChiliHost` (client only, `next/dynamic` with `ssr: false`) and runs URL startup actions (`?plugin=`, `?url=`/`?model=`, `?endcap=`); `/endcap/` is the End Cap Configurator page. `public/` is a symlink to the root `public/`; `scripts/collect-web-export.mjs` copies `packages/web/out` to `dist/`. Next's own types (`next/types/global.d.ts` declares `*.module.css` differently) stay out of the root type program: `next.config.mjs`/`next-env.d.ts` are excluded and app files never import from `"next"` itself (`next/dynamic` is fine).
+- **`react`** — React bindings over core's reactive model: `useObservable(source, "prop")`, `useCollection`, `usePubSub` (all `useSyncExternalStore`/effect based), `ApplicationProvider`/`useApplication`/`useActiveDocument`, `ChiliHost` (boots one application per boot function and moves its window into whichever host mounted last — Strict Mode safe), `mountIsland(element, node, app)` to render React inside the custom-element UI (how legacy panels and dialogs convert one at a time), and shared controls (`Panel`, `Field`, `Checkbox`, `Select`, `TextInput`, `Button`, `LoadingScreen`, `DrawingView` — a `@chili3d/drawing` drawing as inline SVG). Controls read the app's theme variables with light-theme fallbacks.
+- **`drawing`** — The pure 2D drawing model (lines, arcs, circles, text on layers; `units` mm or inch) with DXF R12 and true-scale SVG writers, `readDxf`, `convertDrawing`. Moved out of `parametric/src/drawing` (which re-exports it) so web pages and templates use it without the CAD.
+- **`fabrication`** — Shop templates as pure flat patterns (no kernel, no DOM). `endcap/`: the Onshape End Cap Configurator recreated — plain and reducing round-duct end caps (`endCapPattern(params)` in inches: two half discs with the rim bend at the duct radius and a size-banded flange allowance, a 1" lap-seam tab, and for reducers a hole 3/32 under the small duct plus two collar strips), the 22 preset sizes with Onshape's configuration option ids (`onshapeConfiguration`), Onshape's export naming (`9.63in x 6.63in Reducing End Cap`) and `endCapDxfZip` for all 253 presets. Every constant was read off the Onshape exports and the generator matches all of them to 1e-6 in (`test/fixtures/onshapeEndCaps.json` always; `ENDCAP_REFERENCE_DIR=… npx rstest packages/fabrication/test/onshapeExports.test.ts` for a whole export folder). `geometry/`: `FlatPattern` parts (outline vs bend lines), `toDrawing` (Onshape's `ModelSketch_Visible` layer), `sameGeometry` comparison. Subpaths: `@chili3d/fabrication/react` (the configuration form, preview and `EndCapEditor`, URL encoding of a cap) and `@chili3d/fabrication/app` (`addEndCapSketch` — the pattern as a mm sketch on XY with bend arcs as construction, one region per part — and the `sheetMetal.endCap` command, whose dialog is the React editor mounted as an island), loaded by `AppBuilder.useFabrication()` (after `useParametric`; End Cap leads Sheet Metal ▸ Round Duct). Loading `./app` also publishes the "End Cap Configurator" public template (`end-cap-configurator`: both sketches at the Onshape defaults, the plain one hidden, plus the reducer's DXF as a drawing element).
+- **`core`** — Everything abstract: shape interfaces, math, document model, reactive data (`Observable`, `Binding`, `PubSub`), `Result<T,E>`, undo, commands, serialization, plugins, services, UI abstractions. Public templates (`documentTemplates.ts`): modules `registerDocumentTemplate({ id, name, description, owner, thumbnail, create(app) })`; the dashboard's Public section lists them and "Open copy" creates and saves a new document; `/?template=<id>` does the same from a link
 - **`parametric`** — Parametric feature-list bodies (Onshape-style) plus the 2D sketch module (`src/sketch/`, wrapping the garlic constraint solver). A body stores no shapes — only an ordered feature list replayed through `registerFeature` handlers, so any upstream edit re-evaluates the chain; the bulk of the module is stable identity for sub-shapes across rebuilds (kernel history → tracked ids → stored `EdgeRef`/`ProfileRef`) and the timeline rules for which shape a reference resolves against.
   `src/featurescript/` is an Onshape-dialect FeatureScript implementation: `lang/` (lexer, parser, tree-walking interpreter — copy-on-write value containers, `ValueWithUnits` in SI, type tags via `as`/`is`, overloads, preconditions), `std/` (math/units, vectors/planes/transforms, bound specs, enums), and `context/` (the modeling `Context`: bodies whose per-entity attributes are carried through kernel history, so `qCreatedBy` and transient queries survive later ops; queries, `op*`/`f*` operations — splits, direct edits, holes, mate connectors and composite parts included, with history the kernel does not report recovered by the surface or curve each output lies on (`geometricHistory.ts`) — in-feature sketches, `ev*`). Source lives in document `FeatureStudioNode`s (imported by name); the `featurescript` feature runs an exported `defineFeature` against the body's chain shape, with panel parameters derived from its precondition (`featureSpec.ts`); an exported `defineTable` (`"Table Type Name"`) is a custom table, run by `tableRuntime.ts` over the Part Studio's visible solids (`customTables.ts`) and normalized into display data for the tables panel (`ui/tablesPanel.ts`). FeatureScript lengths are meters, the kernel is mm — convert at the boundary (`MM_PER_METER`). Studios are edited in `ui/ide/` (`FeatureScriptIde`, CodeMirror 6, its own lazy chunk via `createFeatureScriptIde`; `showFeatureStudioEditor` hosts it in a float panel): the language service is pure modules over a tolerant scanner (`scanner.ts`, `declarations.ts` — never the throwing lexer/parser), std docs/exports come from `StdIndex` scanning the provided std source (`providedOnshapeStd`, CRLF-normalized, warmed in idle slices), and CodeMirror glue stays in `language.ts`/`extensions.ts`/`setup.ts`.
   `onshape/` runs Onshape's own std source (`createOnshapeInterpreter`, `ambientStd: false`): `onshape/std/*` imports load the real modules (std constants are lazy, maps iterate in key order, overloads merge across imports and dispatch most-specific-first, a module's own declaration shadows an imported name) and bottom out in `@` built-ins — pure ones in `pureBuiltins.ts`, modeling ones forwarded to `context/` through `StdBridge` (std `ValueWithUnits` maps and `QueryType`-enum queries ↔ native quantities and string-typed queries; `interpreter.adaptHostValue` converts host-built definitions). This is what Feature Studios run on in the app: the builder loads `@chili3d/onshape-std` and calls `provideOnshapeStd`, after which `createInterpreter` (`runtime.ts`) returns a cheap `fork()` of one cached std interpreter (shared std modules, builtins and std operators; own studio modules, resolver and step budget). Studios must `import(path : "onshape/std/geometry.fs", ...)` like in Onshape; std has no `mm` (use `millimeter`); std's `defineFeature` reports failures as feature status (`describeStatus`), and `qHostBody` is a Chili3d extension. Without a configured std (most unit tests), studios use the native TypeScript std (`nativeStd.ts`, `ambientStd`). A failed app std download calls `markOnshapeStdUnavailable` and reports a compilation error; it never silently switches dialects. Studio compilation caches are per document and keyed by `featureScriptRuntimeRevision`. `onshapeStd*.test.ts` hold the conformance bar: all 276 std modules parse, std's 115 documented examples hold, and the official FsDoc slot tutorials plus std's own features produce exact volumes on both stds.
@@ -47,8 +54,8 @@ web ──> builder ──> app ──> core
 - **`element`** — Custom reactive DOM elements (radio groups, expanders, data converters)
 - **`ui`** — App chrome: main window, ribbon, property panels, project tree, dialogs, toast, status bar
 - **`app`** — `Application`, body nodes (`bodys/`), command implementations, `CommandService`, `HotkeyService`
-- **`builder`** — `AppBuilder` fluent chain (`.useIndexedDB().useWasmOcc().useParametric().useCam().useData().useAssembly().useDocuments().useThree().useUI().build()`), default ribbon layout; `mergeRibbonProfiles` merges module contributions (`SketchRibbonProfiles` from `@chili3d/parametric`, `ParametricRibbonProfiles`) into `DefaultRibbon`
-- **`i18n`** / **`storage`** / **`web`** — Locale data (en, zh-cn, pt-br) / IndexedDB persistence / entry point (loading screen, `?plugin=`/`?url=`/`?model=` params)
+- **`builder`** — `AppBuilder` fluent chain (`.useIndexedDB().useWasmOcc().useParametric().useCam().useData().useAssembly().useDocuments().useFabrication().useThree().useUI(container).build()`), default ribbon layout; `mergeRibbonProfiles` merges module contributions (`SketchRibbonProfiles` from `@chili3d/parametric`, `ParametricRibbonProfiles`) into `DefaultRibbon`
+- **`i18n`** / **`storage`** — Locale data (en, zh-cn, pt-br) / IndexedDB persistence
 
 Import via workspace names (`import { ... } from "@chili3d/core"`); one root `tsconfig.json` covers all packages.
 
@@ -80,7 +87,7 @@ Crates:
 
 ## Testing
 
-- Rstest (not Jest/Vitest) + Happy-DOM; root `rstest.config.ts`, globals enabled (`describe`, `test`, `expect`); tests in `packages/*/test/`; legacy decorators enabled.
+- Rstest (not Jest/Vitest) + Happy-DOM; root `rstest.config.ts`, globals enabled (`describe`, `test`, `expect`); tests in `packages/*/test/`; legacy decorators enabled; `.tsx` compiles with the automatic JSX runtime (React tests render with `createRoot` inside `act`, `IS_REACT_ACT_ENVIRONMENT` set — see `packages/react/test/`).
 - Reuse shared mocks from `@chili3d/core/test-utils` (`TestDocument`, `createMockDocument`, `createMockApplication`, `createMockVisual`, ...) instead of per-package copies; package-specific facades (e.g. `packages/ui/test/_helpers/`) extend them. `initializeI18n()` runs automatically via rstest `setupFiles` — never call it in test files.
 - Assertions must execute: none hidden in event callbacks (unless the callback is also asserted to fire), no tautologies (`x === true || x === false`), no `if (x) expect(...)` — assert the precondition, then the behavior; `await` every promise whose `.then` asserts.
 - Assert behavior, not absence of crashes: bare `not.toThrow()` / `toBeDefined()` is a smell; `querySelector` results need `not.toBeNull()`.
@@ -92,6 +99,7 @@ Crates:
 - Biome: 4-space indent, 110-col width, double quotes, semicolons always
 - `I`-prefixed behavioral interfaces — plain data-carrier shapes stay unprefixed (`...Data`, `...Ref`, `...Options`, e.g. `SketchData`, `EdgeRef`); `camelCase` functions/variables/files; `PascalCase` classes; `UPPER_SNAKE_CASE` constants
 - CSS Modules (`*.module.css`); type-only imports (`import type { IFoo }`)
+- New UI is React (function components in `.tsx`, `PascalCase`, controlled props; shared controls from `@chili3d/react`). Inside the legacy custom-element UI, mount it with `mountIsland` rather than rewriting the host; read core state through `useObservable`/`useCollection`/`usePubSub`, never by copying it into React state. Keep geometry and file formats in pure modules (no React, no DOM) so pages, commands and tests share them.
 - Every TS file starts with the AGPL-3.0 header:
 
 ```ts

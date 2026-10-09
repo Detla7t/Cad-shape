@@ -7,6 +7,7 @@ export * from "./config";
 export * from "./constants";
 export * from "./dataExchange";
 export * from "./document";
+export * from "./documentTemplates";
 export * from "./editor";
 export * from "./eventHandlers";
 export * from "./fileFormat";

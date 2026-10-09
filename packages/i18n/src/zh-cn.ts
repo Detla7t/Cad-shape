@@ -461,6 +461,7 @@ export default {
         "command.sheetMetal.roll": "卷圆",
         "command.sheetMetal.crimp": "压褶",
         "command.sheetMetal.bead": "加强筋",
+        "command.sheetMetal.endCap": "端盖",
         "command.sheetMetal.flatten": "展开",
         "command.sheetMetal.exportFlat": "导出展开图",
         "command.create.folder": "文件夹",

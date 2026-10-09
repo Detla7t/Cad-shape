@@ -33,6 +33,9 @@ declare module "*.json.gz" {
 
 declare module "*.sass";
 
+// The Next.js app's global stylesheet, imported once by its root layout.
+declare module "*/globals.css";
+
 // @rstest/core's JestAssertion interface extends jest.Matchers (normally provided
 // by @types/jest); shim the namespace so tsc --noEmit stays clean without the extra dep
 declare namespace jest {

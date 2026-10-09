@@ -1,0 +1,103 @@
+// Part of the Chili3d Project, under the AGPL-3.0 License.
+// See LICENSE file in the project root for full license information.
+
+import { readdirSync, readFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { TypecheckPlugin } from "../../scripts/typecheck-plugin.mjs";
+
+const webDir = dirname(fileURLToPath(import.meta.url));
+const rootDir = resolve(webDir, "../..");
+const rootPackage = JSON.parse(readFileSync(join(rootDir, "package.json"), "utf8"));
+
+/** Every workspace package: they ship TypeScript sources (legacy decorators, CSS modules), compiled here. */
+const workspacePackages = readdirSync(join(rootDir, "packages"), { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .flatMap((entry) => {
+        try {
+            const manifest = JSON.parse(
+                readFileSync(join(rootDir, "packages", entry.name, "package.json"), "utf8"),
+            );
+            return manifest.name === "@chili3d/web" ? [] : [/** @type {string} */ (manifest.name)];
+        } catch {
+            return [];
+        }
+    });
+
+/**
+ * @typedef {{ loader?: string, options?: { modules?: { mode?: string } }, oneOf?: Rule[], use?: Rule[] | Rule, rules?: Rule[] }} Rule
+ */
+
+/**
+ * The CSS modules were written for Rspack's `css/auto`, which lets a module also style plain
+ * elements (`svg`, `input`, `:root[theme=…]`). Next's css-loader runs modules in `pure` mode and
+ * rejects those selectors; `local` mode keeps class hashing and accepts them.
+ */
+/** @param {readonly unknown[]} rules */
+function allowGlobalSelectorsInModules(rules) {
+    for (const item of rules) {
+        if (item === null || typeof item !== "object") continue;
+        const rule = /** @type {Rule} */ (item);
+        if (rule.loader?.includes("css-loader") && rule.options?.modules?.mode === "pure") {
+            rule.options.modules.mode = "local";
+        }
+        for (const nested of [
+            rule.oneOf,
+            rule.rules,
+            Array.isArray(rule.use) ? rule.use : rule.use && [rule.use],
+        ]) {
+            if (nested) allowGlobalSelectorsInModules(nested);
+        }
+    }
+}
+
+/** @type {import("next").NextConfig} */
+const nextConfig = {
+    // The CAD runs entirely in the browser (WebAssembly kernels, IndexedDB): a static export
+    // deploys anywhere the Rspack build did (`dist/`, the nginx image).
+    output: "export",
+    trailingSlash: true,
+    reactStrictMode: true,
+    // The repository's CLAUDE.md/AGENTS.md describe the workspace; no generated per-app copy.
+    agentRules: false,
+    transpilePackages: workspacePackages,
+    images: { unoptimized: true, disableStaticImages: true },
+    experimental: { externalDir: true },
+    // The workspace is type-checked as one project by `TypecheckPlugin` below (the root
+    // tsconfig, the compiler `npm run typecheck` picks); Next's own check would cover only this app.
+    typescript: { ignoreBuildErrors: true },
+    webpack(config, { webpack, isServer }) {
+        allowGlobalSelectorsInModules(config.module.rules);
+        config.module.rules.push(
+            // Icon sheets are inlined as markup.
+            { test: /\.svg$/, type: "asset/source" },
+            // Kernels, cursors, images and Onshape's std bundle are files, imported as their URL.
+            {
+                test: /\.(wasm|cur|jpg)$/,
+                type: "asset/resource",
+                generator: { filename: "static/media/[name].[hash][ext]" },
+            },
+            {
+                test: /\.json\.gz$/,
+                type: "asset/resource",
+                generator: { filename: "static/media/[name].[hash][ext]" },
+            },
+        );
+        config.plugins.push(
+            new webpack.DefinePlugin({
+                __APP_VERSION__: JSON.stringify(rootPackage.version),
+                __DOCUMENT_VERSION__: JSON.stringify(rootPackage.documentVersion),
+                __IS_PRODUCTION__: JSON.stringify(process.env.NODE_ENV === "production"),
+            }),
+        );
+        if (!isServer) {
+            // Type errors fail the build (and show in dev), as they did under Rspack: once, on the client compiler.
+            config.plugins.push(new TypecheckPlugin(rootDir));
+            // Emscripten glue (LibreDWG in @chili3d/documents) imports Node's `module` only under Node.
+            config.resolve.fallback = { ...config.resolve.fallback, module: false };
+        }
+        return config;
+    },
+};
+
+export default nextConfig;

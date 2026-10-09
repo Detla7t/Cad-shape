@@ -8,19 +8,21 @@ import {
     drawingBounds,
     formatNumber as f,
     type Point2,
+    unitScale,
 } from "./drawing";
 
 /**
- * SVG at true scale: the page is sized in millimetres and one user unit is one
- * millimetre, so a printout or a laser cutter reproduces the drawing exactly. The drawing's
+ * SVG at true scale: the page is sized in the drawing's units (millimetres or inches) and
+ * one user unit is one drawing unit, so a printout or a laser cutter reproduces the drawing
+ * exactly. The drawing's
  * y axis points up (CAD convention); the writer flips it into SVG's downward y. Each layer
  * is a group (an Inkscape layer).
  */
 
 export interface SvgOptions {
-    /** White space around the drawing, mm. */
+    /** White space around the drawing, in drawing units (default 5 mm). */
     readonly margin?: number;
-    /** Stroke width, mm. */
+    /** Stroke width, in drawing units (default 0.25 mm). */
     readonly strokeWidth?: number;
     readonly title?: string;
 }
@@ -29,8 +31,12 @@ const escapeXml = (text: string) =>
     text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 export function writeSvg(drawing: Drawing, options: SvgOptions = {}): string {
-    const margin = options.margin ?? 5;
-    const strokeWidth = options.strokeWidth ?? 0.25;
+    const perMm = 1 / unitScale(drawing.units);
+    const margin = options.margin ?? 5 * perMm;
+    const strokeWidth = options.strokeWidth ?? 0.25 * perMm;
+    const pageUnit = drawing.units === "inch" ? "in" : "mm";
+    const unitName =
+        drawing.units === "inch" ? "inches (1 user unit = 1 in)" : "millimetres (1 user unit = 1 mm)";
     const bounds = drawingBounds(drawing) ?? { min: [0, 0] as Point2, max: [0, 0] as Point2 };
     const width = bounds.max[0] - bounds.min[0] + 2 * margin;
     const height = bounds.max[1] - bounds.min[1] + 2 * margin;
@@ -98,9 +104,9 @@ export function writeSvg(drawing: Drawing, options: SvgOptions = {}): string {
     return [
         `<?xml version="1.0" encoding="UTF-8" standalone="no"?>`,
         `<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"` +
-            ` width="${f(width)}mm" height="${f(height)}mm" viewBox="0 0 ${f(width)} ${f(height)}">`,
+            ` width="${f(width)}${pageUnit}" height="${f(height)}${pageUnit}" viewBox="0 0 ${f(width)} ${f(height)}">`,
         ...(options.title === undefined ? [] : [`  <title>${escapeXml(options.title)}</title>`]),
-        `  <desc>Units: millimetres (1 user unit = 1 mm). Written by Chili3D.</desc>`,
+        `  <desc>Units: ${unitName}. Written by Chili3D.</desc>`,
         ...groups,
         "</svg>",
         "",

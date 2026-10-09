@@ -5,9 +5,10 @@ import { type Drawing, type DrawingEntity, drawingBounds, formatNumber } from ".
 
 /**
  * ASCII DXF R12 (AC1009) — the dialect every CAD, CAM, laser and plasma package reads —
- * with only LINE, ARC, CIRCLE and TEXT entities. Units are millimetres (`$INSUNITS` 4,
- * `$MEASUREMENT` 1); coordinates keep nanometre precision. Dashed layers use a DASHED
- * line type defined in the file.
+ * with only LINE, ARC, CIRCLE and TEXT entities. Units are the drawing's: millimetres
+ * (`$INSUNITS` 4, `$MEASUREMENT` 1) or inches (`$INSUNITS` 1, `$MEASUREMENT` 0);
+ * coordinates keep nine decimals. Dashed layers use a DASHED line type defined in the file,
+ * its pattern scaled to the units (6 mm, or ¼ in).
  */
 
 type Group = readonly [code: number, value: string | number];
@@ -84,15 +85,18 @@ function entityGroups(entity: DrawingEntity): Group[] {
 
 export function writeDxf(drawing: Drawing): string {
     const bounds = drawingBounds(drawing) ?? { min: [0, 0], max: [0, 0] };
+    const inch = drawing.units === "inch";
+    // The dash pattern is 6 mm (4 on, 2 off) in millimetre files and its nearest ¼ in in inch ones.
+    const dash = inch ? 0.25 : 6;
     const header: Group[] = [
         [0, "SECTION"],
         [2, "HEADER"],
         [9, "$ACADVER"],
         [1, "AC1009"],
         [9, "$INSUNITS"],
-        [70, 4],
+        [70, inch ? 1 : 4],
         [9, "$MEASUREMENT"],
-        [70, 1],
+        [70, inch ? 0 : 1],
         [9, "$EXTMIN"],
         [10, bounds.min[0]],
         [20, bounds.min[1]],
@@ -120,9 +124,9 @@ export function writeDxf(drawing: Drawing): string {
         [3, "Dashed __ __ __"],
         [72, 65],
         [73, 2],
-        [40, 6],
-        [49, 4],
-        [49, -2],
+        [40, dash],
+        [49, (dash * 2) / 3],
+        [49, -dash / 3],
         [0, "ENDTAB"],
     ];
     const layers = [{ name: "0", aci: 7, color: "#000000", dashed: false }, ...drawing.layers];

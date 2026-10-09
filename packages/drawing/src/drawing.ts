@@ -2,10 +2,11 @@
 // See LICENSE file in the project root for full license information.
 
 /**
- * A 2D drawing in millimetres — what the DXF and SVG writers (`dxf.ts`, `svg.ts`) put on
- * paper: lines, arcs, circles and single-line text, each on a named layer. Flat patterns
- * (`sheetMetal/flatPattern.ts`) and sketches (`sketch/sketchDrawing.ts`) are converted to
- * one; the writers never see the model they came from.
+ * A 2D drawing — what the DXF and SVG writers (`dxf.ts`, `svg.ts`) put on paper: lines,
+ * arcs, circles and single-line text, each on a named layer, in millimetres unless `units`
+ * says inches. Flat patterns and sketches (`@chili3d/parametric`) and fabrication
+ * templates (`@chili3d/fabrication`) are converted to one; the writers never see the model
+ * they came from.
  */
 
 export type Point2 = readonly [number, number];
@@ -42,9 +43,39 @@ export type DrawingEntity =
           readonly text: string;
       };
 
+export type DrawingUnits = "mm" | "inch";
+
 export interface Drawing {
     readonly layers: readonly DrawingLayer[];
     readonly entities: readonly DrawingEntity[];
+    /** Unit of every coordinate and length; millimetres when absent. */
+    readonly units?: DrawingUnits;
+}
+
+export const MM_PER_INCH = 25.4;
+
+/** Millimetres per drawing unit. */
+export function unitScale(units: DrawingUnits | undefined): number {
+    return units === "inch" ? MM_PER_INCH : 1;
+}
+
+/** The drawing in other units: coordinates, radii and text heights scale, angles stay. */
+export function convertDrawing(drawing: Drawing, units: DrawingUnits): Drawing {
+    const factor = unitScale(drawing.units) / unitScale(units);
+    if (factor === 1) return { ...drawing, units };
+    const p = (point: Point2): Point2 => [point[0] * factor, point[1] * factor];
+    const entities = drawing.entities.map((entity): DrawingEntity => {
+        switch (entity.kind) {
+            case "line":
+                return { ...entity, a: p(entity.a), b: p(entity.b) };
+            case "arc":
+            case "circle":
+                return { ...entity, center: p(entity.center), radius: entity.radius * factor };
+            case "text":
+                return { ...entity, position: p(entity.position), height: entity.height * factor };
+        }
+    });
+    return { ...drawing, units, entities };
 }
 
 /** Angle normalized to [0, 360). */

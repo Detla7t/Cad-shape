@@ -1,0 +1,43 @@
+.form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 260px;
+}
+
+.indent {
+    margin-left: 23px;
+}
+
+.preview {
+    position: relative;
+    min-height: 240px;
+    border: 1px solid var(--border-color, #dddddd);
+    border-radius: 6px;
+    background-color: var(--viewport-background-color, #fafafa);
+    color: var(--foreground-secondary-color, #555555);
+    overflow: hidden;
+}
+
+.error {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    color: var(--error-color, #c92a2a);
+    text-align: center;
+}
+
+.dialog {
+    display: grid;
+    grid-template-columns: 280px minmax(360px, 1fr);
+    gap: 16px;
+    width: min(820px, 80vw);
+    height: min(460px, 70vh);
+}
+
+.dialog .preview {
+    height: 100%;
+}

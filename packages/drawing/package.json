@@ -1,0 +1,7 @@
+{
+    "name": "@chili3d/drawing",
+    "version": "0.7.1",
+    "description": "2D drawing model (lines, arcs, circles, text on layers) with DXF R12 and true-scale SVG writers; no CAD dependencies",
+    "main": "src/index.ts",
+    "type": "module"
+}
