@@ -12,6 +12,7 @@ import {
     ModalWords,
     type NumberStyle,
     option,
+    semicolonComment,
     spindleRpm,
     toolDescription,
     words,
@@ -52,7 +53,7 @@ class SiemensWriter {
     }
 
     private comment(text: string): void {
-        this.lines.push(`; ${text.replace(/[\r\n]/g, " ")}`);
+        this.lines.push(semicolonComment(text));
     }
 
     text(): string {

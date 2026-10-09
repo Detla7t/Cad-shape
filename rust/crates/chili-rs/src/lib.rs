@@ -8,6 +8,7 @@
 use wasm_bindgen::prelude::*;
 
 mod polygon;
+mod stock_sim;
 
 /// The module's version (the workspace version), for a loaded-module check.
 #[wasm_bindgen]

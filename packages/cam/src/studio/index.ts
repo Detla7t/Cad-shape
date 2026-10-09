@@ -5,6 +5,8 @@ export * from "./camStudioElement";
 export * from "./camStudioView";
 export * from "./commands";
 export * from "./picking";
+export * from "./simulationPanel";
+export * from "./simulationPreview";
 export * from "./studioEdits";
 export * from "./studioHost";
 export * from "./toolpathPreview";

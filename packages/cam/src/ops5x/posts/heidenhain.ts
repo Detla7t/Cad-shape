@@ -12,6 +12,7 @@ import {
     ModalWords,
     type NumberStyle,
     option,
+    semicolonComment,
     spindleRpm,
     toolDescription,
 } from "./format";
@@ -89,9 +90,9 @@ class HeidenhainWriter {
 
     header(): void {
         this.block(`BEGIN PGM ${this.name} MM`);
-        this.block(`; MACHINE: ${this.program.machine.name}`);
+        this.block(semicolonComment(`MACHINE: ${this.program.machine.name}`));
         for (const tool of this.program.tools.values())
-            this.block(`; T${tool.number} ${toolDescription(tool)}`);
+            this.block(semicolonComment(`T${tool.number} ${toolDescription(tool)}`));
     }
 
     footer(): void {
@@ -103,7 +104,7 @@ class HeidenhainWriter {
     toolpath(plan: PlannedToolpath): void {
         const { path, tool } = plan;
         this.modal.reset("X", "Y", "Z", "F");
-        if (path.label) this.block(`; ${path.label}`);
+        if (path.label) this.block(semicolonComment(path.label));
         const rpm = spindleRpm(path, tool);
         const speed = rpm === undefined ? "" : ` S${Math.round(rpm)}`;
         if (plan.toolChange || speed)
@@ -168,7 +169,7 @@ class HeidenhainWriter {
                 this.block(`CYCL DEF 9.0 DWELL TIME`);
                 this.block(`CYCL DEF 9.1 DWELL ${formatNumber(move.seconds, { decimals: 3 })}`);
             } else if (move.kind === "comment") {
-                this.block(`; ${move.text}`);
+                this.block(semicolonComment(move.text));
             } else if (move.kind === "raw") {
                 this.block(move.code);
             }
@@ -185,7 +186,7 @@ class HeidenhainWriter {
                 this.block(`CYCL DEF 9.0 DWELL TIME`);
                 this.block(`CYCL DEF 9.1 DWELL ${formatNumber(entry.seconds, { decimals: 3 })}`);
             } else if (entry.kind === "comment") {
-                this.block(`; ${entry.text}`);
+                this.block(semicolonComment(entry.text));
             } else if (entry.kind === "raw") {
                 this.block(entry.code);
             } else {

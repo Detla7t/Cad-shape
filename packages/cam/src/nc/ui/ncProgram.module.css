@@ -1,0 +1,263 @@
+/* Part of the Chili3d Project, under the AGPL-3.0 License.
+   See LICENSE file in the project root for full license information. */
+
+/* The NC Program view: a side panel beside the Part Studio's viewport — header (save,
+   re-post), the dialect and machine, the G-code editor, the playback bar, and the
+   statistics and problems of the program. */
+
+.root {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    box-sizing: border-box;
+    font-size: 12px;
+    color: var(--foreground-color);
+    background-color: var(--panel-background-color);
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.headerIcon {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 auto;
+}
+
+.title {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.dirty {
+    color: var(--warning-color, #ef6c00);
+    font-weight: 700;
+}
+
+.settings {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 4px 8px;
+    flex: 0 0 auto;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.label {
+    color: var(--foreground-secondary-color);
+    white-space: nowrap;
+}
+
+.repost {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+
+    & select {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+}
+
+.editor {
+    position: relative;
+    flex: 1 1 50%;
+    min-height: 160px;
+    overflow: hidden;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.loading {
+    padding: 12px;
+    color: var(--foreground-muted-color);
+}
+
+.playback {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.slider {
+    flex: 1 1 auto;
+    min-width: 60px;
+}
+
+.readout {
+    flex: 0 0 auto;
+    min-width: 0;
+    max-width: 55%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11px;
+    color: var(--foreground-secondary-color);
+}
+
+.legend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 12px;
+    flex: 0 0 auto;
+    padding: 4px 10px;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--foreground-secondary-color);
+
+    & > span {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+}
+
+.swatch {
+    display: inline-block;
+    width: 12px;
+    height: 3px;
+    border-radius: 1px;
+}
+
+.actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+}
+
+.toggle {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+}
+
+.tabs {
+    display: flex;
+    flex: 0 0 auto;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.tab {
+    padding: 6px 12px;
+    border: none;
+    border-bottom: 2px solid transparent;
+    background: none;
+    color: var(--foreground-secondary-color);
+    cursor: pointer;
+    font: inherit;
+
+    &:hover {
+        color: var(--foreground-color);
+    }
+}
+
+.activeTab {
+    border-bottom-color: var(--primary-color);
+    color: var(--foreground-color);
+}
+
+.panel {
+    flex: 0 1 30%;
+    min-height: 90px;
+    overflow: auto;
+}
+
+.stats {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 3px 10px;
+    padding: 8px 10px;
+}
+
+.statValue {
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+}
+
+.problems {
+    display: flex;
+    flex-direction: column;
+}
+
+.problem {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    padding: 4px 10px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border-color);
+
+    &:hover {
+        background-color: var(--hover-background-color);
+    }
+}
+
+.severity {
+    flex: 0 0 auto;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    align-self: center;
+}
+
+.severity[data-severity="error"] {
+    background-color: var(--error-color, #c62828);
+}
+
+.severity[data-severity="warning"] {
+    background-color: var(--warning-color, #ef6c00);
+}
+
+.severity[data-severity="info"] {
+    background-color: var(--primary-color, #1e88e5);
+}
+
+.problemLine {
+    flex: 0 0 auto;
+    color: var(--foreground-muted-color);
+    font-variant-numeric: tabular-nums;
+    min-width: 42px;
+}
+
+.problemText {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.empty {
+    padding: 8px 12px;
+    color: var(--foreground-muted-color);
+}
+
+.select {
+    width: 100%;
+    min-width: 0;
+    height: 24px;
+    box-sizing: border-box;
+    padding: 0 4px;
+    border: 1px solid var(--input-border-color, var(--border-color));
+    border-radius: 3px;
+    background-color: var(--input-background-color, transparent);
+    color: var(--input-text-color, var(--foreground-color));
+    font: inherit;
+}

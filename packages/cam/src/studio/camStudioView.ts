@@ -17,6 +17,7 @@ import { renderMachinePanel } from "./machinePanel";
 import { renderOperationPanel, renderOperationStatus, statusDetail, statusText } from "./operationPanel";
 import { postSetup, renderPostPanel } from "./postPanel";
 import { renderSetupPanel } from "./setupPanel";
+import { SimulationPanel } from "./simulationPanel";
 import {
     commitSetups,
     documentBodies,
@@ -77,6 +78,8 @@ export class CamStudioView implements IElementView, StudioHost {
     readonly element: HTMLElement;
     readonly generator: CamGenerator;
     readonly preview: ToolpathPreview;
+    /** The stock simulation of a setup (its Simulate action). */
+    readonly simulation: SimulationPanel;
     readonly state: StudioViewState = { detail: "setup", hidden: new Set(), collapsed: new Set() };
     private readonly title = span({ className: style.title });
     private readonly tree = div({ className: style.tree });
@@ -104,6 +107,7 @@ export class CamStudioView implements IElementView, StudioHost {
     ) {
         this.generator = options.generator ?? generatorOf(studio);
         this.preview = new ToolpathPreview(document);
+        this.simulation = new SimulationPanel(this, () => this.updatePreview());
         this.playButton = iconButton("icon-angle-right", t("cam.play"), () => this.togglePlayback(), "play");
         this.slider.addEventListener("input", () => this.showPlayback(Number(this.slider.value) / 1000));
         this.pinnedBox.addEventListener("change", () => this.updatePreview());
@@ -122,6 +126,7 @@ export class CamStudioView implements IElementView, StudioHost {
                 ),
             ),
             this.tree,
+            this.simulation.element,
             this.detail,
             div(
                 { className: style.legend },
@@ -163,6 +168,7 @@ export class CamStudioView implements IElementView, StudioHost {
         this.stopPlayback();
         this.studio.removePropertyChanged(this.onStudioChanged);
         this.unsubscribe();
+        this.simulation.dispose();
         this.preview.dispose();
     }
 
@@ -191,6 +197,7 @@ export class CamStudioView implements IElementView, StudioHost {
         this.title.textContent = this.studio.name;
         this.renderTree();
         keepFocus(this.detail, () => this.renderDetail());
+        this.simulation.refresh();
     }
 
     toast(message: string): void {
@@ -268,6 +275,12 @@ export class CamStudioView implements IElementView, StudioHost {
                         t("cam.generate"),
                         () => void this.generator.generateSetup(setup.id),
                         "generate-setup",
+                    ),
+                    iconButton(
+                        "icon-box",
+                        t("cam.simulate"),
+                        () => void this.simulateSetup(setup.id),
+                        "simulate-setup",
                     ),
                     iconButton("icon-layer-group", t("cam.tools"), () =>
                         this.select({ setupId: setup.id, operationId: undefined, detail: "tools" }),
@@ -547,6 +560,7 @@ export class CamStudioView implements IElementView, StudioHost {
     private readonly onGeneratorChanged = (operationId?: string) => {
         if (this.disposed) return;
         this.renderTree();
+        if (this.simulation.current !== undefined) this.simulation.refresh();
         const setup = this.currentSetup();
         const operation = this.currentOperation(setup);
         if (
@@ -584,7 +598,9 @@ export class CamStudioView implements IElementView, StudioHost {
     }
 
     updatePreview(): void {
-        if (!this.showsPreview) {
+        this.simulation.setShown(this.showsPreview);
+        // The simulated stock replaces the toolpaths while it shows (its tool follows the moves).
+        if (!this.showsPreview || this.simulation.current !== undefined) {
             if (this.previewKey !== "") {
                 this.preview.clear();
                 this.previewKey = "";
@@ -631,6 +647,14 @@ export class CamStudioView implements IElementView, StudioHost {
         if (this.playTimer === undefined) return;
         clearInterval(this.playTimer);
         this.playTimer = undefined;
+    }
+
+    /**
+     * Simulates a setup's program against its stock (what the setup's Simulate action does):
+     * generates what is missing, then shows the stock, its playback and its warnings.
+     */
+    simulateSetup(setupId: string): Promise<void> {
+        return this.simulation.simulate(setupId);
     }
 
     /** Posts a setup (what the Post tab's button does). */

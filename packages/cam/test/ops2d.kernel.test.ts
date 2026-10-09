@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { type IEdge, type IFace, type IShape, Plane, ShapeTypes, XYZ } from "@chili3d/core";
 import { initWasm, ShapeFactory } from "@chili3d/wasm";
 import {
+    type CamLoop,
     chamferOperation,
     circleOfEdge,
     contourOperation,
@@ -19,7 +20,7 @@ import {
     type ToolpathMove,
     threadMillOperation,
 } from "../src";
-import { distanceToPolyline } from "../src/geometry2d";
+import { circlePoints, distanceToPolyline } from "../src/geometry2d";
 import { cuttingSamples, fakeContext, millTool, operation, rectLoop } from "./_helpers/context";
 
 /**
@@ -235,6 +236,50 @@ describe("drilling", () => {
         expect(drills(rims)).toHaveLength(1);
         expect(drills(rims)[0].depth).toBe(7);
         expect(drills(rims)[0].at[2]).toBeCloseTo(20, 6);
+    });
+
+    test("picked rims drill the hole they lie on to its floor; a loose circle stops at the stock bottom", () => {
+        // The stock 1 mm above the part (the setup's top margin).
+        const tallStock = { min: [0, 0, 0] as const, max: [60, 40, 21] as const };
+        const rims = (block.findSubShapes(ShapeTypes.edge) as IEdge[]).filter((edge) => {
+            const circle = circleOfEdge(edge);
+            // Both rims of the Ø6 through hole and the top rim of the Ø8 blind one.
+            return (
+                circle !== undefined &&
+                ((Math.abs(circle.radius - 3) < 1e-6 && Math.abs(circle.center[0] - 10) < 1e-6) ||
+                    (Math.abs(circle.radius - 4) < 1e-6 && Math.abs(circle.z - 20) < 1e-6))
+            );
+        });
+        expect(rims).toHaveLength(3);
+        // A sketch circle where the part has no hole, on the part's top.
+        const loose: CamLoop = {
+            points: circlePoints([50, 8], 2.5, 0.001, false),
+            closed: true,
+            z: 20,
+            role: "sketch",
+        };
+        const path = generate(
+            drillOperation,
+            { breakthrough: 1, tipCompensation: true },
+            { tool: drillTool, parts: [block], edges: rims, loops: [loose], stock: tallStock },
+        );
+        const cycles = drills(path).sort((a, b) => a.at[0] - b.at[0]);
+        expect(cycles).toHaveLength(3);
+        const at = [
+            [10, 10, 20],
+            [45, 25, 20],
+            [50, 8, 20],
+        ];
+        cycles.forEach((cycle, i) => {
+            for (let k = 0; k < 3; k++) expect(cycle.at[k]).toBeCloseTo(at[i][k], 6);
+        });
+        const tip = 3 / Math.tan((59 * Math.PI) / 180);
+        // Through: the part's 20 mm, the breakthrough and the point — not the stock's 21 from the rim.
+        expect(cycles[0].depth).toBeCloseTo(20 + 1 + tip, 6);
+        // Blind: to its floor at z 15 — the stock's height from the rim drilled it through the part.
+        expect(cycles[1].depth).toBeCloseTo(5, 6);
+        // No hole under it: through the stock to its bottom, never deeper than the stock below the rim.
+        expect(cycles[2].depth).toBeCloseTo(20 + 1 + tip, 6);
     });
 
     test("thread milling the blind hole: a helix at the ISO major diameter, a pitch per turn", () => {
