@@ -25,17 +25,28 @@ export interface OnshapeTool {
     readonly displayName: string;
     /** The std feature the export aliases; undefined for the generated Transform wrapper. */
     readonly std?: string;
+    readonly icon: string;
 }
 
 export const ONSHAPE_TOOLS = [
-    { featureName: "filletTool", displayName: "Fillet", std: "fillet" },
-    { featureName: "chamferTool", displayName: "Chamfer", std: "chamfer" },
-    { featureName: "shellTool", displayName: "Shell", std: "shell" },
-    { featureName: "booleanTool", displayName: "Boolean", std: "booleanBodies" },
-    { featureName: "transformTool", displayName: "Transform" },
-    { featureName: "linearPatternTool", displayName: "Linear pattern", std: "linearPattern" },
-    { featureName: "circularPatternTool", displayName: "Circular pattern", std: "circularPattern" },
-    { featureName: "mirrorTool", displayName: "Mirror", std: "mirror" },
+    { featureName: "filletTool", displayName: "Fillet", std: "fillet", icon: "icon-fillet" },
+    { featureName: "chamferTool", displayName: "Chamfer", std: "chamfer", icon: "icon-chamfer" },
+    { featureName: "shellTool", displayName: "Shell", std: "shell", icon: "icon-shell" },
+    { featureName: "booleanTool", displayName: "Boolean", std: "booleanBodies", icon: "icon-booleanFuse" },
+    { featureName: "transformTool", displayName: "Transform", icon: "icon-move" },
+    {
+        featureName: "linearPatternTool",
+        displayName: "Linear pattern",
+        std: "linearPattern",
+        icon: "icon-array",
+    },
+    {
+        featureName: "circularPatternTool",
+        displayName: "Circular pattern",
+        std: "circularPattern",
+        icon: "icon-rotate",
+    },
+    { featureName: "mirrorTool", displayName: "Mirror", std: "mirror", icon: "icon-mirror" },
 ] as const satisfies readonly OnshapeTool[];
 
 export type OnshapeToolName = (typeof ONSHAPE_TOOLS)[number]["featureName"];
@@ -177,5 +188,6 @@ export function newOnshapeToolFeature(
     if (!studio.isOk) return Result.err(studio.error);
     const feature = newFeatureScriptFeature(document, studio.value, tool);
     if (!feature.isOk) return Result.err(feature.error);
-    return Result.ok({ body, feature: feature.value });
+    const icon = ONSHAPE_TOOLS.find((entry) => entry.featureName === tool)?.icon;
+    return Result.ok({ body, feature: { ...feature.value, toolIcon: icon } });
 }

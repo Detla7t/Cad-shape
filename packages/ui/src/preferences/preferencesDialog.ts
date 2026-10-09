@@ -135,6 +135,7 @@ export class PreferencesDialog {
         this.mouse();
         this.environment();
         this.assembly();
+        this.saving();
         this.shortcuts();
         this.toolbars();
         this.drawings();
@@ -508,6 +509,20 @@ export class PreferencesDialog {
         section.append(props.row);
         this.save(section, "Save assembly settings", () =>
             patchPreferences({ assemblyProperties: props.input.checked }),
+        );
+    }
+
+    private saving() {
+        const section = this.section("saving", "Saving");
+        const autosave = check("Autosave documents", Config.instance.preferences.autosave);
+        section.append(
+            autosave.row,
+            note(
+                "A recovery save is written shortly after every change. The version history keeps every change; use Commit in Versions & History to name a set of changes, and Save to publish the document to links that follow it.",
+            ),
+        );
+        this.save(section, "Save saving settings", () =>
+            patchPreferences({ autosave: autosave.input.checked }),
         );
     }
 

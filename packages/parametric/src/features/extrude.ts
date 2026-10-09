@@ -2,12 +2,12 @@
 // See LICENSE file in the project root for full license information.
 
 import {
-    I18n,
     type IDocument,
     type IEdge,
     type IFace,
     type IShape,
     LENGTH_UNITS,
+    type ParameterValue,
     Result,
     resolveUnitSpec,
     ShapeTypes,
@@ -68,28 +68,44 @@ const extrudeHandler: FeatureHandler<ExtrudeFeatureData> = {
                           .map((node) => ({ value: node.id, label: node.name })),
                   },
               ]),
-        {
-            key: "profiles",
-            display: "prompt.select.faces",
-            value: feature.profiles?.length
-                ? `${feature.profiles.length} profiles`
-                : feature.source
-                  ? `${feature.source.profiles.length} faces`
-                  : "All sketch profiles",
-            pick: { kinds: ["face"] },
-        },
+        // Onshape's extrude dialog: operation tabs first, then the regions box, the depth and
+        // its opposite-direction toggle (Chili3d stores one signed depth; see `setParameter`).
         {
             key: "operation",
             display: "option.command.operation",
             value: feature.operation ?? "new",
+            optionStyle: "tabs" as const,
             options: [
-                { value: "new", label: I18n.translate("option.command.operation.new") },
-                { value: "fuse", label: I18n.translate("option.command.operation.join") },
-                { value: "cut", label: I18n.translate("option.command.operation.cut") },
-                { value: "common", label: I18n.translate("option.command.operation.intersect") },
+                { value: "new", label: "New" },
+                { value: "fuse", label: "Add" },
+                { value: "cut", label: "Remove" },
+                { value: "common", label: "Intersect" },
             ],
         },
-        { key: "depth", display: "option.command.depth", value: feature.depth, unit: LENGTH_UNITS },
+        {
+            key: "profiles",
+            display: "prompt.select.faces",
+            label: feature.source ? "Faces to extrude" : "Faces and sketch regions to extrude",
+            value: feature.profiles?.length
+                ? plural(feature.profiles.length, "region", "regions")
+                : feature.source
+                  ? plural(feature.source.profiles.length, "face", "faces")
+                  : "All sketch regions",
+            pick: { kinds: ["face"] },
+        },
+        {
+            key: "depth",
+            display: "option.command.depth",
+            value: unsignedDepth(feature.depth),
+            unit: LENGTH_UNITS,
+        },
+        {
+            key: "oppositeDirection",
+            display: "option.command.depth",
+            label: "Opposite direction",
+            value: isOpposite(feature.depth),
+            flip: true,
+        },
         {
             key: "startOffset",
             display: "option.command.startOffset",
@@ -114,7 +130,14 @@ const extrudeHandler: FeatureHandler<ExtrudeFeatureData> = {
                 }
               : key === "symmetric"
                 ? { ...feature, symmetric: value === true || value === "true" }
-                : { ...feature, [key]: value },
+                : key === "oppositeDirection"
+                  ? {
+                        ...feature,
+                        depth: signedDepth(unsignedDepth(feature.depth), value === true || value === "true"),
+                    }
+                  : key === "depth"
+                    ? { ...feature, depth: signedDepth(value as ParameterValue, isOpposite(feature.depth)) }
+                    : { ...feature, [key]: value },
 
     applyResolvedRefs: (feature, { resolvedProfiles }) =>
         resolvedProfiles === undefined
@@ -139,6 +162,37 @@ const extrudeHandler: FeatureHandler<ExtrudeFeatureData> = {
         return combineWithInput(built, feature, context);
     },
 };
+
+function plural(count: number, one: string, many: string): string {
+    return `${count} ${count === 1 ? one : many}`;
+}
+
+/** A negated expression as stored by the opposite-direction toggle: `-(expr)`. */
+const NEGATED = /^-\((.*)\)$/s;
+
+/** Whether a stored depth extrudes against the sketch normal (Onshape's "Opposite direction"). */
+function isOpposite(depth: ParameterValue): boolean {
+    if (typeof depth === "number") return depth < 0;
+    const text = depth.trim();
+    return NEGATED.test(text) || (/^-\s*[\d.]/.test(text) && Number.isFinite(Number(text)));
+}
+
+/** The depth as the dialog shows it: the magnitude, the direction living in the toggle. */
+function unsignedDepth(depth: ParameterValue): ParameterValue {
+    if (typeof depth === "number") return Math.abs(depth);
+    const text = depth.trim();
+    const negated = NEGATED.exec(text);
+    if (negated) return negated[1];
+    const number = Number(text);
+    return Number.isFinite(number) ? Math.abs(number) : depth;
+}
+
+/** A shown depth back to the stored signed value. */
+function signedDepth(depth: ParameterValue, opposite: boolean): ParameterValue {
+    const magnitude = unsignedDepth(depth);
+    if (!opposite) return magnitude;
+    return typeof magnitude === "number" ? -magnitude : `-(${magnitude})`;
+}
 
 /** Resolves the numeric parameters first, so a bad expression fails before any geometry runs. */
 function resolveExtrudeParams(

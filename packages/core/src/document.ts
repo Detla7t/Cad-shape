@@ -12,6 +12,10 @@ import type { Act, IVisual } from "./visual";
 export const DOCUMENT_FILE_EXTENSION = ".cd";
 export const PLUGIN_FILE_EXTENSION = ".chiliplugin";
 
+export interface SaveOptions {
+    readonly auto?: boolean;
+}
+
 export interface IDocument extends IPropertyChanged, IDisposable {
     readonly selection: ISelection;
     readonly picker: IPicker;
@@ -25,7 +29,8 @@ export interface IDocument extends IPropertyChanged, IDisposable {
     name: string;
     acts: ObservableCollection<Act>;
     userData?: Record<string, unknown>;
-    save(): Promise<void>;
+    /** Writes the document to storage; `auto` marks a recovery save (no `documentSaved` event, no new thumbnail). */
+    save(options?: SaveOptions): Promise<void>;
     close(): Promise<void>;
     serialize(): Serialized;
 }

@@ -60,7 +60,7 @@
 }
 .browse[aria-expanded="true"] {
     color: var(--primary-color);
-    background: color-mix(in srgb, #b4def2 35%, var(--panel-background-color));
+    background: color-mix(in srgb, var(--selection-tint) 35%, var(--panel-background-color));
 }
 .browse:focus-visible {
     outline: 2px solid var(--primary-color);

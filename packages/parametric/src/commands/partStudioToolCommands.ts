@@ -25,7 +25,11 @@ abstract class PartStudioToolCommand implements ICommand {
         const firstPick = featureHandler(feature.type)
             ?.parameters(feature, document)
             .find((parameter) => parameter.pick !== undefined)?.key;
-        PubSub.default.pub("editFeature", body, feature.id, { insert: feature, pick: firstPick });
+        // The dialog's edit session takes the command slot, which this command holds until it
+        // returns: open it right after.
+        setTimeout(() =>
+            PubSub.default.pub("editFeature", body, feature.id, { insert: feature, pick: firstPick }),
+        );
     }
 }
 

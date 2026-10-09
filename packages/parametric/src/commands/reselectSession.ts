@@ -328,7 +328,11 @@ export class ProfileReselectSession {
         sketch: SketchNode,
         controller: AsyncController,
     ): Promise<ProfileRef[] | undefined> {
-        const original = this.host.features;
+        // Only this feature's profiles are previewed, so only they are restored: other edits
+        // made while the pick runs (the dialog's depth field, its arrow) are kept.
+        const current = this.host.features.find((x) => x.id === feature.id);
+        const originalProfiles =
+            current?.type === "extrude" || current?.type === "revolve" ? current.profiles : undefined;
         const owner = this.host.document.visual.context.getVisual(this.host);
         return runReselectSession(this.host, controller, {
             prompt: "prompt.select.faces",
@@ -359,7 +363,11 @@ export class ProfileReselectSession {
                         VisualStates.faceTransparent,
                         ShapeTypes.shape,
                     );
-                this.host.setFeaturesEmitShapeChanged(original);
+                this.host.setFeaturesEmitShapeChanged(
+                    this.host.features.map((x) =>
+                        x.id === feature.id ? ({ ...x, profiles: originalProfiles } as FeatureData) : x,
+                    ),
+                );
                 this.host.document.visual.context.setVisible(sketch, sketch.visible && sketch.parentVisible);
             },
         });

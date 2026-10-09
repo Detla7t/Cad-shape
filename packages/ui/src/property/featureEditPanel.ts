@@ -84,6 +84,13 @@ export function showFeatureEditPanel(
         },
     });
     session.onClose = () => panel.close();
-    // Onshape opens a new feature with its first query box taking selections.
-    if (options?.pick !== undefined) void node.reselectShapes?.(session.featureId, options.pick);
+    // Onshape opens a feature — new or edited — with its first query box taking selections
+    // (an extrude's sketch regions, a fillet's edges), the current picks highlighted.
+    const pick =
+        options?.pick ??
+        node
+            .featureItems()
+            .find((item) => item.id === session.featureId)
+            ?.parameters.find((parameter) => parameter.pick !== undefined)?.key;
+    if (pick !== undefined) void node.reselectShapes?.(session.featureId, pick);
 }

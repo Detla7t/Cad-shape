@@ -1,0 +1,5656 @@
+{
+    "home": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "home-create-menu": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "home-new-document": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Millimeter",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "editor": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "ribbon-Choose_toolset": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "ribbon-Sketch_tools": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "ribbon-Solid_features": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "ribbon-Edge_treatments": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "ribbon-Part_operations": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "ribbon-Patterns": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "ribbon-FeatureScript": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "ribbon-New_Feature_Studio_tools": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "search-tools": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "All categories",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "edit-configurations": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "tree-context-menu": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "document-units": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Millimetres (mm)",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0 decimals · 0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degrees (°)",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0 decimals · 0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "view-options": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "viewport-tool-measure": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Show all",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Millimeter",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "analysis-tools": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "mass-properties": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "main-menu": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Context toolbar",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "create-element": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "tabs-browse": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "plus-button": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Millimeter",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "rightpanel-Appearances": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "rightpanel-Configurations": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "rightpanel-Custom_tables": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "rightpanel-Inspection_table": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "All models",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "rightpanel-Variable_table": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "left-versions-or-comments": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "Untitled document",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "variable-dialog": {
+        "failures": [
+            {
+                "text": "✓",
+                "ratio": 1.7,
+                "color": "rgb(255, 255, 255)",
+                "bg": "rgb(21,147,46)",
+                "cls": "",
+                "tag": "BUTTON",
+                "disabled": true
+            }
+        ],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "plane-feature": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Top (XY)",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "new-sketch": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "sketch-dropdown": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "preferences": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Millimetre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Metre per second squared",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree per second",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram per cubic metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Hertz",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton-metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Pascal",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Joule",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "English",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Millimetre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Metre per second squared",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree per second",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram per cubic metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Hertz",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton-metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Pascal",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Joule",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "24 hour",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Chili3D (Onshape controls)",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Current settings",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Automatic (default)",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Part Studio",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Dark view (default)",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "preferences-Current_document": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Millimetre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Metre per second squared",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree per second",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram per cubic metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Hertz",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton-metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Pascal",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Joule",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "English",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Millimetre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Metre per second squared",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree per second",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram per cubic metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Hertz",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton-metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Pascal",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Joule",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "24 hour",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Chili3D (Onshape controls)",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Current settings",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Automatic (default)",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Part Studio",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Dark view (default)",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "preferences-Language": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Millimetre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Metre per second squared",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree per second",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram per cubic metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Hertz",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton-metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Pascal",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Joule",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "English",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Millimetre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Metre per second squared",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree per second",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram per cubic metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Hertz",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton-metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Pascal",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Joule",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "24 hour",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Chili3D (Onshape controls)",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Current settings",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Automatic (default)",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Part Studio",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Dark view (default)",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "preferences-Theming": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Millimetre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Metre per second squared",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree per second",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram per cubic metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Hertz",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton-metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Pascal",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Joule",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "English",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Millimetre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Metre per second squared",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree per second",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram per cubic metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Hertz",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton-metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Pascal",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Joule",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "24 hour",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Chili3D (Onshape controls)",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Current settings",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Automatic (default)",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Part Studio",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Dark view (default)",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "preferences-Decimal_format": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Millimetre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Metre per second squared",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree per second",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram per cubic metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Hertz",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton-metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Pascal",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Joule",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "English",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Millimetre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Metre per second squared",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree per second",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram per cubic metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Hertz",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton-metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Pascal",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Joule",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "24 hour",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Chili3D (Onshape controls)",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Current settings",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Automatic (default)",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Part Studio",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Dark view (default)",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "preferences-Units": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Millimetre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Metre per second squared",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree per second",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram per cubic metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Hertz",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton-metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Pascal",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Joule",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "English",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Millimetre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Metre per second squared",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree per second",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram per cubic metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Hertz",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton-metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Pascal",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Joule",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "24 hour",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Chili3D (Onshape controls)",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Current settings",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Automatic (default)",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Part Studio",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Dark view (default)",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "preferences-Mouse_controls": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Millimetre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Metre per second squared",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree per second",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram per cubic metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Hertz",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton-metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Pascal",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Joule",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "English",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Millimetre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Metre per second squared",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree per second",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram per cubic metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Hertz",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton-metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Pascal",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Joule",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "24 hour",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Chili3D (Onshape controls)",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Current settings",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Automatic (default)",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Part Studio",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Dark view (default)",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "preferences-Environment_profile_settings": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Millimetre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Metre per second squared",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree per second",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram per cubic metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Hertz",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton-metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Pascal",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Joule",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "English",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Millimetre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Metre per second squared",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree per second",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram per cubic metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Hertz",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton-metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Pascal",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Joule",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "24 hour",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Chili3D (Onshape controls)",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Current settings",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Automatic (default)",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Part Studio",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Dark view (default)",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "preferences-Assembly_settings": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Millimetre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Metre per second squared",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree per second",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram per cubic metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Hertz",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton-metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Pascal",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Joule",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "English",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Millimetre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Metre per second squared",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree per second",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram per cubic metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Hertz",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton-metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Pascal",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Joule",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "24 hour",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Chili3D (Onshape controls)",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Current settings",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Automatic (default)",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Part Studio",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Dark view (default)",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "preferences-Saving": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Millimetre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Metre per second squared",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree per second",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram per cubic metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Hertz",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton-metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Pascal",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Joule",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "English",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Millimetre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Metre per second squared",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree per second",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram per cubic metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Hertz",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton-metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Pascal",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Joule",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "24 hour",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Chili3D (Onshape controls)",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Current settings",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Automatic (default)",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Part Studio",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Dark view (default)",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "preferences-Keyboard_shortcuts": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Millimetre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Metre per second squared",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree per second",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram per cubic metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Hertz",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton-metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Pascal",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Joule",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "English",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Millimetre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Metre per second squared",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree per second",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram per cubic metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Hertz",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton-metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Pascal",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Joule",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "24 hour",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Chili3D (Onshape controls)",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Current settings",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Automatic (default)",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Part Studio",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Dark view (default)",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "preferences-Shortcut_toolbars": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Millimetre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Metre per second squared",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree per second",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram per cubic metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Hertz",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton-metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Pascal",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Joule",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "English",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Millimetre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Metre per second squared",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree per second",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram per cubic metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Hertz",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton-metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Pascal",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Joule",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "24 hour",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Chili3D (Onshape controls)",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Current settings",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Automatic (default)",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Part Studio",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Dark view (default)",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "preferences-Toolbars": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Millimetre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Metre per second squared",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree per second",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram per cubic metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Hertz",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton-metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Pascal",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Joule",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "English",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Millimetre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Metre per second squared",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Degree per second",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Kilogram per cubic metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Hertz",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Newton-metre",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Pascal",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Joule",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "24 hour",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Chili3D (Onshape controls)",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Current settings",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Automatic (default)",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Part Studio",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Dark view (default)",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(31, 31, 31)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "customize": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Context toolbar",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    }
+}

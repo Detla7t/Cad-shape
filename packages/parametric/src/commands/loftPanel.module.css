@@ -3,9 +3,9 @@
     min-height: 45px;
     padding: 4px;
     box-sizing: border-box;
-    border: 1px solid #73a9d9;
-    background: #dff2ff;
-    color: #223;
+    border: 1px solid var(--query-border-color);
+    background: var(--query-background-color);
+    color: var(--query-foreground-color);
 }
 .list > span {
     display: block;

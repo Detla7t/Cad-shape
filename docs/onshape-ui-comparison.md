@@ -46,6 +46,14 @@ Checked on 8 October 2026 against the user's [Onshape Testing document](https://
 | Confirm and edit | The green check creates Loft 1 as a feature; double-clicking it reopens the ordered profiles and parameters, and editing a section sketch rebuilds the loft. | Accept creates a parametric `loft` feature (own body, or joined/cut/intersected into the body it overlaps); the row reopens with Solid, Operation, Ruled and Continuity editable; editing a section sketch or its plane rebuilds the loft. Section re-picking from the row is not implemented yet. | Chili3D kernel tests: rebuild after a circle radius edit, fuse into an extruded base, parameter round-trip. Invalid previews keep Accept disabled, so a failed loft never commits or consumes sketches. |
 | Panel controls not yet provided | Thin, Path, Connections, End conditions (Normal/Tangent/Match), Show isocurves. | Not offered rather than shown without effect; the kernel loft takes ordered wires, Ruled and Continuity only. | Code. |
 
+## Saving and history
+
+| Interaction | Onshape | Chili3D now | Verification and remaining difference |
+| --- | --- | --- | --- |
+| Autosave | Every change is saved as it happens; there is no save button. | A recovery save is written 1.5 s after the last change of each open document (Preferences › Saving, on by default). It reuses the last thumbnail and publishes `documentAutosaved`, not `documentSaved`, so links that follow a document's branch keep waiting for a deliberate Save, as the production-readiness notes require. | Chili3D tests: one save per burst of edits, preference off, closed documents dropped, event and thumbnail behaviour. Closing a document still asks whether to save, since an autosave is not a published save. |
+| History until commit | Microversions accumulate silently; the user names versions. | Microversions are still recorded (and autosaved) but the Versions panel folds the operations since the last named commit, version or branch boundary into one "Uncommitted changes (n)" row. Commit names them; its dialog squashes them into one commit by default (untick to keep the operations beneath the checkpoint). | Chili3D tests: pending grouping, commit with and without squash, the panel row. |
+| Squash | Not an Onshape concept (versions are immutable). | "Squash to here" on any earlier commit of the current branch replaces every later commit with one named commit carrying the head's snapshot. Refused when a version or another branch's head or base points into the replaced range, so nothing named is ever orphaned. The replaced commits drop out of the reachable history and are not persisted again. | Chili3D tests: squash to an earlier commit, refusals (version inside, branch inside, off-chain base, nothing after base), panel action disabled on the head. |
+
 ## Layout and rendering
 
 | Area | Onshape | Chili3D now | Remaining difference |
@@ -53,6 +61,7 @@ Checked on 8 October 2026 against the user's [Onshape Testing document](https://
 | Top tools | A 36 px context toolbar below a 40 px document header. Sketch tools replace modeling tools. | Default: 36 px single-row context toolbar below a 40 px header; canvas starts at y = 76. Undo/redo lead, main tools follow, pinned tools and search remain available. Toolsets live in a header menu. | Browser measurements match the top spacing. The older ribbon remains an option in Customize tools and tabs. Available commands and grouping differ; unimplemented Onshape tools are not displayed as placeholders. |
 | Left sidebar | 40 px utility rail plus a 200 px feature tree; canvas begins at x = 246. | A 34 px utility rail plus the existing tree; canvas begins at x = 276 in the latest trial. Name filter preserves ancestors of matches. Empty Properties collapses to its header. | Browser and filter tests. Chili3D now separates Features and solid results in Parts, beneath Configurations, with draggable horizontal dividers. The Features tree still follows Chili3D document/body ownership; Onshape's flat feature list and rollback presentation remain different. History is now on the left utility rail. |
 | Sketch panel | About 220 px wide, with sketch-plane field, checkboxes, accept/cancel icons. | 216 px panel: name, green check/red X, plane, construction and constraints; layers and help are collapsed; solver status is in the footer. | Browser screenshots. The Chili3D layer controls and explicit DOF status are deliberate additions. |
+| Inactive sketches | Closed regions show as a faint translucent fill; thin grey lines; small dots at endpoints, centers and arc ends, in every display mode. | Same: regions render as a 12% fill in the inactive colour (double-sided, no depth write, so nothing behind them is hidden), lines keep the inactive width and colour, and every entity point — line ends, circle and arc centers, arc ends, spline poles, point entities — is a 4 px dot that stays visible in shaded modes. Region opacity and point size are graphics preferences under Inactive sketches; 0 hides either. Previously regions were opaque solid faces with no points. | Chili3D kernel test on a circle-and-line sketch (fill opacity and colour, point positions and colours, preference changes, hidden layers) and renderer tests for the translucent material and styled points. Browser comparison pending. |
 | Selection color | Orange selected strokes in the live trial. | Gold selected strokes with a soft halo. | Intentional user preference; not an exact color match. Browser verified. |
 | Shaded quality | Smooth, grain-free shading with subtle ambient occlusion. | Ambient occlusion renders at the full drawing-buffer resolution with 32 samples on settled frames; frames drawn while the camera moves use a half-resolution pass and the view redraws once at full quality 150 ms after the motion stops. Previously every frame used the half-resolution, 16-sample pass, which read as grain over the MSAA edges. | Chili3D renderer tests (target sizes per quality, draft-then-settle frame scheduling). Visual comparison in the browser pending. |
 | Sketch regions | Neutral gray filled closed regions, blue free curves and dark constrained geometry. | Neutral gray closed profiles, adaptive curve segments and separate constraint/selection colors. | Light profile fill was strengthened after screenshot comparison. Overlap and hole behavior are tested; exact visual parity is not claimed. |
@@ -268,3 +277,35 @@ Remaining differences: section cuts are still uncapped, so **Section interferenc
 Captures: [Shading flyout](ui-comparison/chili-view-shading-menu.png), [tangent-edge flyout](ui-comparison/chili-view-tangent-menu.png), [General graphics preferences](ui-comparison/chili-graphics-general.png), [Sketch graphics preferences](ui-comparison/chili-graphics-sketch.png), [plane context menu](ui-comparison/chili-plane-context-menu.png).
 
 Validation: **8,167 tests passed across 513 files**, TypeScript passed, and production/plugin builds passed. The final menu/preference checks and sketch display regressions also passed after visual refinements. Scoped Biome checks reported warnings without errors; existing bundle-size warnings remain.
+
+## Part Studio tools that are Onshape's own features
+
+The ten-tool UI parity run (`artifacts/cad-ui-parity-testing/run.json`) found Chili3D's Shell, Mirror, Array and Move to be one-shot commands with their own interaction models, and Shell discarded the feature history. The toolbar's **Fillet, Chamfer, Shell, Boolean, Transform, Linear pattern, Circular pattern and Mirror** now insert Onshape's own std features (`parametric/src/featurescript/onshapeTools.ts`): each is an alias of the std feature, and the dialog is built from std's precondition, so field names, order, defaults, conditional rows and results come from Onshape's code.
+
+| Step | Onshape | Chili3D now |
+|---|---|---|
+| Start a tool | Toolbar click opens the feature dialog on a new feature; the first query box is active | Same; the feature is staged in the draft only (`FeatureEditOptions.insert`) |
+| Select entities | Click entities; the active box counts them live | Same (the box shows "1 edge", "2 parts"…); a part pick takes the solid under the cursor |
+| Change box | Click another query box | Same; the previous box keeps its picks |
+| Planes | Click Top/Front/Right in the viewport or feature tree | Same: viewport reference planes or the tree rows; default planes resolve to std's Top/Front/Right |
+| Operation | New / Add / Remove / Intersect tabs | Same tabs (std `UIHint.HORIZONTAL_ENUM`) |
+| Opposite direction | Flip-arrow toggle | ⇄ toggle (std `UIHint.OPPOSITE_DIRECTION`) |
+| ✓ / ✗ | ✓ adds one history entry; ✗ leaves nothing | Same: one "Insert feature" undo step, or nothing |
+| History | Every tool is an editable feature | Same: a feature row with the tool's icon, re-editable and re-pickable |
+
+Parts are the solids of a parametric body (a mirror or pattern with **New** adds solids to it), and part queries see each solid separately. The 1 mm inward shell of the filleted tray, which the kernel's thick-solid refused, now builds: when the wall swallows convex round blends, the cavity is taken from the part without those blends, which matches Onshape's sharp inner corner.
+
+Remaining differences: the toolbar features' source sits in a "Part Studio tools" Feature Studio tab; picks show the feature's input geometry rather than a live result preview; preselected entities are not yet copied into the first box; Extrude and Revolve keep Chili3D's own dialogs (they already have New/Add/Remove/Intersect); Feature-type patterns and mirrors are listed but have no feature-list picker.
+
+## Editing an extrude in the history
+
+Double-clicking a feature in the tree rolls the Part Studio back to it and opens its dialog, as Onshape's **Edit** does. The dialog now opens with its first selection box active: for an extrude the sketch is shown, its current regions are highlighted, and clicking regions re-picks them with a live result preview (`ProfileReselectSession`). The dialog keeps the depth field and the other controls editable while the box picks, and a depth change made during the pick is kept.
+
+| | Onshape | Chili3D now |
+|---|---|---|
+| Direction | Blue manipulator arrow on the end face, pointing the extrude direction | The same blue arrow the Extrude command drags, on the end face, pointing the way the extrude goes; drag it to set the depth (through the sketch plane flips it) |
+| Depth sign | Positive depth + Opposite direction arrow | Positive depth + ⇄ Opposite direction toggle (a negative stored depth, or `-(expr)` for an expression) |
+| Operation | New / Add / Remove / Intersect tabs | Same tabs |
+| Profiles | "Faces and sketch regions to extrude" box | Same box label, "N regions" / "All sketch regions" |
+
+Not yet: press-pull extrudes (from body faces) show no arrow; revolve shows no axis/angle manipulator; Onshape's second-end and draft options are not offered.

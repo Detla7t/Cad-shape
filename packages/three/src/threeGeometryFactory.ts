@@ -21,6 +21,7 @@ import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js";
 
 import { RoundPointsMaterial } from "./roundPointsMaterial";
+import { ThreeHelper } from "./threeHelper";
 
 export const TopRenderOrder = 999;
 
@@ -35,6 +36,25 @@ export class ThreeGeometryFactory {
             points.renderOrder = TopRenderOrder;
         }
         return points;
+    }
+
+    /**
+     * The translucent fill of a region (an inactive sketch's closed loops): double-sided, no
+     * depth write so it never hides geometry behind it, offset so it does not z-fight with the
+     * surfaces it lies on.
+     */
+    static createRegionMaterial(opacity: number, color?: number | number[]) {
+        return new MeshLambertMaterial({
+            transparent: true,
+            opacity,
+            side: DoubleSide,
+            depthWrite: false,
+            color: typeof color === "number" ? ThreeHelper.fromColor(color) : undefined,
+            vertexColors: Array.isArray(color),
+            polygonOffset: true,
+            polygonOffsetFactor: -2,
+            polygonOffsetUnits: -2,
+        });
     }
 
     static createVertexMaterial(data: VertexMeshData, meshOption?: MeshOption) {

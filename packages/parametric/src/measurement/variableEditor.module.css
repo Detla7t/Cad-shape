@@ -38,7 +38,7 @@
     opacity: 0.4;
 }
 .header button:last-of-type {
-    color: #c33;
+    color: var(--danger-color);
 }
 .tabs {
     display: flex;
@@ -50,15 +50,15 @@
     border-bottom: 2px solid transparent;
 }
 .tabs button[aria-pressed="true"] {
-    border-color: #1651b0;
-    color: #1651b0;
+    border-color: var(--accent-text-color);
+    color: var(--accent-text-color);
 }
 .entities {
-    background: #dceffa;
-    color: #333;
+    background: var(--query-background-color);
+    color: var(--query-foreground-color);
     min-height: 35px;
     padding: 6px;
-    border: 1px solid #81b7d5;
+    border: 1px solid var(--query-border-color);
 }
 .entities > div {
     display: flex;

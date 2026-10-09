@@ -47,13 +47,18 @@ import { ThreeVisualObject } from "./threeVisualObject";
 const OnTopMaterialKey = "onTopMaterial";
 
 export class ThreeGeometry extends ThreeVisualObject implements IVisualGeometry {
+    private _vertexMaterial?: PointsMaterial;
     private get vertexMaterial() {
+        if (this._vertexMaterial !== undefined) return this._vertexMaterial;
         return this.geometryNode instanceof OriginNode ? originVertexMaterial : defaultVertexMaterial;
     }
     private _faceMaterial: Material | Material[];
+    /** Set while the faces draw a translucent region fill of their own instead of the node material. */
+    private ownsFaceMaterial = false;
     private _edgeMaterial: LineMaterial = defaultEdgeMaterial;
     private _edges?: LineSegments2;
     private ownsEdgeMaterial = false;
+    private ownsVertexMaterial = false;
     private _faces?: Mesh;
     private _vertexs?: Points;
     private _renderOnTop = false;
@@ -131,7 +136,8 @@ export class ThreeGeometry extends ThreeVisualObject implements IVisualGeometry 
 
     private readonly handleGeometryPropertyChanged = (property: keyof GeometryNode) => {
         if (property === "materialId") {
-            this.changeFaceMaterial(this.context.getMaterial(this.geometryNode.materialId));
+            if (!this.ownsFaceMaterial)
+                this.changeFaceMaterial(this.context.getMaterial(this.geometryNode.materialId));
         } else if ((property as keyof ShapeNode) === "shape") {
             this.removeMeshes();
             this.generateShape();
@@ -173,6 +179,9 @@ export class ThreeGeometry extends ThreeVisualObject implements IVisualGeometry 
             this.disposeOnTopMaterial(this._vertexs);
             this.remove(this._vertexs);
             this._vertexs.geometry.dispose();
+            if (this.ownsVertexMaterial) this._vertexMaterial?.dispose();
+            this._vertexMaterial = undefined;
+            this.ownsVertexMaterial = false;
             this._vertexs = null as any;
         }
         if (this._edges) {
@@ -187,15 +196,34 @@ export class ThreeGeometry extends ThreeVisualObject implements IVisualGeometry 
             this.disposeOnTopMaterial(this._faces);
             this.remove(this._faces);
             this._faces.geometry.dispose();
+            if (this.ownsFaceMaterial) {
+                for (const m of Array.isArray(this._faceMaterial) ? this._faceMaterial : [this._faceMaterial])
+                    m.dispose();
+                this._faceMaterial = this.context.getMaterial(this.geometryNode.materialId);
+                this.ownsFaceMaterial = false;
+            }
             this._faces = null as any;
         }
     }
 
+    /**
+     * Points that carry their own colour (a sketch's entity points) get a material of the
+     * data's size and colour and stay visible in shaded modes, like the origin marker;
+     * plain topology vertices share the default wireframe material.
+     */
     private initVertexs(data: VertexMeshData) {
         const buff = ThreeGeometryFactory.createVertexBufferGeometry(data);
+        const styled = data.color !== undefined && !(this.geometryNode instanceof OriginNode);
+        if (styled) {
+            const material = ThreeGeometryFactory.createVertexMaterial(data);
+            ThreeGeometryFactory.setColor(buff, data, material);
+            this._vertexMaterial = material;
+            this.ownsVertexMaterial = true;
+        }
         this._vertexs = new Points(buff, this.vertexMaterial);
         this._vertexs.layers.set(Constants.Layers.Wireframe);
-        if (this.geometryNode instanceof OriginNode) this._vertexs.layers.enable(Constants.Layers.Solid);
+        if (this.geometryNode instanceof OriginNode || styled)
+            this._vertexs.layers.enable(Constants.Layers.Solid);
         if (this._renderOnTop) this.applyOnTopMaterial(this._vertexs, this.vertexMaterial);
         this.add(this._vertexs);
     }
@@ -214,9 +242,14 @@ export class ThreeGeometry extends ThreeVisualObject implements IVisualGeometry 
         this.add(this._edges);
     }
 
+    /** Faces with an `opacity` are a translucent region fill (an inactive sketch), not the node's material. */
     private initFaces(data: FaceMeshData) {
         const buff = ThreeGeometryFactory.createFaceBufferGeometry(data);
         if (data.groups.length > 1) buff.groups = data.groups;
+        if (data.opacity !== undefined) {
+            this._faceMaterial = ThreeGeometryFactory.createRegionMaterial(data.opacity, data.color);
+            this.ownsFaceMaterial = true;
+        }
         this._faces = new Mesh(buff, this._faceMaterial);
         this._faces.layers.set(Constants.Layers.Solid);
         if (this._renderOnTop) this.applyOnTopMaterial(this._faces, this._faceMaterial);

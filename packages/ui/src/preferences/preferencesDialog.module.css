@@ -50,7 +50,7 @@
     padding: 9px 12px;
 }
 .navigation button[aria-current="true"] {
-    color: var(--primary-color, #2674d9);
+    color: var(--accent-text-color);
     background: var(--hover-background-color);
     font-weight: 600;
 }
@@ -193,7 +193,7 @@
     background: transparent;
 }
 .tabs button[aria-selected="true"] {
-    color: var(--primary-color, #2674d9);
+    color: var(--accent-text-color);
     border-bottom: 2px solid currentColor;
 }
 .shortcutLayout {

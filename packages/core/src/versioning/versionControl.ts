@@ -530,13 +530,98 @@ export class DocumentVersionControl {
 
     // ------------------------------------------------------------------ Versions and branches
 
-    /** An explicit named checkpoint; automatic operation commits remain available beneath it. */
-    createCommit(message: string): Result<ObjectHash> {
+    /**
+     * An explicit named checkpoint over the work recorded since the previous one. By default
+     * the automatic operation commits remain available beneath it; `squash` folds them into
+     * the checkpoint instead, so the branch history reads as one commit per named change.
+     */
+    createCommit(message: string, options: { squash?: boolean } = {}): Result<ObjectHash> {
         if (!message.trim()) return Result.err("A commit needs a message");
         this.flush();
+        if (options.squash) {
+            const pending = this.pendingOperations();
+            const base = pending.at(-1)?.parents[0];
+            if (base !== undefined) return this.squash(base, message);
+        }
         return Result.ok(
             this.commitTree(this.headCommit().tree, { kind: "checkpoint", message: message.trim() }),
         );
+    }
+
+    /**
+     * The automatic operation commits recorded on the current branch since its last named
+     * boundary — a checkpoint, version or merge, another branch's head or base — newest first.
+     * This is the uncommitted work: saved, but not yet named by a commit.
+     */
+    pendingOperations(): CommitEntry[] {
+        this.flush();
+        const boundaries = new Set<ObjectHash>();
+        for (const branch of this.branches()) {
+            if (branch.name === this.repository.current) continue;
+            boundaries.add(branch.head);
+            if (branch.base !== undefined) boundaries.add(branch.base);
+        }
+        for (const version of this.versions()) boundaries.add(version.commit);
+        const operations: CommitEntry[] = [];
+        let cursor: ObjectHash | undefined = this.head;
+        while (cursor !== undefined && !boundaries.has(cursor)) {
+            const commit = this.repository.getCommit(cursor);
+            if (
+                commit.kind !== "micro" ||
+                commit.parents.length !== 1 ||
+                commit.branch !== this.repository.current
+            )
+                break;
+            operations.push({ ...commit, id: cursor });
+            cursor = commit.parents[0];
+        }
+        return operations;
+    }
+
+    /**
+     * Replaces the commits after `base` on the current branch's first-parent history, up to the
+     * head, by one checkpoint commit with the head's snapshot: the branch reads as one named
+     * change where it read as many. History is otherwise append-only, so this refuses whenever
+     * another name would be left pointing into the replaced range — a version, another branch's
+     * head or base.
+     */
+    squash(base: ObjectHash, message: string): Result<ObjectHash> {
+        if (!message.trim()) return Result.err("A commit needs a message");
+        this.flush();
+        if (!this.repository.hasCommit(base)) return Result.err("The squash base is not a commit");
+        const replaced: ObjectHash[] = [];
+        let cursor: ObjectHash | undefined = this.head;
+        while (cursor !== undefined && cursor !== base) {
+            replaced.push(cursor);
+            cursor = this.repository.getCommit(cursor).parents[0];
+        }
+        if (cursor === undefined) return Result.err("Choose a commit on this branch's first-parent history");
+        if (replaced.length === 0) return Result.err("There is nothing after this commit to squash");
+        const inside = new Set(replaced);
+        const current = this.repository.current;
+        for (const branch of this.branches()) {
+            if (branch.name === current) continue;
+            if (inside.has(branch.head)) return Result.err(`${branch.name} points into the squashed commits`);
+            if (branch.base !== undefined && inside.has(branch.base))
+                return Result.err(`${branch.name} was branched from one of the squashed commits`);
+        }
+        for (const version of this.versions()) {
+            if (inside.has(version.commit))
+                return Result.err(`Version ${version.name} points into the squashed commits`);
+        }
+        const tree = this.headCommit().tree;
+        const commit = this.repository.commit({
+            tree,
+            parents: [base],
+            kind: "checkpoint",
+            message: message.trim(),
+            summary: summarizeDiff(diffTrees(this.store, this.repository.getCommit(base).tree, tree)),
+            branch: current,
+            author: this.options.author,
+        });
+        this.repository.setHead(current, commit);
+        this.emit();
+        return Result.ok(commit);
     }
 
     /** Operations recorded since the previous named commit, version, merge or branch boundary. */

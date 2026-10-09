@@ -30,7 +30,7 @@
 }
 .dialog header strong {
     flex: 1;
-    color: #2461a7;
+    color: var(--accent-text-color);
     font-size: 17px;
 }
 .dialog footer {
@@ -38,7 +38,7 @@
 }
 .dialog footer span {
     flex: 1;
-    color: #c44;
+    color: var(--danger-color);
 }
 .dialog button,
 .dialog select,

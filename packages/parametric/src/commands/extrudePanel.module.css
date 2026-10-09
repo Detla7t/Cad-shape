@@ -25,7 +25,7 @@
     font-size: 20px;
     background: transparent;
     border: none;
-    color: #bd3030;
+    color: var(--danger-color);
     cursor: pointer;
 }
 .panel header > button:first-of-type {
@@ -63,9 +63,9 @@
     min-height: 45px;
     padding: 8px;
     text-align: left;
-    color: inherit;
-    border: 1px solid #73a9d9;
-    background: #dff2ff;
+    color: var(--query-foreground-color);
+    border: 1px solid var(--query-border-color);
+    background: var(--query-background-color);
     cursor: pointer;
 }
 .endType {
@@ -100,6 +100,6 @@
     display: none;
 }
 .error {
-    color: #bb3030;
+    color: var(--danger-color);
     font-size: 11px;
 }

@@ -41,7 +41,7 @@
         background: var(--hover-background-color);
     }
     button[aria-expanded="true"] {
-        background: color-mix(in srgb, #71b7e5 25%, var(--panel-background-color));
+        background: color-mix(in srgb, var(--selection-tint-strong) 25%, var(--panel-background-color));
         box-shadow: inset 3px 0 #438dca;
         color: #438dca;
     }

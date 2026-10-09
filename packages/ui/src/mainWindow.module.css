@@ -11,6 +11,19 @@ select {
     border: 1px solid var(--input-border-color);
 }
 
+/* Native option lists, datalists and pickers take their colors from the select, not the page. */
+option,
+optgroup {
+    color: var(--input-text-color);
+    background-color: var(--input-background-color);
+}
+
+input::placeholder,
+textarea::placeholder {
+    color: var(--foreground-muted-color);
+    opacity: 1;
+}
+
 button,
 .button {
     color: var(--foreground-color);
@@ -52,7 +65,7 @@ chili3d-main-window {
 }
 
 ::-webkit-scrollbar-track {
-    background: var(--control-background-colo);
+    background: var(--control-background-color);
     border-radius: 2em;
 }
 
@@ -103,6 +116,23 @@ chili3d-main-window {
     --resizer-gradient-hover: linear-gradient(to right, rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.18));
     --error-color: #ff0000;
     --warning-color: #ffc107;
+    --success-color: #15932e;
+    --danger-color: #c62938;
+    /* Text drawn on a --button-primary-background fill. */
+    --on-primary-color: #ffffff;
+    /* Accent-colored text and selected-tab underlines on panel backgrounds. */
+    --accent-text-color: #1651b0;
+    /* Hue mixed into panel backgrounds for hover / selected rows: color-mix(in srgb, var(--selection-tint) N%, …). */
+    --selection-tint: #b4dfef;
+    --selection-tint-strong: #71b7e5;
+    --info-background-color: #dff2fc;
+    --info-border-color: #a5dfff;
+    --info-foreground-color: #075580;
+    /* Onshape-style pick boxes (feature dialog selections). */
+    --query-background-color: #dff2ff;
+    --query-border-color: #73a9d9;
+    --query-foreground-color: #222233;
+    color-scheme: light;
 }
 
 :root[theme="dark"] {
@@ -112,7 +142,7 @@ chili3d-main-window {
     --secondary-color: #6a9ee6;
     --foreground-color: #ffffff;
     --foreground-secondary-color: #b0b0b0;
-    --foreground-muted-color: #808080;
+    --foreground-muted-color: #969696;
     --border-color: #4e4e4e;
     --border-hover-color: #505050;
     --background-color: #181818;
@@ -130,8 +160,8 @@ chili3d-main-window {
     --input-background-color: #1e1e1e;
     --input-border-color: #404040;
     --input-text-color: #ffffff;
-    --button-primary-background: #4a9eff;
-    --button-primary-hover: #3a8eef;
+    --button-primary-background: #2f6fd6;
+    --button-primary-hover: #3a7be0;
     --button-secondary-background: #2a2a2a;
     --button-secondary-hover: #323232;
     --backdrop-color: rgba(0, 0, 0, 0.45);
@@ -141,4 +171,18 @@ chili3d-main-window {
     --resizer-gradient-hover: linear-gradient(to right, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.18));
     --error-color: #ff6b6b;
     --warning-color: #ffd93d;
+    --success-color: #4cc26a;
+    --danger-color: #ff6b6b;
+    --on-primary-color: #ffffff;
+    --accent-text-color: #8cc4ff;
+    --selection-tint: #2a5d94;
+    --selection-tint-strong: #2a5d94;
+    --info-background-color: #182f3d;
+    --info-border-color: #2f5f80;
+    --info-foreground-color: #b5e0f8;
+    --query-background-color: #1a3244;
+    --query-border-color: #3d79ab;
+    --query-foreground-color: #e6f3ff;
+    /* Native controls (option lists, checkboxes, radios, scrollbars, date pickers) render dark. */
+    color-scheme: dark;
 }

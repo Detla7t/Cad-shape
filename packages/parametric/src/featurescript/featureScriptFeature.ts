@@ -653,7 +653,7 @@ function assignTrackedIds(
 
 const featureScriptHandler: FeatureHandler<FeatureScriptFeatureData> = {
     display: "featurescript.feature",
-    icon: "icon-macro",
+    icon: (feature) => feature.toolIcon ?? "icon-macro",
 
     nodeIds: (feature) => [
         feature.studioId,
@@ -663,7 +663,10 @@ const featureScriptHandler: FeatureHandler<FeatureScriptFeatureData> = {
         ),
     ],
 
-    references: (feature) => [{ key: "studio", display: "featurescript.studio", nodeId: feature.studioId }],
+    references: (feature) =>
+        feature.toolIcon !== undefined
+            ? []
+            : [{ key: "studio", display: "featurescript.studio", nodeId: feature.studioId }],
 
     cacheToken: (feature, document) => studioToken(document, feature.studioId),
 

@@ -85,15 +85,15 @@
 }
 .folder:hover,
 .folder:focus-visible {
-    background: color-mix(in srgb, #b4dfef 50%, var(--panel-background-color));
+    background: color-mix(in srgb, var(--selection-tint) 50%, var(--panel-background-color));
 }
 .empty {
     width: fit-content;
     margin: 8px auto;
     padding: 16px 14px;
-    color: #075580;
-    background: #dff2fc;
-    border: 1px solid #a5dfff;
+    color: var(--info-foreground-color);
+    background: var(--info-background-color);
+    border: 1px solid var(--info-border-color);
     border-radius: 3px;
 }
 .up {

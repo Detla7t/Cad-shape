@@ -17,6 +17,10 @@ export interface GraphicsPreferences {
     occludedColor: string;
     inactiveLineWidth: number;
     inactiveColor: string;
+    /** Fill of an inactive sketch's closed regions, in percent (0 hides the fill). */
+    inactiveRegionOpacity: number;
+    /** Size of an inactive sketch's entity points (endpoints, centers), in pixels; 0 hides them. */
+    inactivePointSize: number;
     firstDash: number;
     firstGap: number;
     secondDash: number;
@@ -38,6 +42,8 @@ export const DEFAULT_GRAPHICS: Readonly<GraphicsPreferences> = Object.freeze({
     occludedColor: "#4444ff",
     inactiveLineWidth: 1,
     inactiveColor: "#999999",
+    inactiveRegionOpacity: 12,
+    inactivePointSize: 4,
     firstDash: 4,
     firstGap: 6,
     secondDash: 30,

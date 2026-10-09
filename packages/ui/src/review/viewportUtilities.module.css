@@ -100,3 +100,6 @@
     paint-order: stroke;
     font: 12px sans-serif;
 }
+:root[theme="dark"] .guide text {
+    fill: #7cc3ea;
+}
