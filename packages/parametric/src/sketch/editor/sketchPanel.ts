@@ -150,7 +150,10 @@ export class SketchPanel {
             this.editor.annotations.showAllConstraints = constraints.checked;
         };
         constraintsLabel.append(constraints, document.createTextNode("Show constraints"));
-        const dragHint = element("div", "Click to select · Space to clear · Alt + drag to move");
+        const dragHint = element(
+            "div",
+            "Click to select · Drag a point or curve to move it · Shift + drag without snapping · Space clears the selection · Esc ends a tool",
+        );
         dragHint.className = style.hint;
         const help = element("details");
         help.append(element("summary", "Sketch help"), legend, dragHint);

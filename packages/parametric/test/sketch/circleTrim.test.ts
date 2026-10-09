@@ -82,6 +82,42 @@ test.each([
     }
 });
 
+test("trimming with a chord attached at one end only still leaves a fully defined arc", () => {
+    // a midpoint line through the center: only the picked end was inferred onto the rim,
+    // the other end is on the circle by symmetry alone
+    const { solver, circle } = dimensionedCircle();
+    try {
+        const line = solver.addLine(-10, 0, 10, 0);
+        const center = solver.addEntity("point", [0, 0]);
+        solver.addConstraint({ kind: ConstraintKind.Horizontal, refs: [ref(line), ref(line, 1)] });
+        solver.addConstraint({ kind: ConstraintKind.Midpoint, refs: [ref(center), ref(line), ref(line, 1)] });
+        solver.addConstraint({ kind: ConstraintKind.P2PCoincident, refs: [ref(center), originRef()] });
+        solver.addConstraint({ kind: ConstraintKind.PointOnCircle, refs: [ref(line, 1), ref(circle)] });
+        expect(solver.solve(true).result).toMatch(/^Ok/);
+        expect(solver.dofs()).toBe(0);
+        const data = solver.toData();
+        trimOrSplit(data, circle, [0, -10], "trim");
+        solver.reset(data);
+        expect(solver.solve(true).result).toMatch(/^Ok/);
+        expect(solver.entity(circle)!.type).toBe("arc");
+        // both arc ends are coincident with the chord's ends, so nothing is left to slide
+        expect(solver.dofs()).toBe(0);
+        const joins = data.constraints.filter(
+            (c) =>
+                c.kind === ConstraintKind.P2PCoincident &&
+                c.refs.some((r) => r.entityId === circle && r.pointIndex > 0) &&
+                c.refs.some((r) => r.entityId === line),
+        );
+        // the arc runs counter-clockwise from the chord's picked end (10, 0) back to its far end (-10, 0)
+        expect(joins.map((c) => c.refs.map((r) => r.pointIndex).sort()).sort()).toEqual([
+            [0, 2],
+            [1, 1],
+        ]);
+    } finally {
+        solver.dispose();
+    }
+});
+
 test("an interior point attachment stays free to slide along a trimmed arc", () => {
     const { solver, circle } = dimensionedCircle();
     try {

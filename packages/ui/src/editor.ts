@@ -4,6 +4,7 @@
 import { type ChatPanel, createChatPanel } from "@chili3d/ai";
 import {
     DocumentVersionControl,
+    type FeatureEditOptions,
     type IApplication,
     type ICommand,
     type IDocument,
@@ -355,17 +356,21 @@ export class Editor extends HTMLElement {
         this.closeFloatingChat();
     }
 
-    private readonly editFeature = async (node: INode & IFeatureListNode, featureId: string) => {
+    private readonly editFeature = async (
+        node: INode & IFeatureListNode,
+        featureId: string,
+        options?: FeatureEditOptions,
+    ) => {
         const model = this.app.activeView?.document;
         if (!model) return;
         if (node.beginFeatureEdit) {
-            const session = await node.beginFeatureEdit(featureId);
+            const session = await node.beginFeatureEdit(featureId, options);
             if (!session.isOk) {
                 PubSub.default.pub("displayError", session.error);
                 return;
             }
             this._workspace?.showPartStudio();
-            showFeatureEditPanel(model, node, session.value);
+            showFeatureEditPanel(model, node, session.value, options);
             return;
         }
         const content = new FeatureListProperty(model, node, featureId);

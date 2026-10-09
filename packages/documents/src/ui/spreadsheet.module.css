@@ -106,3 +106,389 @@
     border-top: 1px solid var(--border-color, #ccc);
     font-size: 11px;
 }
+
+/* A workbook is a light document canvas, independent of the surrounding CAD theme. */
+.sheet {
+    --primary-color: #1a73e8;
+    --checked-color: #e8f0fe;
+    --border-color: #dadce0;
+    --background-color: #f8fafd;
+    --foreground-color: #30343b;
+    --foreground-secondary-color: #5f6368;
+    --input-background-color: #fff;
+    --input-text-color: #202124;
+    --input-border-color: #dadce0;
+    --control-background-color: #fff;
+    color: #202124;
+    background: #fff;
+    font:
+        13px Arial,
+        sans-serif;
+}
+.sheet table {
+    font:
+        13px Arial,
+        sans-serif;
+}
+.sheet table td {
+    position: relative;
+}
+.sheet table th {
+    font-size: 11px;
+}
+.sheet table td[data-error]::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    top: 0;
+    border-top: 6px solid #ea4335;
+    border-left: 6px solid transparent;
+}
+.sheet table td[data-error] {
+    color: #202124;
+}
+.sheet table td:has(.cellDropdown) {
+    padding-right: 20px;
+}
+.menuBar {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex: 0 0 28px;
+    padding: 0 12px;
+    background: #f8fafd;
+}
+.menuBar button,
+.tabs button {
+    background: transparent;
+    color: #30343b;
+    border: 0;
+    border-radius: 4px;
+    font: inherit;
+    cursor: pointer;
+    padding: 5px 8px;
+}
+.menuBar button:hover,
+.menuBar button[aria-expanded="true"] {
+    background: #e5e9ef;
+}
+.sheet .toolbar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    min-height: 36px;
+    margin: 0 8px 5px;
+    padding: 2px 10px;
+    gap: 1px;
+    background: #edf2fa;
+    border: none;
+    border-radius: 22px;
+}
+.sheet .toolbar > * {
+    flex-shrink: 0;
+}
+.sheet .toolbar button {
+    min-width: 28px;
+    padding: 0 5px;
+}
+.sheet .toolbar button:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+.sheet .toolbar select {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    max-width: 105px;
+}
+.sheet .toolbar select[aria-label="Font size"] {
+    width: 47px;
+    border: 1px solid #9aa0a6;
+    border-radius: 3px;
+    height: 24px;
+}
+.sheet .toolbar select[aria-label="Font"] {
+    width: 103px;
+}
+.sheet .toolbar select[aria-label="Horizontal alignment"] {
+    width: 68px;
+}
+.sheet .toolbar select[aria-label="Vertical alignment"] {
+    width: 67px;
+}
+.sheet .toolbar select[aria-label="Borders"] {
+    width: 76px;
+}
+.toolGroup {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 0 6px;
+    border-right: 1px solid #c4c7c5;
+}
+.sheet .toolbar .toolGroup:last-child {
+    border-right: 0;
+    border-left: 1px solid #c4c7c5;
+}
+.sheet .toolbar .colorControl {
+    position: relative;
+    min-width: 24px;
+    height: 28px;
+    justify-content: center;
+    padding: 0 3px;
+    font-weight: 600;
+}
+.sheet .toolbar .colorControl input {
+    position: absolute;
+    bottom: 0;
+    left: 5px;
+    width: 22px;
+    height: 8px;
+    padding: 0;
+}
+.sheet .formulaBar {
+    gap: 2px;
+    padding: 0;
+    min-height: 28px;
+    background: white;
+}
+.sheet .formulaBar input {
+    border: 0;
+    border-radius: 0;
+    font:
+        12px Arial,
+        sans-serif;
+    height: 26px;
+    background: #fff;
+}
+.sheet .formulaBar input:first-child {
+    width: 77px;
+}
+.sheet .formulaBar span {
+    font:
+        italic 16px Georgia,
+        serif;
+    color: #909399;
+    padding: 0 8px;
+    border-left: 1px solid #dadce0;
+}
+.namesButton {
+    border: 0;
+    background: white;
+    color: #5f6368;
+    padding: 0 7px;
+    align-self: stretch;
+    cursor: pointer;
+}
+.namesButton:hover {
+    background: #e8f0fe;
+}
+.cellDropdown {
+    position: absolute;
+    right: 1px;
+    top: 0;
+    bottom: 0;
+    width: 18px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #5f6368;
+    cursor: pointer;
+    font-size: 12px;
+}
+.cellDropdown:hover {
+    background: #0001;
+    color: #174ea6;
+}
+.sheet [role="tab"] {
+    height: 32px;
+}
+.sheet [role="tab"][aria-selected="true"] {
+    color: #1967d2;
+    font-weight: 600;
+}
+.sheet [role="tab"]:hover {
+    background: #e8f0fe;
+}
+.menu,
+.dialog {
+    font:
+        13px / 1.5 Arial,
+        sans-serif;
+    color: #202124;
+    background: #fff;
+    border: 1px solid #dadce0;
+    border-radius: 6px;
+    box-shadow: 0 4px 16px #0003;
+}
+.menu {
+    position: fixed;
+    z-index: 10001;
+    min-width: 215px;
+    max-width: min(500px, calc(100vw - 16px));
+    max-height: min(480px, calc(100vh - 16px));
+    overflow: auto;
+    padding: 6px 0;
+}
+.menu button {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    justify-content: space-between;
+    text-align: left;
+    width: 100%;
+    min-height: 32px;
+    padding: 5px 18px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+.menu button:hover,
+.menu button:focus-visible {
+    background: #e8f0fe;
+    outline: 0;
+}
+.menu button:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+.menu button small {
+    color: #777;
+    font-size: 11px;
+    max-width: 240px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.menu hr {
+    border: 0;
+    border-top: 1px solid #dadce0;
+    margin: 5px 8px;
+}
+.backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 10002;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #172b4d33;
+}
+.dialog {
+    width: 450px;
+    max-width: calc(100vw - 24px);
+    max-height: calc(100vh - 32px);
+    overflow: auto;
+    padding: 20px 24px;
+}
+.dialog header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    font-size: 18px;
+}
+.dialog header button {
+    font-size: 22px;
+    border: 0;
+    background: none;
+}
+.dialog footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 18px;
+}
+.dialog button {
+    font: inherit;
+    border: 1px solid #dadce0;
+    border-radius: 4px;
+    background: #fff;
+    color: #174ea6;
+    padding: 5px 12px;
+    cursor: pointer;
+}
+.dialog button:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+.dialog button:hover {
+    background: #f1f5fb;
+}
+.dialog .primary {
+    background: #1a73e8;
+    border-color: #1a73e8;
+    color: #fff;
+}
+.dialog input:not([type="checkbox"]),
+.dialog select,
+.dialog textarea {
+    font: inherit;
+    color: #202124;
+    background: white;
+    border: 1px solid #dadce0;
+    border-radius: 4px;
+    padding: 8px;
+    min-width: 0;
+    box-sizing: border-box;
+}
+.dialog input:focus,
+.dialog textarea:focus,
+.dialog select:focus {
+    outline: 2px solid #1a73e8;
+    outline-offset: -1px;
+}
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-bottom: 12px;
+    font-weight: 500;
+}
+.field[hidden] {
+    display: none;
+}
+.field textarea {
+    height: 110px;
+    resize: vertical;
+}
+.panelBody {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.panelBody p {
+    font-size: 12px;
+    color: #5f6368;
+    margin: 4px 0;
+}
+.rangeList,
+.filterList,
+.functionReference {
+    max-height: 260px;
+    overflow-y: auto;
+}
+.rangeList {
+    display: flex;
+    flex-direction: column;
+}
+.rangeList button {
+    text-align: left;
+    border: 0;
+    font-size: 12px;
+}
+.filterList label {
+    display: flex;
+    gap: 8px;
+    padding: 3px 0;
+}
+.filterList label[hidden] {
+    display: none;
+}
+.validationError {
+    color: #b3261e;
+    font-size: 12px;
+    margin-top: 10px;
+}

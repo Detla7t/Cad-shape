@@ -1,0 +1,59 @@
+.list {
+    width: 100%;
+    min-height: 45px;
+    padding: 4px;
+    box-sizing: border-box;
+    border: 1px solid #73a9d9;
+    background: #dff2ff;
+    color: #223;
+}
+.list > span {
+    display: block;
+    padding: 6px 4px;
+    opacity: 0.7;
+}
+.list button {
+    border: 0;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    padding: 2px 4px;
+}
+.list button:disabled {
+    opacity: 0.3;
+    cursor: default;
+}
+.section {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px 0;
+}
+.section > span {
+    flex: 1;
+    padding-left: 4px;
+}
+.heading {
+    display: flex;
+    align-items: center;
+    padding: 8px 0 4px;
+    font-weight: 600;
+}
+.heading > button {
+    margin-left: auto;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+}
+.panel details {
+    border-top: 1px solid var(--border-color);
+    padding: 6px 0;
+}
+.panel summary {
+    cursor: pointer;
+    padding: 4px 0;
+}
+.panel select {
+    margin-left: auto;
+}

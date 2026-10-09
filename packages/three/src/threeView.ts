@@ -94,6 +94,9 @@ function wantedContainers(shapeType: ShapeType, subType: ShapeType): ShapeType[]
     return wanted;
 }
 
+/** How long after the last camera change frames keep drawing at interactive (draft) quality. */
+const CAMERA_SETTLE_MS = 150;
+
 /** Whether the sub-shape itself is what a pick with no applicable container asked for. */
 function keepsSubShape(shapeType: ShapeType, subType: ShapeType): boolean {
     if (subType === ShapeTypes.face) return ShapeTypeUtils.hasFace(shapeType);
@@ -117,7 +120,13 @@ export class ThreeView extends Observable implements IView {
     private renderedFrames = 0;
     private frameCpuMs = 0;
     private readonly lightDirection = new Vector3();
-    private readonly cameraChanged = () => this.update();
+    /** Frames requested within this window after a camera move draw at interactive quality. */
+    private interactingUntil = 0;
+    private settleTimer?: ReturnType<typeof setTimeout>;
+    private readonly cameraChanged = () => {
+        this.interactingUntil = performance.now() + CAMERA_SETTLE_MS;
+        this.update();
+    };
     private readonly visibilityChanged = () => {
         if (globalThis.document.visibilityState === "hidden") this.cancelFrame();
         else this.requestFrame();
@@ -220,6 +229,8 @@ export class ThreeView extends Observable implements IView {
 
     override disposeInternal(): void {
         this.cancelFrame();
+        if (this.settleTimer !== undefined) clearTimeout(this.settleTimer);
+        this.settleTimer = undefined;
         this.visibilityObserver?.disconnect();
         globalThis.document.removeEventListener("visibilitychange", this.visibilityChanged);
         this.cameraController.removePropertyChanged(this.cameraChanged);
@@ -361,11 +372,11 @@ export class ThreeView extends Observable implements IView {
         return element;
     }
 
-    protected renderEffects() {
-        this.effects.render();
+    protected renderEffects(quality: "interactive" | "final" = "final") {
+        this.effects.render(quality);
     }
 
-    private renderFrame() {
+    private renderFrame(quality: "interactive" | "final" = "final") {
         const start = performance.now();
         const reset = this._renderer.info.autoReset;
         this._renderer.info.autoReset = false;
@@ -373,7 +384,7 @@ export class ThreeView extends Observable implements IView {
         try {
             this.display.render(() => {
                 this._renderer.render(this._scene, this.camera);
-                this.renderEffects();
+                this.renderEffects(quality);
             });
         } finally {
             this._renderer.info.autoReset = reset;
@@ -456,9 +467,17 @@ export class ThreeView extends Observable implements IView {
 
         this.lightDirection.copy(this.camera.position).sub(this.cameraController.target);
         this.dynamicLight.position.copy(this.lightDirection);
-        this.renderFrame();
+        const interactive = performance.now() < this.interactingUntil;
+        this.renderFrame(interactive ? "interactive" : "final");
         this._cssRenderer.render(this.labelScene, this.camera);
         this._gizmo?.update();
+        // an interactive frame is a draft: redraw once at full quality when the motion stops
+        if (interactive && this.settleTimer === undefined) {
+            this.settleTimer = setTimeout(() => {
+                this.settleTimer = undefined;
+                this.update();
+            }, CAMERA_SETTLE_MS);
+        }
     };
 
     resize(width: number, height: number) {

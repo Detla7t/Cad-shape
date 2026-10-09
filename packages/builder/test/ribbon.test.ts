@@ -183,6 +183,7 @@ describe("ParametricRibbonProfiles", () => {
             "plane.create",
             "feature.extrude",
             "feature.revolve",
+            "feature.loft",
             "feature.fillet",
             "feature.chamfer",
             "feature.fuse",

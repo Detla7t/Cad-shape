@@ -120,6 +120,28 @@ describe("viewport render scheduling", () => {
         expect(render).toHaveBeenCalledTimes(2);
     });
 
+    test("a camera move draws a draft frame and settles into one full-quality frame", async () => {
+        frame();
+        const effects = rs.spyOn(view as unknown as { renderEffects(q: string): void }, "renderEffects");
+        view.cameraController.pan(10, 5);
+        frame();
+        expect(effects).toHaveBeenLastCalledWith("interactive");
+        // a burst of moves keeps drafting without stacking settle frames
+        view.cameraController.pan(10, 5);
+        frame();
+        expect(effects).toHaveBeenLastCalledWith("interactive");
+        expect(frames.size).toBe(0);
+        await new Promise((resolve) => setTimeout(resolve, 220));
+        expect(frames.size).toBe(1);
+        frame();
+        expect(effects).toHaveBeenLastCalledWith("final");
+        expect(effects).toHaveBeenCalledTimes(3);
+        // a change that is not a camera move renders at full quality right away
+        view.update();
+        frame();
+        expect(effects).toHaveBeenLastCalledWith("final");
+    });
+
     test("hidden viewports retain changes and render once when visible again", () => {
         const render = rs.spyOn(view.renderer, "render");
         intersect(false);

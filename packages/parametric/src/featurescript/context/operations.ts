@@ -864,11 +864,99 @@ function shellOp(ctx: FsContext, opId: string, definition: FsMap, form: "operati
     for (const body of bodies) {
         if (body.kind !== "SOLID") continue;
         const faces = faceRefs.filter((ref) => ref.body === body).map((ref) => body.faces()[ref.index]);
-        const result = kernel(
-            shapeFactory.makeThickSolidByJoin(body.shape, faces, sign * thickness, "intersection"),
-            "Shell",
-        );
+        const offset = sign * thickness;
+        const direct = shapeFactory.makeThickSolidByJoin(body.shape, faces, offset, "intersection");
+        const result = direct.isOk
+            ? direct.value
+            : kernel(collapsedBlendShell(body, faces, offset, direct), "Shell");
         ctx.rebuildBody(body, result, [historySource(body)], opId);
+    }
+}
+
+/**
+ * An inward shell whose wall swallows convex round blends. Offsetting a convex cylinder or
+ * sphere of radius r inward by t ≥ r collapses it, which the kernel's thick-solid refuses;
+ * Onshape (Parasolid) gives the cavity a sharp corner there. That cavity is the one the part
+ * would have without those blends, so: remove the blends (defeaturing), shell that part,
+ * take its cavity (defeatured − shelled) and cut it from the original. Other failures keep
+ * the kernel's error.
+ */
+function collapsedBlendShell(
+    body: FsBody,
+    removed: readonly IFace[],
+    offset: number,
+    failure: Result<IShape>,
+): Result<IShape> {
+    if (offset >= 0) return failure;
+    const blends = body.faces().filter((face) => {
+        if (removed.some((open) => open.isSame(face))) return false;
+        return collapsesInward(face, -offset);
+    });
+    if (blends.length === 0) return failure;
+    const sharp = shapeFactory.removeFeature(body.shape, blends);
+    if (!sharp.isOk) return failure;
+    const sharpFaces = sharp.value.findSubShapes(ShapeTypes.face) as IFace[];
+    try {
+        // The faces to remove, re-found on the defeatured part (blend removal re-trims them).
+        const open = removed.map((face) => {
+            const plane = facePlane(face);
+            if (plane === undefined) return undefined;
+            return sharpFaces.find((candidate) => {
+                const other = facePlane(candidate);
+                return (
+                    other !== undefined &&
+                    vec.dot(other.normal, plane.normal) > 1 - 1e-9 &&
+                    Math.abs(vec.dot(plane.normal, vec.sub(other.origin, plane.origin))) < 1e-10
+                );
+            });
+        });
+        if (open.some((face) => face === undefined)) return failure;
+        const shelled = shapeFactory.makeThickSolidByJoin(
+            sharp.value,
+            open as IFace[],
+            offset,
+            "intersection",
+        );
+        if (!shelled.isOk) return failure;
+        const cavity = shapeFactory.booleanCut([sharp.value], [shelled.value]);
+        if (!cavity.isOk) return failure;
+        const result = shapeFactory.booleanCut([body.shape], [cavity.value]);
+        shelled.value.dispose();
+        cavity.value.dispose();
+        return result.isOk && result.value.checkShape() ? result : failure;
+    } finally {
+        sharpFaces.forEach((face) => face.dispose());
+        sharp.value.dispose();
+    }
+}
+
+/** A convex cylinder or sphere face whose radius an inward offset of `depth` reaches. */
+function collapsesInward(face: IFace, depth: number): boolean {
+    const type = surfaceTypeOf(face);
+    if (type !== "CYLINDER" && type !== "SPHERE") return false;
+    const surface = face.surface() as unknown as {
+        location?: XYZ;
+        axis?: XYZ;
+        radius?: number;
+        bounds(): { u1: number; u2: number; v1: number; v2: number };
+        dispose(): void;
+    };
+    try {
+        const radius = surface.radius;
+        if (radius === undefined || surface.location === undefined || radius > depth + 1e-7) return false;
+        const { u1, u2, v1, v2 } = surface.bounds();
+        const [point, normal] = face.normal((u1 + u2) / 2, (v1 + v2) / 2);
+        // Convex when the outward normal points away from the centre (axis or sphere centre).
+        let center = surface.location;
+        if (type === "CYLINDER" && surface.axis !== undefined) {
+            const axis = surface.axis.normalize() ?? surface.axis;
+            center = center.add(axis.multiply(point.sub(center).dot(axis)));
+        }
+        return point.sub(center).dot(normal) > 0;
+    } catch {
+        return false;
+    } finally {
+        surface.dispose();
     }
 }
 

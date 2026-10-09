@@ -3,6 +3,7 @@
 
 import {
     type AsyncController,
+    type FeatureEditOptions,
     type FeatureItem,
     type FeatureReference,
     type I18nKeys,
@@ -172,20 +173,40 @@ export class ParametricBodyNode
             : JSON.parse(this.featuresJson);
     }
 
-    private _featureDraft?: { id: string; features: FeatureData[]; rollback?: number };
+    private _featureDraft?: { id: string; features: FeatureData[]; rollback?: number; inserting: boolean };
     featureEditSession?: FeatureEditSession;
 
-    async beginFeatureEdit(featureId: string) {
-        return FeatureEditSession.start(this, featureId);
+    async beginFeatureEdit(featureId: string, options?: FeatureEditOptions) {
+        return FeatureEditSession.start(this, featureId, options?.insert as FeatureData | undefined);
     }
 
-    /** Draft data is runtime-only: serialization and undo continue to see the committed list. */
-    startFeatureDraft(featureId: string): Result<void> {
+    /** True while the edited feature exists only in the draft (see `startFeatureDraft`). */
+    get featureDraftInserting(): boolean {
+        return this._featureDraft?.inserting === true;
+    }
+
+    /**
+     * Draft data is runtime-only: serialization and undo continue to see the committed list.
+     * `inserted` stages a new feature at the rollback position (the end without one): it
+     * joins the list only when the draft is applied, as one "Insert feature" step.
+     */
+    startFeatureDraft(featureId: string, inserted?: FeatureData): Result<void> {
         if (this._featureDraft) return Result.err("A feature is already being edited.");
         const features = this.features;
+        if (inserted !== undefined) {
+            if (inserted.id !== featureId) return Result.err("The inserted feature has another id.");
+            if (features.some((feature) => feature.id === featureId))
+                return Result.err("This feature already exists.");
+            features.splice(Math.min(this.rollbackIndex ?? features.length, features.length), 0, inserted);
+        }
         const index = features.findIndex((feature) => feature.id === featureId);
         if (index < 0) return Result.err("This feature no longer exists.");
-        this._featureDraft = { id: featureId, features, rollback: this.rollbackIndex };
+        this._featureDraft = {
+            id: featureId,
+            features,
+            rollback: this.rollbackIndex,
+            inserting: inserted !== undefined,
+        };
         this._rollbackIndex = index + 1;
         this.refreshFeatureDraft();
         return Result.ok(undefined);
@@ -199,10 +220,13 @@ export class ParametricBodyNode
             if (error) return Result.err(error);
         }
         this._featureDraft = undefined;
-        this._rollbackIndex = draft.rollback;
+        // An inserted feature sat before the old rollback bar; the bar moves past it.
+        this._rollbackIndex =
+            apply && draft.inserting && draft.rollback !== undefined ? draft.rollback + 1 : draft.rollback;
+        if (!apply && draft.inserting) this._featureErrors.delete(draft.id);
         const json = JSON.stringify(draft.features);
         if (apply && json !== this.featuresJson) {
-            Transaction.execute(this.document, "Edit feature", () =>
+            Transaction.execute(this.document, draft.inserting ? "Insert feature" : "Edit feature", () =>
                 this.setFeaturesEmitShapeChanged(draft.features),
             );
         } else {

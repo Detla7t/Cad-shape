@@ -233,3 +233,16 @@ export function formatCellValue(value: CellValue | null | undefined, format?: st
     const text = formatNumberCode(number, code, literals);
     return number < 0 && !negativeSection ? `-${text}` : text;
 }
+
+/** Change mantissa precision without modifying quoted units or scientific exponents. */
+export function adjustDecimalPlaces(format: string, delta: number): string {
+    const numeric = /[0#]/.test(format) && !/[ymdhHs@]/.test(format.replace(/"[^"]*"/g, "")) ? format : "0";
+    return numeric.replace(
+        /"(?:[^"]|"")*"|([0#][0#,]*)(?:\.([0#]+))?([Ee][+-]?[0#]+)?/g,
+        (token, integer: string | undefined, fraction: string | undefined, exponent: string | undefined) => {
+            if (integer === undefined) return token;
+            const count = Math.max(0, Math.min(12, (fraction?.length ?? 0) + delta));
+            return integer + (count ? `.${"0".repeat(count)}` : "") + (exponent ?? "");
+        },
+    );
+}

@@ -107,7 +107,9 @@ export interface TableRun {
 export function runTable(run: TableRun): TableRunResult {
     const context = new FsContext();
     try {
-        for (const body of run.bodies) context.addHostBody(body.shape).name = body.name;
+        for (const body of run.bodies) {
+            for (const part of context.addHostBody(body.shape)) part.name = body.name;
+        }
         for (const [name, value] of run.variables ?? []) context.variables.set(name, value);
         for (const name of run.configurationVariables ?? []) context.configurationVariables.add(name);
         context.dataTables = run.dataTables;

@@ -21,7 +21,12 @@ import type { SketchPointSnapData } from "./sketchPointStep";
 export interface SketchPointSnapResult extends SnapResult {
     sketchSnap?: DragSnap;
     suppressInference?: boolean;
+    /** The pick was completed by releasing a press-and-drag rather than by a click. */
+    dragged?: boolean;
 }
+
+/** Pointer travel (CSS px) with the button held before a release counts as a drag-to-draw. */
+const DRAG_DRAW_THRESHOLD_PX = 4;
 
 /**
  * Point-snap handler for sketch drawing: snaps the cursor onto sketch targets
@@ -36,6 +41,13 @@ export class SketchPointSnapEventHandler extends PointSnapEventHandler {
     /** Tangency the probe's entity would get: shown in place of the snap's own icon. */
     private sketchTangentKind?: ConstraintKind;
     private guide?: number;
+    /**
+     * Where the pointer first moved with the left button still held — the press
+     * that completed the previous step. Releasing past the threshold completes
+     * this step too, so a line, circle or rectangle can be drawn in one gesture.
+     */
+    private heldFrom?: [number, number];
+    private heldMoved = false;
 
     constructor(
         document: IDocument,
@@ -103,10 +115,40 @@ export class SketchPointSnapEventHandler extends PointSnapEventHandler {
         }
     }
 
+    override pointerMove(view: IView, event: PointerEvent): void {
+        if (event.pointerType === "mouse" && (event.buttons & 1) === 1) {
+            this.heldFrom ??= [event.offsetX, event.offsetY];
+            if (
+                Math.hypot(event.offsetX - this.heldFrom[0], event.offsetY - this.heldFrom[1]) >=
+                DRAG_DRAW_THRESHOLD_PX
+            )
+                this.heldMoved = true;
+        }
+        super.pointerMove(view, event);
+    }
+
     override pointerDown(view: IView, event: PointerEvent): void {
         // A click can arrive without a preceding move (touch, or a newly activated tool).
         this.findSnapPoint(0 as ShapeType, view, event);
         super.pointerDown(view, event);
+    }
+
+    override pointerUp(view: IView, event: PointerEvent): void {
+        if (event.pointerType === "mouse" && event.button === 0) {
+            const dragged = this.heldMoved;
+            this.heldFrom = undefined;
+            this.heldMoved = false;
+            if (dragged && this.state !== "completed" && this.state !== "cancelled") {
+                this.findSnapPoint(0 as ShapeType, view, event);
+                const snaped = this._snaped as SketchPointSnapResult | undefined;
+                if (snaped !== undefined) {
+                    snaped.dragged = true;
+                    this.controller.success();
+                }
+            }
+            return;
+        }
+        super.pointerUp(view, event);
     }
 
     override dispose(): void {

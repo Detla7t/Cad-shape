@@ -8,6 +8,7 @@ import { SketchNode } from "../sketch/sketchNode";
 const modelingFeatures: Partial<Record<CommandKeys, CommandKeys>> = {
     "create.extrude": "feature.extrude",
     "create.revol": "feature.revolve",
+    "create.loft": "feature.loft",
     "modify.fillet": "feature.fillet",
     "modify.chamfer": "feature.chamfer",
     "boolean.join": "feature.fuse",

@@ -1,0 +1,46 @@
+{
+    "task": "Match the supplied spreadsheet screenshot and implement its core editing features",
+    "reference": "/home/hugo/.t3/userdata/attachments/156b06b8-851b-4c68-b14d-f660794136f4-6e612e67-c739-4e44-8f3e-aea376b8d850.png",
+    "screenshots": ["layout.png", "named-ranges.png"],
+    "workbook": "finance-example.xlsx",
+    "implemented": [
+        "Light worksheet canvas, compact rounded toolbar, File/Edit/View/Insert/Format/Data/Help menus",
+        "Workbook named-range management, address navigation, formula references and suggestions",
+        "List and range-based cell dropdowns, invalid-value rejection and non-overlapping XLSX validation rules",
+        "Alternating color palettes, font and cell formatting, decimal controls and number formats",
+        "Sorting with relative formula updates, column value filters, hidden rows/columns and frozen panes",
+        "Local undo/redo, styled copy/paste, relative formula translation, find, zoom and aggregate insertion",
+        "Sheet tab menus for rename/duplicate/reorder/delete and all-sheets navigation",
+        "Cell error markers, stable drag/double-click selection and double-click column auto-fit",
+        "XLSX preservation of names, validation, formatting, dimensions, hidden state and freeze panes"
+    ],
+    "browser_verification": [
+        "Created a document and spreadsheet through the standard application menus",
+        "Pasted a 12-row finance table through the grid clipboard event",
+        "Applied Rose alternating colors, decimal formatting, a column filter and 11 cell dropdowns through the menus",
+        "Created Expenses for D2:D12 and renamed the sheet to Bank Transactions",
+        "Entered SUM(Expenses): 1287; verified Undo clears it and Redo restores it",
+        "Filtered Subcategory to Coffee: only worksheet rows 4 and 10 remained visible",
+        "Froze the first row: after scrollTop=600, header top remained 237px (scroller top 215px plus 22px)",
+        "Saved, reloaded, and reopened the workbook; named formula, dropdowns and formatting survived",
+        "Double-clicked column borders to auto-fit B through G from 88px to 93/130/120/132/88/113px",
+        "Double-clicked C2: input Edit C2 opened with Opening balance; Escape cancelled",
+        "Saved and downloaded the XLSX through the document Download menu; verified its XML names, filter, frozen pane, validation and cached results"
+    ],
+    "checks": {
+        "command": "npx rstest packages/documents/test packages/data/test",
+        "passed": 300,
+        "failed": 0,
+        "typecheck": "npx tsc --noEmit passed",
+        "build": "npm run build passed; three existing bundle-size warnings",
+        "lint": "Targeted Biome check passed",
+        "whitespace": "git diff --check passed"
+    },
+    "limits": [
+        "This is not full Google Sheets or Excel feature parity; charts, pivot tables, macros, cloud collaboration and the full formula catalog are not implemented",
+        "Filter criteria are session view state; XLSX saves the filter range and hidden rows, not the value-checkbox criteria",
+        "Names are workbook-scoped direct ranges; formula-defined and sheet-scoped names are not supported",
+        "XLSX is the format for these new workbook features; CSV is values-only and ODS does not preserve all of this metadata",
+        "Rich text, workbook-specific theme palettes, embedded workbook images and structured table references retain the existing limitations"
+    ]
+}

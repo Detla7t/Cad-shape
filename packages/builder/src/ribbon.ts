@@ -144,11 +144,24 @@ export const ParametricRibbonProfiles: RibbonProfileExtra[] = [
         groups: [
             {
                 groupName: "ribbon.group.feature",
-                items: ["feature.extrude", "feature.revolve", "feature.fillet", "feature.chamfer"],
+                // Onshape's Part Studio toolbar order. Fillet through Mirror are Onshape's own
+                // features (`onshapeTools.ts`), opened in the feature dialog.
+                items: [
+                    "feature.extrude",
+                    "feature.revolve",
+                    "feature.loft",
+                    "partStudio.fillet",
+                    "partStudio.chamfer",
+                    "partStudio.shell",
+                ],
             },
             {
                 groupName: "ribbon.group.boolean",
-                items: [["feature.fuse", "feature.cut", "feature.common"]],
+                items: ["partStudio.boolean", "partStudio.transform"],
+            },
+            {
+                groupName: "ribbon.group.pattern",
+                items: ["partStudio.linearPattern", "partStudio.circularPattern", "partStudio.mirror"],
             },
             {
                 groupName: "ribbon.group.featureScript",

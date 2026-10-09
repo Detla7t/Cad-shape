@@ -7,7 +7,7 @@
  * into the parsing worker), cells keyed by A1 address.
  */
 
-import type { Style } from "exceljs";
+import type { DataValidation, DefinedNamesModel, Style } from "exceljs";
 
 export type CellValue = number | string | boolean;
 /** Excel's serializable style data; ExcelJS remains a lazy runtime dependency. */
@@ -35,10 +35,19 @@ export interface SheetData {
     rows?: Record<number, number>;
     /** Merged ranges, e.g. "A1:C1". */
     merges?: string[];
+    /** Excel validation rules keyed by a cell or rectangular range. */
+    validations?: Record<string, DataValidation>;
+    /** Header and data range for the column filter controls. */
+    autoFilter?: string;
+    hiddenRows?: number[];
+    hiddenCols?: number[];
+    frozen?: { rows: number; cols: number };
 }
 
 export interface WorkbookData {
     sheets: SheetData[];
+    /** Workbook-scoped names, with Excel-qualified absolute references. */
+    names?: DefinedNamesModel;
 }
 
 export interface CellAddress {

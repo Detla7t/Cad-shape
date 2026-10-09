@@ -7,12 +7,23 @@ import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
 import { SSAOPass } from "three/examples/jsm/postprocessing/SSAOPass.js";
 import type { ThreeView } from "./threeView";
 
-/** Multiplies only the occlusion contribution over the existing antialiased frame. */
+/** Occlusion samples per pixel: enough for a smooth, grain-free shade on the settled frame. */
+const AO_KERNEL_SIZE = 32;
+
+/**
+ * Multiplies only the occlusion contribution over the existing antialiased frame.
+ *
+ * Quality follows the frame: a settled frame shades at the full drawing-buffer
+ * resolution (the grain of a half-size occlusion map upscaled over crisp MSAA edges is
+ * what reads as a "noisy" viewport); frames drawn while the camera is still moving use
+ * the half-resolution map, a quarter of the pixel work, and the view redraws once more
+ * at full quality when the motion settles.
+ */
 export class ViewEffects {
     private ao?: SSAOPass;
     private readonly bufferSize = new Vector2();
     constructor(private readonly view: ThreeView) {}
-    render() {
+    render(quality: "interactive" | "final" = "final") {
         const view = this.view,
             strength = Config.instance.graphics.ambientOcclusion / 100;
         if (strength <= 0 || view.mode === "wireframe" || view.displayOptions.translucent) return;
@@ -39,7 +50,7 @@ export class ViewEffects {
         });
         if (!hasOccluder) return;
         if (!this.ao) {
-            this.ao = new SSAOPass(scene, view.camera, 1, 1, 16);
+            this.ao = new SSAOPass(scene, view.camera, 1, 1, AO_KERNEL_SIZE);
             this.ao.renderToScreen = true;
             this.ao.copyMaterial.fragmentShader = this.ao.copyMaterial.fragmentShader.replace(
                 "gl_FragColor = opacity * texel;",
@@ -49,10 +60,11 @@ export class ViewEffects {
         const ao = this.ao;
         ao.camera = view.camera;
         const size = view.renderer.getDrawingBufferSize(this.bufferSize);
-        // AO is a low-frequency shading effect. Half-resolution targets cut its pixel work by 75%,
-        // while the model's MSAA render and line/text detail retain the full display resolution.
-        const width = Math.max(1, Math.ceil(size.x / 2));
-        const height = Math.max(1, Math.ceil(size.y / 2));
+        // While the camera moves, half-resolution targets cut the pixel work by 75%; the
+        // model's MSAA render and line/text detail keep the full display resolution either way.
+        const scale = quality === "interactive" ? 2 : 1;
+        const width = Math.max(1, Math.ceil(size.x / scale));
+        const height = Math.max(1, Math.ceil(size.y / scale));
         if (ao.width !== width || ao.height !== height) ao.setSize(width, height);
         // Projection changes on zoom or a camera switch even when target sizes stay constant.
         ao.ssaoMaterial.uniforms["cameraProjectionMatrix"].value.copy(view.camera.projectionMatrix);

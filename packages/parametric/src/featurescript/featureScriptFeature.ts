@@ -4,6 +4,7 @@
 import {
     ANGLE_UNITS,
     type FeatureParameter,
+    type FeaturePickKind,
     findDataTable,
     type IDocument,
     type IFace,
@@ -12,6 +13,8 @@ import {
     LENGTH_UNITS,
     Matrix4,
     type ParameterValue,
+    Plane,
+    ReferencePlaneNode,
     Result,
     resolveUnitSpec,
     type Scope,
@@ -26,20 +29,29 @@ import type { EdgeRef } from "../features/edgeRef";
 import {
     type FeatureContext,
     type FeatureHandler,
+    type FeatureScriptBodyRef,
     type FeatureScriptFaceRef,
     type FeatureScriptFeatureData,
     type FeatureScriptParameterValue,
+    type FeatureScriptPlaneRef,
     type FeatureScriptQueryValue,
     registerFeature,
     type ShapeTracking,
 } from "../features/feature";
 import { captureFaceFingerprint } from "../features/historyCompletion";
-import { type EntityRef, type FsBody, type FsContext, HOST_ID, MM_PER_METER } from "./context/fsContext";
+import {
+    type EntityRef,
+    type FsBody,
+    type FsContext,
+    MM_PER_METER,
+    toKernelPlane,
+} from "./context/fsContext";
 import { query, transientQuery } from "./context/queries";
 import { type FeatureSpec, type FsParameterSpec, isParameterVisible } from "./featureSpec";
 import type { FeatureExport } from "./lang/interpreter";
 import { ANGLE, FsArray, FsMap, FsQuantity, type FsValue, LENGTH } from "./lang/values";
 import { describeError, runFeature } from "./runtime";
+import { makePlaneData, type Vec3 } from "./std/geometry";
 import {
     type CompiledStudio,
     compileDocumentStudio,
@@ -70,6 +82,8 @@ export function querySummary(value: FeatureScriptParameterValue | undefined): st
     if (!isQueryValue(value)) return "—";
     const count = (n: number, one: string, many: string) => (n === 0 ? [] : [`${n} ${n === 1 ? one : many}`]);
     const parts = [
+        ...count(value.bodies?.length ?? 0, "part", "parts"),
+        ...count(value.planes?.length ?? 0, "plane", "planes"),
         ...count(value.faces?.length ?? 0, "face", "faces"),
         ...count(value.edges?.length ?? 0, "edge", "edges"),
         ...count(value.vertices?.length ?? 0, "vertex", "vertices"),
@@ -277,48 +291,159 @@ interface PickResolution {
 /**
  * Re-matches one query parameter's picks on the host input: edges through the tracked
  * ids (`matchEdgesAnchored`) with fingerprint fallback, faces by tracked id then
- * fingerprint, vertices by position.
+ * fingerprint, vertices by position, parts by volume and centre. Indexes address the
+ * whole input; `FsContext.hostEntity` maps them onto the host part holding the entity.
+ * Planes resolve on the document's reference plane nodes.
  */
 function resolvePicks(
     value: FeatureScriptQueryValue,
-    host: FsBody | undefined,
-    input: IShape | undefined,
-    tracking: ShapeTracking | undefined,
+    fsContext: FsContext,
+    context: FeatureContext,
     label: string,
 ): Result<PickResolution> {
     const refs: EntityRef[] = [];
     const edges = value.edges ?? [];
     const faces = value.faces ?? [];
     const vertices = value.vertices ?? [];
-    if (edges.length + faces.length + vertices.length === 0) return Result.ok({ refs });
-    if (host === undefined || input === undefined)
+    const bodies = value.bodies ?? [];
+    for (const plane of value.planes ?? []) {
+        refs.push(planeEntity(fsContext, currentPlane(context.document, plane)));
+    }
+    if (edges.length + faces.length + vertices.length + bodies.length === 0) return Result.ok({ refs });
+    const input = context.input;
+    const hosts = fsContext.hostBodies();
+    if (hosts.length === 0 || input === undefined)
         return Result.err(`${label}: there is no preceding geometry to pick from`);
+    const tracking = context.tracking;
+    const hostRef = (kind: "FACE" | "EDGE", index: number) => {
+        const ref = fsContext.hostEntity(kind, index);
+        if (ref !== undefined) refs.push(ref);
+        return ref !== undefined;
+    };
 
     let edgeAnchors: EdgeRef[] | undefined;
     if (edges.length > 0) {
+        let indexes: number[];
         if (tracking !== undefined) {
             const matched = matchEdgesAnchored(input, edges, tracking.inputEdgeIds);
             if (!matched.isOk) return Result.err(`${label}: ${matched.error}`);
             edgeAnchors = matched.value.anchors;
-            for (const index of matched.value.indexes) refs.push({ body: host, kind: "EDGE", index });
+            indexes = matched.value.indexes;
         } else {
             const matched = matchEdgeIndexes(input, edges);
             if (!matched.isOk) return Result.err(`${label}: ${matched.error}`);
-            for (const index of matched.value) refs.push({ body: host, kind: "EDGE", index });
+            indexes = matched.value;
+        }
+        for (const index of indexes) {
+            if (!hostRef("EDGE", index)) return Result.err(`${label}: a picked edge no longer exists`);
         }
     }
-    for (const face of faces) {
-        const index = matchFace(host.faces(), face, tracking?.inputFaceIds);
-        if (index === undefined) return Result.err(`${label}: a picked face no longer exists`);
-        refs.push({ body: host, kind: "FACE", index });
+    if (faces.length > 0) {
+        const inputFaces = fsContext.track(input.findSubShapes(ShapeTypes.face)) as IFace[];
+        for (const face of faces) {
+            const index = matchFace(inputFaces, face, tracking?.inputFaceIds);
+            if (index === undefined || !hostRef("FACE", index))
+                return Result.err(`${label}: a picked face no longer exists`);
+        }
     }
     for (const vertex of vertices) {
         const target = new XYZ(vertex.point);
-        const index = host.vertices().findIndex((candidate) => candidate.point().distanceTo(target) < 1e-4);
-        if (index < 0) return Result.err(`${label}: a picked vertex no longer exists`);
-        refs.push({ body: host, kind: "VERTEX", index });
+        const ref = hosts.flatMap((body) => {
+            const index = body
+                .vertices()
+                .findIndex((candidate) => candidate.point().distanceTo(target) < 1e-4);
+            return index < 0 ? [] : [{ body, kind: "VERTEX" as const, index }];
+        })[0];
+        if (ref === undefined) return Result.err(`${label}: a picked vertex no longer exists`);
+        refs.push(ref);
+    }
+    for (const body of bodies) {
+        const match = matchBody(hosts, body);
+        if (match === undefined) return Result.err(`${label}: a picked part no longer exists`);
+        refs.push({ body: match, kind: "BODY", index: 0 });
     }
     return Result.ok({ refs, edgeAnchors });
+}
+
+/** The fingerprint a part is re-found by. */
+export function captureFeatureScriptBodyRef(shape: IShape): FeatureScriptBodyRef {
+    const box = shape.boundingBox();
+    return {
+        center: {
+            x: (box.min.x + box.max.x) / 2,
+            y: (box.min.y + box.max.y) / 2,
+            z: (box.min.z + box.max.z) / 2,
+        },
+        volume: shape.volume(),
+    };
+}
+
+/** The host part nearest the fingerprint — refused when two parts are equally near. */
+function matchBody(hosts: readonly FsBody[], ref: FeatureScriptBodyRef): FsBody | undefined {
+    const size = Math.cbrt(Math.max(Math.abs(ref.volume), 1e-9));
+    const ranked = hosts
+        .map((body) => {
+            try {
+                const print = captureFeatureScriptBodyRef(body.shape);
+                const score =
+                    new XYZ(print.center).distanceTo(new XYZ(ref.center)) +
+                    Math.abs(print.volume - ref.volume) / (size * size);
+                return { body, score };
+            } catch {
+                return { body, score: Number.POSITIVE_INFINITY };
+            }
+        })
+        .filter((entry) => Number.isFinite(entry.score))
+        .sort((a, b) => a.score - b.score);
+    const best = ranked[0];
+    if (best === undefined) return undefined;
+    if (ranked[1] !== undefined && ranked[1].score - best.score < 1e-6 * size) return undefined;
+    return best.body;
+}
+
+/** The plane a ref names now: its node's current plane, the stored snapshot once the node is gone. */
+function currentPlane(document: IDocument, ref: FeatureScriptPlaneRef): Plane {
+    const node = document.modelManager.findNode((candidate) => candidate.id === ref.nodeId);
+    if (node instanceof ReferencePlaneNode) return node.plane;
+    return new Plane({ origin: new XYZ(ref.origin), normal: new XYZ(ref.normal), xvec: new XYZ(ref.xvec) });
+}
+
+export function captureFeatureScriptPlaneRef(node: ReferencePlaneNode): FeatureScriptPlaneRef {
+    const plane = node.plane;
+    const xyz = (value: XYZ) => ({ x: value.x, y: value.y, z: value.z });
+    return { nodeId: node.id, origin: xyz(plane.origin), normal: xyz(plane.normal), xvec: xyz(plane.xvec) };
+}
+
+/**
+ * A plane as a context entity. A plane through the origin along a principal direction is
+ * one of Onshape's default planes (Top, Front, Right) — the same entity std features see in
+ * Onshape, with Onshape's orientation (Front's normal is −Y); any other plane is added as a
+ * construction plane.
+ */
+function planeEntity(fsContext: FsContext, plane: Plane): EntityRef {
+    const normal: Vec3 = [plane.normal.x, plane.normal.y, plane.normal.z];
+    if (plane.origin.length() < 1e-9) {
+        const datum = fsContext.bodies.find((body) => {
+            const data = body.flags.plane;
+            if (!body.flags.defaultGeometry || data === undefined) return false;
+            const dot = data.normal[0] * normal[0] + data.normal[1] * normal[1] + data.normal[2] * normal[2];
+            return Math.abs(Math.abs(dot) - 1) < 1e-9;
+        });
+        if (datum !== undefined) return { body: datum, kind: "FACE", index: 0 };
+    }
+    const data = makePlaneData(
+        [plane.origin.x / MM_PER_METER, plane.origin.y / MM_PER_METER, plane.origin.z / MM_PER_METER],
+        normal,
+        [plane.xvec.x, plane.xvec.y, plane.xvec.z],
+    );
+    const face = shapeFactory.rect(toKernelPlane(data, -50, -50), 100, 100);
+    if (!face.isOk) throw new Error(`A picked plane could not be built: ${face.error}`);
+    const body = fsContext.addBody(face.value, `_plane${fsContext.bodies.length}`, {
+        construction: true,
+        plane: data,
+        defaultGeometry: true,
+    });
+    return { body, kind: "FACE", index: 0 };
 }
 
 /** Tracked id first (best fingerprint among the id's pieces), then the nearest fingerprint. */
@@ -436,13 +561,12 @@ function buildDefinition(
     anchorsIncomplete: () => void,
 ): FsMap {
     const definition = new FsMap();
-    const host = fsContext.bodies.find((body) => body.bodyAttr.createdBy === HOST_ID);
     // Query parameters resolve in stored-key order — the order `applyResolvedRefs`
     // slices the flat edge-anchor list back by.
     for (const [key, value] of Object.entries(feature.definition)) {
         const parameter = spec.parameters.find((p) => p.key === key);
         if (parameter?.kind !== "query" || !isQueryValue(value)) continue;
-        const picks = resolvePicks(value, host, context.input, context.tracking, parameter.label);
+        const picks = resolvePicks(value, fsContext, context, parameter.label);
         if (!picks.isOk) throw new Error(picks.error);
         definition.set(
             key,
@@ -531,7 +655,13 @@ const featureScriptHandler: FeatureHandler<FeatureScriptFeatureData> = {
     display: "featurescript.feature",
     icon: "icon-macro",
 
-    nodeIds: (feature) => [feature.studioId, ...studioDependencies(feature.studioId)],
+    nodeIds: (feature) => [
+        feature.studioId,
+        ...studioDependencies(feature.studioId),
+        ...Object.values(feature.definition).flatMap((value) =>
+            isQueryValue(value) ? (value.planes ?? []).map((plane) => plane.nodeId) : [],
+        ),
+    ],
 
     references: (feature) => [{ key: "studio", display: "featurescript.studio", nodeId: feature.studioId }],
 
@@ -545,6 +675,7 @@ const featureScriptHandler: FeatureHandler<FeatureScriptFeatureData> = {
         const scope = document.variables.evaluate().scope;
         const preview = previewDefinition(spec, scope, (parameter) => storedValue(feature, parameter));
         return spec.parameters
+            .filter((parameter) => !hasHint(parameter, "ALWAYS_HIDDEN"))
             .filter((parameter) => isParameterVisible(spec, parameter, preview))
             .map((parameter) => toFeatureParameter(storedValue(feature, parameter), parameter, scope));
     },
@@ -581,6 +712,10 @@ const featureScriptHandler: FeatureHandler<FeatureScriptFeatureData> = {
     evaluate: evaluateFeatureScript,
 };
 
+function hasHint(parameter: FsParameterSpec, ...hints: string[]): boolean {
+    return parameter.uiHints?.some((hint) => hints.includes(hint)) ?? false;
+}
+
 function specOf(document: IDocument, feature: FeatureScriptFeatureData): FeatureSpec | undefined {
     const resolved = resolveSpec(document, feature);
     return resolved.isOk ? resolved.value.spec : undefined;
@@ -614,9 +749,22 @@ function toFeatureParameter(
     };
     switch (parameter.kind) {
         case "boolean":
-            return { ...base, ...flags, value: shown === true || shown === "true" };
+            return {
+                ...base,
+                ...flags,
+                value: shown === true || shown === "true",
+                ...(hasHint(parameter, "OPPOSITE_DIRECTION", "OPPOSITE_DIRECTION_CIRCULAR")
+                    ? { flip: true }
+                    : {}),
+            };
         case "enum":
-            return { ...base, ...flags, value: String(shown), options: parameter.options ?? [] };
+            return {
+                ...base,
+                ...flags,
+                value: String(shown),
+                options: parameter.options ?? [],
+                ...(hasHint(parameter, "HORIZONTAL_ENUM") ? { optionStyle: "tabs" as const } : {}),
+            };
         case "string":
             return { ...base, ...flags, value: String(shown), text: true };
         case "query":
@@ -624,9 +772,9 @@ function toFeatureParameter(
                 ...base,
                 value: querySummary(value),
                 pick: {
-                    kinds: (parameter.filter ?? ["EDGE", "FACE"])
-                        .filter((kind) => kind !== "BODY")
-                        .map((kind) => kind.toLowerCase() as "edge" | "face" | "vertex"),
+                    kinds: (parameter.filter ?? ["EDGE", "FACE"]).map(
+                        (kind) => kind.toLowerCase() as FeaturePickKind,
+                    ),
                 },
             };
         default:

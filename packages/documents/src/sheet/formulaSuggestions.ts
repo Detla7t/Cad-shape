@@ -8,6 +8,7 @@ export interface FormulaCompletion {
     start: number;
     end: number;
     names: readonly string[];
+    ranges?: readonly string[];
 }
 
 /** Masks strings and quoted sheet names without shifting cursor positions. */
@@ -32,19 +33,23 @@ function context(text: string, cursor: number): { code: string; quoted: boolean 
     return { code, quoted: quote !== "" };
 }
 
-export function formulaCompletion(text: string, cursor = text.length): FormulaCompletion | undefined {
+export function formulaCompletion(
+    text: string,
+    cursor = text.length,
+    ranges: readonly string[] = [],
+): FormulaCompletion | undefined {
     if (!text.startsWith("=")) return undefined;
     const { code, quoted } = context(text, cursor);
     if (quoted) return undefined;
-    const match = /(?:^|[=+\-*/^&<>,;(\s])([A-Za-z_][A-Za-z_.]*)$/.exec(code);
+    const match = /(?:^|[=+\-*/^&<>,;(\s])([A-Za-z_][A-Za-z_0-9.]*)$/.exec(code);
     if (!match) return undefined;
     const prefix = match[1].toUpperCase();
     let end = cursor;
-    while (/[A-Za-z_.]/.test(text[end] ?? "") && end < text.length) end++;
+    while (/[A-Za-z_0-9.]/.test(text[end] ?? "") && end < text.length) end++;
     // Don't offer functions for sheet names or a cell reference like ABS12.
     if (/[!\d]/.test(text[end] ?? "")) return undefined;
-    const names = FORMULA_FUNCTIONS.filter((name) => name.startsWith(prefix));
-    return names.length ? { start: cursor - prefix.length, end, names } : undefined;
+    const names = [...FORMULA_FUNCTIONS, ...ranges].filter((name) => name.toUpperCase().startsWith(prefix));
+    return names.length ? { start: cursor - prefix.length, end, names, ranges } : undefined;
 }
 
 export function acceptFormulaCompletion(
@@ -54,7 +59,7 @@ export function acceptFormulaCompletion(
 ): { text: string; cursor: number } {
     const suffix = text.slice(completion.end);
     const existing = /^\s*\(/.exec(suffix);
-    const insertion = name + (existing ? "" : "(");
+    const insertion = name + (existing || completion.ranges?.includes(name) ? "" : "(");
     return {
         text: text.slice(0, completion.start) + insertion + suffix,
         cursor: completion.start + insertion.length + (existing?.[0].length ?? 0),

@@ -37,6 +37,10 @@ function fakeEditor() {
         solver,
         selectedWholeEntityIds: [] as number[],
         beginConstraintSelection: rs.fn(),
+        registerTool: () => ({ dispose() {} }),
+        selectedEntityIds: [] as number[],
+        pickSequence: 0,
+        lastPickCancelled: false,
         endConstraintSelection: rs.fn(),
         pickPointOrEntity: rs.fn(() => {
             const ref = pointQueue.shift();

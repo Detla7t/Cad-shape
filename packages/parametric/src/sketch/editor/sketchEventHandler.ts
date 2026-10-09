@@ -66,6 +66,15 @@ const EXTERNAL_DANGLING_COLOR = 0xdd4444;
 /** Live-snap target accent — distinct from the green hover/selection and blue dimensions. */
 const SNAP_HIGHLIGHT_COLOR = 0xff9800;
 
+/** A curve-body drag: the curves it moves (pressed one first), where it started, and the circle-rim case. */
+interface EntityDrag {
+    moves: { entityId: number; original: number[] }[];
+    /** Sketch uv under the press. */
+    start: [number, number];
+    /** A lone circle grabbed by its rim changes radius instead of moving. */
+    radius: boolean;
+}
+
 /**
  * Viewport event handler active while a sketch is being edited:
  * point dragging with live preview, entity hover highlight and click
@@ -116,7 +125,13 @@ export class SketchEventHandler implements IEventHandler {
             this.editor.annotations.refresh();
         }
     }, 30);
-    private entityDrag?: { id: number; start: [number, number]; params: number[]; radius?: boolean };
+    /**
+     * A press on a curve body: the drag starts once the pointer moves past the
+     * click threshold, a release before that toggles the curve's selection. The
+     * drag carries the whole selection when the pressed curve is part of it.
+     */
+    private pendingEntityDrag?: EntityDrag;
+    private entityDrag?: EntityDrag;
     private dragSnapshot?: SketchData;
     private selectionGlowId?: number;
 
@@ -451,7 +466,7 @@ export class SketchEventHandler implements IEventHandler {
         // events over an annotation badge carry badge-relative offsets; ignoring
         // them keeps the hover alive instead of clearing it with garbage uv
         if (isBadgeEventTarget(event.target)) return;
-        if (this.entityDrag) {
+        if (this.pendingEntityDrag || this.entityDrag) {
             const uv = this.pointerToUV(view, event);
             if (
                 !uv ||
@@ -459,22 +474,19 @@ export class SketchEventHandler implements IEventHandler {
                     Math.hypot(event.offsetX - this.dragStart[0], event.offsetY - this.dragStart[1]) < 3)
             )
                 return;
+            if (this.pendingEntityDrag) this.beginEntityDrag(view, this.pendingEntityDrag);
             this.dragMoved = true;
-            const drag = this.entityDrag;
+            const drag = this.entityDrag!;
+            const [first] = drag.moves;
             if (drag.radius) {
                 const distance = (p: [number, number]) =>
-                    Math.hypot(p[0] - drag.params[0], p[1] - drag.params[1]);
+                    Math.hypot(p[0] - first.original[0], p[1] - first.original[1]);
                 this.editor.solver.dragCircleRadiusTo(
-                    drag.id,
-                    Math.max(1e-6, drag.params[2] + distance(uv) - distance(drag.start)),
+                    first.entityId,
+                    Math.max(1e-6, first.original[2] + distance(uv) - distance(drag.start)),
                 );
             } else {
-                this.editor.solver.dragEntityTo(
-                    drag.id,
-                    drag.params,
-                    uv[0] - drag.start[0],
-                    uv[1] - drag.start[1],
-                );
+                this.editor.solver.dragEntitiesTo(drag.moves, uv[0] - drag.start[0], uv[1] - drag.start[1]);
             }
             this.updateDragPreview(view);
             this.editor.annotations.refresh();
@@ -543,39 +555,73 @@ export class SketchEventHandler implements IEventHandler {
             this.selectPoint(view, ref);
             return;
         }
-        if (event.altKey) {
-            const id = this.hitTestEntity(view, event);
-            const entity = id === undefined ? undefined : this.editor.solver.entity(id);
-            const start = this.pointerToUV(view, event);
-            if (
-                entity &&
-                start &&
-                !isDatumEntityId(entity.id) &&
-                !isExternalEntityId(entity.id) &&
-                !this.editor.solver.entityLocked(entity) &&
-                !this.editor.fullyConstrainedEntities.has(entity.id)
-            ) {
-                event.preventDefault();
-                this.dragSnapshot = this.editor.solver.toData();
-                this.entityDrag = {
-                    id: entity.id,
-                    start,
-                    params: [...entity.params],
-                    radius: entity.type === "circle",
-                };
-                this.dragStart = [event.offsetX, event.offsetY];
-                this.dragMoved = false;
-                this.clearHover(view);
-                this.editor.solver.beginDrag(
-                    Array.from({ length: entityPointCount(entity.type, entity.params) }, (_, pointIndex) => ({
-                        entityId: entity.id,
-                        pointIndex,
-                    })),
-                );
-                return;
-            }
+        // Onshape-style direct manipulation: a press on a free curve arms a drag of
+        // the curve (or of the whole selection it belongs to); a plain release
+        // without movement is the click that toggles its selection instead.
+        const pending = this.entityDragAt(view, event);
+        if (pending) {
+            event.preventDefault?.();
+            this.pendingEntityDrag = pending;
+            this.dragStart = [event.offsetX, event.offsetY];
+            this.dragMoved = false;
+            return;
         }
         this.selectEntityAtPointer(view, event);
+    }
+
+    /** The drag a press at `event` would start, or undefined when nothing draggable is under it. */
+    private entityDragAt(view: IView, event: PointerEvent): EntityDrag | undefined {
+        const id = this.hitTestEntity(view, event);
+        const entity = id === undefined ? undefined : this.editor.solver.entity(id);
+        const start = this.pointerToUV(view, event);
+        if (!entity || !start || !this.isDraggableEntity(entity)) return undefined;
+        // grabbing one curve of a multi-selection moves the selection as a whole
+        const ids =
+            this.selectedEntities.has(entity.id) && this.selectedEntities.size > 1
+                ? [...this.selectedEntities]
+                : [entity.id];
+        const moves = ids
+            .map((entityId) => this.editor.solver.entity(entityId))
+            .filter((e): e is SketchEntityData => e !== undefined && this.isDraggableEntity(e))
+            .map((e) => ({ entityId: e.id, original: [...e.params] }));
+        // the pressed curve leads: its params drive the circle-radius drag
+        moves.sort((a, b) => (a.entityId === entity.id ? -1 : b.entityId === entity.id ? 1 : 0));
+        return { moves, start, radius: entity.type === "circle" && moves.length === 1 };
+    }
+
+    /** Datum, external, locked and fully constrained geometry is selectable but never dragged. */
+    private isDraggableEntity(entity: SketchEntityData): boolean {
+        return (
+            !isDatumEntityId(entity.id) &&
+            !isExternalEntityId(entity.id) &&
+            !this.editor.solver.entityLocked(entity) &&
+            !this.editor.fullyConstrainedEntities.has(entity.id)
+        );
+    }
+
+    /** The pointer crossed the click threshold over a pressed curve: the drag starts now. */
+    private beginEntityDrag(view: IView, drag: EntityDrag): void {
+        this.pendingEntityDrag = undefined;
+        this.dragSnapshot = this.editor.solver.toData();
+        this.entityDrag = drag;
+        this.clearHover(view);
+        this.editor.solver.beginDrag(
+            drag.moves.flatMap(({ entityId }) => {
+                const entity = this.editor.solver.entity(entityId);
+                if (entity === undefined) return [];
+                return Array.from(
+                    { length: entityPointCount(entity.type, entity.params) },
+                    (_, pointIndex) => ({
+                        entityId,
+                        pointIndex,
+                    }),
+                );
+            }),
+        );
+        // keep the dragged curves' constraint symbols visible during the drag
+        this.editor.annotations.setHighlightedEntities(
+            new Set([...drag.moves.map((m) => m.entityId), ...this.selectedEntities]),
+        );
     }
 
     /** Hands the click to an active pick; returns whether the pick consumed it. */
@@ -644,6 +690,7 @@ export class SketchEventHandler implements IEventHandler {
         if (event.type === "pointercancel" || event.type === "lostpointercapture") {
             this.boxSelection?.element.remove();
             this.boxSelection = undefined;
+            this.pendingEntityDrag = undefined;
         }
     }
 
@@ -681,17 +728,26 @@ export class SketchEventHandler implements IEventHandler {
             }
             return;
         }
+        if (this.pendingEntityDrag) {
+            // released before the threshold: an ordinary click on the curve
+            const id = this.pendingEntityDrag.moves[0].entityId;
+            this.pendingEntityDrag = undefined;
+            this.selectEntity(view, id);
+            return;
+        }
         if (this.entityDrag) {
-            const id = this.entityDrag.id;
+            const ids = this.entityDrag.moves.map((m) => m.entityId);
             this.entityDrag = undefined;
             this.clearDragPreview(view);
             const result = this.editor.solver.endDrag();
             if (!result.result.startsWith("Ok") && this.dragSnapshot)
                 this.editor.solver.reset(this.dragSnapshot);
             this.dragSnapshot = undefined;
-            this.selectEntity(view, id, !this.dragMoved);
+            // a moved curve joins the selection; the rest of a dragged selection stays
+            for (const id of ids) this.selectedEntities.add(id);
+            this.updateSelectionHighlight(view);
             this.editor.solve(true);
-            if (this.dragMoved) this.editor.commit();
+            this.editor.commit();
             return;
         }
         if (this.draggingRef === undefined) return;
@@ -764,6 +820,10 @@ export class SketchEventHandler implements IEventHandler {
             this.boxSelection = undefined;
             return;
         }
+        if (this.pendingEntityDrag) {
+            this.pendingEntityDrag = undefined;
+            return;
+        }
         if (this.draggingRef || this.entityDrag) {
             this.draggingRef = undefined;
             this.entityDrag = undefined;
@@ -790,7 +850,13 @@ export class SketchEventHandler implements IEventHandler {
         // whose node-selection step can delete the very sketch node being edited,
         // leaving the editor drawing into an invisible orphan
         event.stopImmediatePropagation();
-        if (this.editor.isPicking || this.draggingRef !== undefined || this.entityDrag !== undefined) return;
+        if (
+            this.editor.isPicking ||
+            this.draggingRef !== undefined ||
+            this.entityDrag !== undefined ||
+            this.pendingEntityDrag !== undefined
+        )
+            return;
         // a label being placed follows the cursor — it is the delete target
         const draggingLabel = this.editor.annotations.draggingLabelId;
         if (draggingLabel !== undefined) {
@@ -904,6 +970,8 @@ export class SketchEventHandler implements IEventHandler {
         this.pointSelection.clear();
         this.selectedEntities.clear();
         this.draggingRef = undefined;
+        this.pendingEntityDrag = undefined;
+        this.entityDrag = undefined;
     }
 
     // ------------------------------------------------------------------ Hover, drag and snap feedback

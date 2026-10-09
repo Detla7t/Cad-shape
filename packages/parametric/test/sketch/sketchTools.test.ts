@@ -41,8 +41,16 @@ describe("sketch editing operations", () => {
         expect(horizontal).toHaveLength(2);
         expect(horizontal[1].params[0]).toBeCloseTo(20, 6);
         expect(horizontal[1].params[2]).toBe(30);
-        expect(d.constraints).toHaveLength(1);
-        expect(d.constraints[0].refs[0].entityId).toBe(a);
+        // the unrelated Vertical survives, and each new end is attached to the line that cut it
+        expect(d.constraints[0]).toMatchObject({
+            kind: ConstraintKind.Vertical,
+            refs: [{ entityId: a }, { entityId: a }],
+        });
+        const attachments = d.constraints.slice(1).map((c) => [c.kind, c.refs[0], c.refs[1].entityId]);
+        expect(attachments).toEqual([
+            [ConstraintKind.PointOnLine, { entityId: id, pointIndex: 1 }, a],
+            [ConstraintKind.PointOnLine, { entityId: horizontal[1].id, pointIndex: 0 }, b],
+        ]);
     });
     test("trim a circle across its angle wrap leaves the opposite semicircle", () => {
         const d = blank(),
@@ -72,6 +80,18 @@ describe("sketch editing operations", () => {
         line(d, [30, -4, 30, 4]);
         trimOrSplit(d, id, [9, 0], "extend");
         expect(d.entities.find((e) => e.id === id)?.params).toEqual([0, 0, 15, 0]);
+        // the extended end stays on the boundary it reached; the untouched end gains nothing
+        expect(d.constraints).toEqual([
+            {
+                id: 1,
+                kind: ConstraintKind.PointOnLine,
+                refs: [
+                    { entityId: id, pointIndex: 1 },
+                    { entityId: 2, pointIndex: 0 },
+                    { entityId: 2, pointIndex: 1 },
+                ],
+            },
+        ]);
     });
     test("trim accepts line-circle intersections and removes an unbounded curve", () => {
         const d = blank(),

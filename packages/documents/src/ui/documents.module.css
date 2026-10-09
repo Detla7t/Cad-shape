@@ -358,11 +358,11 @@
 .selected {
     outline: 2px solid var(--primary-color);
     outline-offset: -2px;
-    background-color: var(--checked-color);
+    box-shadow: inset 0 0 0 1000px #4285f41a;
 }
 
 .inRange {
-    background-color: var(--checked-color);
+    box-shadow: inset 0 0 0 1000px #4285f426;
 }
 
 .cellEditor {
@@ -382,7 +382,7 @@
     flex-direction: row;
     align-items: stretch;
     flex: 0 0 auto;
-    height: 28px;
+    min-height: 36px;
     border-top: 1px solid var(--border-color);
     background-color: var(--background-color);
     overflow-x: auto;
@@ -391,8 +391,7 @@
 .sheetTab {
     display: flex;
     align-items: center;
-    padding: 0 12px;
-    border-right: 1px solid var(--border-color);
+    padding: 0 4px;
     cursor: pointer;
     white-space: nowrap;
 
@@ -402,7 +401,7 @@
 }
 
 .sheetActive {
-    background-color: var(--control-background-color);
+    background-color: var(--checked-color);
     font-weight: 600;
 }
 

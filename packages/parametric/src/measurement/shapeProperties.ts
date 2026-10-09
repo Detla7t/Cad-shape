@@ -8,11 +8,9 @@ import { inertiaTensor, massData } from "../featurescript/context/massProperties
 registerShapeProperties((shapes) => {
     const context = new FsContext();
     try {
-        const refs = shapes.map((shape) => ({
-            body: context.addHostBody(shape),
-            kind: "BODY" as const,
-            index: -1,
-        }));
+        const refs = shapes.flatMap((shape) =>
+            context.addHostBody(shape).map((body) => ({ body, kind: "BODY" as const, index: -1 })),
+        );
         const data = massData(refs);
         return Result.ok({
             dimension: data.dimension,

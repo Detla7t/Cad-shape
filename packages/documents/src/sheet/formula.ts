@@ -15,6 +15,7 @@ import {
     type WorkbookData,
 } from "./model";
 import { formatCellValue } from "./numberFormat";
+import { resolveRanges } from "./ranges";
 
 /**
  * A spreadsheet formula engine for the grid editor and `readDocumentTable`: Excel
@@ -150,6 +151,7 @@ export type Ast =
     | { type: "boolean"; value: boolean }
     | { type: "error"; code: FormulaErrorCode }
     | { type: "ref"; sheet?: string; text: string }
+    | { type: "name"; name: string }
     | { type: "unary"; op: string; arg: Ast }
     | { type: "percent"; arg: Ast }
     | { type: "binary"; op: string; left: Ast; right: Ast }
@@ -254,7 +256,7 @@ class Parser {
                 if (token.value === "TRUE" || token.value === "FALSE") {
                     return { type: "boolean", value: token.value === "TRUE" };
                 }
-                return { type: "error", code: "#NAME?" };
+                return { type: "name", name: token.value };
             }
             case "op":
                 if (token.value === "(") {
@@ -1088,6 +1090,13 @@ export class WorkbookEvaluator {
                 return ERR(ast.code);
             case "ref":
                 return this.reference(ast, sheet);
+            case "name": {
+                const named = this.workbook.names?.find((n) => n.name.toUpperCase() === ast.name);
+                if (!named) return ERR("#NAME?");
+                const ranges = resolveRanges(this.workbook, ast.name, sheet);
+                if (ranges.length !== named.ranges.length) return ERR("#REF!");
+                return ranges.flatMap((r) => this.range(r.sheet, r.range.start, r.range.end));
+            }
             case "unary": {
                 const x = toNumber(scalar(this.evaluate(ast.arg, sheet)));
                 return isError(x) ? x : -x;

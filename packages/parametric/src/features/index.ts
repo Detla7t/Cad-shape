@@ -9,6 +9,7 @@ export * from "./edgeRef";
 export * from "./extrude";
 export * from "./feature";
 export * from "./historyCompletion";
+export * from "./loft";
 export * from "./operationIds";
 export * from "./pressPull";
 export * from "./profileBuilder";

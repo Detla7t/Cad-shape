@@ -11,6 +11,7 @@ import {
     FsMap,
     FsQuantity,
     type FsValue,
+    isCallable,
     LENGTH,
     type Units,
     unitsEqual,
@@ -33,7 +34,9 @@ import {
  *
  * Statements nested in `if (cond)` (or its `else`) carry the condition, so the panel only
  * shows a parameter while the current values satisfy it — Onshape's conditional
- * visibility. Defaults come from the annotation's `"Default"`, then the `defineFeature`
+ * visibility. A predicate called on the definition (`booleanStepTypePredicate(definition)`,
+ * how std shares its operation tabs and pattern-type rows) is read in place, under the
+ * predicate's own parameter name and module scope. Defaults come from the annotation's `"Default"`, then the `defineFeature`
  * defaults map, then the bound spec, then a per-kind fallback.
  *
  * Values are stored in app units (mm, degrees) as `ParameterValue`s, so they can be
@@ -50,11 +53,20 @@ export type FsParameterKind =
     | "enum"
     | "query";
 
-export type QueryEntityKind = "FACE" | "EDGE" | "VERTEX" | "BODY";
+/**
+ * `PLANE` is a construction plane — a document reference plane (Top, Front, Right or a
+ * user plane), which std queries see as a construction body. It comes from std's
+ * `QueryFilterCompound.ALLOWS_PLANE`/`ALLOWS_DIRECTION` filters.
+ */
+export type QueryEntityKind = "FACE" | "EDGE" | "VERTEX" | "BODY" | "PLANE";
 
 export interface VisibilityCondition {
     readonly expression: Expression;
     readonly negate: boolean;
+    /** The name the condition's scope gives the definition — a predicate's own parameter name. */
+    readonly definitionName: string;
+    /** Where the condition's identifiers resolve (the declaring module). */
+    readonly env: Environment;
 }
 
 export interface FsParameterSpec {
@@ -72,6 +84,8 @@ export interface FsParameterSpec {
     /** Entity kinds a query parameter accepts (from the annotation's `"Filter"`). */
     readonly filter?: readonly QueryEntityKind[];
     readonly maxPicks?: number;
+    /** `"UIHint"` member names (`HORIZONTAL_ENUM`, `OPPOSITE_DIRECTION`, …). */
+    readonly uiHints?: readonly string[];
     readonly conditions: readonly VisibilityCondition[];
 }
 
@@ -86,6 +100,11 @@ export interface FeatureSpec {
     readonly parameters: readonly FsParameterSpec[];
     /** The name the feature function gives its definition parameter (usually `definition`). */
     readonly definitionName: string;
+    /**
+     * The scope the precondition reads: the feature function's closure, so an exported
+     * alias of a std feature (`export const mirror2 = mirror;`) resolves std's names.
+     */
+    readonly env: Environment;
 }
 
 const MM_PER_M = 1000;
@@ -103,7 +122,7 @@ export function analyzeFeature(
 ): FeatureSpec {
     const fn = feature.definition.fn;
     const definitionName = fn.params[definitionIndex]?.name ?? "definition";
-    const env = feature.module.env;
+    const env = fn.closure instanceof Environment ? fn.closure : feature.module.env;
     const parameters: FsParameterSpec[] = [];
     const seen = new Set<string>();
     const analyzer = new PreconditionAnalyzer(interpreter, env, definitionName, feature.definition.defaults);
@@ -122,6 +141,7 @@ export function analyzeFeature(
         description: feature.description,
         parameters,
         definitionName,
+        env,
     };
 }
 
@@ -130,12 +150,16 @@ export function analyzeTable(interpreter: Interpreter, table: TableExport): Feat
     return analyzeFeature(interpreter, table, 1);
 }
 
+/** Nested predicate calls followed before giving up (std nests two deep). */
+const MAX_PREDICATE_DEPTH = 8;
+
 class PreconditionAnalyzer {
     constructor(
         private readonly interpreter: Interpreter,
         private readonly env: Environment,
         private readonly definitionName: string,
         private readonly defaults: FsMap | undefined,
+        private readonly depth = 0,
     ) {}
 
     block(block: Block, conditions: VisibilityCondition[]): FsParameterSpec[] {
@@ -147,8 +171,9 @@ class PreconditionAnalyzer {
             case "Block":
                 return this.block(statement, conditions);
             case "If": {
-                const whenTrue = [...conditions, { expression: statement.test, negate: false }];
-                const whenFalse = [...conditions, { expression: statement.test, negate: true }];
+                const scope = { definitionName: this.definitionName, env: this.env };
+                const whenTrue = [...conditions, { expression: statement.test, negate: false, ...scope }];
+                const whenFalse = [...conditions, { expression: statement.test, negate: true, ...scope }];
                 return [
                     ...this.statement(statement.consequent, whenTrue),
                     ...(statement.alternate === undefined
@@ -157,12 +182,49 @@ class PreconditionAnalyzer {
                 ];
             }
             case "ExpressionStatement": {
+                const inlined = this.predicateCall(statement.expression, conditions);
+                if (inlined !== undefined) return inlined;
                 const spec = this.parameter(statement.expression, statement.annotations ?? [], conditions);
                 return spec === undefined ? [] : [spec];
             }
             default:
                 return [];
         }
+    }
+
+    /**
+     * The parameters of a user predicate called with the definition as an argument, read
+     * from the predicate's body under its own parameter name; undefined for any other call.
+     */
+    private predicateCall(
+        expression: Expression,
+        conditions: VisibilityCondition[],
+    ): FsParameterSpec[] | undefined {
+        if (expression.kind !== "Call" || expression.callee.kind !== "Identifier") return undefined;
+        if (expression.callee.namespace !== undefined || this.depth >= MAX_PREDICATE_DEPTH) return undefined;
+        const index = expression.args.findIndex(
+            (arg) =>
+                arg.kind === "Identifier" && arg.namespace === undefined && arg.name === this.definitionName,
+        );
+        if (index < 0) return undefined;
+        const callee = this.env.lookup(expression.callee.name)?.value;
+        const candidates =
+            isCallable(callee) && callee.kind === "user"
+                ? [callee]
+                : isCallable(callee) && callee.kind === "overloads"
+                  ? callee.candidates
+                  : [];
+        const predicate = candidates.find((fn) => fn.predicate === true && fn.params.length > index);
+        if (predicate === undefined) return undefined;
+        const env = predicate.closure instanceof Environment ? predicate.closure : this.env;
+        const nested = new PreconditionAnalyzer(
+            this.interpreter,
+            env,
+            predicate.params[index].name,
+            this.defaults,
+            this.depth + 1,
+        );
+        return nested.block(predicate.body, conditions);
     }
 
     /** The definition field an expression reads (`definition.x` / `definition["x"]`), if any. */
@@ -230,6 +292,7 @@ class PreconditionAnalyzer {
             case "boolean":
                 return {
                     ...base,
+                    uiHints: annotation.uiHints,
                     kind: "boolean",
                     defaultValue:
                         this.defaultOf(key, annotation, (v) => (typeof v === "boolean" ? v : undefined)) ??
@@ -256,6 +319,7 @@ class PreconditionAnalyzer {
                     defaultValue: "",
                     filter: annotation.filter,
                     maxPicks: annotation.maxPicks,
+                    uiHints: annotation.uiHints,
                 };
             case "ValueWithUnits":
                 return this.numeric(key, "length", annotation, conditions, undefined, 25);
@@ -273,7 +337,14 @@ class PreconditionAnalyzer {
             this.defaultOf(key, annotation, (v) =>
                 v instanceof FsEnumValue && v.type === resolved ? v.name : undefined,
             ) ?? first;
-        return { ...base, kind: "enum", defaultValue, options, enumType: resolved };
+        return {
+            ...base,
+            kind: "enum",
+            defaultValue,
+            options,
+            enumType: resolved,
+            uiHints: annotation.uiHints,
+        };
     }
 
     private numeric(
@@ -342,6 +413,9 @@ class PreconditionAnalyzer {
                     case "Filter":
                         info.filter = filterKinds(entry.value);
                         break;
+                    case "UIHint":
+                        info.uiHints = uiHintNames(this.tryEvaluate(entry.value));
+                        break;
                     default:
                         break;
                 }
@@ -365,7 +439,29 @@ interface AnnotationInfo {
     defaultValue?: FsValue;
     maxPicks?: number;
     filter?: QueryEntityKind[];
+    uiHints?: string[];
 }
+
+/** `"UIHint"` as member names: one `UIHint` enum value, a string, or an array of either. */
+function uiHintNames(value: FsValue): string[] | undefined {
+    const name = (item: FsValue) =>
+        item instanceof FsEnumValue ? item.name : typeof item === "string" ? item : undefined;
+    const items = value instanceof FsArray ? value.items : [value];
+    const names = items.map(name).filter((item): item is string => item !== undefined);
+    return names.length === 0 ? undefined : names;
+}
+
+/**
+ * The entity kinds std's compound filters stand for (`QueryFilterCompound` in std's
+ * `query.fs`): a plane is a planar face or a construction plane; a direction adds linear
+ * edges; an axis is a linear edge or a face with an axis (cylinder, cone, …).
+ */
+const COMPOUND_FILTER_KINDS: Record<string, readonly QueryEntityKind[]> = {
+    ALLOWS_PLANE: ["FACE", "PLANE"],
+    ALLOWS_DIRECTION: ["EDGE", "FACE", "PLANE"],
+    ALLOWS_AXIS: ["EDGE", "FACE"],
+    ALLOWS_VERTEX: ["VERTEX"],
+};
 
 /**
  * The entity kinds a `"Filter"` mentions. Filters are a small boolean language over enum
@@ -381,6 +477,9 @@ function filterKinds(expression: Expression): QueryEntityKind[] | undefined {
                     const kind = node.property as QueryEntityKind;
                     if (kind === "FACE" || kind === "EDGE" || kind === "VERTEX" || kind === "BODY")
                         kinds.add(kind);
+                }
+                if (node.object.kind === "Identifier" && node.object.name === "QueryFilterCompound") {
+                    for (const kind of COMPOUND_FILTER_KINDS[node.property] ?? []) kinds.add(kind);
                 }
                 break;
             case "Logical":
@@ -496,10 +595,11 @@ export function isParameterVisible(
     definition: FsMap,
 ): boolean {
     if (parameter.conditions.length === 0) return true;
-    const env = new Environment(spec.feature.module.env);
-    env.define(spec.definitionName, spec.interpreter.adaptHostValue(definition));
+    const adapted = spec.interpreter.adaptHostValue(definition);
     return parameter.conditions.every((condition) => {
         try {
+            const env = new Environment(condition.env);
+            env.define(condition.definitionName, adapted);
             const value = spec.interpreter.evaluate(condition.expression, env);
             return typeof value === "boolean" && value !== condition.negate;
         } catch {

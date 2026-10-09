@@ -28,18 +28,51 @@ function editorOrError(): SketchEditor | undefined {
 }
 
 export abstract class SketchConstraintCommand extends CancelableCommand {
+    /**
+     * Onshape keeps a constraint tool armed after each application until Escape;
+     * tools that pick once and then open their own input (dimensions) or run their
+     * own loop (trim) leave this off.
+     */
+    protected get repeatsUntilEscape(): boolean {
+        return false;
+    }
+
     async executeAsync(): Promise<void> {
         const editor = editorOrError();
         if (editor === undefined) return;
+        const registration = editor.registerTool(this);
         editor.beginConstraintSelection();
+        // a pre-selected target applies the constraint at once and ends the tool
+        const preselected = editor.selectedEntityIds.length > 0;
         try {
-            await this.executeWithEditor(editor);
+            let again = true;
+            while (again) {
+                const picksBefore = editor.pickSequence;
+                await this.executeWithEditor(editor);
+                again =
+                    this.repeatsUntilEscape &&
+                    !preselected &&
+                    !this.isCanceled &&
+                    SketchEditor.getActive() === editor &&
+                    editor.pickSequence > picksBefore &&
+                    editor.lastPickCancelled === false;
+                // the next round starts from a clean pick highlight
+                if (again) editor.endConstraintSelection();
+            }
         } finally {
+            registration.dispose();
             editor.endConstraintSelection();
         }
     }
 
     protected abstract executeWithEditor(editor: SketchEditor): Promise<void>;
+}
+
+/** A constraint tool that stays armed for the next pair of targets until Escape. */
+abstract class RepeatingConstraintCommand extends SketchConstraintCommand {
+    protected override get repeatsUntilEscape(): boolean {
+        return true;
+    }
 }
 
 /** Same-kind constraint with the same ref set already exists — adding it would be redundant. */
@@ -81,7 +114,7 @@ function solveAndCommit(editor: SketchEditor, before: SketchData): void {
 }
 
 @command({ key: "constraint.coincident", icon: "icon-cCoincident" })
-export class CoincidentConstraintCommand extends SketchConstraintCommand {
+export class CoincidentConstraintCommand extends RepeatingConstraintCommand {
     protected async executeWithEditor(editor: SketchEditor): Promise<void> {
         this.controller = new AsyncController();
         const first = await editor.pickPointOrEntity("prompt.pickSketchPointOrEntity", this.controller);
@@ -120,7 +153,7 @@ export class CoincidentConstraintCommand extends SketchConstraintCommand {
     }
 }
 
-abstract class LineConstraintCommand extends SketchConstraintCommand {
+abstract class LineConstraintCommand extends RepeatingConstraintCommand {
     protected abstract readonly kind: ConstraintKind.Horizontal | ConstraintKind.Vertical;
 
     protected async executeWithEditor(editor: SketchEditor): Promise<void> {
@@ -141,7 +174,7 @@ export class VerticalConstraintCommand extends LineConstraintCommand {
     protected readonly kind = ConstraintKind.Vertical;
 }
 
-abstract class TwoLineConstraintCommand extends SketchConstraintCommand {
+abstract class TwoLineConstraintCommand extends RepeatingConstraintCommand {
     protected abstract readonly kind: ConstraintKind.Parallel | ConstraintKind.Perpendicular;
 
     protected async executeWithEditor(editor: SketchEditor): Promise<void> {
@@ -179,7 +212,7 @@ export class PerpendicularConstraintCommand extends TwoLineConstraintCommand {
     protected readonly kind = ConstraintKind.Perpendicular;
 }
 
-abstract class TwoPointConstraintCommand extends SketchConstraintCommand {
+abstract class TwoPointConstraintCommand extends RepeatingConstraintCommand {
     protected abstract readonly kind: ConstraintKind.HorizontalAlign | ConstraintKind.VerticalAlign;
 
     protected async executeWithEditor(editor: SketchEditor): Promise<void> {
@@ -223,7 +256,7 @@ export class VerticalAlignConstraintCommand extends TwoPointConstraintCommand {
 
 /** Picks two entities of the same type and applies the matching equal constraint. */
 @command({ key: "constraint.equal", icon: "icon-cEqual" })
-export class EqualConstraintCommand extends SketchConstraintCommand {
+export class EqualConstraintCommand extends RepeatingConstraintCommand {
     protected async executeWithEditor(editor: SketchEditor): Promise<void> {
         this.controller = new AsyncController();
         const e1 = await editor.pickEntity("prompt.pickSketchEntity", undefined, undefined, this.controller);
@@ -259,7 +292,7 @@ export class EqualConstraintCommand extends SketchConstraintCommand {
 
 /** Picks two entities (any order) and applies the matching tangent constraint. */
 @command({ key: "constraint.tangent", icon: "icon-cTangent" })
-export class TangentConstraintCommand extends SketchConstraintCommand {
+export class TangentConstraintCommand extends RepeatingConstraintCommand {
     protected async executeWithEditor(editor: SketchEditor): Promise<void> {
         this.controller = new AsyncController();
         const e1 = await editor.pickEntity("prompt.pickSketchEntity", undefined, undefined, this.controller);
@@ -284,7 +317,7 @@ export class TangentConstraintCommand extends SketchConstraintCommand {
 
 /** Picks a point and an entity (or a datum axis), constraining the point onto it. */
 @command({ key: "constraint.pointOn", icon: "icon-cPointOn" })
-export class PointOnConstraintCommand extends SketchConstraintCommand {
+export class PointOnConstraintCommand extends RepeatingConstraintCommand {
     protected async executeWithEditor(editor: SketchEditor): Promise<void> {
         this.controller = new AsyncController();
         const p = await editor.pickPoint("prompt.pickSketchPoint", undefined, this.controller);
@@ -315,7 +348,7 @@ function addPointOn(editor: SketchEditor, point: SketchPointRef, entityId: numbe
 }
 
 @command({ key: "constraint.midpoint", icon: "icon-cMid" })
-export class MidpointConstraintCommand extends SketchConstraintCommand {
+export class MidpointConstraintCommand extends RepeatingConstraintCommand {
     protected async executeWithEditor(editor: SketchEditor): Promise<void> {
         this.controller = new AsyncController();
         const p = await editor.pickPoint("prompt.pickSketchPoint", undefined, this.controller);
@@ -329,7 +362,7 @@ export class MidpointConstraintCommand extends SketchConstraintCommand {
 
 /** Two points symmetric about a picked line or datum axis. */
 @command({ key: "constraint.symmetric", icon: "icon-cSymmetric" })
-export class SymmetricConstraintCommand extends SketchConstraintCommand {
+export class SymmetricConstraintCommand extends RepeatingConstraintCommand {
     protected async executeWithEditor(editor: SketchEditor): Promise<void> {
         this.controller = new AsyncController();
         const p1 = await editor.pickPoint("prompt.pickSketchPoint", undefined, this.controller);
@@ -351,7 +384,7 @@ export class SymmetricConstraintCommand extends SketchConstraintCommand {
 
 /** Pins a point at its current coordinates (two datum values, double-click the badge to edit). */
 @command({ key: "constraint.fix", icon: "icon-cFix" })
-export class FixConstraintCommand extends SketchConstraintCommand {
+export class FixConstraintCommand extends RepeatingConstraintCommand {
     protected async executeWithEditor(editor: SketchEditor): Promise<void> {
         const selected = editor.selectedWholeEntityIds;
         if (selected.length) {

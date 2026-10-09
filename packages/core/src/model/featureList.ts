@@ -10,10 +10,32 @@ import type { INode } from "./node";
 export interface IFeatureEditSession {
     readonly featureId: string;
     readonly closed: boolean;
+    /** True while the feature exists only in the draft: applying inserts it, cancelling drops it. */
+    readonly inserting?: boolean;
+    /** The pick parameter currently taking selections (Onshape's active query box). */
+    readonly activePick?: string;
     onClose?: () => void;
+    /** Fires when `activePick` changes. */
+    onPickChanged?: () => void;
     apply(): Promise<Result<void>>;
     cancel(): Promise<void>;
 }
+
+/**
+ * How a feature dialog opens. `insert` stages a brand-new feature (the node's own feature
+ * payload) in the draft only — Onshape's flow, where a new feature exists once ✓ commits
+ * it and ✗ leaves no trace. `pick` names the pick parameter that takes selections first.
+ */
+export interface FeatureEditOptions {
+    readonly insert?: unknown;
+    readonly pick?: string;
+}
+
+/**
+ * What a pick parameter accepts: sub-shapes of the body, whole parts (solids) of it, or
+ * the document's reference planes.
+ */
+export type FeaturePickKind = "edge" | "face" | "vertex" | "body" | "plane";
 
 /** A single editable parameter of a feature, rendered by the feature list panel. */
 export interface FeatureParameter {
@@ -39,7 +61,14 @@ export interface FeatureParameter {
      * Set for a pick of the body's own entities: the panel shows `value` (a summary such
      * as "2 edges") with a button that starts `reselectShapes(featureId, key)`.
      */
-    readonly pick?: { readonly kinds: readonly ("edge" | "face" | "vertex")[] };
+    readonly pick?: { readonly kinds: readonly FeaturePickKind[] };
+    /**
+     * How a closed set of choices renders: `tabs` for a row of toggle buttons (Onshape's
+     * horizontal enum — New / Add / Remove / Intersect), else a dropdown.
+     */
+    readonly optionStyle?: "tabs";
+    /** Set on a checkbox that flips a direction: rendered as Onshape's flip-arrow toggle. */
+    readonly flip?: boolean;
     /**
      * Whether the panel offers to configure the slot (`configure(…)` per configuration). A
      * numeric slot is configurable unless this is `false` — it resolves through
@@ -105,7 +134,7 @@ export interface FeatureItem {
  * node or feature types.
  */
 export interface IFeatureListNode {
-    beginFeatureEdit?(featureId: string): Promise<Result<IFeatureEditSession>>;
+    beginFeatureEdit?(featureId: string, options?: FeatureEditOptions): Promise<Result<IFeatureEditSession>>;
     readonly rollbackIndex?: number;
     setRollbackIndex?(index: number | undefined): boolean;
     featureItems(): readonly FeatureItem[];

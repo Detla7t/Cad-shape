@@ -13,7 +13,7 @@ import style from "../spreadsheet.module.css";
 let nextId = 0;
 
 /** One accessible popup shared by the formula bar and the active cell editor. */
-export function createFormulaAssist() {
+export function createFormulaAssist(ranges: () => readonly string[] = () => []) {
     const popup = document.createElement("div");
     popup.className = style.formulaAssist;
     popup.hidden = true;
@@ -110,7 +110,7 @@ export function createFormulaAssist() {
     };
     const refresh = (box: HTMLInputElement) => {
         active = box;
-        completion = formulaCompletion(box.value, box.selectionStart ?? box.value.length);
+        completion = formulaCompletion(box.value, box.selectionStart ?? box.value.length, ranges());
         selected = 0;
         render();
     };

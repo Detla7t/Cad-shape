@@ -12,15 +12,17 @@ import {
     Result,
     setHistoryHidden,
 } from "@chili3d/core";
-import { featureHandler } from "../features/feature";
+import { type FeatureData, featureHandler } from "../features/feature";
 import type { ParametricBodyNode } from "../parametricBodyNode";
 
 /** Owns the command slot so changing tools or documents awaits draft/picker cleanup. */
 export class FeatureEditSession implements IFeatureEditSession, ICancelableCommand {
     closed = false;
     onClose?: () => void;
+    onPickChanged?: () => void;
     private controller?: AsyncController;
     private pendingPick?: Promise<void>;
+    private _activePick?: string;
     private closing?: Promise<void>;
     private readonly hidden: INode[] = [];
 
@@ -29,14 +31,19 @@ export class FeatureEditSession implements IFeatureEditSession, ICancelableComma
         readonly featureId: string,
     ) {}
 
-    static async start(body: ParametricBodyNode, id: string): Promise<Result<IFeatureEditSession>> {
+    /** `inserted` stages a new feature in the draft (see `ParametricBodyNode.startFeatureDraft`). */
+    static async start(
+        body: ParametricBodyNode,
+        id: string,
+        inserted?: FeatureData,
+    ): Promise<Result<IFeatureEditSession>> {
         const app = body.document.application;
         const current = app.executingCommand;
         if (current) {
             if (!isCancelableCommand(current)) return Result.err("Finish the current command first.");
             await current.cancel();
         }
-        const started = body.startFeatureDraft(id);
+        const started = body.startFeatureDraft(id, inserted);
         if (!started.isOk) return Result.err(started.error);
         const session = new FeatureEditSession(body, id);
         const required = new Set<string>();
@@ -77,18 +84,52 @@ export class FeatureEditSession implements IFeatureEditSession, ICancelableComma
         void this.cancel();
     }
 
+    get inserting(): boolean {
+        return this.body.featureDraftInserting;
+    }
+
+    get activePick(): string | undefined {
+        return this._activePick;
+    }
+
+    /**
+     * Makes `key` the pick parameter taking selections. Like clicking another query box in
+     * Onshape's dialog, activating a field while one is picking keeps what was picked there
+     * and moves on; activating the picking field again just keeps it picking.
+     */
     async pick(key?: string): Promise<void> {
-        if (this.closed || this.closing || this.pendingPick) return;
+        if (this.closed || this.closing) return;
+        if (this.pendingPick) {
+            if (key === this._activePick) return;
+            this.controller?.success();
+            await this.pendingPick.catch(() => {});
+            // Another activation may have started its own pick while this one wound down.
+            if (this.closed || this.isBusy()) return;
+        }
         const controller = new AsyncController();
         this.controller = controller;
+        this.setActivePick(key);
         this.pendingPick = this.body.reselectSession(this.featureId, controller, key);
         try {
             await this.pendingPick;
         } finally {
             controller.dispose();
-            this.controller = undefined;
-            this.pendingPick = undefined;
+            if (this.controller === controller) {
+                this.controller = undefined;
+                this.pendingPick = undefined;
+                this.setActivePick(undefined);
+            }
         }
+    }
+
+    private isBusy(): boolean {
+        return this.closing !== undefined || this.pendingPick !== undefined;
+    }
+
+    private setActivePick(key: string | undefined): void {
+        if (this._activePick === key) return;
+        this._activePick = key;
+        this.onPickChanged?.();
     }
 
     async apply(): Promise<Result<void>> {

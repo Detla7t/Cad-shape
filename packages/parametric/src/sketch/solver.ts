@@ -725,24 +725,45 @@ export class SketchSolver implements ExternalEntityHost {
 
     /** Translate a curve from the pointer-down snapshot; constraints resolve the remaining freedom. */
     dragEntityTo(entityId: number, original: number[], du: number, dv: number): SolveOutcome {
-        const entity = this.entity(entityId);
-        if (!entity || this.fixedEntities.has(entityId) || this.entityLocked(entity))
-            return this.solve(false);
+        return this.dragEntitiesTo([{ entityId, original }], du, dv);
+    }
+
+    /**
+     * Translates several curves together by the same offset from their pointer-down
+     * snapshots (a dragged multi-selection), then solves once so the constraints
+     * between them resolve the remaining freedom. Fixed, locked and unknown
+     * entities are skipped; coincident neighbours ride along.
+     */
+    dragEntitiesTo(
+        moves: ReadonlyArray<{ entityId: number; original: readonly number[] }>,
+        du: number,
+        dv: number,
+    ): SolveOutcome {
         const moved = new Set<string>();
-        for (let pointIndex = 0; pointIndex < entityPointCount(entity.type, entity.params); pointIndex++) {
-            const ref = { entityId, pointIndex };
-            for (const point of this.coincidentGroup(ref)) {
-                const key = pointRefKey(point);
-                if (moved.has(key) || this.fixedEntities.has(point.entityId)) continue;
-                moved.add(key);
-                this.setPointPosition(
-                    point,
-                    original[pointIndex * 2] + du,
-                    original[pointIndex * 2 + 1] + dv,
-                );
+        let any = false;
+        for (const { entityId, original } of moves) {
+            const entity = this.entity(entityId);
+            if (!entity || this.fixedEntities.has(entityId) || this.entityLocked(entity)) continue;
+            any = true;
+            for (
+                let pointIndex = 0;
+                pointIndex < entityPointCount(entity.type, entity.params);
+                pointIndex++
+            ) {
+                const ref = { entityId, pointIndex };
+                for (const point of this.coincidentGroup(ref)) {
+                    const key = pointRefKey(point);
+                    if (moved.has(key) || this.fixedEntities.has(point.entityId)) continue;
+                    moved.add(key);
+                    this.setPointPosition(
+                        point,
+                        original[pointIndex * 2] + du,
+                        original[pointIndex * 2 + 1] + dv,
+                    );
+                }
             }
         }
-        return this.solve(true);
+        return this.solve(any);
     }
 
     /** Dragging a circle's circumference changes its radius; existing dimensions remain authoritative. */

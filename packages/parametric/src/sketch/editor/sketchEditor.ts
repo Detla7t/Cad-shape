@@ -8,6 +8,7 @@ import {
     documentParameterInput,
     formatDocumentValue,
     type I18nKeys,
+    type ICancelableCommand,
     type IDisposable,
     type IDocument,
     type IEventHandler,
@@ -589,6 +590,29 @@ export class SketchEditor implements IDisposable {
     }
 
     lastPickPosition?: [number, number];
+    /** Counts interactive picks that resolved with a target; a tool compares it to know whether it picked anything. */
+    pickSequence = 0;
+    /** The most recent pick ended with Escape / right-click rather than a target. */
+    lastPickCancelled = false;
+
+    /**
+     * The sketch tools (drawing, constraints) running against this session. Leaving the
+     * sketch cancels them, so an armed tool never outlives the session it draws into.
+     */
+    private readonly tools = new Set<ICancelableCommand>();
+
+    registerTool(tool: ICancelableCommand): IDisposable {
+        this.tools.add(tool);
+        return { dispose: () => this.tools.delete(tool) };
+    }
+
+    private cancelTools(): void {
+        for (const tool of [...this.tools]) {
+            this.tools.delete(tool);
+            // fire and forget: cancel() resolves once the command has unwound
+            void tool.cancel().catch(() => undefined);
+        }
+    }
 
     pickPointOrEntity(
         prompt: I18nKeys,
@@ -658,6 +682,7 @@ export class SketchEditor implements IDisposable {
     cancelPick(): void {
         const request = this.pickRequest;
         this.pickRequest = undefined;
+        if (request !== undefined) this.lastPickCancelled = true;
         request?.resolve(undefined);
         this.annotations.suppressConstraintSymbols = false;
         this.publishSolveStatus(this.lastSolveOutcome);
@@ -707,6 +732,8 @@ export class SketchEditor implements IDisposable {
             if (request.kind === "entity") this.rememberPick({ kind: "entity", entityId: value as number });
             this.pickRequest = undefined;
             this.annotations.suppressConstraintSymbols = false;
+            this.lastPickCancelled = false;
+            this.pickSequence++;
             request.resolve(value);
         }
         return true;
@@ -925,6 +952,7 @@ export class SketchEditor implements IDisposable {
     exit(): void {
         if (this.disposed) return;
         this.closeDatum?.();
+        this.cancelTools();
         if (SketchEditor.activeEditor === this) SketchEditor.activeEditor = undefined;
         try {
             this.commit();
@@ -941,6 +969,7 @@ export class SketchEditor implements IDisposable {
     cancel(): void {
         if (this.disposed) return;
         this.closeDatum?.();
+        this.cancelTools();
         this.cancelPick();
         Transaction.execute(this.document, "cancel sketch edits", () => {
             this.node.name = this.initialName;
@@ -992,6 +1021,7 @@ export class SketchEditor implements IDisposable {
     dispose(): void {
         if (this.disposed) return;
         this.closeDatum?.();
+        this.cancelTools();
         this.view.dom?.querySelector("[data-sketch-diagnostics]")?.remove();
         this.disposed = true;
         this.cancelPick();

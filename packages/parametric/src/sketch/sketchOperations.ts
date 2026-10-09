@@ -276,6 +276,13 @@ export function trimOrSplit(
     }
     // Structural constraints are generated after restored ids, preventing collisions.
     for (const part of parts) if (part.entity.type === "arc") ensureArcConstraint(data, part.entity.id);
+    if (mode !== "split")
+        attachCutEnds(
+            data,
+            e,
+            parts.map((p) => ({ entity: p.entity, start: p.start, end: p.end })),
+            mode === "extend",
+        );
     if (mode === "split" && parts.length === 2) {
         const first = parts[0].entity,
             second = parts[1].entity;
@@ -304,6 +311,99 @@ export function trimOrSplit(
             });
     }
 }
+/** Positions closer than this (sketch units) are the same cut. */
+const CUT_TOLERANCE = 1e-6;
+
+/**
+ * Attaches every end a trim or extend created to the boundary that produced the cut,
+ * the way Onshape's trim leaves the trimmed end coincident with the trimming curve: an
+ * end on the boundary's endpoint becomes coincident with that point, an end in the
+ * boundary's interior lies on it. Without this the new end is only on its own curve
+ * and is free to slide — a chord whose far end was never constrained to the circle
+ * (a midpoint line's derived half, say) would leave the trimmed arc under-defined even
+ * though the chord itself is fully defined. Original ends (not cuts) and constraints
+ * the restore step already produced are left alone.
+ */
+function attachCutEnds(
+    data: SketchData,
+    original: SketchEntityData,
+    parts: { entity: SketchEntityData; start: number; end: number }[],
+    extend: boolean,
+): void {
+    const partIds = new Set(parts.map((p) => p.entity.id));
+    const boundaries: SketchEntityData[] = [
+        ...data.entities,
+        ...(data.externalRefs ?? []).map((r) => ({ id: r.entityId, type: r.type, params: r.snapshot })),
+    ].filter((x) => x.id !== original.id && !partIds.has(x.id) && ["line", "circle", "arc"].includes(x.type));
+    const isOriginalEnd = (t: number) => Math.abs(t) < EPS || Math.abs(t - 1) < EPS;
+    for (const part of parts) {
+        const ends: [number, number][] =
+            part.entity.type === "line"
+                ? [
+                      [part.start, 0],
+                      [part.end, 1],
+                  ]
+                : [
+                      [part.start, 1],
+                      [part.end, 2],
+                  ];
+        for (const [t, pointIndex] of ends) {
+            // a circle has no original ends: every arc end is a cut
+            if (original.type !== "circle" && isOriginalEnd(t)) continue;
+            const position = pointAt(part.entity, pointIndex === ends[0][1] ? 0 : 1);
+            const endRef: SketchPointRef = { entityId: part.entity.id, pointIndex };
+            for (const boundary of boundaries) {
+                const hit = intersections(original, boundary, extend).some(
+                    (p) => distance(p, position) < CUT_TOLERANCE,
+                );
+                if (!hit) continue;
+                addUniqueConstraint(data, attachmentTo(boundary, position, endRef));
+                break;
+            }
+        }
+    }
+}
+
+/** Coincident with the boundary's endpoint at `position`, otherwise incidence on the boundary curve. */
+function attachmentTo(
+    boundary: SketchEntityData,
+    position: UV,
+    point: SketchPointRef,
+): Omit<SketchConstraintData, "id"> {
+    const endpoints: number[] = boundary.type === "line" ? [0, 1] : boundary.type === "arc" ? [1, 2] : [];
+    for (const index of endpoints) {
+        const p: UV = [boundary.params[index * 2], boundary.params[index * 2 + 1]];
+        if (distance(p, position) < CUT_TOLERANCE)
+            return {
+                kind: ConstraintKind.P2PCoincident,
+                refs: [point, { entityId: boundary.id, pointIndex: index }],
+            };
+    }
+    const center = { entityId: boundary.id, pointIndex: 0 };
+    if (boundary.type === "line")
+        return {
+            kind: ConstraintKind.PointOnLine,
+            refs: [point, center, { entityId: boundary.id, pointIndex: 1 }],
+        };
+    if (boundary.type === "circle") return { kind: ConstraintKind.PointOnCircle, refs: [point, center] };
+    return {
+        kind: ConstraintKind.PointOnArc,
+        refs: [point, center, { entityId: boundary.id, pointIndex: 1 }],
+    };
+}
+
+/** Adds the constraint unless one of the same kind over the same points exists (the restore step may have made it). */
+function addUniqueConstraint(data: SketchData, constraint: Omit<SketchConstraintData, "id">): void {
+    const key = (refs: SketchPointRef[]) =>
+        refs
+            .map((r) => `${r.entityId}:${r.pointIndex}`)
+            .sort()
+            .join("|");
+    const wanted = key(constraint.refs);
+    if (data.constraints.some((c) => c.kind === constraint.kind && key(c.refs) === wanted)) return;
+    data.constraints.push({ id: Math.max(0, ...data.constraints.map((c) => c.id)) + 1, ...constraint });
+}
+
 /** null means the referenced curve was removed; undefined means an ordinary point constraint. */
 function retargetCurveConstraint(
     data: SketchData,

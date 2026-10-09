@@ -4,11 +4,14 @@
 import { styleColor } from "../../sheet/cellStyle";
 import type { CellStyle } from "../../sheet/model";
 import style from "../spreadsheet.module.css";
+import { sheetButton } from "./sheetControls";
 
 export function createSheetToolbar(
     change: (update: (current: CellStyle) => CellStyle) => void,
     clear: () => void,
     merge: () => void,
+    numberFormat: (format: string) => void,
+    decimals: (change: number) => void,
 ) {
     const element = document.createElement("div");
     element.className = style.toolbar;
@@ -16,13 +19,7 @@ export function createSheetToolbar(
     element.setAttribute("aria-label", "Cell formatting");
     let current: CellStyle = {};
     const button = (text: string, title: string, action: () => void) => {
-        const b = document.createElement("button");
-        b.type = "button";
-        b.textContent = text;
-        b.title = title;
-        b.setAttribute("aria-label", title);
-        b.addEventListener("mousedown", (e) => e.preventDefault());
-        b.addEventListener("click", action);
+        const b = sheetButton(title, text, action);
         element.append(b);
         return b;
     };
@@ -40,6 +37,10 @@ export function createSheetToolbar(
         element.append(select);
         return select;
     };
+    button("$", "Currency", () => numberFormat('"$"#,##0.00'));
+    button("%", "Percent", () => numberFormat("0.00%"));
+    button(".0←", "Decrease decimal places", () => decimals(-1));
+    button(".00→", "Increase decimal places", () => decimals(1));
     const font = dropdown(
         "Font",
         ["Arial", "Calibri", "Aptos", "Verdana", "Times New Roman", "Courier New"],
@@ -83,7 +84,7 @@ export function createSheetToolbar(
     const textColor = color("Text color", "A", (argb) =>
         change((s) => ({ ...s, font: { ...s.font, color: { argb } } })),
     );
-    const fill = color("Fill color", "Fill", (argb) =>
+    const fill = color("Fill color", "▰", (argb) =>
         change((s) => ({ ...s, fill: { type: "pattern", pattern: "solid", fgColor: { argb } } })),
     );
     const alignment = dropdown(
@@ -97,6 +98,9 @@ export function createSheetToolbar(
                     horizontal: value === "General" ? undefined : (value.toLowerCase() as "left"),
                 },
             })),
+    );
+    const vertical = dropdown("Vertical alignment", ["Bottom", "Middle", "Top"], (value) =>
+        change((s) => ({ ...s, alignment: { ...s.alignment, vertical: value.toLowerCase() as "bottom" } })),
     );
     const wrap = button("↵", "Wrap text", () => {
         const value = !current.alignment?.wrapText;
@@ -116,8 +120,8 @@ export function createSheetToolbar(
                       ),
         }));
     });
-    button("Merge", "Merge or unmerge selected cells", merge);
-    button("Clear format", "Clear formatting", clear);
+    button("⊞", "Merge or unmerge selected cells", merge);
+    button("T̸", "Clear formatting", clear);
     const setOption = (select: HTMLSelectElement, value: string) => {
         if (![...select.options].some((o) => o.value === value)) {
             const option = document.createElement("option");
@@ -142,6 +146,8 @@ export function createSheetToolbar(
                 current.fill?.type === "pattern"
                     ? (styleColor(current.fill.fgColor) ?? "#ffffff")
                     : "#ffffff";
+            const v = current.alignment?.vertical ?? "bottom";
+            vertical.value = v[0].toUpperCase() + v.slice(1);
             const align = current.alignment?.horizontal;
             alignment.value = align ? align[0].toUpperCase() + align.slice(1) : "General";
         },

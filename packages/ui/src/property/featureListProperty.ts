@@ -14,6 +14,7 @@ import {
     I18n,
     type I18nKeys,
     type IDocument,
+    type IFeatureEditSession,
     type IFeatureListNode,
     type INode,
     isConfiguredValue,
@@ -61,11 +62,17 @@ export class FeatureListProperty extends HTMLElement {
     private historyBar?: HistoryBar;
     private picking = false;
 
+    /**
+     * `session` is the feature dialog's edit session: pick parameters become Onshape-style
+     * query boxes — click one to make it take selections, the active one is outlined, and
+     * the other inputs stay editable while it picks.
+     */
     constructor(
         readonly document: IDocument,
         readonly node: INode & IFeatureListNode,
         private readonly featureId?: string,
         private readonly timeline = false,
+        private readonly session?: IFeatureEditSession,
     ) {
         super();
         if (featureId) this.expanded.add(featureId);
@@ -75,9 +82,11 @@ export class FeatureListProperty extends HTMLElement {
     connectedCallback(): void {
         this.node.onPropertyChanged(this.handleNodeChanged);
         PubSub.default.sub("documentUnitsChanged", this.handleUnitsChanged);
+        if (this.session) this.session.onPickChanged = () => this.renderItems();
     }
 
     disconnectedCallback(): void {
+        if (this.session) this.session.onPickChanged = undefined;
         this.node.removePropertyChanged(this.handleNodeChanged);
         PubSub.default.remove("documentUnitsChanged", this.handleUnitsChanged);
         this.closeMenu();
@@ -281,6 +290,8 @@ export class FeatureListProperty extends HTMLElement {
     }
 
     private parameterRow(item: FeatureItem, param: FeatureParameter) {
+        if (param.pick !== undefined && this.session) return this.queryBox(item, param);
+        if (param.optionStyle === "tabs" && param.options !== undefined) return this.optionTabs(item, param);
         return div(
             { className: style.param },
             // A script-defined parameter names itself; built-in ones translate their key.
@@ -294,6 +305,7 @@ export class FeatureListProperty extends HTMLElement {
     }
 
     private parameterEditor(item: FeatureItem, param: FeatureParameter) {
+        if (typeof param.value === "boolean" && param.flip) return this.flipToggle(item, param);
         if (typeof param.value === "boolean") {
             const configured = this.configuredOf(param);
             return input({
@@ -408,6 +420,78 @@ export class FeatureListProperty extends HTMLElement {
         );
     }
 
+    /**
+     * Onshape's query box: the parameter's name while empty, what is picked otherwise. A
+     * click makes it the box taking selections (the session keeps what the previous box
+     * picked).
+     */
+    private queryBox(item: FeatureItem, param: FeatureParameter) {
+        const active = this.session?.activePick === param.key;
+        const empty = param.value === "—" || param.value === "";
+        const label = param.label ?? I18n.translate(param.display) ?? param.key;
+        return div(
+            {
+                className: `${style.queryBox} ${active ? style.queryActive : ""}`,
+                role: "button",
+                tabIndex: 0,
+                ariaLabel: label,
+                ariaPressed: String(active),
+                title: label,
+                onclick: (e: MouseEvent) => {
+                    e.stopPropagation();
+                    void this.node.reselectShapes?.(item.id, param.key);
+                },
+                onkeydown: (e: KeyboardEvent) => {
+                    if (e.key !== "Enter" && e.key !== " ") return;
+                    e.preventDefault();
+                    void this.node.reselectShapes?.(item.id, param.key);
+                },
+            },
+            span({
+                className: empty ? style.queryPlaceholder : style.queryValue,
+                textContent: empty ? label : String(param.value),
+            }),
+        );
+    }
+
+    /** Onshape's horizontal enum: one toggle button per option (New / Add / Remove / Intersect). */
+    private optionTabs(item: FeatureItem, param: FeatureParameter) {
+        const label = param.label ?? I18n.translate(param.display) ?? param.key;
+        return div(
+            { className: style.tabs, role: "radiogroup", ariaLabel: label, title: label },
+            ...(param.options ?? []).map((choice) =>
+                button({
+                    className: `${style.tab} ${choice.value === param.value ? style.tabOn : ""}`,
+                    role: "radio",
+                    ariaChecked: String(choice.value === param.value),
+                    textContent: tabLabel(choice.label),
+                    onclick: (e: MouseEvent) => {
+                        e.stopPropagation();
+                        if (choice.value !== param.value)
+                            this.applyValue(item, param.key, this.editedValue(param, choice.value));
+                    },
+                }),
+            ),
+        );
+    }
+
+    /** Onshape's opposite-direction arrow: a toggle button instead of a checkbox. */
+    private flipToggle(item: FeatureItem, param: FeatureParameter) {
+        const on = param.value === true;
+        return button(
+            {
+                className: `${style.flip} ${on ? style.flipOn : ""}`,
+                ariaPressed: String(on),
+                title: param.label ?? I18n.translate(param.display) ?? param.key,
+                onclick: (e: MouseEvent) => {
+                    e.stopPropagation();
+                    this.applyChecked(item, param, !on);
+                },
+            },
+            span({ textContent: "⇄", ariaHidden: "true" }),
+        );
+    }
+
     /** A pick of the body's own entities: the summary, and a button that re-picks. */
     private pickParam(item: FeatureItem, param: FeatureParameter) {
         return div(
@@ -433,6 +517,11 @@ export class FeatureListProperty extends HTMLElement {
     }
 
     private async pick(item: FeatureItem, key?: string): Promise<void> {
+        // In a feature dialog the session owns picking: inputs stay live, boxes switch.
+        if (this.session) {
+            await this.node.reselectShapes?.(item.id, key);
+            return;
+        }
         this.picking = true;
         this.setInputsDisabled(true);
         try {
@@ -807,3 +896,10 @@ export class FeatureListProperty extends HTMLElement {
 }
 
 customElements.define("chili-feature-list", FeatureListProperty);
+
+/** An option label as a tab caption: std enum display names are already words (New, Add…). */
+function tabLabel(label: string): string {
+    if (label !== label.toUpperCase()) return label;
+    const lower = label.toLowerCase().replace(/_/g, " ");
+    return lower.charAt(0).toUpperCase() + lower.slice(1);
+}

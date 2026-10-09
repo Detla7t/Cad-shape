@@ -330,9 +330,13 @@ export class ContextToolbar extends HTMLElement {
                         if (typeof item === "string") available.add(item);
                     }
                 for (const [name, tools] of [
-                    ["Solid features", ["feature.extrude", "feature.revolve"]],
-                    ["Edge treatments", ["feature.fillet", "feature.chamfer"]],
-                    ["Boolean operations", ["feature.fuse", "feature.cut", "feature.common"]],
+                    ["Solid features", ["feature.extrude", "feature.revolve", "feature.loft"]],
+                    ["Edge treatments", ["partStudio.fillet", "partStudio.chamfer", "partStudio.shell"]],
+                    ["Part operations", ["partStudio.boolean", "partStudio.transform"]],
+                    [
+                        "Patterns",
+                        ["partStudio.linearPattern", "partStudio.circularPattern", "partStudio.mirror"],
+                    ],
                     [
                         "FeatureScript",
                         ["featurescript.insert", "featurescript.newStudio", "featurescript.editStudio"],

@@ -108,12 +108,13 @@ describe("viewport ambient occlusion", () => {
         expect(SSAOPass.prototype.render).not.toHaveBeenCalled();
     });
 
-    test("solid models shade at half resolution without resizing unchanged targets", () => {
+    test("settled frames shade at full resolution without resizing unchanged targets", () => {
         mesh();
         effects.render();
         const ao = pass();
-        expect([ao.normalRenderTarget.width, ao.normalRenderTarget.height]).toEqual([501, 361]);
-        expect([ao.ssaoRenderTarget.width, ao.blurRenderTarget.height]).toEqual([501, 361]);
+        expect([ao.normalRenderTarget.width, ao.normalRenderTarget.height]).toEqual([1001, 721]);
+        expect([ao.ssaoRenderTarget.width, ao.blurRenderTarget.height]).toEqual([1001, 721]);
+        expect(ao.ssaoMaterial.defines["KERNEL_SIZE"]).toBe(32);
         expect(ao.renderToScreen).toBe(true);
         expect(ao.copyMaterial.uniforms["opacity"].value).toBe(0.375);
         const resize = rs.spyOn(ao, "setSize");
@@ -122,8 +123,20 @@ describe("viewport ambient occlusion", () => {
         width = 1280;
         height = 720;
         effects.render();
-        expect(resize).toHaveBeenCalledExactlyOnceWith(640, 360);
+        expect(resize).toHaveBeenCalledExactlyOnceWith(1280, 720);
         expect(SSAOPass.prototype.render).toHaveBeenCalledTimes(3);
+    });
+
+    test("frames drawn while the camera moves shade at half resolution, then settle back", () => {
+        mesh();
+        effects.render("interactive");
+        const ao = pass();
+        expect([ao.ssaoRenderTarget.width, ao.ssaoRenderTarget.height]).toEqual([501, 361]);
+        const resize = rs.spyOn(ao, "setSize");
+        effects.render("interactive");
+        expect(resize).not.toHaveBeenCalled();
+        effects.render("final");
+        expect(resize).toHaveBeenCalledExactlyOnceWith(1001, 721);
     });
 
     test("zoom and camera switches refresh projection uniforms at a constant size", () => {

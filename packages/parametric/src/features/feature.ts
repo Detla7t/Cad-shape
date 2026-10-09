@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    type Continuity,
     type FeatureParameter,
     type I18nKeys,
     type IDocument,
@@ -42,6 +43,7 @@ export interface FeatureBase {
 export type FeatureData =
     | ExtrudeFeatureData
     | RevolveFeatureData
+    | LoftFeatureData
     | FilletFeatureData
     | ChamferFeatureData
     | BooleanFeatureData
@@ -104,6 +106,32 @@ export interface RevolveFeatureData extends FeatureBase {
     readonly profiles?: ProfileRef[];
 }
 
+/** One loft section: a sketch's profile region, or its first outer profile when `profile` is absent. */
+export interface LoftSectionRef {
+    readonly sketchId: string;
+    /** Fingerprint of the region (`profileRef.ts`); undefined lofts the sketch's first outer profile. */
+    readonly profile?: ProfileRef;
+}
+
+/**
+ * A loft through ordered sketch profiles (Onshape's Loft): each section is a closed
+ * sketch region resolved on every rebuild, so editing a section sketch or its plane
+ * reshapes the loft.
+ */
+export interface LoftFeatureData extends FeatureBase {
+    readonly type: "loft";
+    /** Sections in loft order; at least two. */
+    readonly sections: LoftSectionRef[];
+    /** Solid (default) or a surface shell. */
+    readonly solid?: boolean;
+    /** Straight (ruled) surfaces between consecutive sections instead of a smooth skin. */
+    readonly ruled?: boolean;
+    /** Continuity of the smooth skin; ignored when ruled. Default `c0`. */
+    readonly continuity?: Continuity;
+    /** How the loft combines with the preceding feature's shape; undefined creates standalone geometry. */
+    readonly operation?: BooleanOperation;
+}
+
 export interface FilletFeatureData extends FeatureBase {
     readonly type: "fillet";
     readonly radius: ParameterValue;
@@ -139,6 +167,27 @@ export interface FeatureScriptQueryValue {
     readonly edges?: EdgeRef[];
     readonly faces?: FeatureScriptFaceRef[];
     readonly vertices?: { readonly point: XYZLike }[];
+    /** Parts of the host body (its solids), for std's `EntityType.BODY` picks. */
+    readonly bodies?: FeatureScriptBodyRef[];
+    /** Reference planes of the document (Top, Front, Right, user planes). */
+    readonly planes?: FeatureScriptPlaneRef[];
+}
+
+/** One solid of the host body, re-found by volume and bounding-box centre. */
+export interface FeatureScriptBodyRef {
+    readonly center: XYZLike;
+    readonly volume: number;
+}
+
+/**
+ * A reference plane node, with the plane it had when picked — the fallback when the node
+ * is gone. A default datum plane resolves to Onshape's own Top/Front/Right.
+ */
+export interface FeatureScriptPlaneRef {
+    readonly nodeId: string;
+    readonly origin: XYZLike;
+    readonly normal: XYZLike;
+    readonly xvec: XYZLike;
 }
 
 export interface FeatureScriptFaceRef {

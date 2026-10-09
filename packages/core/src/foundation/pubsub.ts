@@ -5,7 +5,7 @@ import type { CommandKeys, ICommand } from "../command";
 import type { IDocument } from "../document";
 import type { I18nKeys } from "../i18n";
 import type { Material } from "../material";
-import type { IFeatureListNode, INode } from "../model";
+import type { FeatureEditOptions, IFeatureListNode, INode } from "../model";
 import type { DialogButton, FloatPanelOptions } from "../ui";
 import type { CursorType, IView } from "../visual";
 import type { AsyncController } from "./asyncController";
@@ -37,7 +37,7 @@ export interface PubSubEventMap {
     openWhereUsed: (target?: import("../review/comments").ReviewTarget) => void;
     editMaterial: (document: IDocument, material: Material, callback: (material: Material) => void) => void;
     editConfiguration: (document: IDocument) => void;
-    editFeature: (node: INode & IFeatureListNode, featureId: string) => void;
+    editFeature: (node: INode & IFeatureListNode, featureId: string, options?: FeatureEditOptions) => void;
     editVariables: (document: IDocument, onApplied: () => void) => void;
     executeCommand: (commandName: CommandKeys) => void;
     modelUpdate: (model: INode) => void;

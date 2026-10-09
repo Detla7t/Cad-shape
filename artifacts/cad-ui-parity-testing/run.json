@@ -1,0 +1,140 @@
+{
+    "task": "Testing drawings — UI-only modeling and raw export parity",
+    "dateUTC": "2026-10-08",
+    "onshapeUrl": "https://cad.onshape.com/documents/bcf2b0f57a114bba79c81ac1/w/f824c55ae3e3a7f33d2eb028/e/11c6213eed2e971d2e7e4955",
+    "documentName": "Testing - UI tools only",
+    "scope": {
+        "uniqueModelingTools": 10,
+        "additionalSketchTools": ["Corner rectangle", "Dimension"],
+        "featureScriptUsed": false,
+        "creationAndExport": "All CAD geometry and exports were produced through visible UI controls and normal keyboard/pointer events. DOM inspection and one control-focus operation aided browser automation; no modeling API, app internal geometry call, or FeatureScript constructed either model.",
+        "offlineVerification": "Raw files were copied unchanged, compared byte for byte and hashed. Separate read-only STEP/DXF geometry inspection did not replace the raw comparison."
+    },
+    "finalResult": {
+        "rawStepEqual": false,
+        "rawDxfEqual": false,
+        "interactionParity": false,
+        "solidsPerApplication": 4,
+        "geometry": "After explicit axis correction, all four exported solids are valid in OCCT 8.0. Pairwise bidirectional Boolean differences have zero volume at OCCT tolerances; maximum bounding-coordinate difference is about 1e-7 mm. This is not byte equality.",
+        "dxf": "Both contain four LINE entities forming the 20 × 20 mm rectangle. Ordering, line direction, floating-point text, metadata and line endings differ."
+    },
+    "sketch": {
+        "plane": "XY",
+        "corner1Mm": [0, 0],
+        "corner2Mm": [20, 20],
+        "constraints": "Width and height dimensioned; Chili3D reported 0 DOF / fully constrained. Onshape display units were inches but all dimensions were entered explicitly in mm."
+    },
+    "features": [
+        {
+            "tool": "Extrude",
+            "inputs": "20 × 20 mm XY rectangle, New, +Z 10 mm",
+            "onshape": "Sketch region, operation tabs, depth in side panel",
+            "chili3d": "Sketch profile, New/Add/Remove/Intersect, depth panel",
+            "result": "Completed"
+        },
+        {
+            "tool": "Fillet",
+            "inputs": "1 mm radius; vertical edge at (20, 0)",
+            "onshape": "Edge selection and radius in feature panel",
+            "chili3d": "Edge selection and radius in floating command control",
+            "result": "Completed"
+        },
+        {
+            "tool": "Chamfer",
+            "inputs": "1 mm equal-distance; vertical edge at (20, 20)",
+            "onshape": "Chamfer feature panel",
+            "chili3d": "Edge treatments → Chamfer",
+            "result": "Completed"
+        },
+        {
+            "tool": "Shell",
+            "inputs": "Remove top face; inward 0.5 mm",
+            "onshape": "1 mm and 0.5 mm both succeeded; parametric history retained",
+            "chili3d": "−1 mm failed; −0.5 mm succeeded. Replaced the parametric body with an editable solid",
+            "result": "1 mm result mismatch; 0.5 mm completed"
+        },
+        {
+            "tool": "Mirror",
+            "inputs": "Mirror through Y = 0; keep original and new part",
+            "onshape": "Part + Front plane; explicitly choose New",
+            "chili3d": "Two points along X plus Clone checkbox",
+            "result": "Completed"
+        },
+        {
+            "tool": "Linear pattern",
+            "inputs": "Original tray; +X 40 mm; 2 instances",
+            "onshape": "Part, direction edge, spacing and instance count",
+            "chili3d": "Array Linear; Group off, Total Length off, Count 2; point/distance entry",
+            "result": "Completed"
+        },
+        {
+            "tool": "Circular pattern",
+            "inputs": "Translated tray; 2 instances separated by 180° about Z through (0.5, −0.5)",
+            "onshape": "Part + selected vertical edge; 360° full pattern, equal spacing, 2 instances",
+            "chili3d": "Array Circular; explicit center, radius point, angle 180°. Corrected inferred plane using fixed XOY workplane",
+            "result": "Completed after UI axis correction"
+        },
+        {
+            "tool": "Transform / Move",
+            "inputs": "Circular copy +Z 20 mm; cylinder +X 100 mm",
+            "onshape": "Translate by XYZ fields",
+            "chili3d": "Move, Clone off, two coordinate points. Numeric input before viewport hover threw an error; restart/hover recovered",
+            "result": "Completed; used twice"
+        },
+        {
+            "tool": "Boolean union",
+            "inputs": "Join original and mirrored tray; consume tools",
+            "onshape": "Boolean → Union; choose both parts",
+            "chili3d": "Fuse could not select the editable shell outputs. Preselect a body, then Join via search worked",
+            "result": "Completed with different command path"
+        },
+        {
+            "tool": "Revolve",
+            "inputs": "Original 20 × 20 mm rectangle; full turn around its X = 0 edge parallel to Y; New cylinder",
+            "onshape": "Profile + axis + full revolve; explicitly choose New",
+            "chili3d": "Select sketch then straight axis edge; Angle 360°",
+            "result": "Completed"
+        }
+    ],
+    "corrections": [
+        "Initial circular-pattern exports had different placements: an offset vertical edge was selected in Onshape and a dynamic plane was inferred in Chili3D. This is recorded as a selection/workplane mismatch, not proof of a kernel defect.",
+        "Kept the cached Onshape exports. Recreated the Chili3D circular pattern through the UI with center (0.5, -0.5, 0), fixed XOY working plane and 180-degree spacing; moved the copy +Z 20 mm. The initial files and inspection remain in initial-run/.",
+        "Restored Chili3D's dynamic working-plane preference after the correction."
+    ],
+    "exportSettings": {
+        "onshapeStep": "STEP AP214, preprocessing None, custom Millimeter, Download, all four parts together, Y-up off",
+        "chili3dStep": "Export .step, Merge checked, 4 selected parts; OCCT AP214 output",
+        "onshapeDxf": "Sketch 1, DXF Release 11–12 (AC1009), Millimeter, Download, set Z height to zero and normals positive",
+        "chili3dDxf": "Sketch1 context menu → Export as DXF/SVG; default DXF R12 (AC1009), mm"
+    },
+    "downloads": {
+        "onshapeStep": {
+            "timeUTC": "2026-10-08T23:35:33.571Z",
+            "bytes": 69339
+        },
+        "onshapeDxf": {
+            "timeUTC": "2026-10-08T23:37:16.112Z",
+            "bytes": 11478
+        },
+        "chili3dStep": {
+            "timeUTC": "2026-10-08T23:46:57.114Z",
+            "bytes": 179476
+        },
+        "chili3dDxf": {
+            "timeUTC": "2026-10-08T23:42:24.156Z",
+            "bytes": 828
+        },
+        "chili3dProject": {
+            "timeUTC": "2026-10-08T23:47:10.182Z",
+            "bytes": 67755
+        }
+    },
+    "caching": "Onshape STEP and DXF were each downloaded once after the Onshape model was complete and cached without rewriting.",
+    "limitations": [
+        "Only this testing specimen and these command paths were exercised; this is not full UI conformance coverage.",
+        "Shell and array workflows do not retain the same editable feature tree in Chili3D.",
+        "A native project download initially stalled during a session with concurrent development rebuilds; reopening the saved document and retrying succeeded. Cause not isolated.",
+        "Development compile overlays from unrelated workspace changes interrupted the run; no unrelated source files were modified."
+    ],
+    "reproduction": "Run node artifacts/cad-ui-parity-testing/verify-exports.mjs from this repository to recheck the stored raw bytes and secondary STEP geometry metrics."
+}

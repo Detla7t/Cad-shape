@@ -1,0 +1,102 @@
+{
+    "chili3d/testing-ui.chili3d": {
+        "bytes": 67755,
+        "sha256": "4a5838496fe559c22c8e72fb80332cbad99c2078f175d6732ee186d3ab542998"
+    },
+    "chili3d/testing-ui.dxf": {
+        "bytes": 828,
+        "sha256": "9fb34927d4f340e152ce507e7563b56b1db7a01ef80515cf20de7009ed31868f"
+    },
+    "chili3d/testing-ui.step": {
+        "bytes": 179476,
+        "sha256": "303eea84ee19e9952e680c2c52b280718e05118d8ae4c17695985ffa95500181"
+    },
+    "dxf-geometry-inspection.json": {
+        "bytes": 1401,
+        "sha256": "023de36027750475db7062ea528f7cae78dff48032476b60736fc7b42b29216a"
+    },
+    "evidence/chili-final.png": {
+        "bytes": 93587,
+        "sha256": "9b684691cd6289375902ee5b8bd3444d9433bbe97bdb517baf9fa56b065375f6"
+    },
+    "evidence/chili-move-coordinate-input-error.png": {
+        "bytes": 127505,
+        "sha256": "3ad3b66bec5824a7f8b7d912e06f23b0d50f7c9a39d7178864927c0cddd68e7f"
+    },
+    "evidence/chili-native-download-stuck.png": {
+        "bytes": 83809,
+        "sha256": "857745ce0c6d5a17298922697c40ae72062bced8fe0b04aee412de7e3009beec"
+    },
+    "evidence/chili-shell-1mm-failure.png": {
+        "bytes": 103251,
+        "sha256": "858b27dd3c929fa0c0159387631d8d4c1f84d1ff5f84c310c763d3edae7de374"
+    },
+    "evidence/chili-sketch.png": {
+        "bytes": 95945,
+        "sha256": "6575ad2b7d369eb086c708b6223aae47fb92e98ce94bdc1dadfa751a750f4fb5"
+    },
+    "evidence/chili-step-export-settings.png": {
+        "bytes": 121406,
+        "sha256": "621f74550f584d6b4be143deaaf935af5b5905473756ca23207c2189edb9b5a9"
+    },
+    "evidence/onshape-dxf-export-settings.png": {
+        "bytes": 99411,
+        "sha256": "c5846fde4e4456f0aff62898bd21ec5ef1068825f47d6ad2a109b0d46ef29d40"
+    },
+    "evidence/onshape-final.png": {
+        "bytes": 135147,
+        "sha256": "0f9b2b3e699883ff0e0c6b37e5b08848fbe78ec94ca4b2c630fc3703384b9ea0"
+    },
+    "evidence/onshape-sketch.png": {
+        "bytes": 85925,
+        "sha256": "4aa3dc55a57ea86206cc75982cf34016d179d8489453bccdf1397d92bc4e64cb"
+    },
+    "evidence/onshape-step-export-settings.png": {
+        "bytes": 102882,
+        "sha256": "9145ebd7255ec4b151f2feba4d207097d6507ce95a3b72037656d2fe155855b0"
+    },
+    "geometry-inspection.json": {
+        "bytes": 4654,
+        "sha256": "30afd24f0c43f68cc698fd7b0cc763ca1ea3da964ecdf15b7f48a200b9c9f13b"
+    },
+    "initial-run/chili3d.chili3d": {
+        "bytes": 66251,
+        "sha256": "8acc294cd9b36449ffa6040dba01aee79adb8e4ae5b74d8a377e3cd267a1961c"
+    },
+    "initial-run/chili3d.step": {
+        "bytes": 182761,
+        "sha256": "e6d465bfead824c14656a3d3a2aceccd9382cf9a5dac52e0e7deccb92793408b"
+    },
+    "initial-run/geometry-inspection.json": {
+        "bytes": 4833,
+        "sha256": "f6372870e69d711b052817a0aff2e53ad253b1148320f4381d3bb2af3da780f8"
+    },
+    "initial-run/raw-comparison.json": {
+        "bytes": 1536,
+        "sha256": "296e89df522118c46f0d4ec0170fc5138e96bfa1532131ac07ce337dd0b9c54c"
+    },
+    "onshape/testing-ui.dxf": {
+        "bytes": 11478,
+        "sha256": "53f6791772f3cea8fae22efbbf56278a0537e6d298e8f5735322dcebbd8fc39a"
+    },
+    "onshape/testing-ui.step": {
+        "bytes": 69339,
+        "sha256": "8a32dc186179d1b70b963f0c36f40e8a9938fdc18d22abeeeec6d035138bbbef"
+    },
+    "raw-comparison.json": {
+        "bytes": 1550,
+        "sha256": "6ce8398e2dc9114bcfe94cf90ef5292cac595c57f85e12cf354f33924777a794"
+    },
+    "report.html": {
+        "bytes": 1172004,
+        "sha256": "5cc2f480a33ff3b07e8b2251c78a971afddf3041e245fdf2a316e47a98938a5e"
+    },
+    "run.json": {
+        "bytes": 7229,
+        "sha256": "90556225b7d4541b8f376da8db1354ad268a9715f30b8ca6cb5056f7c0768c95"
+    },
+    "verify-exports.mjs": {
+        "bytes": 3875,
+        "sha256": "b808a4ec9d1521f701813a263d59ee8f084e51132ab7cbd7a396fc72f17941ab"
+    }
+}

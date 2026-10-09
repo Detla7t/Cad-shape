@@ -7,6 +7,8 @@ import "./edgeCornerCommand";
 import "./exportCommands";
 import "./extrudeCommand";
 import "./featureScriptCommands";
+import "./loftCommand";
+import "./partStudioToolCommands";
 import "./reselectCommand";
 import "./revolveCommand";
 import "./variableCommand";

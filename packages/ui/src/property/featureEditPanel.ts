@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    type FeatureEditOptions,
     I18n,
     type IDocument,
     type IFeatureEditSession,
@@ -18,6 +19,7 @@ export function showFeatureEditPanel(
     model: IDocument,
     node: INode & IFeatureListNode,
     session: IFeatureEditSession,
+    options?: FeatureEditOptions,
 ): void {
     const content = document.createElement("section");
     content.setAttribute("aria-label", "Edit feature");
@@ -31,7 +33,9 @@ export function showFeatureEditPanel(
     );
     const hint = document.createElement("p");
     hint.className = style.editHint;
-    hint.textContent = "Later features are rolled back while editing. Apply rebuilds the remaining history.";
+    hint.textContent = session.inserting
+        ? "Select entities in the active box; ✓ adds the feature, ✗ discards it."
+        : "Later features are rolled back while editing. Apply rebuilds the remaining history.";
     const error = document.createElement("p");
     error.setAttribute("role", "alert");
     error.className = style.errorText;
@@ -60,7 +64,12 @@ export function showFeatureEditPanel(
             void session.cancel();
         }
     });
-    content.append(title.element, new FeatureListProperty(model, node, session.featureId), hint, error);
+    content.append(
+        title.element,
+        new FeatureListProperty(model, node, session.featureId, false, session),
+        hint,
+        error,
+    );
     const panel = showFloatPanel({
         title: "properties.header",
         document: model,
@@ -75,4 +84,6 @@ export function showFeatureEditPanel(
         },
     });
     session.onClose = () => panel.close();
+    // Onshape opens a new feature with its first query box taking selections.
+    if (options?.pick !== undefined) void node.reselectShapes?.(session.featureId, options.pick);
 }

@@ -9,6 +9,7 @@ import {
     type IVertex,
     Plane,
     type Result,
+    type ShapeType,
     ShapeTypes,
     type TrackedShape,
     XYZ,
@@ -405,16 +406,71 @@ export class FsContext {
 
     /**
      * Adds the host body's input shape: every entity remembers its input index so the
-     * feature can hand stable ids back to the parametric body afterwards.
+     * feature can hand stable ids back to the parametric body afterwards. A compound of
+     * several solids — the parts a parametric body holds after a pattern, a mirror or a
+     * transform copy — enters as one body per solid, the way Onshape's Part Studio lists
+     * its parts, so part queries (`EntityType.BODY`) pick single parts; indexes stay
+     * those of the whole input.
      */
-    addHostBody(shape: IShape): FsBody {
+    addHostBody(shape: IShape): FsBody[] {
         this.foreign.add(shape);
-        const body = new FsBody(this, this.nextKey++, shape, this.freshAttr(HOST_ID), bodyKindOf(shape), {});
-        body.faceAttrs = body.faces().map((_, i) => this.freshAttr(HOST_ID, { hostIndex: i }));
-        body.edgeAttrs = body.edges().map((_, i) => this.freshAttr(HOST_ID, { hostIndex: i }));
-        body.vertexAttrs = body.vertices().map(() => this.freshAttr(HOST_ID));
-        this.bodies.push(body);
-        return body;
+        const parts = hostParts(shape);
+        if (parts === undefined) {
+            const body = new FsBody(
+                this,
+                this.nextKey++,
+                shape,
+                this.freshAttr(HOST_ID),
+                bodyKindOf(shape),
+                {},
+            );
+            body.faceAttrs = body.faces().map((_, i) => this.freshAttr(HOST_ID, { hostIndex: i }));
+            body.edgeAttrs = body.edges().map((_, i) => this.freshAttr(HOST_ID, { hostIndex: i }));
+            body.vertexAttrs = body.vertices().map(() => this.freshAttr(HOST_ID));
+            this.bodies.push(body);
+            return [body];
+        }
+        const faces = shape.findSubShapes(ShapeTypes.face);
+        const edges = shape.findSubShapes(ShapeTypes.edge);
+        const indexIn = (all: IShape[], item: IShape) => all.findIndex((candidate) => candidate.isSame(item));
+        const bodies = parts.map((part) => {
+            this.track([part]);
+            const body = new FsBody(
+                this,
+                this.nextKey++,
+                part,
+                this.freshAttr(HOST_ID),
+                bodyKindOf(part),
+                {},
+            );
+            body.faceAttrs = body
+                .faces()
+                .map((face) => this.freshAttr(HOST_ID, { hostIndex: indexIn(faces, face) }));
+            body.edgeAttrs = body
+                .edges()
+                .map((edge) => this.freshAttr(HOST_ID, { hostIndex: indexIn(edges, edge) }));
+            body.vertexAttrs = body.vertices().map(() => this.freshAttr(HOST_ID));
+            this.bodies.push(body);
+            return body;
+        });
+        faces.forEach((face) => face.dispose());
+        edges.forEach((edge) => edge.dispose());
+        return bodies;
+    }
+
+    /** The host entity at `index` of the whole input's enumeration (faces or edges). */
+    hostEntity(kind: "FACE" | "EDGE", index: number): EntityRef | undefined {
+        for (const body of this.bodies) {
+            if (body.bodyAttr.createdBy !== HOST_ID) continue;
+            const local = body.attrs(kind).findIndex((attr) => attr.hostIndex === index);
+            if (local >= 0) return { body, kind, index: local };
+        }
+        return undefined;
+    }
+
+    /** The host bodies — one per part of the input (see `addHostBody`). */
+    hostBodies(): FsBody[] {
+        return this.bodies.filter((body) => body.bodyAttr.createdBy === HOST_ID);
     }
 
     /** Captures every body's geometry and attributes (shapes are immutable, so this is cheap). */
@@ -685,6 +741,36 @@ export class FsContext {
         const origin = shapeFactory.point({ x: 0, y: 0, z: 0 });
         if (origin.isOk) this.addBody(origin.value, "Origin", { construction: true, defaultGeometry: true });
     }
+}
+
+/**
+ * The solids of a host input that holds two or more and nothing else; undefined keeps the
+ * input whole (a single solid, a sheet, a wire, or a mix with loose faces or edges).
+ */
+function hostParts(shape: IShape): IShape[] | undefined {
+    if (shape.shapeType !== ShapeTypes.compound && shape.shapeType !== ShapeTypes.compoundSolid)
+        return undefined;
+    const count = (owner: IShape, type: ShapeType) => {
+        const items = owner.findSubShapes(type);
+        items.forEach((item) => item.dispose());
+        return items.length;
+    };
+    const solids = shape.findSubShapes(ShapeTypes.solid);
+    let solidFaces = 0;
+    let solidEdges = 0;
+    for (const solid of solids) {
+        solidFaces += count(solid, ShapeTypes.face);
+        solidEdges += count(solid, ShapeTypes.edge);
+    }
+    if (
+        solids.length < 2 ||
+        solidFaces !== count(shape, ShapeTypes.face) ||
+        solidEdges !== count(shape, ShapeTypes.edge)
+    ) {
+        solids.forEach((solid) => solid.dispose());
+        return undefined;
+    }
+    return solids;
 }
 
 function isTracked(value: IShape | TrackedShape): value is TrackedShape {

@@ -1,26 +1,8 @@
 {
-    "method": "Read-only inspection of the unchanged UI-exported STEP files using the repository OCCT WASM reader; separate from raw-byte verdict.",
+    "method": "Secondary inspection of the unchanged UI-exported STEP files with OCCT 8.0. No replacement exports or normalization. This does not change the raw-byte verdict.",
     "units": "mm",
     "onshape": {
         "solids": [
-            {
-                "name": "Part 2",
-                "volumeMm3": 566.2386609959044,
-                "valid": true,
-                "bounds": {
-                    "min": {
-                        "x": 40,
-                        "y": 0,
-                        "z": 0
-                    },
-                    "max": {
-                        "x": 60,
-                        "y": 20,
-                        "z": 10
-                    }
-                },
-                "faceCount": 15
-            },
             {
                 "name": "Part 3",
                 "volumeMm3": 566.2386609959049,
@@ -35,6 +17,42 @@
                         "x": -39,
                         "y": -0.9999999999999988,
                         "z": 30
+                    }
+                },
+                "faceCount": 15
+            },
+            {
+                "name": "Part 1",
+                "volumeMm3": 1132.4773219918109,
+                "valid": true,
+                "bounds": {
+                    "min": {
+                        "x": -3.552713678800501e-15,
+                        "y": -20,
+                        "z": 0
+                    },
+                    "max": {
+                        "x": 20,
+                        "y": 20,
+                        "z": 10
+                    }
+                },
+                "faceCount": 25
+            },
+            {
+                "name": "Part 2",
+                "volumeMm3": 566.2386609959044,
+                "valid": true,
+                "bounds": {
+                    "min": {
+                        "x": 40,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "max": {
+                        "x": 60,
+                        "y": 20,
+                        "z": 10
                     }
                 },
                 "faceCount": 15
@@ -56,14 +74,37 @@
                     }
                 },
                 "faceCount": 3
-            },
+            }
+        ],
+        "totalVolumeMm3": 27397.695872701963
+    },
+    "chili3d": {
+        "solids": [
             {
-                "name": "Part 1",
-                "volumeMm3": 1132.4773219918109,
+                "name": "Open CASCADE STEP translator 8.0 7",
+                "volumeMm3": 566.238660995964,
                 "valid": true,
                 "bounds": {
                     "min": {
-                        "x": -3.552713678800501e-15,
+                        "x": -59,
+                        "y": -21.000000000000004,
+                        "z": 20
+                    },
+                    "max": {
+                        "x": -39,
+                        "y": -0.9999999999999976,
+                        "z": 30
+                    }
+                },
+                "faceCount": 15
+            },
+            {
+                "name": "Open CASCADE STEP translator 8.0 8",
+                "volumeMm3": 1132.4773219918925,
+                "valid": true,
+                "bounds": {
+                    "min": {
+                        "x": 0,
                         "y": -20,
                         "z": 0
                     },
@@ -74,14 +115,9 @@
                     }
                 },
                 "faceCount": 25
-            }
-        ],
-        "totalVolumeMm3": 27397.695872701963
-    },
-    "chili3d": {
-        "solids": [
+            },
             {
-                "name": "Open CASCADE STEP translator 8.0 1",
+                "name": "Open CASCADE STEP translator 8.0 6",
                 "volumeMm3": 566.2386609959307,
                 "valid": true,
                 "bounds": {
@@ -99,25 +135,7 @@
                 "faceCount": 15
             },
             {
-                "name": "Open CASCADE STEP translator 8.0 2",
-                "volumeMm3": 566.2386609963119,
-                "valid": true,
-                "bounds": {
-                    "min": {
-                        "x": -59.700748129671716,
-                        "y": -2.22044604925e-16,
-                        "z": 4.064837905236607
-                    },
-                    "max": {
-                        "x": -38.802992518696136,
-                        "y": 20.00000000000332,
-                        "z": 16.009975062344
-                    }
-                },
-                "faceCount": 15
-            },
-            {
-                "name": "Open CASCADE STEP translator 8.0 3",
+                "name": "Open CASCADE STEP translator 8.0 5",
                 "volumeMm3": 25132.741228718343,
                 "valid": true,
                 "bounds": {
@@ -133,26 +151,42 @@
                     }
                 },
                 "faceCount": 3
-            },
-            {
-                "name": "Open CASCADE STEP translator 8.0 4",
-                "volumeMm3": 1132.4773219918925,
-                "valid": true,
-                "bounds": {
-                    "min": {
-                        "x": 0,
-                        "y": -20,
-                        "z": 0
-                    },
-                    "max": {
-                        "x": 20,
-                        "y": 20,
-                        "z": 10
-                    }
-                },
-                "faceCount": 25
             }
         ],
-        "totalVolumeMm3": 27397.69587270248
-    }
+        "totalVolumeMm3": 27397.69587270213
+    },
+    "pairwiseChecks": [
+        {
+            "onshapePart": "Part 3",
+            "chili3dPart": "Open CASCADE STEP translator 8.0 7",
+            "absoluteVolumeDifferenceMm3": 5.911715561524034e-11,
+            "maximumBoundingCoordinateDifferenceMm": 3.552713678800501e-15,
+            "booleanDifferenceSucceeded": true,
+            "symmetricDifferenceVolumeMm3": 0
+        },
+        {
+            "onshapePart": "Part 1",
+            "chili3dPart": "Open CASCADE STEP translator 8.0 8",
+            "absoluteVolumeDifferenceMm3": 8.162714948412031e-11,
+            "maximumBoundingCoordinateDifferenceMm": 3.552713678800501e-15,
+            "booleanDifferenceSucceeded": true,
+            "symmetricDifferenceVolumeMm3": 0
+        },
+        {
+            "onshapePart": "Part 2",
+            "chili3dPart": "Open CASCADE STEP translator 8.0 6",
+            "absoluteVolumeDifferenceMm3": 2.6261659513693303e-11,
+            "maximumBoundingCoordinateDifferenceMm": 2.22044604925e-16,
+            "booleanDifferenceSucceeded": true,
+            "symmetricDifferenceVolumeMm3": 0
+        },
+        {
+            "onshapePart": "Part 4",
+            "chili3dPart": "Open CASCADE STEP translator 8.0 5",
+            "absoluteVolumeDifferenceMm3": 0,
+            "maximumBoundingCoordinateDifferenceMm": 1.0000000116860974e-7,
+            "booleanDifferenceSucceeded": true,
+            "symmetricDifferenceVolumeMm3": 0
+        }
+    ]
 }
