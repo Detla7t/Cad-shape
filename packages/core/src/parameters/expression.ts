@@ -201,7 +201,7 @@ export function registeredExpressionFunctions(): readonly string[] {
 
 /**
  * Safe arithmetic expression evaluator (no `eval`): `+ - * / %`, parentheses, unary
- * minus, the functions above, `pi`/`e`, and identifiers resolved from `scope` — plus the
+ * minus, comparisons, `&&`/`||` and Onshape's `c ? a : b`, the functions above, `pi`/`e`, and identifiers resolved from `scope` — plus the
  * functions other modules register (`registerExpressionFunction`), whose arguments may be
  * quoted text: `data("Prices", "B3")`. Text is an argument only, never a value.
  *
@@ -310,7 +310,94 @@ class Parser {
         while (/\s/.test(this.source[this.pos] ?? "")) this.pos++;
     }
 
+    /**
+     * The whole grammar, lowest precedence first: `c ? a : b` (Onshape's conditional), `||`,
+     * `&&`, one comparison (`< <= > >= == !=`), then arithmetic. A comparison needs units
+     * that agree and yields 1 or 0 (unitless); `&&`/`||` read nonzero as true; both branches
+     * of `?:` must merge like an addition, and both are evaluated.
+     */
     parseExpression(): Result<EvaluatedValue> {
+        const condition = this.parseOr();
+        if (!condition.isOk) return condition;
+        this.skipSpaces();
+        if (this.source[this.pos] !== "?") return condition;
+        this.pos++;
+        const whenTrue = this.parseExpression();
+        if (!whenTrue.isOk) return whenTrue;
+        this.skipSpaces();
+        if (this.source[this.pos] !== ":") return Result.err("Expected : in a conditional (c ? a : b)");
+        this.pos++;
+        const whenFalse = this.parseExpression();
+        if (!whenFalse.isOk) return whenFalse;
+        const unit = additiveUnitSpec(whenTrue.value.unit, whenFalse.value.unit);
+        if (!unit.isOk) return Result.err(unit.error);
+        const chosen = condition.value.value !== 0 ? whenTrue.value : whenFalse.value;
+        return Result.ok({ value: chosen.value, unit: unit.value });
+    }
+
+    private parseOr(): Result<EvaluatedValue> {
+        let left = this.parseAnd();
+        for (;;) {
+            if (!left.isOk) return left;
+            this.skipSpaces();
+            if (!this.source.startsWith("||", this.pos)) return left;
+            this.pos += 2;
+            const right = this.parseAnd();
+            if (!right.isOk) return right;
+            left = Result.ok({
+                value: left.value.value !== 0 || right.value.value !== 0 ? 1 : 0,
+                unit: UNITLESS,
+            });
+        }
+    }
+
+    private parseAnd(): Result<EvaluatedValue> {
+        let left = this.parseComparison();
+        for (;;) {
+            if (!left.isOk) return left;
+            this.skipSpaces();
+            if (!this.source.startsWith("&&", this.pos)) return left;
+            this.pos += 2;
+            const right = this.parseComparison();
+            if (!right.isOk) return right;
+            left = Result.ok({
+                value: left.value.value !== 0 && right.value.value !== 0 ? 1 : 0,
+                unit: UNITLESS,
+            });
+        }
+    }
+
+    private parseComparison(): Result<EvaluatedValue> {
+        const left = this.parseAdditive();
+        if (!left.isOk) return left;
+        this.skipSpaces();
+        const op = /^(<=|>=|==|!=|<|>)/.exec(this.source.slice(this.pos))?.[0];
+        if (op === undefined) return left;
+        this.pos += op.length;
+        const right = this.parseAdditive();
+        if (!right.isOk) return right;
+        const unit = additiveUnitSpec(left.value.unit, right.value.unit);
+        if (!unit.isOk) return Result.err(unit.error);
+        const a = left.value.value;
+        const b = right.value.value;
+        // lengths arrive converted (2.5 in → 63.5 mm): compare equality within rounding
+        const equal = Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a), Math.abs(b));
+        const holds =
+            op === "<"
+                ? a < b && !equal
+                : op === "<="
+                  ? a < b || equal
+                  : op === ">"
+                    ? a > b && !equal
+                    : op === ">="
+                      ? a > b || equal
+                      : op === "=="
+                        ? equal
+                        : !equal;
+        return Result.ok({ value: holds ? 1 : 0, unit: UNITLESS });
+    }
+
+    private parseAdditive(): Result<EvaluatedValue> {
         let left = this.parseTerm();
         if (!left.isOk) return left;
         for (;;) {
