@@ -699,13 +699,13 @@
     border-top: 1px solid var(--border-color);
 }
 
-/* Pictures anchored to cells, laid over the grid; they scroll with it and stay under the sticky headers. */
+/* Pictures anchored to cells, laid over the grid (and over text running on from a cell); they
+   scroll with it and are clipped below/right of the sticky headers. */
 .imageLayer {
     position: absolute;
     top: 0;
     left: 0;
-    width: 0;
-    height: 0;
+    z-index: 1;
     pointer-events: none;
 }
 .imageLayer img {
@@ -725,4 +725,10 @@
 .sheet table.noGridLines td {
     border-right-color: transparent;
     border-bottom-color: transparent;
+}
+/* Text running on over empty neighbours, drawn above their fills. */
+.sheet table td.overflowText {
+    overflow: visible;
+    text-overflow: clip;
+    z-index: 1;
 }

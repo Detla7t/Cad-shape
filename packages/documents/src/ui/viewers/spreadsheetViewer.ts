@@ -339,6 +339,9 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
                     td.classList.add(chrome.hyperlink);
                     td.title = hyperlinkTitle(link);
                 }
+                // Like Excel, left-aligned text runs on over an empty right neighbour.
+                if (!merge && text && className === "" && overflowsRight(cellRow, cellCol))
+                    td.classList.add(chrome.overflowText);
                 if (r < frozenRows || c < (sheet().frozen?.cols ?? 0)) {
                     td.style.position = "sticky";
                     td.style.zIndex = r < frozenRows && c < (sheet().frozen?.cols ?? 0) ? "4" : "3";
@@ -382,6 +385,17 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
         table.classList.toggle(chrome.noGridLines, sheet().gridLines === false);
         renderImages();
     };
+    /** Whether a text cell may spill into the next column: left/general aligned, unwrapped, neighbour empty. */
+    const overflowsRight = (row: number, col: number) => {
+        const alignment = sheet().cells[addressOf(row, col)]?.s?.alignment;
+        if (
+            alignment?.wrapText ||
+            (alignment?.horizontal && !["left", "general"].includes(alignment.horizontal))
+        )
+            return false;
+        const next = sheet().cells[addressOf(row, col + 1)];
+        return next === undefined || (next.v === undefined && next.f === undefined);
+    };
     /** Pictures at their anchors: column edges from the widths, row edges from the row layout. */
     const renderImages = () => {
         const lefts = [HEADER_WIDTH];
@@ -393,6 +407,11 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
         const top = (row: number) =>
             ROW_HEIGHT + (row <= last ? rowTops[row] : rowTops[last] + (row - last) * ROW_HEIGHT);
         images.render(sheet(), { left, top });
+        // Full content size, clipped to the area below/right of the sticky headers it is drawn above.
+        const layer = images.element.style;
+        layer.width = table.style.width;
+        layer.height = `${top(last)}px`;
+        layer.clipPath = `inset(${scroller.scrollTop + ROW_HEIGHT}px 0 0 ${scroller.scrollLeft + HEADER_WIDTH}px)`;
     };
 
     const renderTabs = () => {
