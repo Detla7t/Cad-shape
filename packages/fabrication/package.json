@@ -1,26 +1,20 @@
 {
     "name": "@chili3d/fabrication",
     "version": "0.7.1",
-    "description": "Fabrication templates (round duct end caps, ...) as pure 2D flat patterns; React configuration UI (./react) and the Chili3d commands that put them into a document (./app)",
+    "description": "Fabrication templates (round duct end caps, ...) as pure 2D flat patterns, and the Chili3d nodes and commands that configure them in a Part Studio (./app)",
     "main": "src/index.ts",
     "type": "module",
     "exports": {
         ".": "./src/index.ts",
-        "./react": "./src/react/index.ts",
         "./app": "./src/app/index.ts"
     },
     "devDependencies": {
         "@chili3d/core": "*",
         "@chili3d/documents": "*",
         "@chili3d/drawing": "*",
-        "@chili3d/parametric": "*",
-        "@chili3d/react": "*"
+        "@chili3d/parametric": "*"
     },
     "dependencies": {
         "jszip": "^3.10.1"
-    },
-    "peerDependencies": {
-        "react": "^19.2.0",
-        "react-dom": "^19.2.0"
     }
 }

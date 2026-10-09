@@ -5,8 +5,10 @@ import { registerDocumentTemplate } from "@chili3d/core";
 import { END_CAP_TEMPLATE } from "./endCapTemplate";
 
 export * from "./endCapCommand";
+export * from "./endCapConfiguration";
 export * from "./endCapSketch";
+export * from "./endCapSketchNode";
 export * from "./endCapTemplate";
 
-// Loading the module publishes its templates, as loading it registers its commands.
+// Loading the module publishes its templates, as loading it registers its commands and nodes.
 registerDocumentTemplate(END_CAP_TEMPLATE);

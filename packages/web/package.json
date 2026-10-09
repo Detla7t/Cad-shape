@@ -1,7 +1,7 @@
 {
     "name": "@chili3d/web",
     "version": "0.7.1",
-    "description": "The Next.js app: the CAD workbench (/) and the End Cap Configurator (/endcap)",
+    "description": "The Next.js app: the CAD workbench (/)",
     "private": true,
     "type": "module",
     "scripts": {
@@ -11,7 +11,6 @@
     },
     "dependencies": {
         "@chili3d/builder": "*",
-        "@chili3d/fabrication": "*",
         "@chili3d/react": "*",
         "next": "^16.4.0",
         "react": "^19.2.8",

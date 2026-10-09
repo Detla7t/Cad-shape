@@ -319,11 +319,10 @@ Not yet: press-pull extrudes (from body faces) show no arrow; revolve shows no a
 
 | Onshape | Chili3D |
 | --- | --- |
-| Part Studio configuration panel: `Endcap` checkbox, `OD`/`ID` lists (4"–24", Custom), `Wall Height` | The same controls, in the same order, in Sheet Metal ▸ Round Duct ▸ End Cap (a dialog) and on the `/endcap/` page |
-| "End Cap" / "Reducing End Cap" sketches, flats laid out below and above the origin | One sketch named like the export (`9.63in x 6.63in Reducing End Cap`), same layout; rim bend arcs as construction, each half and strip a pickable region |
-| Export as DXF (inch, `ModelSketch_Visible` layer); Order Library profile "End caps — all preset sizes" | Download DXF/SVG of one cap; "Download all (.zip)" writes the 253 preset files with the profile's names; geometry matches every Onshape export to 1e-6 in |
-| Configuration string (`Endcap=false;OD_Table=_9_5_8_;List_tBoS7KHF1hLsDf=_6_5_8_`) | Shown on the page for preset sizes |
-| Public document (globe icon) anyone can view and copy | Public template in the dashboard's Public section ("Open copy"), or the link `/?template=end-cap-configurator`; the copy holds both sketches and the reducer's DXF drawing tab |
+| Part Studio Configurations panel: `Endcap` checkbox, `OD`/`ID` lists (4"–24", Custom), `Wall Height` | The same inputs in the Part Studio's Configurations panel (`Endcap`, `OD`, `ID`, `Custom_OD`, `Custom_ID`, `Wall_Height`, `Finish_Wall_Height`), each shown only when it applies; Onshape's option ids (`_9_5_8_`) |
+| "End Cap" / "Reducing End Cap" sketches driven by the configuration | One "End Cap" sketch feature that redraws when the configuration changes (Sheet Metal ▸ Round Duct ▸ End Cap adds it, with the inputs); its size shows read-only in Properties; an impossible pair (ID ≥ OD) badges the feature and keeps the last drawing |
+| Export as DXF (inch, `ModelSketch_Visible` layer); Order Library profile "End caps — all preset sizes" | The template's "End Cap Drawing" tab is the cut-ready DXF of the current configuration (download as DXF/SVG/DWG); geometry matches every Onshape export to 1e-6 in |
+| Public document anyone can copy | Dashboard ▸ Public ▸ End Cap Configurator ▸ Open copy, or `/?template=end-cap-configurator` |
 | Custom Crimp, Wall Inner Edge | Not modelled: every reference export used their defaults, so their effect on the flats is unknown |
 
 ## Equal between a circle and an arc

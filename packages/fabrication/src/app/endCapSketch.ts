@@ -1,10 +1,10 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type IDocument, Plane, Result, Transaction } from "@chili3d/core";
+import { Result } from "@chili3d/core";
 import { drawingToSketchData } from "@chili3d/documents";
 import { convertDrawing } from "@chili3d/drawing";
-import { type SketchData, SketchNode } from "@chili3d/parametric";
+import type { SketchData } from "@chili3d/parametric";
 import { type EndCapParams, endCapPattern } from "../endcap/endCap";
 import { ONSHAPE_LAYERS, toDrawing } from "../geometry/toDrawing";
 
@@ -30,19 +30,4 @@ export function endCapSketchData(params: EndCapParams): Result<{ name: string; d
             activeLayer: ONSHAPE_LAYERS.outline.name,
         },
     });
-}
-
-/** Adds the cap's sketch to `document` as one undo step and selects it. */
-export function addEndCapSketch(document: IDocument, params: EndCapParams): Result<SketchNode> {
-    const sketchData = endCapSketchData(params);
-    if (!sketchData.isOk) return Result.err(sketchData.error);
-    const { name, data } = sketchData.value;
-    let sketch: SketchNode | undefined;
-    Transaction.execute(document, name, () => {
-        sketch = new SketchNode({ document, plane: Plane.XY, data });
-        sketch.name = name;
-        document.modelManager.addNode(sketch);
-    });
-    document.selection.setSelectedNodes([sketch!], false);
-    return Result.ok(sketch!);
 }

@@ -3,8 +3,8 @@
 
 /**
  * Fabrication templates as pure 2D flat patterns (no kernel, no DOM): usable from web pages,
- * tests and scripts. Their React configuration UI is `@chili3d/fabrication/react`; the Chili3d
- * commands that put them into a document are `@chili3d/fabrication/app`.
+ * tests and scripts. The Chili3d nodes and commands that configure them in a Part Studio are
+ * `@chili3d/fabrication/app`.
  */
 
 export * from "./endcap";

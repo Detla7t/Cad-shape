@@ -101,10 +101,10 @@ element ──> core
 - **`builder`** — `AppBuilder` with a fluent `.useIndexedDB().useWasmOcc().useThree().useUI().build()` chain and default ribbon layout
 - **`i18n`** — Locale data (en, zh-cn, pt-br)
 - **`storage`** — IndexedDB persistence layer
-- **`web`** — The Next.js app: the CAD workbench at `/` (boots `AppBuilder`, parses URL parameters) and the End Cap Configurator at `/endcap/`
+- **`web`** — The Next.js app: the CAD workbench at `/` (boots `AppBuilder`, parses URL parameters)
 - **`react`** — React bindings: hooks over the reactive core, the application host, React islands inside the legacy UI, shared controls
 - **`drawing`** — 2D drawing model with DXF and SVG writers (no CAD dependencies)
-- **`fabrication`** — Shop templates as flat patterns (round duct end caps), their React configurator and the End Cap command
+- **`fabrication`** — Shop templates as flat patterns (round duct end caps) and the configured End Cap feature for the Part Studio
 
 ## Technology Stack
 

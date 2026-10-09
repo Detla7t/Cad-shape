@@ -4,8 +4,6 @@
 "use client";
 
 import { findDocumentTemplate, type IApplication, Logger, PubSub } from "@chili3d/core";
-import { insertEndCap } from "@chili3d/fabrication/app";
-import { endCapFromSearchParams } from "@chili3d/fabrication/react";
 import { ChiliHost, LoadingScreen } from "@chili3d/react";
 import { parseStartupParams } from "../startupParams";
 import { bootApplication } from "./bootApplication";
@@ -29,9 +27,6 @@ async function handleReady(app: IApplication) {
     // `/?template=end-cap-configurator`: a copy of a public template, saved to the user's library.
     const templateId = new URLSearchParams(search).get("template");
     if (templateId) await openTemplate(app, templateId);
-    // `/?endcap=reducing&od=9.625&id=6.625`: the configurator page's "Open in CAD".
-    const endCap = endCapFromSearchParams(new URLSearchParams(search));
-    if (endCap !== undefined) await insertEndCap(app, endCap);
 }
 
 async function openTemplate(app: IApplication, id: string) {
