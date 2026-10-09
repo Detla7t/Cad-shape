@@ -110,7 +110,7 @@ element ──> core
 
 - **Frontend**: TypeScript, Three.js (0.184)
 - **3D Kernel**: OpenCascade 8.0.0 (OCCT) compiled to WebAssembly via Emscripten
-- **App framework**: Next.js 16 (static export, webpack) with React 19; plugins still bundle with Rspack 2
+- **App framework**: Next.js 16 (static export, Turbopack) with React 19; plugins still bundle with Rspack 2
 - **Linting & Formatting**: Biome (TypeScript), clang-format (C++)
 - **Testing**: Rstest + Happy-DOM
 - **Package Manager**: npm workspaces
@@ -148,7 +148,7 @@ For Chinese users, you can also browse the [media](https://space.bilibili.com/53
 Start the development server:
 
 ```bash
-npm run dev   # Launches at http://localhost:8080
+npm run dev   # Launches at http://localhost:8080 (Turbopack; a few seconds, faster after the first run)
 ```
 
 ### Building
@@ -165,7 +165,7 @@ Type checking and declaration generation prefer [ts-rust](https://github.com/pin
 (`tsc-rs` 0.1.0). Automatic failover tries Go TypeScript, then the retained TypeScript 6 compiler
 if a compiler is unavailable, crashes, or exceeds the two-minute timeout. TypeScript diagnostics
 fail the check immediately; automatic failover never hides type errors. Each run logs its compiler
-and any fallback reason. Next.js (webpack + SWC) bundles and emits browser JavaScript.
+and any fallback reason. Next.js (Turbopack + SWC) bundles and emits browser JavaScript.
 
 ```bash
 npm run typecheck          # Rust → Go → TypeScript 6, on compiler failure only
@@ -180,7 +180,7 @@ CHILI_TS_COMPILER=go npm run build   # Use Go for application and plugin builds
 
 `CHILI_TS_COMPILER=auto|rust|go|legacy` applies to checking, dev, builds, and declarations;
 the `--compiler` flag overrides it for `typecheck` and `build:types`. Use `npm run dev` for watched
-checking. The build waits for type checking and displays errors in the Next.js overlay.
+checking: it type-checks in the background at start and after every source change and prints errors to its terminal, without slowing the app. `npm run build` type-checks before bundling.
 The watcher also tracks checked files outside the browser's module graph, such as tests.
 CI checks with all three compilers explicitly.
 

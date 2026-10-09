@@ -6,7 +6,7 @@
     "author": "仙阁",
     "type": "module",
     "scripts": {
-        "build": "node scripts/external-assets.mjs --check && next build packages/web --webpack && node scripts/collect-web-export.mjs && node scripts/build-plugins.mjs && node scripts/external-assets.mjs --check-dist",
+        "build": "node scripts/external-assets.mjs --check && node scripts/typecheck.mjs && next build packages/web --no-mangling && node scripts/collect-web-export.mjs && node scripts/build-plugins.mjs && node scripts/external-assets.mjs --check-dist",
         "build:offline": "node scripts/offline.mjs npm run build",
         "assets:check": "node scripts/external-assets.mjs --check",
         "assets:refresh": "node scripts/external-assets.mjs --refresh",
@@ -27,7 +27,7 @@
         "typecheck:go": "node scripts/typecheck.mjs --compiler go",
         "typecheck:legacy": "node scripts/typecheck.mjs --compiler legacy",
         "typecheck:offline": "node scripts/offline.mjs node scripts/typecheck.mjs",
-        "dev": "next dev packages/web --webpack --port 8080",
+        "dev": "node scripts/dev.mjs --port 8080",
         "format": "biome check --write . && npx clang-format --style=Webkit --sort-includes -i ./cpp/src/**",
         "generate:capabilities": "node scripts/generate-shape-capabilities.mjs",
         "preview": "node scripts/serve-offline.mjs",

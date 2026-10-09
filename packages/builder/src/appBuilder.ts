@@ -97,11 +97,16 @@ export class AppBuilder {
     }
 
     useWasmOcc() {
+        // The OCCT kernel (~5 MB of WebAssembly) downloads and compiles while the other modules load.
+        const loading = preload(async () => {
+            const wasm = await import("@chili3d/wasm");
+            await wasm.initWasm();
+            return wasm;
+        });
         this._inits.push(async () => {
             Logger.info("initializing wasm occ");
 
-            const wasm = await import("@chili3d/wasm");
-            await wasm.initWasm();
+            const wasm = await loading;
             this._shapeProvider = new wasm.OccShapeProvider();
         });
         return this;
@@ -111,13 +116,17 @@ export class AppBuilder {
         // Onshape's FeatureScript std library (~1 MB): start fetching now, alongside the rest of startup.
         const onshapeStd = import("@chili3d/onshape-std").then((std) => std.loadOnshapeStd());
         onshapeStd.catch(() => {}); // handled where it is awaited
+        // registers sketch/feature commands, the SketchNode/ParametricBodyNode serializers, and
+        // exposes the sketch ribbon contributions; the garlic solver compiles meanwhile
+        const loading = preload(async () => {
+            const parametric = await import("@chili3d/parametric");
+            await parametric.initGarlic();
+            return parametric;
+        });
         this._inits.push(async () => {
             Logger.info("initializing parametric");
 
-            // registers sketch/feature commands, the SketchNode/ParametricBodyNode
-            // serializers, and exposes the sketch ribbon contributions
-            const parametric = await import("@chili3d/parametric");
-            await parametric.initGarlic();
+            const parametric = await loading;
             try {
                 parametric.provideOnshapeStd(parametric.onshapeStdFromBundle(await onshapeStd));
                 // Parse and instantiate the std once the app is idle, not on the first studio compile.
@@ -142,16 +151,18 @@ export class AppBuilder {
      * it comes after `useParametric`.
      */
     useCam(): this {
-        this._inits.push(async () => {
-            Logger.info("initializing cam");
-
+        const loading = preload(async () => {
             // CAM kernels call the Rust module synchronously
             const rs = await import("@chili3d/rs");
             await rs.initRust();
+            // registers the CAM Studio element and commands, the machine library and the posts
+            return import("@chili3d/cam");
+        });
+        this._inits.push(async () => {
+            Logger.info("initializing cam");
 
-            // registers the CAM Studio element and commands, the machine library and the posts;
             // plugins reach the registries (operations, posts, machines) through the global
-            const cam = await import("@chili3d/cam");
+            const cam = await loading;
             (globalThis as any).Chili3dCam = cam;
             this._ribbonExtras.push(...CamRibbonProfiles);
         });
@@ -165,10 +176,11 @@ export class AppBuilder {
      * sources set to refresh on open or on an interval are kept fresh while their document is shown.
      */
     useData(): this {
+        const loading = preload(() => import("@chili3d/data"));
         this._inits.push(async () => {
             Logger.info("initializing data sources");
 
-            const data = await import("@chili3d/data");
+            const data = await loading;
             data.startDataRefresh();
             this._ribbonExtras.push(...DataRibbonProfiles);
         });
@@ -181,10 +193,11 @@ export class AppBuilder {
      * folder that carries linked geometry.
      */
     useAssembly(): this {
+        const loading = preload(() => import("@chili3d/assembly"));
         this._inits.push(async () => {
             Logger.info("initializing assembly");
 
-            const assembly = await import("@chili3d/assembly");
+            const assembly = await loading;
             // Scriptable like the core API (plugins, the console): insert, mate, solve, link.
             (globalThis as Record<string, unknown>)["Chili3dAssembly"] = assembly;
             this._ribbonExtras.push(...AssemblyRibbonProfiles);
@@ -202,10 +215,11 @@ export class AppBuilder {
      * libraries (LibreDWG, ExcelJS, pdf.js, mammoth, docx, CodeMirror) load on first use.
      */
     useDocuments(): this {
+        const loading = preload(() => import("@chili3d/documents"));
         this._inits.push(async () => {
             Logger.info("initializing documents");
 
-            const documents = await import("@chili3d/documents");
+            const documents = await loading;
             documents.registerDocumentsModule();
             this._ribbonExtras.push(...documents.DocumentsRibbonProfiles);
         });
@@ -218,10 +232,11 @@ export class AppBuilder {
      * joins the sheet metal tab, so it comes after `useParametric`.
      */
     useFabrication(): this {
+        const loading = preload(() => import("@chili3d/fabrication/app"));
         this._inits.push(async () => {
             Logger.info("initializing fabrication");
 
-            const fabrication = await import("@chili3d/fabrication/app");
+            const fabrication = await loading;
             (globalThis as Record<string, unknown>)["Chili3dFabrication"] = fabrication;
             this._ribbonExtras.push(...FabricationRibbonProfiles);
         });
@@ -229,10 +244,11 @@ export class AppBuilder {
     }
 
     useThree(): this {
+        const loading = preload(() => import("@chili3d/three"));
         this._inits.push(async () => {
             Logger.info("initializing three");
 
-            const three = await import("@chili3d/three");
+            const three = await loading;
             this._visualFactory = new three.ThreeVisulFactory((d) => new ShowPropertyEventHandler(d));
         });
         return this;
@@ -243,10 +259,11 @@ export class AppBuilder {
      * workbench passes its own); `#app` or the body when absent.
      */
     useUI(container?: HTMLElement): this {
+        const loading = preload(() => import("@chili3d/ui"));
         this._inits.push(async () => {
             Logger.info("initializing MainWindow");
 
-            const ui = await import("@chili3d/ui");
+            const ui = await loading;
             const app = container ?? (document.getElementById("app") as HTMLElement);
             this._window = new ui.MainWindow(await this.getRibbonTabs(), "iconfont.js", app);
         });
@@ -335,6 +352,17 @@ export class AppBuilder {
     protected getServices(): IService[] {
         return [new CommandService(), new HotkeyService(), new AutosaveService()];
     }
+}
+
+/**
+ * Starts loading a module now — when its `use*()` is called — so every module's download,
+ * evaluation and WebAssembly compile overlap; the init that awaits it still runs in order, so
+ * ribbon contributions and registrations stay deterministic. A failure surfaces in that init.
+ */
+function preload<T>(load: () => Promise<T>): Promise<T> {
+    const loading = load();
+    loading.catch(() => {});
+    return loading;
 }
 
 function whenIdle(task: () => void): void {

@@ -1,56 +1,65 @@
-svg {
+/* Element selectors are :global — this sheet styles plain elements app-wide, and CSS modules
+   (Turbopack, webpack) only accept them explicitly marked. */
+:global(svg) {
     color: inherit;
     fill: currentColor;
 }
 
-input,
-textarea,
-select {
+:global(input),
+:global(textarea),
+:global(select) {
     color: var(--input-text-color);
     background-color: var(--input-background-color);
     border: 1px solid var(--input-border-color);
 }
 
 /* Native option lists, datalists and pickers take their colors from the select, not the page. */
-option,
-optgroup {
+:global(option),
+:global(optgroup) {
     color: var(--input-text-color);
     background-color: var(--input-background-color);
 }
 
-input::placeholder,
-textarea::placeholder {
+:global(input)::placeholder,
+:global(textarea)::placeholder {
     color: var(--foreground-muted-color);
     opacity: 1;
 }
 
-button,
+/* Two rules, not one list: a list mixing the element and the class would compile to
+   :is(button, .button), whose class specificity overrides every component's button classes. */
+:global(button) {
+    color: var(--foreground-color);
+    background-color: var(--control-background-color);
+    border: 1px solid var(--border-color);
+}
+
 .button {
     color: var(--foreground-color);
     background-color: var(--control-background-color);
     border: 1px solid var(--border-color);
 }
 
-a {
+:global(a) {
     color: var(--foreground-color);
 }
 
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
+:global(h1),
+:global(h2),
+:global(h3),
+:global(h4),
+:global(h5),
+:global(h6) {
     color: var(--foreground-color);
 }
 
-p,
-span,
-div {
+:global(p),
+:global(span),
+:global(div) {
     color: var(--foreground-color);
 }
 
-chili3d-main-window {
+:global(chili3d-main-window) {
     position: absolute;
     top: 0;
     left: 0;

@@ -3,5 +3,6 @@
 
 /** Starts pdf.js' worker — its own bundle chunk. */
 export function createPdfWorker(): Worker {
-    return new Worker(new URL("./pdfWorker.ts", import.meta.url));
+    // A module worker: the form both Turbopack and webpack bundle as a worker entry.
+    return new Worker(new URL("./pdfWorker.ts", import.meta.url), { type: "module" });
 }

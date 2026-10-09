@@ -325,3 +325,7 @@ Not yet: press-pull extrudes (from body faces) show no arrow; revolve shows no a
 | Configuration string (`Endcap=false;OD_Table=_9_5_8_;List_tBoS7KHF1hLsDf=_6_5_8_`) | Shown on the page for preset sizes |
 | Public document (globe icon) anyone can view and copy | Public template in the dashboard's Public section ("Open copy"), or the link `/?template=end-cap-configurator`; the copy holds both sketches and the reducer's DXF drawing tab |
 | Custom Crimp, Wall Inner Edge | Not modelled: every reference export used their defaults, so their effect on the flats is unknown |
+
+## Equal between a circle and an arc
+
+Onshape's Equal accepts any two round entities: a circle and an arc (a trimmed circle) get the same radius. Chili3D's Equal refused that pair ("Equal requires two entities of the same type"); it now applies the solver's mixed equal-radius constraint, in either pick order. Lines still pair with lines; a line and a circle or arc is refused with "Equal requires two lines, or two circles or arcs".

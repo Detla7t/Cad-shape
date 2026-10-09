@@ -63,10 +63,34 @@ const nextConfig = {
     transpilePackages: workspacePackages,
     images: { unoptimized: true, disableStaticImages: true },
     experimental: { externalDir: true },
-    // The workspace is type-checked as one project by `TypecheckPlugin` below (the root
-    // tsconfig, the compiler `npm run typecheck` picks); Next's own check would cover only this app.
+    // The workspace is type-checked as one project (the root tsconfig, the compiler `npm run
+    // typecheck` picks): by `TypecheckPlugin` in webpack builds, by `scripts/dev.mjs` beside the
+    // Turbopack dev server. Next's own check would cover only this app.
     typescript: { ignoreBuildErrors: true },
-    webpack(config, { webpack, isServer }) {
+    compiler: {
+        define: {
+            __APP_VERSION__: JSON.stringify(rootPackage.version),
+            __DOCUMENT_VERSION__: JSON.stringify(rootPackage.documentVersion),
+            __IS_PRODUCTION__: JSON.stringify(process.env.NODE_ENV === "production"),
+        },
+    },
+    // `npm run dev` runs Turbopack (seconds to a working app, cached between runs in .next/);
+    // these rules mirror the webpack ones below.
+    turbopack: {
+        root: rootDir,
+        rules: {
+            "*.svg": { type: "raw" },
+            "*.wasm": { type: "asset" },
+            "*.cur": { type: "asset" },
+            "*.jpg": { type: "asset" },
+            "*.gz": { type: "asset" },
+        },
+        resolveAlias: {
+            // Emscripten glue (LibreDWG in @chili3d/documents) imports Node's `module` only under Node.
+            module: { browser: "./src/emptyModule.js" },
+        },
+    },
+    webpack(config, { isServer }) {
         allowGlobalSelectorsInModules(config.module.rules);
         config.module.rules.push(
             // Icon sheets are inlined as markup.
@@ -82,13 +106,6 @@ const nextConfig = {
                 type: "asset/resource",
                 generator: { filename: "static/media/[name].[hash][ext]" },
             },
-        );
-        config.plugins.push(
-            new webpack.DefinePlugin({
-                __APP_VERSION__: JSON.stringify(rootPackage.version),
-                __DOCUMENT_VERSION__: JSON.stringify(rootPackage.documentVersion),
-                __IS_PRODUCTION__: JSON.stringify(process.env.NODE_ENV === "production"),
-            }),
         );
         if (!isServer) {
             // Type errors fail the build (and show in dev), as they did under Rspack: once, on the client compiler.

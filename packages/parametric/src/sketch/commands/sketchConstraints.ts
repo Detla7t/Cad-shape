@@ -254,7 +254,13 @@ export class VerticalAlignConstraintCommand extends TwoPointConstraintCommand {
     protected readonly kind = ConstraintKind.VerticalAlign;
 }
 
-/** Picks two entities of the same type and applies the matching equal constraint. */
+/** Round entities: an equal constraint between any two of them equates their radii. */
+const isRound = (type: string | undefined) => type === "circle" || type === "arc";
+
+/**
+ * Picks two lines (equal length) or two round entities — circles and arcs in any mix, so a
+ * trimmed circle can still be made equal to a whole one — (equal radius).
+ */
 @command({ key: "constraint.equal", icon: "icon-cEqual" })
 export class EqualConstraintCommand extends RepeatingConstraintCommand {
     protected async executeWithEditor(editor: SketchEditor): Promise<void> {
@@ -270,23 +276,22 @@ export class EqualConstraintCommand extends RepeatingConstraintCommand {
         }
         const t1 = editor.solver.entity(e1)?.type;
         const t2 = editor.solver.entity(e2)?.type;
-        if (t1 === undefined || t1 !== t2) {
-            PubSub.default.pub("displayError", "Equal requires two entities of the same type");
-            return;
+        if (t1 === "line" && t2 === "line") {
+            addAndCommit(editor, ConstraintKind.EqualLength, [...lineRefs(e1), ...lineRefs(e2)]);
+        } else if (t1 === "arc" && t2 === "arc") {
+            addAndCommit(editor, ConstraintKind.EqualArcRadius, [
+                centerRef(e1),
+                arcStartRef(e1),
+                centerRef(e2),
+                arcStartRef(e2),
+            ]);
+        } else if (isRound(t1) && isRound(t2)) {
+            // Two circles, or a circle and an arc: the solver equates the arc's radius to the
+            // circle's radius parameter.
+            addAndCommit(editor, ConstraintKind.EqualRadius, [centerRef(e1), centerRef(e2)]);
+        } else {
+            PubSub.default.pub("displayError", "Equal requires two lines, or two circles or arcs");
         }
-        const refs =
-            t1 === "line"
-                ? [...lineRefs(e1), ...lineRefs(e2)]
-                : t1 === "circle"
-                  ? [centerRef(e1), centerRef(e2)]
-                  : [centerRef(e1), arcStartRef(e1), centerRef(e2), arcStartRef(e2)];
-        const kind =
-            t1 === "line"
-                ? ConstraintKind.EqualLength
-                : t1 === "circle"
-                  ? ConstraintKind.EqualRadius
-                  : ConstraintKind.EqualArcRadius;
-        addAndCommit(editor, kind, refs);
     }
 }
 

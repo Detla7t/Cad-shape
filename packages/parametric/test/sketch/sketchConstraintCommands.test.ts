@@ -171,6 +171,36 @@ describe("EqualConstraintCommand", () => {
         }
     });
 
+    test.each([
+        ["circle then arc", "circle"],
+        ["arc then circle", "arc"],
+    ])("a %s produce an EqualRadius constraint that makes the radii equal", async (_name, first) => {
+        const editor = fakeEditor();
+        try {
+            const circle = editor.solver.addCircle(0, 0, 5);
+            // A trimmed circle: radius 8 about (30, 0)
+            const arc = editor.solver.addArc(30, 0, 38, 0, 30, 8);
+            editor.entityQueue.push(...(first === "circle" ? [circle, arc] : [arc, circle]));
+
+            await runCommand(new EqualConstraintCommand(), editor);
+
+            const found = constraintsOf(editor, ConstraintKind.EqualRadius);
+            expect(found.length).toBe(1);
+            expect(found[0].refs).toEqual(
+                first === "circle" ? [ref(circle, 0), ref(arc, 0)] : [ref(arc, 0), ref(circle, 0)],
+            );
+            expect(editor.commit).toHaveBeenCalledTimes(1);
+            // The fake editor does not solve; the real solver makes the radii equal.
+            expect(editor.solver.solve(true).result).toMatch(/^Ok/);
+            const data = editor.solver.toData();
+            const circleRadius = data.entities.find((e) => e.id === circle)!.params[2];
+            const [cx, cy, sx, sy] = data.entities.find((e) => e.id === arc)!.params;
+            expect(Math.hypot(sx - cx, sy - cy)).toBeCloseTo(circleRadius, 6);
+        } finally {
+            editor.solver.dispose();
+        }
+    });
+
     test("line and circle of different types pub an error without a constraint", async () => {
         const editor = fakeEditor();
         const pub = rs.spyOn(PubSub.default, "pub").mockImplementation(() => {});

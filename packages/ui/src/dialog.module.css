@@ -1,4 +1,6 @@
-dialog {
+/* Element selectors are :global — this sheet styles plain elements app-wide, and CSS modules
+   (Turbopack, webpack) only accept them explicitly marked. */
+:global(dialog) {
     border: none;
     box-shadow: 0px 5px 10px var(--foreground-muted-color);
     padding: 0px;
@@ -6,7 +8,7 @@ dialog {
     backdrop-filter: blur(5px);
 }
 
-dialog::backdrop {
+:global(dialog)::backdrop {
     background-color: var(--backdrop-color);
 }
 
