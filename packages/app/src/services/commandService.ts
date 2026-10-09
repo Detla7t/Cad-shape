@@ -9,8 +9,10 @@ import {
     type IService,
     type IView,
     isCancelableCommand,
+    type LogContext,
     Logger,
     OperationLog,
+    PropertyUtils,
     PubSub,
 } from "@chili3d/core";
 
@@ -56,10 +58,10 @@ export class CommandService implements IService {
         }
         if (!command || !(await this.canExecute(command))) return;
 
-        await this.executeAsync(command);
+        await this.executeAsync(command, commandName);
     };
 
-    private async executeAsync(commandName: CommandKeys) {
+    private async executeAsync(commandName: CommandKeys, requested: CommandKeys = commandName) {
         const commandCtor = CommandStore.getCommand(commandName)!;
         if (!commandCtor) {
             Logger.error(`Can not find ${commandName} command`);
@@ -67,9 +69,15 @@ export class CommandService implements IService {
         }
 
         const document = this.app.activeView?.document;
+        // what was asked for, what it resolved to, and what was selected when it started —
+        // the three things that decide which flow a command takes
         const operation = OperationLog.begin("command.execute", {
             command: commandName,
+            ...(requested === commandName ? {} : { requestedCommand: requested }),
             documentId: document?.id,
+            selectedNodesAtStart: document?.selection.getSelectedNodes().length,
+            selectedShapesAtStart: document?.selection.getSelectedShapes().length,
+            nodesAtStart: document?.modelManager?.findNodes?.().length,
         });
         let failure: unknown;
         const command = new commandCtor();
@@ -84,6 +92,7 @@ export class CommandService implements IService {
             .finally(() => {
                 operation.add({
                     nodeCount: document?.modelManager?.findNodes?.().length,
+                    ...commandParameters(command),
                 });
                 operation.finish(
                     failure !== undefined
@@ -125,4 +134,25 @@ export class CommandService implements IService {
         }
         return false;
     }
+}
+
+/**
+ * The command's declared parameters as `param.<name>` fields — the options the user set
+ * (depth, operation, connected …) are what make a run reproducible. Only scalar values are
+ * recorded; a parameter whose getter throws is skipped.
+ */
+export function commandParameters(command: object): LogContext {
+    const values: LogContext = {};
+    for (const property of PropertyUtils.getProperties(command)) {
+        try {
+            const value = (command as Record<string, unknown>)[property.name];
+            if (typeof value === "function" || value === undefined || value === null) continue;
+            if (typeof value === "string" || typeof value === "number" || typeof value === "boolean")
+                values[`param.${property.name}`] = typeof value === "string" ? value.slice(0, 200) : value;
+            else values[`param.${property.name}`] = String(value).slice(0, 200);
+        } catch {
+            // a parameter that cannot be read is not worth failing the log for
+        }
+    }
+    return values;
 }

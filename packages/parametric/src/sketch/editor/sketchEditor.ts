@@ -13,6 +13,8 @@ import {
     type IDocument,
     type IEventHandler,
     type IView,
+    type OperationHandle,
+    OperationLog,
     type ParameterValue,
     PubSub,
     Result,
@@ -237,6 +239,9 @@ export class SketchEditor implements IDisposable {
     private closeDatum?: () => void;
     private readonly initialData: SketchData;
     private readonly initialName: string;
+    /** The session as one event: entered → accepted or cancelled, with the commits made meanwhile. */
+    private readonly sessionOperation: OperationHandle;
+    private commits = 0;
 
     constructor(
         readonly document: IDocument,
@@ -245,6 +250,14 @@ export class SketchEditor implements IDisposable {
     ) {
         this.initialData = structuredClone(node.data);
         this.initialName = node.name;
+        this.sessionOperation = OperationLog.begin("sketch.session", {
+            documentId: document.id,
+            sketchId: node.id,
+            sketchName: node.name,
+            newSketch: options.newSketch === true,
+            entitiesAtStart: node.data.entities.length,
+            constraintsAtStart: node.data.constraints.length,
+        });
         // The only non-null assertion in here — resolve it before any session state
         // is written: enter() publishes the active editor only after the constructor
         // returns, so a later throw unwinds in this constructor's own catch, and this
@@ -723,6 +736,7 @@ export class SketchEditor implements IDisposable {
         }
 
         if (value !== undefined) {
+            this.sessionOperation.step(`pick.${request.kind}`, describePick(value));
             if (
                 request.kind === "pointOrEntity" ||
                 (request.kind === "dimension" && (value as { kind: string }).kind !== "position")
@@ -821,9 +835,29 @@ export class SketchEditor implements IDisposable {
         if (this.dimensionAnchors.size > 0) {
             data.anchors = [...this.dimensionAnchors].map(([id, anchor]) => ({ id, anchor }));
         }
-        Transaction.execute(this.document, "edit sketch", () => {
-            this.node.setDataEmitShapeChanged(data);
+        // one event per committed sketch edit: the solver state a report needs to reproduce it
+        const operation = OperationLog.begin("sketch.commit", {
+            documentId: this.document.id,
+            sketchId: this.node.id,
+            sketchName: this.node.name,
+            entities: data.entities.length,
+            constraints: data.constraints.length,
+            externalRefs: data.externalRefs?.length ?? 0,
+            dofs: this.lastSolveOutcome.dofs,
+            solveResult: this.lastSolveOutcome.result,
+            datumErrors: this.solver.datumErrors.size,
+            picking: this.isPicking,
         });
+        this.commits++;
+        try {
+            Transaction.execute(this.document, "edit sketch", () => {
+                this.node.setDataEmitShapeChanged(data);
+            });
+            operation.finish(this.lastSolveOutcome.result.startsWith("Ok") ? "success" : "error");
+        } catch (error) {
+            operation.finish("error", error);
+            throw error;
+        }
         // toData re-derives external-ref roles from the constraints — a flip
         // (dashed ↔ solid) shows up only when the session display re-renders
         this.refreshExternalDisplay();
@@ -956,6 +990,7 @@ export class SketchEditor implements IDisposable {
         if (SketchEditor.activeEditor === this) SketchEditor.activeEditor = undefined;
         try {
             this.commit();
+            this.finishSession("success");
         } finally {
             // a commit failure must not strand the session teardown
             this.node.setShowProfileFaces(true);
@@ -971,6 +1006,7 @@ export class SketchEditor implements IDisposable {
         this.closeDatum?.();
         this.cancelTools();
         this.cancelPick();
+        this.finishSession("cancelled");
         Transaction.execute(this.document, "cancel sketch edits", () => {
             this.node.name = this.initialName;
             this.node.setDataEmitShapeChanged(structuredClone(this.initialData));
@@ -1006,6 +1042,17 @@ export class SketchEditor implements IDisposable {
         );
     }
 
+    private finishSession(outcome: "success" | "cancelled"): void {
+        this.sessionOperation.add({
+            commits: this.commits,
+            entities: this.solver.entities().length,
+            constraints: this.solver.toData().constraints.length,
+            dofs: this.lastSolveOutcome.dofs,
+            solveResult: this.lastSolveOutcome.result,
+        });
+        this.sessionOperation.finish(outcome);
+    }
+
     /** Sets the sketch's visibility without recording an undo history record. */
     private setNodeVisibleSilently(visible: boolean): void {
         const history = this.node.document.history;
@@ -1022,6 +1069,8 @@ export class SketchEditor implements IDisposable {
         if (this.disposed) return;
         this.closeDatum?.();
         this.cancelTools();
+        // a session torn down without exit/cancel (view closed) still ends its event
+        this.finishSession("cancelled");
         this.view.dom?.querySelector("[data-sketch-diagnostics]")?.remove();
         this.disposed = true;
         this.cancelPick();
@@ -1116,4 +1165,27 @@ export class SketchEditor implements IDisposable {
             handler["canRotate"] = value;
         }
     }
+}
+
+/** A pick result as log fields: the entity and point it names, or the free position. */
+function describePick(value: unknown): Record<string, string | number | undefined> {
+    if (Array.isArray(value))
+        return { u: Math.round(value[0] * 1000) / 1000, v: Math.round(value[1] * 1000) / 1000 };
+    if (typeof value === "number") return { entityId: value };
+    const target = value as {
+        kind?: string;
+        ref?: SketchPointRef;
+        entityId?: number;
+        position?: [number, number];
+    };
+    if (target.kind === "point" && target.ref)
+        return { entityId: target.ref.entityId, pointIndex: target.ref.pointIndex };
+    if (target.kind === "entity") return { entityId: target.entityId };
+    if (target.kind === "position" && target.position)
+        return {
+            u: Math.round(target.position[0] * 1000) / 1000,
+            v: Math.round(target.position[1] * 1000) / 1000,
+        };
+    const ref = value as SketchPointRef;
+    return { entityId: ref.entityId, pointIndex: ref.pointIndex };
 }

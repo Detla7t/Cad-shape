@@ -76,6 +76,7 @@ Crates:
 - **Undo/redo** — `Transaction` records snapshots, `History` keeps the stack; commands create transactions automatically.
 - **Plugins** — Loaded from URLs or `?plugin=`; manager in `core/src/plugin/` + `app/src/pluginManager.ts`; examples in `plugins/`.
 - **Global singleton** — `getCurrentApplication()` (from `core`) instead of DI threading.
+- **Diagnostics** — `OperationLog` (`core/src/foundation/operationLog.ts`) records one wide event per operation (command, transaction, feature rebuild, sketch session/commit, user-facing and unhandled errors) with session, context, application state and a parent id; see `docs/diagnostics.md`. Enrich with `operation.add`/`step`; never log per frame or per pointer.
 - **MCP server** — a separate package (`chili3d-mcp`, moved out of this repo): its `live_*` tools drive the user's open browser tab, and headless tools (`run_cad_program`, `render_preview`, …) are a server-side scratchpad. Units: millimetres; angles: degrees.
 
 ## Testing

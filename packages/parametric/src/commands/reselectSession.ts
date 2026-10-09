@@ -265,24 +265,8 @@ export class EdgeReselectSession {
             .map((x) => this.captureRef(x));
     }
 
-    /**
-     * Displays `shape` as a temporary mesh and returns its id, or undefined when it carries no
-     * mesh data. The temp mesh renders in world space; the chain evaluates locally.
-     */
     private displayPreviewMesh(shape: IShape): number | undefined {
-        let previewShape = shape;
-        const transform = this.host.worldTransform();
-        if (!transform.equals(Matrix4.identity())) {
-            previewShape = shape.transformedMul(transform);
-        }
-        try {
-            const { faces, edges } = previewShape.mesh;
-            const datas = [faces, edges].filter((x) => x !== undefined);
-            return datas.length > 0 ? this.host.document.visual.context.displayMesh(datas) : undefined;
-        } finally {
-            previewShape.dispose();
-            if (previewShape !== shape) shape.dispose();
-        }
+        return displayChainPreview(this.host, shape);
     }
 
     /** Selects the edges the feature currently references so the pick starts from them. */
@@ -418,6 +402,27 @@ export class ProfileReselectSession {
             indexes: [index],
         }));
         this.host.document.selection.setSelectedShapes(picked, VisualStates.faceSelected, false);
+    }
+}
+
+/**
+ * Displays `shape` as a temporary mesh and returns its id, or undefined when it carries no
+ * mesh data. The temp mesh renders in world space; the chain evaluates locally. The shape
+ * is consumed: it is disposed once meshed.
+ */
+export function displayChainPreview(host: ReselectHost, shape: IShape): number | undefined {
+    let previewShape = shape;
+    const transform = host.worldTransform();
+    if (!transform.equals(Matrix4.identity())) {
+        previewShape = shape.transformedMul(transform);
+    }
+    try {
+        const { faces, edges } = previewShape.mesh;
+        const datas = [faces, edges].filter((x) => x !== undefined);
+        return datas.length > 0 ? host.document.visual.context.displayMesh(datas) : undefined;
+    } finally {
+        previewShape.dispose();
+        if (previewShape !== shape) shape.dispose();
     }
 }
 

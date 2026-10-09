@@ -341,7 +341,7 @@ function resolvePicks(
     if (faces.length > 0) {
         const inputFaces = fsContext.track(input.findSubShapes(ShapeTypes.face)) as IFace[];
         for (const face of faces) {
-            const index = matchFace(inputFaces, face, tracking?.inputFaceIds);
+            const index = matchFeatureScriptFace(inputFaces, face, tracking?.inputFaceIds);
             if (index === undefined || !hostRef("FACE", index))
                 return Result.err(`${label}: a picked face no longer exists`);
         }
@@ -446,8 +446,11 @@ function planeEntity(fsContext: FsContext, plane: Plane): EntityRef {
     return { body, kind: "FACE", index: 0 };
 }
 
-/** Tracked id first (best fingerprint among the id's pieces), then the nearest fingerprint. */
-function matchFace(
+/**
+ * The index of the face a ref names: tracked id first (best fingerprint among the id's
+ * pieces), then the nearest fingerprint. `ids` are the tracked ids of `faces`, by index.
+ */
+export function matchFeatureScriptFace(
     faces: readonly IFace[],
     ref: FeatureScriptFaceRef,
     ids: readonly string[] | undefined,

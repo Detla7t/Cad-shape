@@ -6,6 +6,7 @@ import {
     AutosaveService,
     CommandService,
     HotkeyService,
+    installDiagnostics,
     ShowPropertyEventHandler,
 } from "@chili3d/app";
 import {
@@ -244,6 +245,7 @@ export class AppBuilder {
         this.ensureNecessary();
 
         const app = this.createApp();
+        installDiagnostics(app);
         for (const onBuilt of this._onBuilt) {
             await onBuilt(app);
         }

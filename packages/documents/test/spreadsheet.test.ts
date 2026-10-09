@@ -124,7 +124,7 @@ describe("formula engine", () => {
 
     test("an unsupported function keeps the value the file stored", () => {
         const workbook: WorkbookData = {
-            sheets: [{ name: "S", cells: { A1: { f: "XIRR(B1:B3)", v: 0.125 } } }],
+            sheets: [{ name: "S", cells: { A1: { f: 'GETPIVOTDATA("Income",B1)', v: 0.125 } } }],
         };
         expect(value(workbook, "A1")).toBe(0.125);
     });

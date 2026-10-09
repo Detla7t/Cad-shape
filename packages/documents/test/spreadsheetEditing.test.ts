@@ -130,14 +130,13 @@ describe("formula suggestions", () => {
         document.body.append(input);
         assist.bind(input);
         try {
-            input.value = "=su";
-            input.setSelectionRange(3, 3);
+            input.value = "=sum";
+            input.setSelectionRange(4, 4);
             input.focus();
             input.dispatchEvent(new Event("input"));
             const list = document.querySelector('[role="listbox"]');
             expect(list).not.toBeNull();
             expect(list!.textContent).toContain("SUMIFS");
-            input.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", cancelable: true }));
             input.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", cancelable: true }));
             const selected = document.querySelector('[role="option"][aria-selected="true"]');
             expect(selected).not.toBeNull();

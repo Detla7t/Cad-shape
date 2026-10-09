@@ -12,9 +12,22 @@ export * from "./sketchNode";
 export * from "./solver";
 import "./commands";
 
-import { PubSub, ReferencePlaneNode } from "@chili3d/core";
+import { OperationLog, PubSub, ReferencePlaneNode } from "@chili3d/core";
 import { SketchEditor } from "./editor/sketchEditor";
 import { SketchNode } from "./sketchNode";
+
+// Every diagnostic event records which sketch is being edited, and how far it is solved.
+OperationLog.addContextProvider(() => {
+    const editor = SketchEditor.getActive();
+    if (editor === undefined) return undefined;
+    return {
+        activeSketchId: editor.node.id,
+        activeSketchName: editor.node.name,
+        sketchPicking: editor.isPicking,
+        sketchDofs: editor.lastSolveOutcome.dofs,
+        sketchSolve: editor.lastSolveOutcome.result,
+    };
+});
 
 // Double-clicking a sketch node in the project tree enters its editing session.
 PubSub.default.sub("nodeDoubleClicked", (node) => {

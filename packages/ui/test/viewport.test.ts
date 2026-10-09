@@ -11,9 +11,6 @@ rs.mock("../src/viewport/viewport.module.css", () => ({
     acts: "vp-acts",
     tools: "vp-tools",
     viewControls: "vp-view-controls",
-    viewModeControl: "vp-view-mode-control",
-    viewModeDisplay: "vp-view-mode-display",
-    viewModeMenu: "vp-view-mode-menu",
     visible: "vp-visible",
     actived: "vp-actived",
 }));

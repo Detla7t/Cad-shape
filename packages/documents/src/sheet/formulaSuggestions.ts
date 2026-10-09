@@ -84,3 +84,46 @@ export function formulaArgumentHelp(
     }
     return [...stack].reverse().find((call) => FUNCTION_INFO[call.name]);
 }
+
+/**
+ * Inserts a function call at the cursor, as the function browser does: a partially typed
+ * function name before the cursor is replaced, an existing "(" after it is reused, and
+ * otherwise the call is written balanced — `NAME()` with the cursor inside, or after it for
+ * a function without arguments — so the formula stays valid. `wrapRest` makes the text
+ * after the cursor the first argument (`=12` → `=ROUND(12)`, cursor before the ")").
+ */
+export function insertFunctionCall(
+    text: string,
+    cursor: number,
+    name: string,
+    options: { names?: readonly string[]; zeroArgs?: boolean; wrapRest?: boolean } = {},
+): { text: string; cursor: number } {
+    let start = cursor;
+    let end = cursor;
+    const { code, quoted } = context(text, cursor);
+    const partial = quoted ? undefined : /(?:^|[=+\-*/^&<>,;(\s])([A-Za-z_][A-Za-z_0-9.]*)$/.exec(code)?.[1];
+    if (partial && (options.names ?? [name]).some((n) => n.startsWith(partial.toUpperCase()))) {
+        let after = cursor;
+        while (/[A-Za-z_0-9.]/.test(text[after] ?? "") && after < text.length) after++;
+        if (text[after] !== "!") {
+            start = cursor - partial.length;
+            end = after;
+        }
+    }
+    const head = text.slice(0, start);
+    const rest = text.slice(end);
+    if (options.zeroArgs) {
+        const tail = options.wrapRest ? "" : rest.replace(/^\s*\(\s*\)/, "");
+        return { text: `${head}${name}()${tail}`, cursor: head.length + name.length + 2 };
+    }
+    if (options.wrapRest) {
+        return { text: `${head}${name}(${rest})`, cursor: head.length + name.length + 1 + rest.length };
+    }
+    const paren = /^\s*\(/.exec(rest);
+    if (paren) return { text: head + name + rest, cursor: head.length + name.length + paren[0].length };
+    const closed = rest.trim() === "" || /^\s*[,;)+\-*/^&<>=%]/.test(rest);
+    return {
+        text: `${head}${name}(${closed ? ")" : ""}${rest}`,
+        cursor: head.length + name.length + 1,
+    };
+}

@@ -12,7 +12,7 @@ export default {
         "sidebar.appearance": "外观",
         "body.referencePlane": "Plane",
         "command.plane.create": "Plane",
-        "plane.offset": "Offset (mm)",
+        "plane.offset": "偏移",
         "plane.size": "Display size (mm)",
         "plane.defaultGeometry": "Default geometry",
         "plane.top": "Top",

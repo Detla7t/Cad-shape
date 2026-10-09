@@ -73,7 +73,7 @@ describe("spreadsheet workbook features", () => {
     });
     test("named-range suggestions insert a reference instead of a function call", () => {
         const completion = formulaCompletion("=SUM(Exp", 8, ["Expenses"]);
-        expect(completion?.names).toEqual(["EXP", "Expenses"]);
+        expect(completion?.names).toEqual(["EXP", "EXPAND", "Expenses"]);
         expect(acceptFormulaCompletion("=SUM(Exp", completion!, "Expenses").text).toBe("=SUM(Expenses");
     });
     test.each(["A1", "R", "C", "R2C3", "1abc", "Some name", "TRUE"])("invalid name %s is rejected", (name) =>

@@ -1,55 +1,152 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { generalNumberText } from "./generalNumber";
-
-export { generalNumberText } from "./generalNumber";
-
+import { offsetRef } from "./formulaArrays";
+import { ELEMENTWISE, LIBRARY, setCoreFunctions } from "./formulaLibrary";
+import {
+    type Ast,
+    compare,
+    ERR,
+    ERROR_CODES,
+    type EvalContext,
+    excelSerial,
+    type Fn,
+    FormulaError,
+    type FormulaErrorCode,
+    flatten,
+    isError,
+    LambdaValue,
+    lift,
+    localNowSerial,
+    lookupValue,
+    matrix,
+    numbers,
+    numeric1,
+    type RangeRef,
+    round,
+    type Scalar,
+    type StructuredSpec,
+    sameSize,
+    scalar,
+    serialDate,
+    toBoolean,
+    toNumber,
+    toText,
+    type Value,
+    wildcard,
+} from "./formulaValues";
 import { FUNCTION_INFO } from "./functionInfo";
+import { MORE_FUNCTION_INFO } from "./functionInfoMore";
 import {
     addressOf,
     type CellData,
-    type CellValue,
     columnIndex,
     parseAddress,
+    parseRange,
+    type TableData,
+    usedSize,
     type WorkbookData,
 } from "./model";
 import { formatCellValue } from "./numberFormat";
 import { resolveRanges } from "./ranges";
 
+export { type Ast, FormulaError, type FormulaErrorCode, type Scalar } from "./formulaValues";
+export { generalNumberText } from "./generalNumber";
+
 /**
  * A spreadsheet formula engine for the grid editor and `readDocumentTable`: Excel
  * operators and precedence (`-2^2` = 4, `%`, `&`, comparisons), A1 / absolute / ranged /
- * cross-sheet references (`'Sheet 2'!B3`), and the common functions (SUM, AVERAGE, MIN,
- * MAX, COUNT, IF, ROUND, VLOOKUP, …). Evaluation is lazy and memoized per workbook
- * revision; reference cycles evaluate to `#CIRC!`. A formula using a function the engine
- * lacks keeps the result stored in the file, so imported workbooks still show their values.
+ * cross-sheet references (`'Sheet 2'!B3`), structured references to tables
+ * (`Sales[Amount]`, `Sales[[#This Row],[Qty]]`, `[@Qty]`), array constants, names (also
+ * defined by a formula), and a broad function library (`formulaLibrary.ts`). Values are
+ * arrays where Excel's are: operators and per-value functions work element by element, and
+ * a formula whose result is an array spills it into the cells below and to the right
+ * (`#SPILL!` when one of them holds a value; `A1#` refers to the whole spill). Evaluation
+ * is lazy and memoized per workbook revision; reference cycles evaluate to `#CIRC!`. A
+ * formula using a function the engine lacks keeps the result stored in the file, so
+ * imported workbooks still show their values.
  */
-
-export type FormulaErrorCode = "#DIV/0!" | "#VALUE!" | "#REF!" | "#NAME?" | "#N/A" | "#NUM!" | "#CIRC!";
-
-export class FormulaError {
-    constructor(readonly code: FormulaErrorCode) {}
-    toString(): string {
-        return this.code;
-    }
-}
-
-/** An evaluated cell: a value, an error, or null for an empty cell. */
-export type Scalar = CellValue | FormulaError | null;
-type Value = Scalar | Scalar[][];
 
 // ------------------------------------------------------------------ Tokens
 
 type Token =
     | { kind: "number"; value: number }
     | { kind: "string"; value: string }
-    | { kind: "ref"; sheet?: string; text: string }
+    | { kind: "ref"; sheet?: string; text: string; spill?: boolean }
+    | { kind: "structured"; table?: string; spec: StructuredSpec }
     | { kind: "name"; value: string }
     | { kind: "error"; value: FormulaErrorCode }
     | { kind: "op"; value: string };
 
-const ERROR_CODES: FormulaErrorCode[] = ["#DIV/0!", "#VALUE!", "#REF!", "#NAME?", "#N/A", "#NUM!", "#CIRC!"];
+/** Excel's storage prefixes for newer functions and LET/LAMBDA parameters. */
+const PREFIXES = /^(?:_xlfn\.|_xlws\.|_xludf\.|_xlpm\.)+/i;
+
+export function normalizeName(name: string): string {
+    return name.replace(PREFIXES, "").toUpperCase();
+}
+
+/** The text between the bracket at `start` and its match; `'` escapes the next character. */
+function bracket(text: string, start: number): { inner: string; end: number } {
+    let depth = 0;
+    for (let i = start; i < text.length; i++) {
+        const c = text[i];
+        if (c === "'") {
+            i++;
+            continue;
+        }
+        if (c === "[") depth++;
+        else if (c === "]" && --depth === 0) return { inner: text.slice(start + 1, i), end: i + 1 };
+    }
+    throw new Error("unterminated [");
+}
+
+const ITEMS = ["#All", "#Data", "#Headers", "#Totals", "#This Row"] as const;
+
+/** Parses the inside of a structured reference's brackets. */
+export function parseStructuredSpec(inner: string): StructuredSpec {
+    const unquote = (name: string) => name.replace(/'(.)/g, "$1").trim();
+    const item = (part: string) =>
+        ITEMS.find((candidate) => candidate.toLowerCase() === part.trim().toLowerCase());
+    let text = inner.trim();
+    const items: StructuredSpec["items"][number][] = [];
+    if (text.startsWith("@")) {
+        items.push("#This Row");
+        text = text.slice(1).trim();
+        if (text === "") return { items };
+        if (!text.startsWith("[")) return { items, startColumn: unquote(text) };
+    }
+    if (!text.startsWith("[")) {
+        const found = item(text);
+        return found ? { items: [found] } : { items, startColumn: unquote(text) };
+    }
+    let startColumn: string | undefined;
+    let endColumn: string | undefined;
+    let i = 0;
+    while (i < text.length) {
+        if (/[\s,]/.test(text[i])) {
+            i++;
+            continue;
+        }
+        if (text[i] !== "[") throw new Error("bad structured reference");
+        const { inner: part, end } = bracket(text, i);
+        i = end;
+        const found = item(part);
+        if (found) {
+            items.push(found);
+            continue;
+        }
+        startColumn = unquote(part);
+        // [A]:[B]
+        const rest = text.slice(i);
+        const span = /^\s*:\s*\[/.exec(rest);
+        if (span) {
+            const second = bracket(text, i + span[0].length - 1);
+            endColumn = unquote(second.inner);
+            i = second.end;
+        }
+    }
+    return { items, startColumn, endColumn };
+}
 
 function tokenize(text: string): Token[] {
     const tokens: Token[] = [];
@@ -114,27 +211,44 @@ function tokenize(text: string): Token[] {
             i += code.length;
             continue;
         }
+        if (char === "[") {
+            // A structured reference inside the table: [@Amount], [[#This Row],[Qty]].
+            const { inner, end } = bracket(text, i);
+            tokens.push({ kind: "structured", spec: parseStructuredSpec(inner) });
+            i = end;
+            continue;
+        }
         const start = i;
         const sheet = sheetPrefix();
         const reference =
-            /^(\$?[A-Za-z]{1,3}\$?\d+(:\$?[A-Za-z]{1,3}\$?\d+)?|\$?[A-Za-z]{1,3}:\$?[A-Za-z]{1,3}|\$?\d+:\$?\d+)(?![\w(])/.exec(
+            /^(\$?[A-Za-z]{1,3}\$?\d+(:\$?[A-Za-z]{1,3}\$?\d+)?|\$?[A-Za-z]{1,3}:\$?[A-Za-z]{1,3}|\$?\d+:\$?\d+)(?![\w(.[])/.exec(
                 text.slice(i),
             );
         if (reference) {
-            tokens.push({ kind: "ref", sheet, text: reference[0] });
             i += reference[0].length;
+            // A1# — the spill range anchored at A1 (an error literal never follows a reference).
+            const spill =
+                text[i] === "#" && !ERROR_CODES.some((c) => text.slice(i).toUpperCase().startsWith(c));
+            if (spill) i++;
+            tokens.push({ kind: "ref", sheet, text: reference[0], ...(spill ? { spill } : {}) });
             continue;
         }
         if (sheet !== undefined) throw new Error(`bad reference after ${text.slice(start, i)}`);
-        const name = /^[A-Za-z_][\w.]*/.exec(rest);
+        const name = /^[A-Za-z_\\][\w.\\]*/.exec(rest);
         if (name) {
-            tokens.push({ kind: "name", value: name[0].toUpperCase() });
             i += name[0].length;
+            if (text[i] === "[") {
+                const { inner, end } = bracket(text, i);
+                tokens.push({ kind: "structured", table: name[0], spec: parseStructuredSpec(inner) });
+                i = end;
+                continue;
+            }
+            tokens.push({ kind: "name", value: normalizeName(name[0]) });
             continue;
         }
-        const op = /^(<=|>=|<>|[-+*/^&=<>(),;%])/.exec(rest);
+        const op = /^(<=|>=|<>|[-+*/^&=<>(),;%{}])/.exec(rest);
         if (op) {
-            tokens.push({ kind: "op", value: op[0] === ";" ? "," : op[0] });
+            tokens.push({ kind: "op", value: op[0] });
             i += op[0].length;
             continue;
         }
@@ -144,18 +258,6 @@ function tokenize(text: string): Token[] {
 }
 
 // ------------------------------------------------------------------ Syntax
-
-export type Ast =
-    | { type: "number"; value: number }
-    | { type: "string"; value: string }
-    | { type: "boolean"; value: boolean }
-    | { type: "error"; code: FormulaErrorCode }
-    | { type: "ref"; sheet?: string; text: string }
-    | { type: "name"; name: string }
-    | { type: "unary"; op: string; arg: Ast }
-    | { type: "percent"; arg: Ast }
-    | { type: "binary"; op: string; left: Ast; right: Ast }
-    | { type: "call"; name: string; args: Ast[] };
 
 const BINARY: Record<string, number> = {
     "=": 1,
@@ -191,6 +293,11 @@ class Parser {
         return token?.kind === "op" && token.value === value;
     }
 
+    /** An argument separator: "," or the ";" of locales with a decimal comma. */
+    private isSeparator(): boolean {
+        return this.isOp(",") || this.isOp(";");
+    }
+
     private expression(minPrecedence: number): Ast {
         let left = this.unary();
         for (;;) {
@@ -223,6 +330,28 @@ class Parser {
         return ast;
     }
 
+    private arrayLiteral(): Ast {
+        const rows: Ast[][] = [[]];
+        if (this.isOp("}")) throw new Error("empty array");
+        for (;;) {
+            rows[rows.length - 1].push(this.expression(0));
+            if (this.isOp(",")) {
+                this.at++;
+                continue;
+            }
+            if (this.isOp(";")) {
+                this.at++;
+                rows.push([]);
+                continue;
+            }
+            break;
+        }
+        if (!this.isOp("}")) throw new Error("missing }");
+        this.at++;
+        if (rows.some((row) => row.length !== rows[0].length)) throw new Error("ragged array");
+        return { type: "array", rows };
+    }
+
     private primary(): Ast {
         const token = this.tokens[this.at++];
         if (token === undefined) throw new Error("the formula ends early");
@@ -234,15 +363,24 @@ class Parser {
             case "error":
                 return { type: "error", code: token.value };
             case "ref":
-                return { type: "ref", sheet: token.sheet, text: token.text };
+                return {
+                    type: "ref",
+                    sheet: token.sheet,
+                    text: token.text,
+                    ...(token.spill ? { spill: true } : {}),
+                };
+            case "structured":
+                return { type: "structured", table: token.table, spec: token.spec };
             case "name": {
                 if (this.isOp("(")) {
                     this.at++;
                     const args: Ast[] = [];
                     if (!this.isOp(")")) {
                         for (;;) {
-                            args.push(this.expression(0));
-                            if (this.isOp(",")) {
+                            // An omitted argument (FN(a,,b)) is an empty value.
+                            if (this.isSeparator() || this.isOp(")")) args.push({ type: "name", name: "" });
+                            else args.push(this.expression(0));
+                            if (this.isSeparator()) {
                                 this.at++;
                                 continue;
                             }
@@ -265,6 +403,7 @@ class Parser {
                     this.at++;
                     return inner;
                 }
+                if (token.value === "{") return this.arrayLiteral();
                 throw new Error(`unexpected "${token.value}"`);
         }
     }
@@ -281,7 +420,7 @@ export function parseFormula(formula: string): Ast {
         } catch (error) {
             ast = error instanceof Error ? error : new Error(String(error));
         }
-        if (parsed.size > 5000) parsed.clear();
+        if (parsed.size > 20000) parsed.clear();
         parsed.set(formula, ast);
     }
     if (ast instanceof Error) throw ast;
@@ -289,113 +428,6 @@ export function parseFormula(formula: string): Ast {
 }
 
 // ------------------------------------------------------------------ Values
-
-const isError = (value: unknown): value is FormulaError => value instanceof FormulaError;
-const ERR = (code: FormulaErrorCode) => new FormulaError(code);
-
-function toNumber(value: Scalar): number | FormulaError {
-    if (value === null) return 0;
-    if (isError(value)) return value;
-    if (typeof value === "number") return value;
-    if (typeof value === "boolean") return value ? 1 : 0;
-    const text = value.trim();
-    if (text === "") return 0;
-    const number = Number(text.endsWith("%") ? text.slice(0, -1) : text);
-    if (!Number.isFinite(number)) return ERR("#VALUE!");
-    return text.endsWith("%") ? number / 100 : number;
-}
-
-function toText(value: Scalar): string | FormulaError {
-    if (value === null) return "";
-    if (isError(value)) return value;
-    if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
-    if (typeof value === "number") return generalNumberText(value);
-    return value;
-}
-
-function toBoolean(value: Scalar): boolean | FormulaError {
-    if (value === null) return false;
-    if (isError(value)) return value;
-    if (typeof value === "boolean") return value;
-    if (typeof value === "number") return value !== 0;
-    const upper = value.toUpperCase();
-    if (upper === "TRUE") return true;
-    if (upper === "FALSE") return false;
-    return ERR("#VALUE!");
-}
-
-/** Excel's ordering across types: numbers < text < booleans; text case-insensitive. */
-function compare(a: Scalar, b: Scalar): number {
-    const rank = (v: Scalar) => (typeof v === "number" || v === null ? 0 : typeof v === "string" ? 1 : 2);
-    const x = a === null ? (typeof b === "string" ? "" : typeof b === "boolean" ? false : 0) : a;
-    const y = b === null ? (typeof a === "string" ? "" : typeof a === "boolean" ? false : 0) : b;
-    if (rank(x) !== rank(y)) return rank(x) - rank(y);
-    if (typeof x === "string" && typeof y === "string") {
-        const l = x.toLowerCase();
-        const r = y.toLowerCase();
-        return l < r ? -1 : l > r ? 1 : 0;
-    }
-    return Number(x) - Number(y);
-}
-
-const scalar = (value: Value): Scalar => (Array.isArray(value) ? (value[0]?.[0] ?? null) : value);
-
-function flatten(values: Value[]): Scalar[] {
-    const out: Scalar[] = [];
-    for (const value of values) {
-        if (Array.isArray(value)) for (const row of value) out.push(...row);
-        else out.push(value);
-    }
-    return out;
-}
-
-/**
- * The numbers of aggregate arguments: from ranges only numbers count (text, booleans and
- * empty cells are skipped); a direct argument is coerced. The first error wins.
- */
-function numbers(values: Value[]): number[] | FormulaError {
-    const out: number[] = [];
-    for (const value of values) {
-        if (Array.isArray(value)) {
-            for (const row of value)
-                for (const cell of row) {
-                    if (isError(cell)) return cell;
-                    if (typeof cell === "number") out.push(cell);
-                }
-        } else {
-            if (value === null) continue;
-            const number = toNumber(value);
-            if (isError(number)) return number;
-            out.push(number);
-        }
-    }
-    return out;
-}
-
-const round = (value: number, digits: number, mode: "half" | "up" | "down") => {
-    const factor = 10 ** digits;
-    const scaled = Math.abs(value) * factor;
-    const fixed = Number.parseFloat(scaled.toPrecision(15));
-    const rounded =
-        mode === "half" ? Math.round(fixed) : mode === "up" ? Math.ceil(fixed) : Math.floor(fixed);
-    return (Math.sign(value) * rounded) / factor;
-};
-
-type Fn = (args: Value[], raw: Ast[], context: EvalContext) => Value;
-
-function numeric1(f: (x: number) => number): Fn {
-    return (args) => {
-        if (args.length !== 1) return ERR("#VALUE!");
-        const x = toNumber(scalar(args[0]));
-        if (isError(x)) return x;
-        const result = f(x);
-        return Number.isFinite(result) ? result : ERR("#NUM!");
-    };
-}
-
-function lookupValue(array: Scalar[][], row: number, col: number): Scalar {
-    return array[row]?.[col] ?? null;
-}
 
 const FUNCTIONS: Record<string, Fn> = {
     SUM: (args) => {
@@ -739,6 +771,10 @@ const FUNCTIONS: Record<string, Fn> = {
     XLOOKUP: (args) => xlookup(args),
 };
 
+// The library adds the rest of Excel's functions and array-aware replacements of a few above.
+Object.assign(FUNCTIONS, LIBRARY);
+setCoreFunctions((name) => FUNCTIONS[name]);
+
 function roundFn(args: Value[], mode: "half" | "up" | "down"): Value {
     const x = toNumber(scalar(args[0] ?? null));
     const digits = args.length > 1 ? toNumber(scalar(args[1])) : 0;
@@ -821,21 +857,6 @@ function conditional(args: Value[], mode: "sum" | "count"): Value {
     return total;
 }
 
-const matrix = (value: Value): Scalar[][] => (Array.isArray(value) ? value : [[value]]);
-const sameSize = (a: Scalar[][], b: Scalar[][]) =>
-    a.length === b.length && a.every((row, i) => row.length === b[i].length);
-
-function wildcard(text: string): RegExp {
-    let pattern = "";
-    const escapeRegex = (c: string) => c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    for (let i = 0; i < text.length; i++) {
-        const c = text[i];
-        if (c === "~" && i + 1 < text.length) pattern += escapeRegex(text[++i]);
-        else pattern += c === "*" ? ".*" : c === "?" ? "." : escapeRegex(c);
-    }
-    return new RegExp(`^${pattern}$`, "i");
-}
-
 function conditionalMany(args: Value[], mode: "sum" | "count" | "average" | "min" | "max"): Value {
     if (args.length < 3 || args.length % 2 !== 1) return ERR("#VALUE!");
     const target = matrix(args[0]);
@@ -887,18 +908,6 @@ function findText(args: Value[], insensitive: boolean): Value {
     });
 }
 
-const DAY_MS = 86400000;
-function excelSerial(ms: number): number {
-    const n = (ms - Date.UTC(1899, 11, 31)) / DAY_MS;
-    return n >= 60 ? n + 1 : n;
-}
-function serialDate(n: number): Date {
-    return new Date(Date.UTC(1899, 11, 31) + (n >= 60 ? n - 1 : n) * DAY_MS);
-}
-function localNowSerial(): number {
-    const now = new Date();
-    return excelSerial(now.getTime() - now.getTimezoneOffset() * 60000);
-}
 function datePart(args: Value[], get: (d: Date) => number): Value {
     const n = toNumber(scalar(args[0] ?? null));
     if (isError(n)) return n;
@@ -953,12 +962,40 @@ function xlookup(args: Value[]): Value {
 
 // ------------------------------------------------------------------ Evaluation
 
-interface EvalContext {
-    evaluate(ast: Ast): Value;
-}
-
 /** The functions the engine evaluates (for the editor's hints). */
 export const FORMULA_FUNCTIONS: readonly string[] = Object.keys(FUNCTIONS).sort();
+
+/** Functions whose arguments are evaluated by the function itself (short-circuiting, bindings). */
+const LAZY = new Set(["IF", "IFERROR", "IFNA", "IFS", "LET", "LAMBDA", "SWITCH", "CHOOSE"]);
+
+type Binding = Value | LambdaValue;
+
+interface Frame {
+    readonly sheet: number;
+    readonly cell?: { row: number; col: number };
+    readonly scope?: ReadonlyMap<string, Binding>;
+}
+
+/** An evaluated formula cell: its full result and whether it came from the engine or the file. */
+interface CellResult {
+    readonly value: Value;
+    readonly live: boolean;
+}
+
+interface SpillEntry {
+    readonly anchor: string;
+    readonly row: number;
+    readonly col: number;
+}
+
+interface SheetSpills {
+    /** Spilled cell address → where its value comes from. */
+    readonly cells: Map<string, SpillEntry>;
+    /** Anchor address → the spill area ("O10:O24"). */
+    readonly areas: Map<string, string>;
+    /** Cached spill outputs from the file that the live spill no longer covers. */
+    readonly cleared: Set<string>;
+}
 
 /**
  * Evaluates every cell of a workbook on demand. Create a new one (or call `invalidate`)
@@ -966,12 +1003,20 @@ export const FORMULA_FUNCTIONS: readonly string[] = Object.keys(FUNCTIONS).sort(
  */
 export class WorkbookEvaluator {
     private readonly memo = new Map<string, Scalar>();
+    private readonly results = new Map<string, CellResult>();
     private readonly active = new Set<string>();
+    private readonly spills = new Map<number, SheetSpills>();
+    private readonly spillBuilding = new Set<number>();
+    private readonly activeNames = new Set<string>();
+    private tableIndex?: Map<string, { sheet: number; table: TableData }>;
 
     constructor(private readonly workbook: WorkbookData) {}
 
     invalidate(): void {
         this.memo.clear();
+        this.results.clear();
+        this.spills.clear();
+        this.tableIndex = undefined;
     }
 
     private sheetIndex(name: string | undefined, current: number): number {
@@ -980,48 +1025,188 @@ export class WorkbookEvaluator {
         return this.workbook.sheets.findIndex((sheet) => sheet.name.toLowerCase() === lower);
     }
 
-    /** The evaluated value of a cell (null when empty). */
+    /** The evaluated value of a cell (null when empty); a spilled cell shows its part of the spill. */
     value(sheet: number, address: string): Scalar {
         const key = `${sheet}!${address}`;
         const memo = this.memo.get(key);
         if (memo !== undefined || this.memo.has(key)) return memo ?? null;
         const cell = this.workbook.sheets[sheet]?.cells[address];
-        if (this.active.has(key)) return ERR("#CIRC!");
+        if (cell?.f === undefined) {
+            const spilled = this.spilledValue(sheet, address, cell);
+            if (spilled !== undefined) return spilled;
+        }
+        const result = this.cellResult(sheet, address);
+        let value = scalar(result.value);
+        // An array result spills: the anchor shows #SPILL! when its area is blocked.
+        if (Array.isArray(result.value) && isSpill(result.value) && !this.spillBuilding.has(sheet)) {
+            const spills = this.sheetSpills(sheet);
+            if (!spills.areas.has(address)) value = ERR("#SPILL!");
+        }
+        this.memo.set(key, value);
+        return value;
+    }
+
+    /** The anchor of the spill a cell is part of (the anchor itself included), if any. */
+    spillAnchor(sheet: number, address: string): string | undefined {
+        const spills = this.sheetSpills(sheet);
+        if (spills.areas.has(address)) return address;
+        return spills.cells.get(address)?.anchor;
+    }
+
+    /** The area a spilling formula fills ("B2:B9"), or undefined. */
+    spillArea(sheet: number, anchor: string): string | undefined {
+        return this.sheetSpills(sheet).areas.get(anchor);
+    }
+
+    private cellResult(sheet: number, address: string): CellResult {
+        const key = `${sheet}!${address}`;
+        const done = this.results.get(key);
+        if (done !== undefined) return done;
+        if (this.active.has(key)) return { value: ERR("#CIRC!"), live: true };
         this.active.add(key);
-        let result: Scalar;
+        let result: CellResult;
         try {
-            result = this.evaluateCell(sheet, cell);
+            const at = parseAddress(address);
+            result = this.evaluateCell(sheet, at, this.workbook.sheets[sheet]?.cells[address]);
         } finally {
             this.active.delete(key);
         }
-        this.memo.set(key, result);
+        this.results.set(key, result);
         return result;
     }
 
-    private evaluateCell(sheet: number, cell: CellData | undefined): Scalar {
-        if (cell === undefined) return null;
-        if (cell.f === undefined) {
-            if (cell.v === undefined) return null;
-            return cell.e === true && typeof cell.v === "string" ? errorOf(cell.v) : cell.v;
-        }
+    private evaluateCell(
+        sheet: number,
+        at: { row: number; col: number } | undefined,
+        cell: CellData | undefined,
+    ): CellResult {
+        const stored = (): Scalar =>
+            cell?.v === undefined
+                ? null
+                : cell.e === true && typeof cell.v === "string"
+                  ? errorOf(cell.v)
+                  : cell.v;
+        if (cell === undefined) return { value: null, live: true };
+        if (cell.f === undefined) return { value: stored(), live: true };
         let ast: Ast;
         try {
             ast = parseFormula(cell.f);
         } catch {
-            return cell.v !== undefined && cell.e !== true ? cell.v : ERR("#NAME?");
+            return { value: cell.v !== undefined && cell.e !== true ? cell.v : ERR("#NAME?"), live: false };
         }
-        const result = scalar(this.evaluate(ast, sheet));
+        let value: Value;
+        try {
+            // A LAMBDA left uncalled in a cell is #CALC!, as in Excel.
+            value = this.plain(this.evaluate(ast, { sheet, cell: at }));
+        } catch {
+            value = ERR("#VALUE!");
+        }
+        if (Array.isArray(value) && value.length === 0) value = ERR("#CALC!");
+        const first = scalar(value);
         // A function the engine lacks: keep the value the file stored.
-        if (isError(result) && result.code === "#NAME?" && cell.v !== undefined) {
-            return cell.e === true && typeof cell.v === "string" ? errorOf(cell.v) : cell.v;
+        if (isError(first) && first.code === "#NAME?" && cell.v !== undefined) {
+            return { value: stored(), live: false };
         }
-        return result;
+        return { value: Array.isArray(value) && !isSpill(value) ? first : value, live: true };
+    }
+
+    /** The value of a cell that holds no formula of its own, when a spill covers it. */
+    private spilledValue(sheet: number, address: string, cell: CellData | undefined): Scalar | undefined {
+        const blank = cell === undefined || cell.v === undefined || cell.sp === true;
+        if (!blank) return undefined;
+        if (this.spillBuilding.has(sheet)) return cell?.sp === true ? undefined : null;
+        const spills = this.sheetSpills(sheet);
+        const entry = spills.cells.get(address);
+        if (entry !== undefined) {
+            const anchor = this.cellResult(sheet, entry.anchor).value;
+            return Array.isArray(anchor) ? (anchor[entry.row]?.[entry.col] ?? null) : null;
+        }
+        if (cell?.sp === true && spills.cleared.has(address)) return null;
+        return undefined;
+    }
+
+    /** Evaluates the sheet's formulas once and lays out their spills. */
+    private sheetSpills(sheet: number): SheetSpills {
+        const known = this.spills.get(sheet);
+        if (known !== undefined) return known;
+        const spills: SheetSpills = { cells: new Map(), areas: new Map(), cleared: new Set() };
+        const data = this.workbook.sheets[sheet];
+        if (data === undefined || this.spillBuilding.has(sheet)) return spills;
+        this.spillBuilding.add(sheet);
+        try {
+            for (const [address, cell] of Object.entries(data.cells)) {
+                if (cell.f === undefined) continue;
+                const at = parseAddress(address);
+                if (at === undefined) continue;
+                const result = this.cellResult(sheet, address);
+                const covered = new Set<string>();
+                if (Array.isArray(result.value) && isSpill(result.value)) {
+                    const rows = result.value.length;
+                    const cols = result.value[0]?.length ?? 0;
+                    const targets: string[] = [];
+                    let blocked = false;
+                    for (let r = 0; r < rows && !blocked; r++) {
+                        for (let c = 0; c < cols; c++) {
+                            if (r === 0 && c === 0) continue;
+                            const target = addressOf(at.row + r, at.col + c);
+                            const other = data.cells[target];
+                            const occupied =
+                                other?.f !== undefined ||
+                                (other?.v !== undefined && other.sp !== true) ||
+                                spills.cells.has(target);
+                            if (occupied) {
+                                blocked = true;
+                                break;
+                            }
+                            targets.push(target);
+                        }
+                    }
+                    if (!blocked) {
+                        targets.forEach((target) => {
+                            const t = parseAddress(target)!;
+                            spills.cells.set(target, {
+                                anchor: address,
+                                row: t.row - at.row,
+                                col: t.col - at.col,
+                            });
+                            covered.add(target);
+                        });
+                        spills.areas.set(
+                            address,
+                            `${address}:${addressOf(at.row + rows - 1, at.col + cols - 1)}`,
+                        );
+                    }
+                }
+                // The file's cached spill outputs the live result no longer reaches are empty.
+                if (cell.a && result.live) {
+                    const area = parseRange(cell.a);
+                    if (area) {
+                        for (let r = area.start.row; r <= area.end.row; r++)
+                            for (let c = area.start.col; c <= area.end.col; c++) {
+                                const target = addressOf(r, c);
+                                if (target !== address && !covered.has(target) && data.cells[target]?.sp)
+                                    spills.cleared.add(target);
+                            }
+                    }
+                }
+            }
+        } finally {
+            this.spillBuilding.delete(sheet);
+        }
+        this.spills.set(sheet, spills);
+        // Formulas evaluated while the layout was being built read spilled cells as empty:
+        // evaluate them again against it.
+        const prefix = `${sheet}!`;
+        for (const key of [...this.memo.keys()]) if (key.startsWith(prefix)) this.memo.delete(key);
+        for (const key of [...this.results.keys()]) if (key.startsWith(prefix)) this.results.delete(key);
+        return spills;
     }
 
     /** Evaluates a formula (without "=") as if it were in `sheet`. */
     evaluateFormula(formula: string, sheet = 0): Scalar {
         try {
-            return scalar(this.evaluate(parseFormula(formula), sheet));
+            const value = this.evaluate(parseFormula(formula), { sheet });
+            return value instanceof LambdaValue ? ERR("#CALC!") : scalar(value);
         } catch {
             return ERR("#NAME?");
         }
@@ -1039,24 +1224,31 @@ export class WorkbookEvaluator {
     }
 
     private bounds(sheet: number): { rows: number; cols: number } {
-        let rows = 0;
-        let cols = 0;
-        for (const key of Object.keys(this.workbook.sheets[sheet]?.cells ?? {})) {
-            const at = parseAddress(key);
-            if (at === undefined) continue;
-            rows = Math.max(rows, at.row + 1);
-            cols = Math.max(cols, at.col + 1);
-        }
-        return { rows, cols };
+        const data = this.workbook.sheets[sheet];
+        return data === undefined ? { rows: 0, cols: 0 } : usedSize(data);
     }
 
-    private reference(ast: Extract<Ast, { type: "ref" }>, current: number): Value {
+    // -------------------------------------------------------------- References
+
+    private refOf(ast: Extract<Ast, { type: "ref" }>, current: number): RangeRef | undefined {
         const sheet = this.sheetIndex(ast.sheet, current);
-        if (sheet < 0) return ERR("#REF!");
+        if (sheet < 0) return undefined;
         const [a, b] = ast.text.replace(/\$/g, "").split(":");
         if (b === undefined) {
             const at = parseAddress(a);
-            return at === undefined ? ERR("#REF!") : this.value(sheet, a.toUpperCase());
+            if (at === undefined) return undefined;
+            if (ast.spill) {
+                // The anchor's whole result (also while the sheet's spills are being laid out).
+                const result = this.cellResult(sheet, addressOf(at.row, at.col)).value;
+                if (Array.isArray(result)) {
+                    return {
+                        sheet,
+                        start: at,
+                        end: { row: at.row + result.length - 1, col: at.col + (result[0]?.length ?? 1) - 1 },
+                    };
+                }
+            }
+            return { sheet, start: at, end: at };
         }
         let start: { row: number; col: number } | undefined;
         let end: { row: number; col: number } | undefined;
@@ -1072,15 +1264,163 @@ export class WorkbookEvaluator {
             start = parseAddress(a);
             end = parseAddress(b);
         }
-        if (start === undefined || end === undefined || start.col < 0 || end.col < 0) return ERR("#REF!");
-        return this.range(
+        if (start === undefined || end === undefined || start.col < 0 || end.col < 0) return undefined;
+        return {
             sheet,
-            { row: Math.min(start.row, end.row), col: Math.min(start.col, end.col) },
-            { row: Math.max(start.row, end.row), col: Math.max(start.col, end.col) },
-        );
+            start: { row: Math.min(start.row, end.row), col: Math.min(start.col, end.col) },
+            end: { row: Math.max(start.row, end.row), col: Math.max(start.col, end.col) },
+        };
     }
 
-    private evaluate(ast: Ast, sheet: number): Value {
+    private tables(): Map<string, { sheet: number; table: TableData }> {
+        if (this.tableIndex === undefined) {
+            this.tableIndex = new Map();
+            this.workbook.sheets.forEach((sheet, index) => {
+                for (const table of sheet.tables ?? [])
+                    this.tableIndex!.set(table.name.toLowerCase(), { sheet: index, table });
+            });
+        }
+        return this.tableIndex;
+    }
+
+    private structuredRef(ast: Extract<Ast, { type: "structured" }>, frame: Frame): RangeRef | FormulaError {
+        let found: { sheet: number; table: TableData } | undefined;
+        if (ast.table !== undefined) found = this.tables().get(ast.table.toLowerCase());
+        else if (frame.cell !== undefined) {
+            const { row, col } = frame.cell;
+            found = [...this.tables().values()].find((entry) => {
+                if (entry.sheet !== frame.sheet) return false;
+                const area = parseRange(entry.table.ref);
+                return (
+                    area !== undefined &&
+                    row >= area.start.row &&
+                    row <= area.end.row &&
+                    col >= area.start.col &&
+                    col <= area.end.col
+                );
+            });
+        }
+        if (found === undefined) return ERR(ast.table === undefined ? "#REF!" : "#NAME?");
+        const { sheet, table } = found;
+        const area = parseRange(table.ref);
+        if (area === undefined) return ERR("#REF!");
+        const header = table.headerRow !== false;
+        const totals = table.totalsRow === true;
+        const headerRow = area.start.row;
+        const firstData = area.start.row + (header ? 1 : 0);
+        const lastData = area.end.row - (totals ? 1 : 0);
+        const totalsRow = area.end.row;
+        const items = ast.spec.items.length === 0 ? ["#Data"] : ast.spec.items;
+        let top = Number.POSITIVE_INFINITY;
+        let bottom = Number.NEGATIVE_INFINITY;
+        const span = (from: number, to: number) => {
+            top = Math.min(top, from);
+            bottom = Math.max(bottom, to);
+        };
+        for (const item of items) {
+            if (item === "#All") span(area.start.row, area.end.row);
+            else if (item === "#Data") span(firstData, lastData);
+            else if (item === "#Headers") {
+                if (!header) return ERR("#REF!");
+                span(headerRow, headerRow);
+            } else if (item === "#Totals") {
+                if (!totals) return ERR("#REF!");
+                span(totalsRow, totalsRow);
+            } else {
+                const row = frame.cell?.row;
+                if (row === undefined || row < firstData || row > lastData || frame.sheet !== sheet)
+                    return ERR("#VALUE!");
+                span(row, row);
+            }
+        }
+        const columnAt = (name: string) =>
+            table.columns.findIndex((column) => column.name.toLowerCase() === name.toLowerCase());
+        let left = area.start.col;
+        let right = area.end.col;
+        if (ast.spec.startColumn !== undefined) {
+            const first = columnAt(ast.spec.startColumn);
+            const last = ast.spec.endColumn === undefined ? first : columnAt(ast.spec.endColumn);
+            if (first < 0 || last < 0) return ERR("#REF!");
+            left = area.start.col + Math.min(first, last);
+            right = area.start.col + Math.max(first, last);
+        }
+        if (bottom < top) return ERR("#CALC!");
+        return { sheet, start: { row: top, col: left }, end: { row: bottom, col: right } };
+    }
+
+    private referenceOf(ast: Ast, frame: Frame): RangeRef | undefined {
+        if (ast.type === "ref") return this.refOf(ast, frame.sheet);
+        if (ast.type === "structured") {
+            const ref = this.structuredRef(ast, frame);
+            return isError(ref) ? undefined : ref;
+        }
+        if (ast.type === "name" && !frame.scope?.has(ast.name)) {
+            const ranges = resolveRanges(this.workbook, ast.name, frame.sheet);
+            const first = ranges[0];
+            return first === undefined ? undefined : { sheet: first.sheet, ...first.range };
+        }
+        if (ast.type === "call") {
+            const name = normalizeName(ast.name);
+            // INDEX, OFFSET and INDIRECT return references (e.g. A1:INDEX(…) or ROW(OFFSET(…))).
+            const context = this.context(frame);
+            const handler = REFERENCE_FUNCTIONS[name];
+            return handler?.(ast.args, context);
+        }
+        return undefined;
+    }
+
+    private rangeValues(ref: RangeRef): Value {
+        if (ref.start.row === ref.end.row && ref.start.col === ref.end.col) {
+            return this.value(ref.sheet, addressOf(ref.start.row, ref.start.col));
+        }
+        return this.range(ref.sheet, ref.start, ref.end);
+    }
+
+    private parseReference(text: string, sheet: number): RangeRef | undefined {
+        try {
+            const ast = parseFormula(text.trim().replace(/^=/, ""));
+            return this.referenceOf(ast, { sheet });
+        } catch {
+            return undefined;
+        }
+    }
+
+    private context(frame: Frame): EvalContext {
+        return {
+            evaluate: (node) => this.plain(this.evaluate(node, frame)),
+            evaluateWith: (node, names) => {
+                const scope = new Map(frame.scope ?? []);
+                for (const [name, value] of names) scope.set(name, value);
+                return this.plain(this.evaluate(node, { ...frame, scope }));
+            },
+            referenceOf: (node) => this.referenceOf(node, frame),
+            values: (ref) => this.range(ref.sheet, ref.start, ref.end),
+            parseReference: (text) => this.parseReference(text, frame.sheet),
+            sheet: frame.sheet,
+            cell: frame.cell,
+            formulaAt: (sheet, row, col) => this.workbook.sheets[sheet]?.cells[addressOf(row, col)]?.f,
+            call: (fn, args) => this.apply(fn, args, frame),
+            bind: (node) => this.evaluate(node, frame),
+            scope: frame.scope,
+        };
+    }
+
+    /** A lambda where a value is expected is a #CALC! error, as in Excel. */
+    private plain(value: Binding): Value {
+        return value instanceof LambdaValue ? ERR("#CALC!") : value;
+    }
+
+    private apply(fn: Value | LambdaValue, args: Value[], frame: Frame): Value {
+        if (!(fn instanceof LambdaValue)) return ERR("#VALUE!");
+        if (args.length > fn.params.length) return ERR("#VALUE!");
+        const scope = new Map(fn.closure);
+        fn.params.forEach((param, i) => scope.set(param, args[i] ?? null));
+        return this.plain(this.evaluate(fn.body, { ...frame, scope }));
+    }
+
+    // -------------------------------------------------------------- Expressions
+
+    private evaluate(ast: Ast, frame: Frame): Binding {
         switch (ast.type) {
             case "number":
             case "string":
@@ -1088,86 +1428,189 @@ export class WorkbookEvaluator {
                 return ast.value;
             case "error":
                 return ERR(ast.code);
-            case "ref":
-                return this.reference(ast, sheet);
-            case "name": {
-                const named = this.workbook.names?.find((n) => n.name.toUpperCase() === ast.name);
-                if (!named) return ERR("#NAME?");
-                const ranges = resolveRanges(this.workbook, ast.name, sheet);
-                if (ranges.length !== named.ranges.length) return ERR("#REF!");
-                return ranges.flatMap((r) => this.range(r.sheet, r.range.start, r.range.end));
+            case "ref": {
+                const ref = this.refOf(ast, frame.sheet);
+                if (ref === undefined) return ERR("#REF!");
+                // A1#: the anchor's result itself, whether or not its spill is laid out yet.
+                if (ast.spill) {
+                    const result = this.cellResult(ref.sheet, addressOf(ref.start.row, ref.start.col)).value;
+                    if (Array.isArray(result)) return result;
+                }
+                return this.rangeValues(ref);
             }
+            case "structured": {
+                const ref = this.structuredRef(ast, frame);
+                return isError(ref) ? ref : this.rangeValues(ref);
+            }
+            case "array":
+                return ast.rows.map((row) =>
+                    row.map((item) => scalar(this.plain(this.evaluate(item, frame)))),
+                );
+            case "name":
+                return this.name(ast.name, frame);
             case "unary": {
-                const x = toNumber(scalar(this.evaluate(ast.arg, sheet)));
-                return isError(x) ? x : -x;
+                const arg = this.plain(this.evaluate(ast.arg, frame));
+                return lift([arg], ([x]) => {
+                    const n = toNumber(x);
+                    return isError(n) ? n : -n;
+                });
             }
             case "percent": {
-                const x = toNumber(scalar(this.evaluate(ast.arg, sheet)));
-                return isError(x) ? x : x / 100;
+                const arg = this.plain(this.evaluate(ast.arg, frame));
+                return lift([arg], ([x]) => {
+                    const n = toNumber(x);
+                    return isError(n) ? n : n / 100;
+                });
             }
-            case "binary":
-                return this.binary(
-                    ast.op,
-                    scalar(this.evaluate(ast.left, sheet)),
-                    scalar(this.evaluate(ast.right, sheet)),
-                );
-            case "call": {
-                const fn = FUNCTIONS[ast.name.replace(/^_xlfn\./i, "")];
-                if (fn === undefined) return ERR("#NAME?");
-                const info = FUNCTION_INFO[ast.name.replace(/^_xlfn\./i, "")];
-                if (info && (ast.args.length < info[2] || ast.args.length > (info[3] ?? Infinity)))
-                    return ERR("#VALUE!");
-                const context: EvalContext = { evaluate: (node) => this.evaluate(node, sheet) };
-                const lazy = ["IF", "IFERROR", "IFNA", "IFS"].includes(ast.name.replace(/^_xlfn\./i, ""));
-                const args = lazy ? [] : ast.args.map((arg) => this.evaluate(arg, sheet));
-                return fn(args, ast.args, context);
+            case "binary": {
+                const left = this.plain(this.evaluate(ast.left, frame));
+                const right = this.plain(this.evaluate(ast.right, frame));
+                return lift([left, right], ([a, b]) => binary(ast.op, a, b));
             }
+            case "call":
+                return this.call(ast, frame);
         }
     }
 
-    private binary(op: string, left: Scalar, right: Scalar): Scalar {
-        if (isError(left)) return left;
-        if (isError(right)) return right;
-        if (op === "&") {
-            const a = toText(left);
-            const b = toText(right);
-            return isError(a) ? a : isError(b) ? b : a + b;
+    private name(name: string, frame: Frame): Binding {
+        if (name === "") return null;
+        const bound = frame.scope?.get(name);
+        if (bound !== undefined || frame.scope?.has(name)) return bound ?? null;
+        const named = this.workbook.names?.find((n) => n.name.toUpperCase() === name);
+        if (!named) {
+            // A table name alone is its data body.
+            if (this.tables().has(name.toLowerCase()))
+                return this.evaluate({ type: "structured", table: name, spec: { items: [] } }, frame);
+            return ERR("#NAME?");
         }
-        if (op === "=" || op === "<>" || op === "<" || op === ">" || op === "<=" || op === ">=") {
-            const c = compare(left, right);
-            return op === "="
-                ? c === 0
-                : op === "<>"
-                  ? c !== 0
-                  : op === "<"
-                    ? c < 0
-                    : op === ">"
-                      ? c > 0
-                      : op === "<="
-                        ? c <= 0
-                        : c >= 0;
+        const ranges = resolveRanges(this.workbook, name, frame.sheet);
+        if (ranges.length === named.ranges.length && ranges.length > 0) {
+            if (ranges.length === 1) return this.rangeValues({ sheet: ranges[0].sheet, ...ranges[0].range });
+            return ranges.flatMap((r) => this.range(r.sheet, r.range.start, r.range.end));
         }
-        const a = toNumber(left);
-        const b = toNumber(right);
-        if (isError(a)) return a;
-        if (isError(b)) return b;
-        switch (op) {
-            case "+":
-                return a + b;
-            case "-":
-                return a - b;
-            case "*":
-                return a * b;
-            case "/":
-                return b === 0 ? ERR("#DIV/0!") : a / b;
-            case "^": {
-                const result = a ** b;
-                return Number.isFinite(result) ? result : ERR("#NUM!");
-            }
+        // A name defined by a formula ("=categories[Subcategory]", "=Rate*12").
+        if (named.ranges.length !== 1 || this.activeNames.has(name)) return ERR("#REF!");
+        this.activeNames.add(name);
+        try {
+            return this.evaluate(parseFormula(String(named.ranges[0]).replace(/^=/, "")), frame);
+        } catch {
+            return ERR("#NAME?");
+        } finally {
+            this.activeNames.delete(name);
         }
-        return ERR("#VALUE!");
+    }
+
+    private call(ast: Extract<Ast, { type: "call" }>, frame: Frame): Binding {
+        const name = normalizeName(ast.name);
+        const local = frame.scope?.get(name);
+        if (local instanceof LambdaValue) {
+            return this.apply(
+                local,
+                ast.args.map((arg) => this.plain(this.evaluate(arg, frame))),
+                frame,
+            );
+        }
+        if (name === "LAMBDA") {
+            const params = ast.args.slice(0, -1).map((arg) => (arg.type === "name" ? arg.name : ""));
+            const body = ast.args.at(-1);
+            if (body === undefined || params.some((param) => param === "")) return ERR("#VALUE!");
+            return new LambdaValue(params, body, new Map(frame.scope ?? []));
+        }
+        const fn = FUNCTIONS[name];
+        if (fn === undefined) return ERR("#NAME?");
+        const info = FUNCTION_INFO[name] ?? MORE_FUNCTION_INFO[name];
+        if (info && (ast.args.length < info[2] || ast.args.length > (info[3] ?? Number.POSITIVE_INFINITY)))
+            return ERR("#VALUE!");
+        const context = this.context(frame);
+        if (LAZY.has(name)) return fn([], ast.args, context);
+        const args = ast.args.map((arg) => this.plain(this.evaluate(arg, frame)));
+        // Per-value functions map over arrays (MONTH(A2:A9) is an array of months).
+        if (ELEMENTWISE.has(name) && args.some(Array.isArray)) {
+            return lift(args, (scalars) => scalar(fn(scalars, ast.args, context)));
+        }
+        return fn(args, ast.args, context);
     }
 }
+
+/** A result that occupies more than one cell. */
+function isSpill(value: Scalar[][]): boolean {
+    return value.length > 1 || (value[0]?.length ?? 0) > 1;
+}
+
+function binary(op: string, left: Scalar, right: Scalar): Scalar {
+    if (isError(left)) return left;
+    if (isError(right)) return right;
+    if (op === "&") {
+        const a = toText(left);
+        const b = toText(right);
+        return isError(a) ? a : isError(b) ? b : a + b;
+    }
+    if (op === "=" || op === "<>" || op === "<" || op === ">" || op === "<=" || op === ">=") {
+        const c = compare(left, right);
+        return op === "="
+            ? c === 0
+            : op === "<>"
+              ? c !== 0
+              : op === "<"
+                ? c < 0
+                : op === ">"
+                  ? c > 0
+                  : op === "<="
+                    ? c <= 0
+                    : c >= 0;
+    }
+    const a = toNumber(left);
+    const b = toNumber(right);
+    if (isError(a)) return a;
+    if (isError(b)) return b;
+    switch (op) {
+        case "+":
+            return a + b;
+        case "-":
+            return a - b;
+        case "*":
+            return a * b;
+        case "/":
+            return b === 0 ? ERR("#DIV/0!") : a / b;
+        case "^": {
+            const result = a ** b;
+            return Number.isFinite(result) ? result : ERR("#NUM!");
+        }
+    }
+    return ERR("#VALUE!");
+}
+
+/** Functions that also return a reference, for ROW(INDEX(…)), A1:INDEX(…), OFFSET(…). */
+const REFERENCE_FUNCTIONS: Record<string, (args: Ast[], context: EvalContext) => RangeRef | undefined> = {
+    INDEX: (args, context) => {
+        const ref = args[0] === undefined ? undefined : context.referenceOf(args[0]);
+        if (ref === undefined) return undefined;
+        const row = toNumber(scalar(args[1] === undefined ? null : context.evaluate(args[1])));
+        const col = toNumber(scalar(args[2] === undefined ? 1 : context.evaluate(args[2])));
+        if (isError(row) || isError(col)) return undefined;
+        const height = ref.end.row - ref.start.row + 1;
+        const width = ref.end.col - ref.start.col + 1;
+        const r = height === 1 && args.length === 2 ? 0 : Math.trunc(row) - 1;
+        const c = height === 1 && args.length === 2 ? Math.trunc(row) - 1 : Math.trunc(col) - 1;
+        if (r >= height || c >= width) return undefined;
+        return {
+            sheet: ref.sheet,
+            start: {
+                row: r < 0 ? ref.start.row : ref.start.row + r,
+                col: c < 0 ? ref.start.col : ref.start.col + c,
+            },
+            end: {
+                row: r < 0 ? ref.end.row : ref.start.row + r,
+                col: c < 0 ? ref.end.col : ref.start.col + c,
+            },
+        };
+    },
+    OFFSET: (args, context) => offsetRef(args, context),
+    INDIRECT: (args, context) => {
+        const text = toText(scalar(args[0] === undefined ? null : context.evaluate(args[0])));
+        return isError(text) ? undefined : context.parseReference(text);
+    },
+};
 
 function errorOf(code: string): FormulaError {
     return ERR((ERROR_CODES as string[]).includes(code) ? (code as FormulaErrorCode) : "#N/A");

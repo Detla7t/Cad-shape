@@ -43,6 +43,8 @@ export interface SheetActionContext {
     clearFormat(): void;
     merge(): void;
     editFormula(text: string, cursor?: number): void;
+    /** Opens the function browser for the active cell (Shift+F3). */
+    browseFunctions(): void;
     setValue(address: string, value: string): void;
     zoom(value: number): void;
     message(text: string): void;
@@ -634,9 +636,8 @@ export function createSheetActions(ctx: SheetActionContext) {
     trailingTools.className = style.toolGroup;
     const filter = sheetButton("Create or remove filter", "⏷", toggleFilter);
     const functions = sheetButton("Functions", "Σ", () =>
-        overlays.menu(
-            functions,
-            ["SUM", "AVERAGE", "COUNT", "MAX", "MIN"].map((name) => ({
+        overlays.menu(functions, [
+            ...["SUM", "AVERAGE", "COUNT", "MAX", "MIN"].map((name) => ({
                 label: name,
                 action: () => {
                     const { index, range } = ctx.read();
@@ -662,7 +663,9 @@ export function createSheetActions(ctx: SheetActionContext) {
                     ctx.editFormula(`=${name}(${source})`);
                 },
             })),
-        ),
+            null,
+            { label: "More functions…", hint: "Shift+F3", action: ctx.browseFunctions },
+        ]),
     );
     trailingTools.append(filter, functions);
     return {

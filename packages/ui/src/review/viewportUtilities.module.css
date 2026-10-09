@@ -84,22 +84,17 @@
     border: 1px solid var(--border-color);
     padding: 6px;
 }
-.guide {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
+/* The selection measurement label, anchored in the 3D scene (see measurementGuide.ts). */
+.guideLabel {
     pointer-events: none;
-    z-index: 990;
-    overflow: hidden;
-}
-.guide text {
-    fill: #12658c;
-    stroke: var(--panel-background-color);
-    stroke-width: 4px;
-    paint-order: stroke;
+    color: #12658c;
     font: 12px sans-serif;
+    white-space: nowrap;
+    text-shadow:
+        0 0 3px var(--panel-background-color),
+        0 0 3px var(--panel-background-color),
+        0 0 2px var(--panel-background-color);
 }
-:root[theme="dark"] .guide text {
-    fill: #7cc3ea;
+:root[theme="dark"] .guideLabel {
+    color: #7cc3ea;
 }

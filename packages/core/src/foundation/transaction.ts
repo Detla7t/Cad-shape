@@ -97,6 +97,7 @@ export class Transaction {
         Transaction._transactionMap.delete(this.document);
         this.operation?.add({
             recordCount: arrayRecord.records.length,
+            records: recordNames(arrayRecord.records),
         });
         this.operation?.finish("success");
     }
@@ -106,7 +107,16 @@ export class Transaction {
         Transaction._transactionMap.delete(this.document);
 
         transaction?.undo();
-        this.operation?.add({ recordCount: transaction?.records.length ?? 0 });
+        this.operation?.add({
+            recordCount: transaction?.records.length ?? 0,
+            records: recordNames(transaction?.records ?? []),
+        });
         this.operation?.finish("rolled_back", error);
     }
+}
+
+/** The first few record names of a transaction ("edit name, change structure (+3)"). */
+function recordNames(records: readonly { name: string }[]): string {
+    const shown = records.slice(0, 5).map((record) => record.name);
+    return records.length > 5 ? `${shown.join(", ")} (+${records.length - 5})` : shown.join(", ");
 }

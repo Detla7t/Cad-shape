@@ -2,9 +2,11 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    type EdgeMeshData,
     FolderNode,
     type INode,
     type MeasurementMode,
+    type MeshOption,
     PubSub,
     Result,
     registerSelectionMeasurementProvider,
@@ -46,8 +48,24 @@ test("the readout refines a measurement, creates that definition and clears its 
     const host = document.createElement("div");
     document.body.append(host);
     const view = createMockView({ document: doc, dom: host });
+    // The guide is scene geometry plus a 3D label: track what is on display.
+    const meshes = new Map<number, { data: EdgeMeshData; option?: MeshOption }>();
+    let nextId = 1;
+    doc.visual.context.displayMesh = (datas, option) => {
+        meshes.set(nextId, { data: datas[0] as EdgeMeshData, option });
+        return nextId++;
+    };
+    doc.visual.context.removeMesh = (id) => {
+        meshes.delete(id);
+    };
+    const labels = new Set<string>();
+    view.htmlText = (text) => {
+        labels.add(text);
+        return { dispose: () => labels.delete(text) };
+    };
+    const outline = () => [...meshes.values()].find((mesh) => mesh.data.lineType === "dash");
     const control = new SelectionMeasurementControl(view, () => control.close());
-    host.append(control.element, control.popup, control.guide.element);
+    host.append(control.element, control.popup);
     try {
         await Promise.resolve();
         expect(control.element.hidden).toBe(true);
@@ -55,9 +73,11 @@ test("the readout refines a measurement, creates that definition and clears its 
         doc.selection.onNodeChanged.emit(selected);
         await Promise.resolve();
         expect(control.element.textContent).toContain("Diameter: 50.80 mm");
-        const originalLine = control.guide.element.querySelector("path");
-        expect(originalLine).not.toBeNull();
-        expect(originalLine!.getAttribute("stroke-dasharray")).toBe("6 4");
+        const originalLine = outline();
+        expect(originalLine).toBeDefined();
+        expect(originalLine!.option?.onTop).toBe(true);
+        expect([...originalLine!.data.position]).toEqual([-25.4, 0, 0, 25.4, 0, 0].map(Math.fround));
+        expect([...labels]).toEqual(["Diameter: 50.80 mm"]);
         const readout = control.element.querySelector<HTMLButtonElement>(
             '[aria-label="Refine selection measurement"]',
         );
@@ -69,9 +89,8 @@ test("the readout refines a measurement, creates that definition and clears its 
         method!.value = "radius";
         method!.dispatchEvent(new Event("change"));
         expect(control.element.textContent).toContain("Radius: 25.40 mm");
-        expect(control.guide.element.querySelector("path")!.getAttribute("d")).not.toBe(
-            originalLine!.getAttribute("d"),
-        );
+        expect([...outline()!.data.position]).toEqual([0, 0, 0, 25.4, 0, 0].map(Math.fround));
+        expect([...labels]).toEqual(["Radius: 25.40 mm"]);
         doc.userData = { displayUnits: { length: "in", lengthPrecision: 3 } };
         PubSub.default.pub("documentUnitsChanged", doc);
         await Promise.resolve();
@@ -88,7 +107,8 @@ test("the readout refines a measurement, creates that definition and clears its 
         doc.selection.onNodeChanged.emit(selected);
         await Promise.resolve();
         expect(control.element.hidden).toBe(true);
-        expect(control.guide.element.childElementCount).toBe(0);
+        expect(meshes.size).toBe(0);
+        expect(labels.size).toBe(0);
     } finally {
         control.dispose();
         host.remove();
