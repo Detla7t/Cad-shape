@@ -5,7 +5,7 @@ import { I18n, Localize, Transaction } from "@chili3d/core";
 import { div, input, option, select, span } from "@chili3d/element";
 import { setDocumentWorkbook } from "../../api";
 import { applyCellStyle } from "../../sheet/cellStyle";
-import { isFormulaError, WorkbookEvaluator } from "../../sheet/formula";
+import { FORMULA_FUNCTIONS, isFormulaError, WorkbookEvaluator } from "../../sheet/formula";
 import {
     addressOf,
     type CellAddress,
@@ -30,8 +30,10 @@ import style from "../documents.module.css";
 import chrome from "../spreadsheet.module.css";
 import type { DocumentExport, IDocumentViewer, ViewerContext } from "../viewer";
 import { createFormulaAssist } from "./formulaAssist";
+import { createFunctionButton } from "./functionButton";
 import { createSheetActions } from "./sheetActions";
 import { sheetButton } from "./sheetControls";
+import { createImageLayer, followHyperlink, hyperlinkTitle } from "./sheetOverlays";
 import { createSheetToolbar } from "./sheetToolbar";
 
 /**
@@ -100,7 +102,11 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
     const thead = window.document.createElement("thead");
     const tbody = window.document.createElement("tbody");
     table.append(colgroup, thead, tbody);
-    const scroller = div({ className: style.gridScroller, tabIndex: 0 }, table);
+    // Hyperlinks and pictures from the workbook (sheetOverlays.ts).
+    const followLink = (link: { target?: string; location?: string }) =>
+        followHyperlink(link, workbook, sheetIndex, (index, range) => switchSheet(index, range));
+    const images = createImageLayer(followLink);
+    const scroller = div({ className: style.gridScroller, tabIndex: 0 }, table, images.element);
     const tabs = div({ className: `${style.sheetTabs} ${chrome.tabs}` });
 
     const sheet = () => workbook.sheets[sheetIndex];
@@ -328,6 +334,14 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
                 td.className = [className, isFocus ? style.selected : inRange ? style.inRange : ""]
                     .join(" ")
                     .trim();
+                const link = sheet().hyperlinks?.[addressOf(cellRow, cellCol)];
+                if (link) {
+                    td.classList.add(chrome.hyperlink);
+                    td.title = hyperlinkTitle(link);
+                }
+                // Like Excel, left-aligned text runs on over an empty right neighbour.
+                if (!merge && text && className === "" && overflowsRight(cellRow, cellCol))
+                    td.classList.add(chrome.overflowText);
                 if (r < frozenRows || c < (sheet().frozen?.cols ?? 0)) {
                     td.style.position = "sticky";
                     td.style.zIndex = r < frozenRows && c < (sheet().frozen?.cols ?? 0) ? "4" : "3";
@@ -368,6 +382,36 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
         }
         if (previous < rows - 1) fragment.append(spacer(rowTops[rows] - rowTops[previous + 1]));
         tbody.replaceChildren(fragment);
+        table.classList.toggle(chrome.noGridLines, sheet().gridLines === false);
+        renderImages();
+    };
+    /** Whether a text cell may spill into the next column: left/general aligned, unwrapped, neighbour empty. */
+    const overflowsRight = (row: number, col: number) => {
+        const alignment = sheet().cells[addressOf(row, col)]?.s?.alignment;
+        if (
+            alignment?.wrapText ||
+            (alignment?.horizontal && !["left", "general"].includes(alignment.horizontal))
+        )
+            return false;
+        const next = sheet().cells[addressOf(row, col + 1)];
+        return next === undefined || (next.v === undefined && next.f === undefined);
+    };
+    /** Pictures at their anchors: column edges from the widths, row edges from the row layout. */
+    const renderImages = () => {
+        const lefts = [HEADER_WIDTH];
+        const left = (col: number) => {
+            while (lefts.length <= col) lefts.push(lefts[lefts.length - 1] + widthOf(lefts.length - 1));
+            return lefts[col];
+        };
+        const last = rowTops.length - 1;
+        const top = (row: number) =>
+            ROW_HEIGHT + (row <= last ? rowTops[row] : rowTops[last] + (row - last) * ROW_HEIGHT);
+        images.render(sheet(), { left, top });
+        // Full content size, clipped to the area below/right of the sticky headers it is drawn above.
+        const layer = images.element.style;
+        layer.width = table.style.width;
+        layer.height = `${top(last)}px`;
+        layer.clipPath = `inset(${scroller.scrollTop + ROW_HEIGHT}px 0 0 ${scroller.scrollLeft + HEADER_WIDTH}px)`;
     };
 
     const renderTabs = () => {
@@ -414,6 +458,7 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
             formatMenu.append(option({ value: cell?.z ?? "", textContent: cell?.z ?? "" }));
             formatMenu.value = cell?.z ?? "";
         }
+        fx.sync();
     };
 
     const renderNotice = () => {
@@ -553,6 +598,7 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
         box.addEventListener("keydown", (e) => {
             if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") return;
             e.stopPropagation();
+            if (fx.handleKey(e)) return;
             if (e.key === "Enter" || e.key === "Tab") {
                 e.preventDefault();
                 commitEditor();
@@ -692,6 +738,14 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
         if (e.button !== 0) return;
         const td = (e.target as HTMLElement).closest("td");
         if (td === null || td.dataset["row"] === undefined) return;
+        if (e.ctrlKey || e.metaKey) {
+            const link =
+                sheet().hyperlinks?.[addressOf(Number(td.dataset["row"]), Number(td.dataset["col"]))];
+            if (link && followLink(link)) {
+                e.preventDefault();
+                return;
+            }
+        }
         selecting = true;
         e.preventDefault();
         const at = { row: Number(td.dataset["row"]), col: Number(td.dataset["col"]) };
@@ -706,6 +760,7 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
         if (editor !== undefined || !loaded) return;
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") return;
         e.stopPropagation();
+        if (fx.handleKey(e)) return;
         if (e.ctrlKey || e.metaKey) {
             const key = e.key.toLowerCase();
             if (["z", "y", "f"].includes(key)) {
@@ -796,10 +851,56 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
         }
         assist.hide();
     };
-    formulaInput.addEventListener("blur", commitFormula);
+    // The fx button and its function browser (focus moves into the browser while it is open).
+    const formulaToValue = () => {
+        const address = addressOf(focus.row, focus.col);
+        const pending = formulaInput.value !== cellInputText(sheet().cells[address]);
+        if (pending) setCell(address, formulaInput.value);
+        const cell = sheet().cells[address];
+        if (cell?.f !== undefined) {
+            const value = (pending ? new WorkbookEvaluator(workbook) : evaluator).value(sheetIndex, address);
+            const { f: _formula, v: _value, e: _error, ...rest } = cell;
+            const next: CellData = isFormulaError(value)
+                ? { ...rest, v: value.code, e: true }
+                : value === null
+                  ? rest
+                  : { ...rest, v: value };
+            if (Object.keys(next).length) sheet().cells[address] = next;
+            else delete sheet().cells[address];
+        }
+        markDirty();
+        renderRows();
+        renderFormulaBar();
+        scroller.focus();
+    };
+    const fx = createFunctionButton({
+        formulaInput,
+        formulaBar: () => formulaInput.parentElement ?? formulaInput,
+        names: () => FORMULA_FUNCTIONS,
+        storedText: () => cellInputText(sheet().cells[addressOf(focus.row, focus.col)]),
+        takeCellEditor: () => {
+            if (editor === undefined) return undefined;
+            const moved = { text: editor.value, cursor: editor.selectionStart ?? editor.value.length };
+            cancelEditor();
+            return moved;
+        },
+        toValue: formulaToValue,
+        revert: (focusGrid) => {
+            renderFormulaBar();
+            if (focusGrid) scroller.focus();
+        },
+        commit: commitFormula,
+        edited: changed,
+        showHint: () => assist.refresh(formulaInput),
+        hideHint: () => assist.hide(),
+    });
+    formulaInput.addEventListener("blur", () => {
+        if (!fx.browsing()) commitFormula();
+    });
     formulaInput.addEventListener("keydown", (e) => {
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") return;
         e.stopPropagation();
+        if (fx.handleKey(e)) return;
         if (e.key === "Enter") {
             e.preventDefault();
             const address = addressOf(focus.row, focus.col);
@@ -952,6 +1053,7 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
         clear: clearRange,
         clearFormat,
         merge: mergeSelection,
+        browseFunctions: () => fx.openBrowser(),
         editFormula: (text, cursor = text.length) => {
             formulaInput.value = text;
             formulaInput.focus();
@@ -1048,7 +1150,7 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
                 { className: `${style.formulaBar} ${chrome.formulaBar}` },
                 cellName,
                 names,
-                span({ textContent: "fx" }),
+                fx.button,
                 formulaInput,
             ),
             notice,
@@ -1069,6 +1171,7 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
         dispose: () => {
             cancelAnimationFrame(frame);
             assist.dispose();
+            fx.dispose();
             actions.dispose();
             window.removeEventListener("mouseup", endSelection);
             editor?.remove();

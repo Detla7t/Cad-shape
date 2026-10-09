@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import type { IDocument } from "@chili3d/core";
+import type { IDisposable, IDocument } from "@chili3d/core";
 import { analyzeFeature, analyzeTable, type FeatureSpec } from "./featureSpec";
 import { FeatureStudioNode } from "./featureStudioNode";
 import {
@@ -53,7 +53,30 @@ const documentCaches = new WeakMap<IDocument, Map<string, CompiledStudio>>();
 /** studio id → the dependencies its latest compilation read; what bodies watch. */
 const lastDependencies = new Map<string, readonly string[]>();
 
+/**
+ * A studio that is not a node of the document: the Part Studio tools studio
+ * (`onshapeTools.ts`) is generated from the loaded std and lives in no document, so it has
+ * no tab, no tree row and no undo step. Providers answer by id before the document is searched.
+ */
+export type StudioProvider = (document: IDocument, studioId: string) => FeatureStudioNode | undefined;
+
+const providers: StudioProvider[] = [];
+
+export function registerStudioProvider(provider: StudioProvider): IDisposable {
+    providers.push(provider);
+    return {
+        dispose: () => {
+            const index = providers.indexOf(provider);
+            if (index >= 0) providers.splice(index, 1);
+        },
+    };
+}
+
 export function findStudio(document: IDocument, idOrName: string): FeatureStudioNode | undefined {
+    for (const provider of providers) {
+        const provided = provider(document, idOrName);
+        if (provided !== undefined) return provided;
+    }
     const byId = document.modelManager.findNode(
         (node) => node instanceof FeatureStudioNode && node.id === idOrName,
     );

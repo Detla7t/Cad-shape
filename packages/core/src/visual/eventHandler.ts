@@ -7,6 +7,12 @@ import type { IView } from "./view";
 
 export interface IEventHandler extends IDisposable {
     isEnabled: boolean;
+    /**
+     * True when a pick also takes nodes clicked in the model tree (a feature dialog's plane
+     * box accepting Top/Front/Right from the tree); the tree otherwise refuses to select
+     * while a sub-shape pick runs in the viewport.
+     */
+    readonly treeSelection?: boolean;
     /** Maps shared toolbar/shortcut actions into the active editing context. */
     resolveCommand?(command: CommandKeys): CommandKeys;
     contextMenu?(view: IView, event: PointerEvent): boolean;

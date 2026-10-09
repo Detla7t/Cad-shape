@@ -26,6 +26,8 @@ export interface PubSubEventMap {
     documentClosed: (document: IDocument) => void;
     /** A document and its version history were written to storage (links into it may update). */
     documentSaved: (document: IDocument) => void;
+    /** A recovery save: the same write as `documentSaved`, but links following the document do not advance. */
+    documentAutosaved: (document: IDocument) => void;
     documentUnitsChanged: (document: IDocument) => void;
     openPreferences: (document?: IDocument, section?: string) => void;
     measurementPreview: (

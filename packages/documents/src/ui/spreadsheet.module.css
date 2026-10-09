@@ -264,13 +264,29 @@
 .sheet .formulaBar input:first-child {
     width: 77px;
 }
-.sheet .formulaBar span {
+.fxButton {
+    align-self: stretch;
+    min-width: 34px;
+    padding: 0 8px;
     font:
         italic 16px Georgia,
         serif;
-    color: #909399;
-    padding: 0 8px;
-    border-left: 1px solid #dadce0;
+    color: var(--foreground-secondary-color);
+    background: transparent;
+    border: 0;
+    border-left: 1px solid var(--border-color);
+    cursor: pointer;
+}
+.fxButton:hover {
+    background: var(--checked-color);
+}
+.fxButton[aria-pressed="true"] {
+    color: var(--primary-color);
+    font-weight: 700;
+}
+.fxButton:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: -2px;
 }
 .namesButton {
     border: 0;
@@ -491,4 +507,228 @@
     color: #b3261e;
     font-size: 12px;
     margin-top: 10px;
+}
+
+/* Insert-function browser: lives on <body>, so it follows the app theme (light or dark). */
+.functionBrowser {
+    position: fixed;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    min-height: 160px;
+    font:
+        12px / 1.45 Arial,
+        sans-serif;
+    color: var(--foreground-color);
+    background: var(--panel-background-color);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    box-shadow: var(--panel-shadow);
+    overflow: hidden;
+}
+.functionBrowser[hidden] {
+    display: none;
+}
+.functionBrowserHeader {
+    display: flex;
+    gap: 8px;
+    padding: 8px;
+    border-bottom: 1px solid var(--border-color);
+}
+.functionSearch,
+.functionCategory {
+    height: 28px;
+    box-sizing: border-box;
+    font: inherit;
+    color: var(--input-text-color);
+    background: var(--input-background-color);
+    border: 1px solid var(--input-border-color);
+    border-radius: 4px;
+}
+.functionSearch {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0 8px;
+}
+.functionCategory {
+    flex: 0 0 auto;
+    max-width: 45%;
+    padding: 0 4px;
+}
+.functionSearch:focus,
+.functionCategory:focus-visible,
+.functionBrowserList:focus-visible,
+.functionInsert:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: -1px;
+}
+.functionBrowserBody {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+.functionBrowserList {
+    position: relative;
+    flex: 0 0 46%;
+    overflow-y: auto;
+    border-right: 1px solid var(--border-color);
+    overscroll-behavior: contain;
+}
+.functionBrowserSizer {
+    position: relative;
+}
+.functionOption {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 28px;
+    box-sizing: border-box;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 5px 10px;
+    white-space: nowrap;
+    cursor: pointer;
+}
+.functionOption:hover {
+    background: var(--panel-hover-background-color);
+}
+.functionOption[aria-selected="true"] {
+    background: color-mix(in srgb, var(--selection-tint) 45%, var(--panel-background-color));
+}
+.functionName {
+    flex: 0 0 auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-weight: 600;
+}
+.functionName mark {
+    color: inherit;
+    background: color-mix(in srgb, var(--warning-color) 35%, transparent);
+    border-radius: 2px;
+}
+.functionSummary {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--foreground-secondary-color);
+}
+.functionEmpty {
+    padding: 12px 10px;
+    color: var(--foreground-secondary-color);
+}
+.functionDetail {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-y: auto;
+    padding: 10px 12px;
+}
+.functionDetail p {
+    margin: 6px 0 8px;
+}
+.functionDetailTitle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 14px;
+}
+.functionTag {
+    padding: 1px 8px;
+    font-size: 11px;
+    white-space: nowrap;
+    color: var(--query-foreground-color);
+    background: var(--query-background-color);
+    border: 1px solid var(--query-border-color);
+    border-radius: 10px;
+}
+.functionSignature,
+.functionExample {
+    display: block;
+    margin-top: 6px;
+    padding: 5px 7px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    overflow-wrap: anywhere;
+    background: var(--background-color);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+}
+.functionArgs {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 3px 10px;
+    margin: 0 0 8px;
+}
+.functionArgs dt {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-weight: 600;
+}
+.functionArgs dt small {
+    font-family: Arial, sans-serif;
+    font-weight: 400;
+    color: var(--foreground-secondary-color);
+}
+.functionArgs dd {
+    margin: 0;
+}
+.functionExampleLabel {
+    margin-top: 4px;
+    font-weight: 600;
+    color: var(--foreground-secondary-color);
+}
+.functionInsert {
+    margin-top: 10px;
+    padding: 5px 12px;
+    font: inherit;
+    color: var(--on-primary-color);
+    background: var(--button-primary-background);
+    border: 1px solid var(--button-primary-background);
+    border-radius: 4px;
+    cursor: pointer;
+}
+.functionInsert:hover {
+    background: var(--button-primary-hover);
+}
+.functionBrowserFooter {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 5px 10px;
+    font-size: 11px;
+    color: var(--foreground-secondary-color);
+    border-top: 1px solid var(--border-color);
+}
+
+/* Pictures anchored to cells, laid over the grid (and over text running on from a cell); they
+   scroll with it and are clipped below/right of the sticky headers. */
+.imageLayer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1;
+    pointer-events: none;
+}
+.imageLayer img {
+    position: absolute;
+    pointer-events: none;
+    user-select: none;
+}
+.imageLayer img[data-link] {
+    pointer-events: auto;
+    cursor: pointer;
+}
+/* A linked cell; the workbook's own hyperlink style (inline) wins over these defaults. */
+.sheet table td.hyperlink {
+    color: #0563c1;
+    text-decoration: underline;
+}
+.sheet table.noGridLines td {
+    border-right-color: transparent;
+    border-bottom-color: transparent;
+}
+/* Text running on over empty neighbours, drawn above their fills. */
+.sheet table td.overflowText {
+    overflow: visible;
+    text-overflow: clip;
+    z-index: 1;
 }

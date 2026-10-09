@@ -1,0 +1,326 @@
+{
+    "feature-Extrude": {
+        "failures": [
+            {
+                "text": "✓",
+                "ratio": 1.88,
+                "color": "rgb(255, 255, 255)",
+                "bg": "rgb(0,138,8)",
+                "cls": "",
+                "tag": "BUTTON",
+                "disabled": true
+            }
+        ],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "feature-Fillet": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "feature-Boolean": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "feature-Linear_pattern": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "feature-Custom_Feature": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Draft — neutral plane",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "New body",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "feature-Plane": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Top (XY)",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "feature-Variable": {
+        "failures": [
+            {
+                "text": "✓",
+                "ratio": 1.7,
+                "color": "rgb(255, 255, 255)",
+                "bg": "rgb(21,147,46)",
+                "cls": "",
+                "tag": "BUTTON",
+                "disabled": true
+            }
+        ],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "feature-Configuration": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "feature-Loft": {
+        "failures": [
+            {
+                "text": "✓",
+                "ratio": 1.88,
+                "color": "rgb(255, 255, 255)",
+                "bg": "rgb(0,138,8)",
+                "cls": "",
+                "tag": "BUTTON",
+                "disabled": true
+            }
+        ],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "C0",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "feature-Revolve": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "feature-Shell2": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "new-sketch-panel": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "sketch-context-menu": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    },
+    "sketch-dropdown": {
+        "failures": [],
+        "selects": [
+            {
+                "select": true,
+                "text": "▾",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            },
+            {
+                "select": true,
+                "text": "Single view",
+                "optionColor": "rgb(255, 255, 255)",
+                "optionBg": "rgb(30, 30, 30)",
+                "colorScheme": "dark"
+            }
+        ]
+    }
+}

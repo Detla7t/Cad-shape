@@ -96,7 +96,7 @@
 }
 .filters .iconButton[aria-pressed="true"] {
     color: var(--primary-color);
-    background: color-mix(in srgb, #b4def2 40%, var(--panel-background-color));
+    background: color-mix(in srgb, var(--selection-tint) 40%, var(--panel-background-color));
     border-color: var(--primary-color);
 }
 .clear {
@@ -132,7 +132,7 @@
 }
 .row[aria-selected="true"] {
     border-color: var(--primary-color);
-    background: color-mix(in srgb, #81c8eb 55%, var(--panel-background-color));
+    background: color-mix(in srgb, var(--selection-tint-strong) 55%, var(--panel-background-color));
 }
 .row[aria-current="page"] .rowTitle {
     font-weight: 600;

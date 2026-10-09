@@ -2,7 +2,9 @@
 // See LICENSE file in the project root for full license information.
 
 import { Box3, OrthographicCamera, PerspectiveCamera, Vector3 } from "three";
-import { thumbnailCamera } from "../src/modelThumbnail";
+import { THUMBNAIL_HEIGHT, THUMBNAIL_WIDTH, thumbnailCamera } from "../src/modelThumbnail";
+
+const ASPECT = THUMBNAIL_WIDTH / THUMBNAIL_HEIGHT;
 
 test.each([
     "orthographic",
@@ -20,7 +22,7 @@ test.each([
     source.updateMatrixWorld(true);
     const before = source.toJSON();
     const bounds = new Box3(new Vector3(10, 20, -10), new Vector3(210, 120, 50));
-    const camera = thumbnailCamera(source, bounds, 1.6);
+    const camera = thumbnailCamera(source, bounds, ASPECT);
     for (const x of [10, 210])
         for (const y of [20, 120])
             for (const z of [-10, 50]) {
@@ -41,11 +43,15 @@ test.each(["orthographic", "perspective"])("%s thumbnails preserve a circle's pr
     source.position.set(0, 0, 100);
     source.lookAt(0, 0, 0);
     source.updateMatrixWorld(true);
-    const camera = thumbnailCamera(source, new Box3(new Vector3(-20, -20, 0), new Vector3(20, 20, 0)), 1.6);
+    const camera = thumbnailCamera(
+        source,
+        new Box3(new Vector3(-20, -20, 0), new Vector3(20, 20, 0)),
+        ASPECT,
+    );
     const left = new Vector3(-20, 0, 0).project(camera);
     const right = new Vector3(20, 0, 0).project(camera);
     const top = new Vector3(0, 20, 0).project(camera);
     const bottom = new Vector3(0, -20, 0).project(camera);
-    // NDC must be scaled by the actual 320 x 200 target, not the source viewport.
-    expect((right.x - left.x) * 160).toBeCloseTo((top.y - bottom.y) * 100, 8);
+    // NDC must be scaled by the actual thumbnail target, not the source viewport.
+    expect((right.x - left.x) * THUMBNAIL_WIDTH).toBeCloseTo((top.y - bottom.y) * THUMBNAIL_HEIGHT, 8);
 });

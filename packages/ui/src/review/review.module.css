@@ -96,8 +96,8 @@
 }
 .tag {
     display: inline-block;
-    background: #e0eefb;
-    color: #20568a;
+    background: var(--info-background-color);
+    color: var(--info-foreground-color);
     border-radius: 3px;
     padding: 2px 5px;
     margin: 2px;
@@ -164,7 +164,7 @@
     justify-content: flex-end;
 }
 .error {
-    color: #b42318;
+    color: var(--danger-color);
 }
 .analysisMenu {
     display: flex;

@@ -213,6 +213,12 @@ export interface FeatureScriptFeatureData extends FeatureBase {
     /** The exported feature constant's name. */
     readonly featureName: string;
     readonly definition: Record<string, FeatureScriptParameterValue>;
+    /**
+     * Set on features inserted from the Part Studio toolbar (`onshapeTools.ts`): their
+     * studio is an implementation detail, so the panel shows no studio link and the row
+     * carries the tool's own icon.
+     */
+    readonly toolIcon?: string;
 }
 
 /** A straight sketch line a sheet metal feature uses (a bend line, a bead path). */

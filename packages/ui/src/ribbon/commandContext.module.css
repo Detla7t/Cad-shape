@@ -184,7 +184,7 @@
 
 .selectionCountLabel {
     font-size: 11px;
-    color: var(--secondary-foreground-color, #888);
+    color: var(--foreground-secondary-color);
 }
 
 .selectionButton {

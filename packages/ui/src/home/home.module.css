@@ -57,6 +57,9 @@
     color: #28613b;
     width: 174px;
 }
+:root[theme="dark"] .brand {
+    color: #5cbf7a;
+}
 .search {
     width: 340px;
     max-width: 50vw;
@@ -120,12 +123,12 @@
 .navItem:hover,
 .labelItem:hover,
 .menuItem:hover {
-    background: color-mix(in srgb, #b4d8ee 30%, var(--panel-background-color));
+    background: color-mix(in srgb, var(--selection-tint) 30%, var(--panel-background-color));
 }
 .navItem.active,
 .labelItem.active {
-    border-left-color: #2056b5;
-    color: #2056b5;
+    border-left-color: var(--accent-text-color);
+    color: var(--accent-text-color);
     font-weight: 600;
 }
 .sidebarBottom {
@@ -281,7 +284,7 @@
     text-overflow: ellipsis;
 }
 .recentCard:hover {
-    background: color-mix(in srgb, #b4d8ee 25%, var(--panel-background-color));
+    background: color-mix(in srgb, var(--selection-tint) 25%, var(--panel-background-color));
     border-color: #9ebed8;
 }
 .recentThumbnail {
@@ -347,7 +350,7 @@
 }
 .textButton:hover,
 .iconButton:hover {
-    background: color-mix(in srgb, #b4d8ee 35%, var(--panel-background-color));
+    background: color-mix(in srgb, var(--selection-tint) 35%, var(--panel-background-color));
 }
 .table {
     width: 100%;
@@ -422,7 +425,7 @@
 }
 .table tbody tr:hover,
 .table tbody tr[aria-selected="true"] {
-    background: color-mix(in srgb, #b4dfef 45%, var(--panel-background-color));
+    background: color-mix(in srgb, var(--selection-tint) 45%, var(--panel-background-color));
 }
 .templateTable th:nth-child(1) {
     width: 30%;
@@ -575,8 +578,8 @@
     gap: 10px;
     margin: 8px 0;
     padding: 7px 10px;
-    border: 1px solid #adc8dd;
-    background: color-mix(in srgb, #b4dfef 20%, var(--panel-background-color));
+    border: 1px solid var(--info-border-color);
+    background: color-mix(in srgb, var(--selection-tint) 20%, var(--panel-background-color));
     border-radius: 3px;
 }
 .notice > .iconButton {
@@ -655,7 +658,7 @@
     border-top: 1px solid var(--border-color);
 }
 .formError {
-    color: #d44e40;
+    color: var(--danger-color);
     margin: 0 20px 12px;
 }
 .formError:empty {

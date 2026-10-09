@@ -14,6 +14,7 @@ import {
 } from "@chili3d/core";
 import { type FeatureData, featureHandler } from "../features/feature";
 import type { ParametricBodyNode } from "../parametricBodyNode";
+import { ExtrudeEditArrow } from "./extrudeEditArrow";
 
 /** Owns the command slot so changing tools or documents awaits draft/picker cleanup. */
 export class FeatureEditSession implements IFeatureEditSession, ICancelableCommand {
@@ -23,6 +24,7 @@ export class FeatureEditSession implements IFeatureEditSession, ICancelableComma
     private controller?: AsyncController;
     private pendingPick?: Promise<void>;
     private _activePick?: string;
+    private manipulator?: ExtrudeEditArrow;
     private closing?: Promise<void>;
     private readonly hidden: INode[] = [];
 
@@ -76,6 +78,10 @@ export class FeatureEditSession implements IFeatureEditSession, ICancelableComma
         }
         body.featureEditSession = session;
         app.executingCommand = session;
+        // An extrude shows its depth arrow, as Onshape's dialog shows its manipulator.
+        const view = app.activeView;
+        if (view !== undefined && body.features.find((feature) => feature.id === id)?.type === "extrude")
+            session.manipulator = new ExtrudeEditArrow(body, id, view);
         return Result.ok(session);
     }
 
@@ -162,6 +168,8 @@ export class FeatureEditSession implements IFeatureEditSession, ICancelableComma
 
     private finish(): void {
         this.closed = true;
+        this.manipulator?.dispose();
+        this.manipulator = undefined;
         for (const node of this.hidden) setHistoryHidden(this.body.document, node, false);
         this.body.featureEditSession = undefined;
         const app = this.body.document.application;

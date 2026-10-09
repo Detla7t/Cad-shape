@@ -117,7 +117,7 @@
     color: var(--foreground-secondary-color);
 }
 .parts > .selected {
-    background: color-mix(in srgb, #71b7e5 40%, var(--panel-background-color));
+    background: color-mix(in srgb, var(--selection-tint-strong) 40%, var(--panel-background-color));
 }
 .partIcon {
     flex: 0 0 18px;

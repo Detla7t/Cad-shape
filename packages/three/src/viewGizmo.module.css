@@ -110,7 +110,7 @@
     & button:hover,
     & button:focus-visible,
     & button[aria-expanded="true"] {
-        background: color-mix(in srgb, #a7d8ef 40%, var(--panel-background-color));
+        background: color-mix(in srgb, var(--selection-tint) 40%, var(--panel-background-color));
     }
     & button:disabled {
         opacity: 0.4;

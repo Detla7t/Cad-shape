@@ -1,0 +1,54 @@
+{
+    "thresholds": "WCAG ratio < 4.5 normal text, < 3 large, < 2 disabled",
+    "before_dark": 85,
+    "after_dark": 4,
+    "after_light": 3,
+    "scenes": 61,
+    "remaining_dark": [
+        {
+            "scene": "variable-dialog",
+            "text": "✓",
+            "ratio": 1.7,
+            "color": "rgb(255, 255, 255)",
+            "bg": "rgb(21,147,46)",
+            "cls": "",
+            "tag": "BUTTON",
+            "disabled": true
+        },
+        {
+            "scene": "feature-Extrude",
+            "text": "✓",
+            "ratio": 1.88,
+            "color": "rgb(255, 255, 255)",
+            "bg": "rgb(0,138,8)",
+            "cls": "",
+            "tag": "BUTTON",
+            "disabled": true
+        },
+        {
+            "scene": "feature-Variable",
+            "text": "✓",
+            "ratio": 1.7,
+            "color": "rgb(255, 255, 255)",
+            "bg": "rgb(21,147,46)",
+            "cls": "",
+            "tag": "BUTTON",
+            "disabled": true
+        },
+        {
+            "scene": "feature-Loft",
+            "text": "✓",
+            "ratio": 1.88,
+            "color": "rgb(255, 255, 255)",
+            "bg": "rgb(0,138,8)",
+            "cls": "",
+            "tag": "BUTTON",
+            "disabled": true
+        }
+    ],
+    "native_options_before": "white text, transparent bg, color-scheme normal (white-on-white popups)",
+    "native_options_after": [
+        "rgb(255, 255, 255) on rgb(30, 30, 30), color-scheme dark",
+        "rgb(255, 255, 255) on rgb(31, 31, 31), color-scheme dark"
+    ]
+}

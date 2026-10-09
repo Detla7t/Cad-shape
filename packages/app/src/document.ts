@@ -23,6 +23,7 @@ import {
     ObservableCollection,
     PubSub,
     restoreConfiguration,
+    type SaveOptions,
     type Serialized,
     Serializer,
     StorageHistoryPersistence,
@@ -104,15 +105,20 @@ export class Document extends Observable implements IDocument {
         this.acts.clear();
     }
 
-    save(): Promise<void> {
+    save(options: SaveOptions = {}): Promise<void> {
         // A later save cannot overtake an earlier one and replace it with an older
         // snapshot. Failure must not poison the queue or lose unsaved history objects.
-        const save = this.saveQueue.then(() => this.saveCurrent());
+        const save = this.saveQueue.then(() => this.saveCurrent(options.auto === true));
         this.saveQueue = save.catch(() => {});
         return save;
     }
 
-    private async saveCurrent(): Promise<void> {
+    /**
+     * `auto`: a recovery save — the thumbnail is not re-rendered (the last saved one stays)
+     * and `documentAutosaved` is published instead of `documentSaved`, so links that follow
+     * this document's branch do not advance on every edit.
+     */
+    private async saveCurrent(auto = false): Promise<void> {
         if (this._isDisposed) throw new Error("The document is closed");
         if (this.versioningError !== undefined)
             throw new Error("The version history could not be loaded; saving would risk losing it", {
@@ -123,9 +129,9 @@ export class Document extends Observable implements IDocument {
             this.application.activeView?.document === this
                 ? this.application.activeView
                 : this.application.views.find((item) => item.document === this);
-        const image = view
-            ? (view.toThumbnail?.() ?? view.toImage())
-            : (await this.application.storage.get(Constants.DBName, Constants.RecentTable, this.id))?.image;
+        const previous = async () =>
+            (await this.application.storage.get(Constants.DBName, Constants.RecentTable, this.id))?.image;
+        const image = view && !auto ? (view.toThumbnail?.() ?? view.toImage()) : await previous();
         const writes: StorageOperation[] = [
             { type: "put", table: Constants.DocumentTable, id: this.id, value: data },
             {
@@ -154,7 +160,7 @@ export class Document extends Observable implements IDocument {
         } else {
             await writeStorageBatch(this.application.storage, Constants.DBName, writes);
         }
-        if (!this._isDisposed) PubSub.default.pub("documentSaved", this);
+        if (!this._isDisposed) PubSub.default.pub(auto ? "documentAutosaved" : "documentSaved", this);
     }
 
     async close() {

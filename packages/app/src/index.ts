@@ -4,6 +4,7 @@
 export * from "./application";
 export * from "./bodys";
 export * from "./commands";
+export * from "./diagnostics";
 export * from "./document";
 export * from "./pluginManager";
 export * from "./project/projectFile";

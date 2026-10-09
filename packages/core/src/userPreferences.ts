@@ -123,6 +123,8 @@ export interface UserPreferences {
     drawingBackground: "dark" | "light";
     materialLibraries: MaterialLibrary[];
     exportRules: ExportRule[];
+    /** Write a recovery save of each document shortly after every change. */
+    autosave: boolean;
 }
 
 export function defaultUserPreferences(): UserPreferences {
@@ -144,6 +146,7 @@ export function defaultUserPreferences(): UserPreferences {
         drawingBackground: "dark",
         materialLibraries: [],
         exportRules: [],
+        autosave: true,
     };
 }
 

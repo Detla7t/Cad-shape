@@ -1,14 +1,14 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type IDocument, Result, Transaction } from "@chili3d/core";
+import { type IDocument, Result } from "@chili3d/core";
 import type { FeatureScriptFeatureData } from "../features/feature";
 import { ParametricBodyNode } from "../parametricBodyNode";
 import { FeatureStudioNode } from "./featureStudioNode";
 import { newFeatureScriptFeature } from "./insertFeature";
 import type { OnshapeStdSource } from "./onshape/onshapeStd";
 import { providedOnshapeStd } from "./runtime";
-import { documentStudios } from "./studioCompiler";
+import { registerStudioProvider } from "./studioCompiler";
 
 /**
  * Part Studio tools that ARE Onshape's own features: each export of the tools studio is
@@ -25,22 +25,40 @@ export interface OnshapeTool {
     readonly displayName: string;
     /** The std feature the export aliases; undefined for the generated Transform wrapper. */
     readonly std?: string;
+    readonly icon: string;
 }
 
 export const ONSHAPE_TOOLS = [
-    { featureName: "filletTool", displayName: "Fillet", std: "fillet" },
-    { featureName: "chamferTool", displayName: "Chamfer", std: "chamfer" },
-    { featureName: "shellTool", displayName: "Shell", std: "shell" },
-    { featureName: "booleanTool", displayName: "Boolean", std: "booleanBodies" },
-    { featureName: "transformTool", displayName: "Transform" },
-    { featureName: "linearPatternTool", displayName: "Linear pattern", std: "linearPattern" },
-    { featureName: "circularPatternTool", displayName: "Circular pattern", std: "circularPattern" },
-    { featureName: "mirrorTool", displayName: "Mirror", std: "mirror" },
+    { featureName: "filletTool", displayName: "Fillet", std: "fillet", icon: "icon-fillet" },
+    { featureName: "chamferTool", displayName: "Chamfer", std: "chamfer", icon: "icon-chamfer" },
+    { featureName: "shellTool", displayName: "Shell", std: "shell", icon: "icon-shell" },
+    { featureName: "booleanTool", displayName: "Boolean", std: "booleanBodies", icon: "icon-booleanFuse" },
+    { featureName: "transformTool", displayName: "Transform", icon: "icon-move" },
+    {
+        featureName: "linearPatternTool",
+        displayName: "Linear pattern",
+        std: "linearPattern",
+        icon: "icon-array",
+    },
+    {
+        featureName: "circularPatternTool",
+        displayName: "Circular pattern",
+        std: "circularPattern",
+        icon: "icon-rotate",
+    },
+    { featureName: "mirrorTool", displayName: "Mirror", std: "mirror", icon: "icon-mirror" },
 ] as const satisfies readonly OnshapeTool[];
 
 export type OnshapeToolName = (typeof ONSHAPE_TOOLS)[number]["featureName"];
 
 export const ONSHAPE_TOOLS_STUDIO_NAME = "Part Studio tools";
+
+/**
+ * The id tool features reference as their studio. It is not a node id: the studio is
+ * provided to the compiler (`registerStudioProvider`), so a document using the tools has no
+ * extra tab, no tree row and no undo step for it — as Onshape's toolbar leaves nothing behind.
+ */
+export const ONSHAPE_TOOLS_STUDIO_ID = "onshape-part-studio-tools";
 
 let cachedSource: { std: OnshapeStdSource; source: string } | undefined;
 
@@ -135,16 +153,32 @@ function matchingBrace(text: string, open: number): number | undefined {
     return undefined;
 }
 
-/** The document's tools studio for the current std, created (one undo step) when missing. */
-export function ensureOnshapeToolsStudio(document: IDocument): Result<FeatureStudioNode> {
-    const source = onshapeToolsSource();
-    if (source === undefined) return Result.err("The Onshape standard library has not loaded");
-    const existing = documentStudios(document).find((studio) => studio.source === source);
-    if (existing !== undefined) return Result.ok(existing);
-    const studio = new FeatureStudioNode({ document, name: ONSHAPE_TOOLS_STUDIO_NAME, source });
-    Transaction.execute(document, "add Part Studio tools", () => document.modelManager.addNode(studio));
-    return Result.ok(studio);
+const studios = new WeakMap<IDocument, { std: OnshapeStdSource; studio: FeatureStudioNode }>();
+
+/**
+ * The tools studio for `document` under the loaded std: a detached `FeatureStudioNode`
+ * (never added to the model tree) carrying the generated source, rebuilt when the std
+ * changes. Undefined while no std is loaded.
+ */
+export function onshapeToolsStudio(document: IDocument): FeatureStudioNode | undefined {
+    const std = providedOnshapeStd();
+    const source = onshapeToolsSource(std);
+    if (std === undefined || source === undefined) return undefined;
+    const cached = studios.get(document);
+    if (cached?.std === std) return cached.studio;
+    const studio = new FeatureStudioNode({
+        document,
+        id: ONSHAPE_TOOLS_STUDIO_ID,
+        name: ONSHAPE_TOOLS_STUDIO_NAME,
+        source,
+    });
+    studios.set(document, { std, studio });
+    return studio;
 }
+
+registerStudioProvider((document, studioId) =>
+    studioId === ONSHAPE_TOOLS_STUDIO_ID ? onshapeToolsStudio(document) : undefined,
+);
 
 /**
  * The Part Studio a tool works in: the selected parametric body, the body of a selected
@@ -173,9 +207,10 @@ export function newOnshapeToolFeature(
     body: ParametricBodyNode | undefined = onshapeToolTarget(document),
 ): Result<{ body: ParametricBodyNode; feature: FeatureScriptFeatureData }> {
     if (body === undefined) return Result.err("Create a part first: there is no Part Studio body to work in");
-    const studio = ensureOnshapeToolsStudio(document);
-    if (!studio.isOk) return Result.err(studio.error);
-    const feature = newFeatureScriptFeature(document, studio.value, tool);
+    const studio = onshapeToolsStudio(document);
+    if (studio === undefined) return Result.err("The Onshape standard library has not loaded");
+    const feature = newFeatureScriptFeature(document, studio, tool);
     if (!feature.isOk) return Result.err(feature.error);
-    return Result.ok({ body, feature: feature.value });
+    const icon = ONSHAPE_TOOLS.find((entry) => entry.featureName === tool)?.icon;
+    return Result.ok({ body, feature: { ...feature.value, toolIcon: icon } });
 }

@@ -23,6 +23,13 @@ export interface CellData {
     /** The cell holds an error value (`v` is its code, e.g. "#N/A"). */
     e?: boolean;
     s?: CellStyle;
+    /** On an array / dynamic-array formula's anchor cell: the range its result fills ("O10:O107"). */
+    a?: string;
+    /**
+     * A cached value of another cell's array/spill output — replaced by the live spill, not a
+     * blocker.
+     */
+    sp?: true;
 }
 
 export interface SheetData {
@@ -42,6 +49,71 @@ export interface SheetData {
     hiddenRows?: number[];
     hiddenCols?: number[];
     frozen?: { rows: number; cols: number };
+    /** Excel tables (ListObjects) on the sheet — what structured references (`Sales[Amount]`) resolve. */
+    tables?: TableData[];
+    /** Cell links by A1 address: an external `target` (URL, mailto:) or an in-workbook `location` ("Sheet2!A1"). */
+    hyperlinks?: Record<string, HyperlinkData>;
+    /** Pictures floating over the grid. */
+    images?: SheetImage[];
+    /** False when the sheet hides its gridlines (dashboards); absent: shown. */
+    gridLines?: boolean;
+}
+
+/**
+ * An Excel table: `ref` spans the header row (when `headerRow` is not false), the data rows
+ * and the totals row (when `totalsRow`). Column names are unique within the table.
+ */
+export interface TableData {
+    /** The table's name as formulas use it ("Transactions"). */
+    name: string;
+    /** "A1:D20". */
+    ref: string;
+    /** Defaults to true. */
+    headerRow?: boolean;
+    totalsRow?: boolean;
+    columns: TableColumnData[];
+    /** Excel's table style name ("TableStyleMedium2") and its banding switches. */
+    style?: {
+        name?: string;
+        showRowStripes?: boolean;
+        showColumnStripes?: boolean;
+        showFirstColumn?: boolean;
+        showLastColumn?: boolean;
+    };
+}
+
+export interface TableColumnData {
+    name: string;
+    /** The column's calculated formula (applied to new rows), without "=". */
+    formula?: string;
+    /** Totals row function ("sum", "average", "count", "custom", …) or label. */
+    totalsFunction?: string;
+    totalsLabel?: string;
+}
+
+export interface HyperlinkData {
+    target?: string;
+    location?: string;
+    tooltip?: string;
+}
+
+/** A picture anchored to cells (zero-based, offsets in pixels), or placed at a fixed size. */
+export interface SheetImage {
+    /** Base64 of the image bytes. */
+    data: string;
+    /** "image/png", "image/jpeg", "image/gif", "image/svg+xml", … */
+    mime: string;
+    from: { row: number; col: number; rowOffset?: number; colOffset?: number };
+    /** The opposite corner for a two-cell anchor; absent with `size`. */
+    to?: { row: number; col: number; rowOffset?: number; colOffset?: number };
+    /** Pixel size for a one-cell anchor. */
+    size?: { width: number; height: number };
+    name?: string;
+    description?: string;
+    /** Where clicking the picture leads: a URL or an in-workbook location ("Sheet2!A1"). */
+    hyperlink?: HyperlinkData;
+    /** A raster stand-in for a vector `data` (Excel stores a PNG beside every SVG). */
+    fallback?: { data: string; mime: string };
 }
 
 export interface WorkbookData {

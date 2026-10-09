@@ -21,6 +21,7 @@ import {
     isFeatureListNode,
     Localize,
     PubSub,
+    ShapeTypes,
     selectConfiguredArm,
     Transaction,
     type UnitSpec,
@@ -82,16 +83,27 @@ export class FeatureListProperty extends HTMLElement {
     connectedCallback(): void {
         this.node.onPropertyChanged(this.handleNodeChanged);
         PubSub.default.sub("documentUnitsChanged", this.handleUnitsChanged);
-        if (this.session) this.session.onPickChanged = () => this.renderItems();
+        if (this.session) {
+            this.session.onPickChanged = () => this.renderItems();
+            this.document.selection.onShapeChanged.sub(this.handleSelectionChanged);
+        }
     }
 
     disconnectedCallback(): void {
-        if (this.session) this.session.onPickChanged = undefined;
+        if (this.session) {
+            this.session.onPickChanged = undefined;
+            this.document.selection.onShapeChanged.remove(this.handleSelectionChanged);
+        }
         this.node.removePropertyChanged(this.handleNodeChanged);
         PubSub.default.remove("documentUnitsChanged", this.handleUnitsChanged);
         this.closeMenu();
         this.historyBar?.dispose();
     }
+
+    /** The active query box shows what is selected right now, as Onshape's does. */
+    private readonly handleSelectionChanged = () => {
+        if (this.session?.activePick !== undefined) this.renderItems();
+    };
 
     private readonly handleNodeChanged = (property: string) => {
         if (property === "featuresJson") this.renderItems();
@@ -266,7 +278,10 @@ export class FeatureListProperty extends HTMLElement {
                       }),
                   ]
                 : []),
-            ...(item.references ?? []).map((ref) => this.referenceRow(item, ref)),
+            // A reference the feature also exposes as a parameter (an extrude's sketch) shows once.
+            ...(item.references ?? [])
+                .filter((ref) => !item.parameters.some((param) => param.key === ref.key))
+                .map((ref) => this.referenceRow(item, ref)),
             ...item.parameters.map((param) => this.parameterRow(item, param)),
         );
     }
@@ -427,7 +442,9 @@ export class FeatureListProperty extends HTMLElement {
      */
     private queryBox(item: FeatureItem, param: FeatureParameter) {
         const active = this.session?.activePick === param.key;
-        const empty = param.value === "—" || param.value === "";
+        const live = active ? selectionSummary(this.document) : undefined;
+        const value = live ?? String(param.value);
+        const empty = value === "—" || value === "";
         const label = param.label ?? I18n.translate(param.display) ?? param.key;
         return div(
             {
@@ -449,7 +466,7 @@ export class FeatureListProperty extends HTMLElement {
             },
             span({
                 className: empty ? style.queryPlaceholder : style.queryValue,
-                textContent: empty ? label : String(param.value),
+                textContent: empty ? label : value,
             }),
         );
     }
@@ -902,4 +919,32 @@ function tabLabel(label: string): string {
     if (label !== label.toUpperCase()) return label;
     const lower = label.toLowerCase().replace(/_/g, " ");
     return lower.charAt(0).toUpperCase() + lower.slice(1);
+}
+
+/** "2 edges, 1 face" for the current shape selection; undefined when nothing is selected. */
+function selectionSummary(document: IDocument): string | undefined {
+    const counts = new Map<string, number>();
+    for (const shape of document.selection.getSelectedShapes()) {
+        const type = shape.shape.shapeType;
+        const kind =
+            type === ShapeTypes.edge
+                ? "edge"
+                : type === ShapeTypes.face
+                  ? "face"
+                  : type === ShapeTypes.vertex
+                    ? "vertex"
+                    : "part";
+        counts.set(kind, (counts.get(kind) ?? 0) + 1);
+    }
+    if (counts.size === 0) return undefined;
+    const plural: Record<string, string> = {
+        edge: "edges",
+        face: "faces",
+        vertex: "vertices",
+        part: "parts",
+    };
+    return ["part", "face", "edge", "vertex"]
+        .filter((kind) => counts.has(kind))
+        .map((kind) => `${counts.get(kind)} ${counts.get(kind) === 1 ? kind : plural[kind]}`)
+        .join(", ");
 }

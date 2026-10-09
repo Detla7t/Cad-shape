@@ -46,7 +46,7 @@
 }
 .cancel {
     background: transparent;
-    color: #c62938;
+    color: var(--danger-color);
 }
 
 /* Flat rows separated by a hairline pseudo-element instead of bordered cards. */
@@ -357,8 +357,8 @@
 }
 
 .tabOn {
-    background-color: var(--primary-color, #4a9eff);
-    color: #fff;
+    background-color: var(--button-primary-background);
+    color: var(--on-primary-color);
 }
 
 /* Onshape's opposite-direction arrow. */
@@ -375,5 +375,5 @@
 
 .flipOn {
     border-color: var(--primary-color, #4a9eff);
-    color: var(--primary-color, #4a9eff);
+    color: var(--accent-text-color);
 }

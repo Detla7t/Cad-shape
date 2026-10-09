@@ -429,12 +429,24 @@ describe("ParametricBodyNode", () => {
         expect(items[0].error).toBeUndefined();
         expect(items[0].parameters).toMatchObject([
             { key: "sketchId", value: sketch.id, configurable: false },
-            { key: "profiles", value: "All sketch profiles", pick: { kinds: ["face"] }, configurable: false },
             {
                 key: "operation",
                 value: "new",
                 configurable: true,
-                options: [{ value: "new" }, { value: "fuse" }, { value: "cut" }, { value: "common" }],
+                optionStyle: "tabs",
+                options: [
+                    { value: "new", label: "New" },
+                    { value: "fuse", label: "Add" },
+                    { value: "cut", label: "Remove" },
+                    { value: "common", label: "Intersect" },
+                ],
+            },
+            {
+                key: "profiles",
+                label: "Faces and sketch regions to extrude",
+                value: "All sketch regions",
+                pick: { kinds: ["face"] },
+                configurable: false,
             },
             {
                 key: "depth",
@@ -443,6 +455,7 @@ describe("ParametricBodyNode", () => {
                 unit: LENGTH_UNITS,
                 configurable: true,
             },
+            { key: "oppositeDirection", label: "Opposite direction", value: false, flip: true },
             {
                 key: "startOffset",
                 display: "option.command.startOffset",

@@ -5,12 +5,16 @@ import {
     AsyncController,
     CancelableCommand,
     command,
+    documentParameterInput,
     type FaceMeshData,
+    formatDocumentValue,
     I18n,
+    LENGTH_UNITS,
     MeshGroup,
     Plane,
     PubSub,
     ReferencePlaneNode,
+    resolveUnitSpec,
     Transaction,
 } from "@chili3d/core";
 import { createCadIcon } from "@chili3d/element";
@@ -66,16 +70,35 @@ export class CreateReferencePlane extends CancelableCommand {
                 .filter((n) => n instanceof ReferencePlaneNode)
                 .map((node) => ({ name: node.name, plane: node.plane, node })),
         ];
-        choices.forEach((item, i) => base.add(new Option(item.name, String(i))));
+        choices.forEach((item, i) => {
+            const option = document.createElement("option");
+            option.value = String(i);
+            option.textContent = item.name;
+            base.add(option);
+        });
         const index = choices.findIndex((item) => "node" in item && item.node === selected);
         if (index >= 0) base.value = String(index);
         add("Reference plane", base);
+        // The offset reads and writes in the document's length unit ("25 mm", "1 in", "w / 2"):
+        // the box shows the value with its unit, the model keeps millimetres.
+        const scope = doc.variables.evaluate().scope;
         const offset = document.createElement("input");
-        offset.type = "number";
-        offset.step = "any";
-        offset.value = "25";
+        offset.type = "text";
+        offset.spellcheck = false;
         offset.required = true;
+        offset.value = formatDocumentValue(25, doc, LENGTH_UNITS);
         offset.setAttribute("aria-label", I18n.translate("plane.offset"));
+        offset.onfocus = () => offset.select();
+        const offsetValue = (): number | undefined => {
+            const parsed = documentParameterInput(offset.value, doc, LENGTH_UNITS, scope);
+            if (!parsed.isOk) {
+                offset.setCustomValidity(parsed.error);
+                return undefined;
+            }
+            const resolved = resolveUnitSpec(parsed.value, scope, LENGTH_UNITS);
+            offset.setCustomValidity(resolved.isOk ? "" : resolved.error);
+            return resolved.isOk ? resolved.value : undefined;
+        };
         add(I18n.translate("plane.offset"), offset);
         const name = document.createElement("input");
         name.placeholder = "Plane";
@@ -90,17 +113,18 @@ export class CreateReferencePlane extends CancelableCommand {
             if (mesh !== undefined) doc.visual.context.removeMesh(mesh);
             mesh = undefined;
         };
-        const frame = () => {
+        const frame = (distance: number) => {
             const p = choices[Number(base.value)].plane;
-            return p.translateTo(p.origin.add(p.normal.multiply(offset.valueAsNumber)));
+            return p.translateTo(p.origin.add(p.normal.multiply(distance)));
         };
         const preview = () => {
             clear();
-            if (!offset.checkValidity() || !Number.isFinite(offset.valueAsNumber)) {
+            const distance = offsetValue();
+            if (distance === undefined) {
                 view.update();
                 return;
             }
-            const p = frame();
+            const p = frame(distance);
             const positions = [
                 [-100, -100],
                 [100, -100],
@@ -127,6 +151,7 @@ export class CreateReferencePlane extends CancelableCommand {
         offset.oninput = preview;
         root.onsubmit = (event) => {
             event.preventDefault();
+            offsetValue();
             if (root.reportValidity()) controller.success();
         };
         root.onkeydown = (event) => {
@@ -144,10 +169,12 @@ export class CreateReferencePlane extends CancelableCommand {
         preview();
         try {
             if (!(await done)) return;
+            const distance = offsetValue();
+            if (distance === undefined) return;
             const node = new ReferencePlaneNode({
                 document: doc,
                 basePlane: choices[Number(base.value)].plane,
-                offset: offset.valueAsNumber,
+                offset: distance,
                 name: name.value.trim() || undefined,
             });
             Transaction.execute(doc, "Create reference plane", () => doc.modelManager.addNode(node));

@@ -338,6 +338,21 @@ describe("Tree", () => {
 
             expect(fixture.doc.selection.setSelectedNodes).not.toHaveBeenCalled();
         });
+
+        test("a pick handler that takes tree picks (a plane box) selects the clicked row", () => {
+            fixture = createFixture();
+            // A feature dialog's plane box runs a sub-shape pick in the viewport but accepts
+            // Top/Front/Right from the tree: the handler says so with `treeSelection`.
+            fixture.doc.visual.eventHandler = {
+                isEnabled: true,
+                treeSelection: true,
+            } as unknown as typeof fixture.doc.visual.eventHandler;
+            const model1El = fixture.tree.treeItem(fixture.model1 as unknown as INode) as HTMLElement;
+
+            model1El.click();
+
+            expect(fixture.doc.selection.setSelectedNodes).toHaveBeenCalledWith([fixture.model1], false);
+        });
     });
 
     describe("double-click", () => {

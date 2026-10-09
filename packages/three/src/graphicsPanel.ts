@@ -178,6 +178,8 @@ export class GraphicsPanel {
             const inactive = group("Inactive sketches");
             number(inactive, "Line width", "inactiveLineWidth", "px", 0.5, 8, 0.5);
             color(inactive, "Color", "inactiveColor");
+            number(inactive, "Region opacity", "inactiveRegionOpacity", "%", 0, 100, 1);
+            number(inactive, "Point size", "inactivePointSize", "px", 0, 8, 0.5);
             const construction = group("Construction lines");
             number(construction, "First dash", "firstDash", "px", 1, 100, 1, false);
             number(construction, "First gap", "firstGap", "px", 1, 100, 1, false);

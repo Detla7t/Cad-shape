@@ -1,64 +1,83 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { formatDocumentValue, type IView, LENGTH_UNITS, type MeasurementResult, XYZ } from "@chili3d/core";
+import {
+    type EdgeMeshData,
+    formatDocumentValue,
+    type IDisposable,
+    type IView,
+    LENGTH_UNITS,
+    type MeasurementResult,
+    MeshDataUtils,
+    XYZ,
+} from "@chili3d/core";
 import style from "./viewportUtilities.module.css";
 
-const SVG = "http://www.w3.org/2000/svg";
+const GUIDE_COLOR = 0x1683b9;
+
+/**
+ * The dashed outline and label of the selection measurement. They are drawn in the 3D scene
+ * — an on-top dashed line mesh, endpoint points and a 3D-anchored label — so the renderer
+ * draws them in the same frame and with the same camera as the measured geometry: while the
+ * view rotates they stay on the edges they measure instead of trailing behind as a separately
+ * projected overlay would.
+ */
 export class MeasurementGuide {
-    readonly element = document.createElementNS(SVG, "svg");
-    private result?: MeasurementResult;
-    private readonly resize: ResizeObserver;
-    constructor(private readonly view: IView) {
-        this.element.classList.add(style.guide);
-        this.element.setAttribute("aria-label", "Measurement guide");
-        this.element.setAttribute("aria-hidden", "true");
-        view.cameraController.onPropertyChanged(this.render);
-        this.resize = new ResizeObserver(this.render);
-        this.resize.observe(this.element);
-    }
+    private meshIds: number[] = [];
+    private label?: IDisposable;
+
+    constructor(private readonly view: IView) {}
+
     show(result?: MeasurementResult) {
-        this.result = result;
-        this.render();
-    }
-    private readonly render = () => {
-        this.element.replaceChildren();
-        const result = this.result;
-        if (!result || !this.view.dom) return;
-        const projected = result.segments
-            .map(
-                ([a, b]) =>
-                    [this.view.worldToScreen(new XYZ(a)), this.view.worldToScreen(new XYZ(b))] as const,
-            )
-            .filter((pair) => pair.every((p) => Number.isFinite(p.x) && Number.isFinite(p.y)));
-        if (!projected.length) return;
-        const path = document.createElementNS(SVG, "path");
-        path.setAttribute("d", projected.map(([a, b]) => `M${a.x},${a.y}L${b.x},${b.y}`).join(" "));
-        path.setAttribute("fill", "none");
-        path.setAttribute("stroke", "#1683b9");
-        path.setAttribute("stroke-width", "1.5");
-        path.setAttribute("stroke-dasharray", "6 4");
-        this.element.append(path);
-        if (result.mode !== "length")
-            for (const point of projected[0]) {
-                const marker = document.createElementNS(SVG, "circle");
-                marker.setAttribute("cx", String(point.x));
-                marker.setAttribute("cy", String(point.y));
-                marker.setAttribute("r", "3");
-                marker.setAttribute("fill", "#1683b9");
-                this.element.append(marker);
+        this.clear();
+        if (!result) return;
+        const segments = result.segments.filter((pair) =>
+            pair.every((p) => Number.isFinite(p.x) && Number.isFinite(p.y) && Number.isFinite(p.z)),
+        );
+        if (segments.length === 0) return;
+        const context = this.view.document.visual.context;
+        const length = segments.reduce((sum, [a, b]) => sum + new XYZ(a).distanceTo(new XYZ(b)), 0);
+        // Dashes are measured along the line in model units: size them to the guide so a long
+        // edge and a short one both read as dashed.
+        const dash = Math.max(length / 60, 1e-3);
+        const outline: EdgeMeshData = {
+            position: new Float32Array(segments.flatMap(([a, b]) => [a.x, a.y, a.z, b.x, b.y, b.z])),
+            range: [],
+            color: GUIDE_COLOR,
+            lineType: "dash",
+            dashSize: dash,
+            gapSize: dash * 0.6,
+            lineWidth: 1.5,
+        };
+        this.meshIds.push(context.displayMesh([outline], { onTop: true }));
+        if (result.mode !== "length") {
+            for (const point of segments[0]) {
+                const marker = MeshDataUtils.createVertexMesh(new XYZ(point), 6, GUIDE_COLOR);
+                this.meshIds.push(context.displayMesh([marker], { onTop: true }));
             }
-        const [a, b] = projected[Math.floor(projected.length / 2)];
-        const text = document.createElementNS(SVG, "text");
-        text.setAttribute("x", String((a.x + b.x) / 2));
-        text.setAttribute("y", String((a.y + b.y) / 2 - 9));
-        text.setAttribute("text-anchor", "middle");
-        text.textContent = `${result.label}: ${formatDocumentValue(result.value, this.view.document, LENGTH_UNITS)}`;
-        this.element.append(text);
-    };
+        }
+        const [a, b] = segments[Math.floor(segments.length / 2)];
+        const middle = new XYZ(a).add(new XYZ(b)).multiply(0.5);
+        const text = `${result.label}: ${formatDocumentValue(result.value, this.view.document, LENGTH_UNITS)}`;
+        this.label = this.view.htmlText(text, middle, {
+            hideDelete: true,
+            className: style.guideLabel,
+            // Just above the guide's midpoint.
+            center: { x: 0.5, y: 1.4 },
+        });
+        this.view.update();
+    }
+
+    private clear() {
+        const context = this.view.document.visual.context;
+        for (const id of this.meshIds) context.removeMesh(id);
+        this.meshIds = [];
+        this.label?.dispose();
+        this.label = undefined;
+    }
+
     dispose() {
-        this.resize.disconnect();
-        this.view.cameraController.removePropertyChanged(this.render);
-        this.element.remove();
+        this.clear();
+        this.view.update();
     }
 }

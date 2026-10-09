@@ -597,10 +597,8 @@ export class ParametricBodyNode
             ?.parameters(feature, this.document)
             .find((x) => x.key === key);
         if (parameter?.pick === undefined) return;
-        const current = feature.definition[key];
         const value = await new FeatureScriptPickSession(this).pick(
-            typeof current === "object" ? current : undefined,
-            featureIndex,
+            { feature, featureIndex, key },
             parameter.pick.kinds,
             controller,
         );

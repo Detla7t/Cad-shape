@@ -22,6 +22,7 @@ import {
     selectConfiguredBoolean,
     serializable,
     serialize,
+    type VertexMeshData,
     VisualConfig,
 } from "@chili3d/core";
 import { allProfiles, sketchProfiles } from "../features/profileBuilder";
@@ -37,6 +38,7 @@ import {
     arcAngles,
     DEFAULT_SKETCH_LAYER,
     type ExternalRefData,
+    entityPointCount,
     profileExternalRefs,
     rawArcSweep,
     type SketchConstraintData,
@@ -211,19 +213,22 @@ export class SketchNode extends ParameterShapeNode {
         if (this._editingSession || this.suppressed)
             return { edges: undefined, faces: undefined, vertexs: undefined };
         const mesh = this.sketchMesh();
-        mesh.images = sketchImageMeshes(this.plane, this.data.images);
+        const images = sketchImageMeshes(this.plane, this.data.images);
         const data = this.data;
+        const faces = this.regionFill(mesh.faces);
+        const vertexs = this.entityPointMesh();
         if (
             !data.layers?.length &&
             !data.entities.some((entity) => entity.construction || entity.color || entity.dashed)
         ) {
-            if (mesh.edges !== undefined) {
-                mesh.edges.lineWidth = Config.instance.graphics.inactiveLineWidth;
+            const edges = mesh.edges;
+            if (edges !== undefined) {
+                edges.lineWidth = Config.instance.graphics.inactiveLineWidth;
                 const color = Number.parseInt(Config.instance.graphics.inactiveColor.slice(1), 16);
                 const rgb = [(color >> 16) & 255, (color >> 8) & 255, color & 255];
-                mesh.edges.color = Array.from(mesh.edges.position, (_, i) => rgb[i % 3] / 255);
+                edges.color = Array.from(edges.position, (_, i) => rgb[i % 3] / 255);
             }
-            return mesh;
+            return { images, edges, faces, vertexs };
         }
         const source = super.createMesh().edges;
         const positions: number[] = [];
@@ -275,7 +280,8 @@ export class SketchNode extends ParameterShapeNode {
             );
         }
         return {
-            ...mesh,
+            images,
+            faces,
             edges: {
                 position: new Float32Array(positions),
                 color: colors,
@@ -283,8 +289,55 @@ export class SketchNode extends ParameterShapeNode {
                 lineType: "solid",
                 lineWidth: Config.instance.graphics.inactiveLineWidth,
             },
-            vertexs: undefined,
+            vertexs,
         };
+    }
+
+    /**
+     * The closed regions of an inactive sketch read as a light translucent fill (Onshape's
+     * look) rather than solid faces: they stay pickable as profiles, but never hide the
+     * geometry behind them. The "Inactive sketches" graphics preferences set the tint and
+     * opacity; 0% drops the fill.
+     */
+    private regionFill(faces: FaceMeshData | undefined): FaceMeshData | undefined {
+        if (faces === undefined) return undefined;
+        const opacity = Config.instance.graphics.inactiveRegionOpacity / 100;
+        if (opacity <= 0) return undefined;
+        return {
+            ...faces,
+            color: Number.parseInt(Config.instance.graphics.inactiveColor.slice(1), 16),
+            opacity: Math.min(1, opacity),
+        };
+    }
+
+    /**
+     * The entity points of an inactive sketch — line ends, circle and arc centers, arc ends,
+     * spline poles, point entities — as small markers, so the sketch's structure stays
+     * visible outside the editing session. Hidden layers contribute none; a 0 px point
+     * size turns them off.
+     */
+    private entityPointMesh(): VertexMeshData | undefined {
+        const size = Config.instance.graphics.inactivePointSize;
+        if (!(size > 0)) return undefined;
+        const data = this.data;
+        const inactive = Number.parseInt(Config.instance.graphics.inactiveColor.slice(1), 16);
+        const position: number[] = [];
+        const color: number[] = [];
+        for (const entity of data.entities) {
+            const layer = data.layers?.find((item) => item.id === (entity.layer ?? "0"));
+            if (layer?.visible === false) continue;
+            const layerColor =
+                layer?.id === "0" && layer.color === DEFAULT_SKETCH_LAYER.color ? undefined : layer?.color;
+            const own = entity.color ?? layerColor;
+            const rgb = own === undefined ? inactive : Number.parseInt(own.slice(1), 16);
+            for (let index = 0; index < entityPointCount(entity.type, entity.params); index++) {
+                const point = toWorld(this.plane, entity.params[index * 2], entity.params[index * 2 + 1]);
+                position.push(point.x, point.y, point.z);
+                color.push(((rgb >> 16) & 255) / 255, ((rgb >> 8) & 255) / 255, (rgb & 255) / 255);
+            }
+        }
+        if (position.length === 0) return undefined;
+        return { position: new Float32Array(position), color, range: [], size };
     }
 
     /** Neutral region shading in the editor, separate from pickable modeling topology. */

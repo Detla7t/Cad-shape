@@ -14,9 +14,6 @@ import {
     Result,
     type ShapeType,
     ShapeTypes,
-    type ViewMode,
-    ViewModeI18nKeys,
-    ViewModes,
 } from "@chili3d/core";
 import { collection, div, input, label, span, svg } from "@chili3d/element";
 import { showNodeContextMenu } from "../project/nodeContextMenu";
@@ -29,17 +26,6 @@ class CameraConverter implements IConverter<CameraType> {
 
     convert(value: CameraType): Result<string, string> {
         if (value === this.type) {
-            return Result.ok(style.actived);
-        }
-        return Result.ok("");
-    }
-}
-
-class ViewModeConverter implements IConverter<ViewMode> {
-    constructor(readonly mode: ViewMode) {}
-
-    convert(value: ViewMode): Result<string, string> {
-        if (value === this.mode) {
             return Result.ok(style.actived);
         }
         return Result.ok("");
@@ -75,7 +61,6 @@ export class Viewport extends HTMLElement {
 
     private render() {
         this.append(
-            this.utilities.selection.guide.element,
             this.utilities.element,
             this._acts,
             this.showViewControls
@@ -89,7 +74,6 @@ export class Viewport extends HTMLElement {
                       this.createActionControls(),
                   )
                 : "",
-            this.createViewModeControl(),
         );
     }
 
@@ -224,54 +208,6 @@ export class Viewport extends HTMLElement {
         );
     }
 
-    private createViewModeControl() {
-        const label = span({
-            textContent: new Localize(ViewModeI18nKeys[this.view.mode]),
-        });
-        return div(
-            {
-                className: style.viewModeControl,
-            },
-            div(
-                {
-                    className: style.viewModeDisplay,
-                    onclick: (e) => {
-                        e.stopPropagation();
-                        const target = e.currentTarget as HTMLElement;
-                        if (target.nextElementSibling instanceof HTMLElement) {
-                            target.nextElementSibling.classList.toggle(style.visible);
-                        }
-                    },
-                },
-                "[ ",
-                label,
-                " ]",
-            ),
-            div(
-                {
-                    className: style.viewModeMenu,
-                },
-                ...ViewModes.map((m) =>
-                    div({
-                        className: new Binding(this.view, "mode", new ViewModeConverter(m)),
-                        textContent: new Localize(ViewModeI18nKeys[m]),
-                        onclick: (e) => {
-                            e.stopPropagation();
-                            I18n.set(label, "textContent", ViewModeI18nKeys[m]);
-                            this.view.mode = m;
-                            this.view.update();
-
-                            const target = e.currentTarget as HTMLElement;
-                            if (target.parentElement instanceof HTMLElement) {
-                                target.parentElement.classList.remove(style.visible);
-                            }
-                        },
-                    }),
-                ),
-            ),
-        );
-    }
-
     connectedCallback() {
         // setDom runs before attachment; resume a dirty viewport when its tab becomes visible.
         this.view.update();
@@ -339,7 +275,7 @@ export class Viewport extends HTMLElement {
     }
 
     private readonly handleEvent = (
-        eventName: Exclude<keyof IEventHandler, "isEnabled" | "dispose" | "resolveCommand">,
+        eventName: Exclude<keyof IEventHandler, "isEnabled" | "dispose" | "resolveCommand" | "treeSelection">,
         event: PointerEvent | WheelEvent,
     ) => {
         if (this.view.document.visual.eventHandler.isEnabled)

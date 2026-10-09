@@ -2,9 +2,11 @@
 // See LICENSE file in the project root for full license information.
 
 import { ShapeTypes } from "@chili3d/core";
-import { Box3, Mesh, MeshBasicMaterial, Points } from "three";
+import { rs } from "@rstest/core";
+import { Box3, Mesh, MeshBasicMaterial, MeshLambertMaterial, Points, type PointsMaterial } from "three";
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
-import { defaultEdgeMaterial, edgeMaterialOfWidth } from "../src/materials";
+import { Constants } from "../src/constants";
+import { defaultEdgeMaterial, defaultVertexMaterial, edgeMaterialOfWidth } from "../src/materials";
 import { ThreeGeometry } from "../src/threeGeometry";
 import type { ThreeVisualContext } from "../src/threeVisualContext";
 import { createTestGeometryNode, createThreeMockVisualContext } from "./mocks";
@@ -334,5 +336,56 @@ describe("ThreeGeometry", () => {
             // The mock context returns a new material instance per getMaterial call
             expect(geo.faces()?.material).not.toBe(originalFaceMat);
         });
+    });
+});
+
+describe("inactive sketch appearance", () => {
+    test("faces with an opacity draw a translucent region material that a material change keeps", () => {
+        const context = createThreeMockVisualContext();
+        const node = createTestGeometryNode({ hasVertexs: false });
+        (node.mesh!.faces as { opacity?: number; color?: number }).opacity = 0.12;
+        (node.mesh!.faces as { opacity?: number; color?: number }).color = 0x999999;
+        const geo = new ThreeGeometry(node, context);
+        const material = geo.faces()!.material as MeshLambertMaterial;
+        expect(material).toBeInstanceOf(MeshLambertMaterial);
+        expect(material.transparent).toBe(true);
+        expect(material.opacity).toBeCloseTo(0.12);
+        expect(material.depthWrite).toBe(false);
+        expect(material.color.getHex()).toBe(0x999999);
+        node.materialId = "mat-2";
+        node._notify("materialId");
+        expect(geo.faces()!.material).toBe(material);
+        const dispose = rs.spyOn(material, "dispose");
+        geo.dispose();
+        expect(dispose).toHaveBeenCalledTimes(1);
+    });
+
+    test("coloured points get their own size and colour and stay visible in shaded modes", () => {
+        const context = createThreeMockVisualContext();
+        const node = createTestGeometryNode({ hasFaces: false, hasEdges: false });
+        (node.mesh!.vertexs as { size: number; color?: number }).size = 4;
+        (node.mesh!.vertexs as { size: number; color?: number }).color = 0x336699;
+        const geo = new ThreeGeometry(node, context);
+        const points = geo.vertexs()!;
+        const material = points.material as PointsMaterial;
+        expect(material).not.toBe(defaultVertexMaterial);
+        expect(material.size).toBe(4);
+        expect(material.color.getHex()).toBe(0x336699);
+        expect(points.layers.isEnabled(Constants.Layers.Solid)).toBe(true);
+        const plain = new ThreeGeometry(
+            createTestGeometryNode({ hasFaces: false, hasEdges: false }),
+            context,
+        );
+        (plain.geometryNode.mesh!.vertexs as { color?: number }).color = undefined;
+        plain.dispose();
+    });
+
+    test("points without a colour of their own share the default wireframe material", () => {
+        const context = createThreeMockVisualContext();
+        const node = createTestGeometryNode({ hasFaces: false, hasEdges: false });
+        (node.mesh!.vertexs as { color?: number }).color = undefined;
+        const geo = new ThreeGeometry(node, context);
+        expect(geo.vertexs()!.material).toBe(defaultVertexMaterial);
+        expect(geo.vertexs()!.layers.isEnabled(Constants.Layers.Solid)).toBe(false);
     });
 });

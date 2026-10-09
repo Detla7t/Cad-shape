@@ -59,7 +59,7 @@
     background: #159229;
 }
 .panel header .cancel {
-    color: #d12d39;
+    color: var(--danger-color);
     background: transparent;
 }
 .plane {
@@ -86,13 +86,13 @@
 .status {
     font-weight: 600;
     font-size: 12px;
-    color: #287bd2;
+    color: var(--accent-text-color);
 }
 .status[data-state="solved"] {
-    color: #248451;
+    color: var(--success-color);
 }
 .status[data-state="error"] {
-    color: #da5050;
+    color: var(--danger-color);
 }
 .hint {
     color: var(--foreground-secondary-color);

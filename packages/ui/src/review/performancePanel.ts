@@ -43,14 +43,16 @@ export class PerformancePanel {
                     style.muted,
                 ),
                 table([
-                    ["Operation", "Duration", "Outcome"],
+                    ["#", "Operation", "Duration", "Outcome", "Detail"],
                     ...events
                         .slice(-25)
                         .reverse()
                         .map((e) => [
-                            `${e.operation}${e.context["featureId"] ? ` · ${e.context["featureId"]}` : ""}`,
+                            String(e.sequence),
+                            `${e.operation}${e.context["featureId"] ? ` · ${e.context["featureId"]}` : ""}${e.context["command"] ? ` · ${e.context["command"]}` : ""}`,
                             `${e.durationMs.toFixed(2)} ms`,
                             e.outcome,
+                            e.error?.message ?? String(e.context["action"] ?? e.context["records"] ?? ""),
                         ]),
                 ]),
             );

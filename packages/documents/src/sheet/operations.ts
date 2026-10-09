@@ -2,34 +2,11 @@
 // See LICENSE file in the project root for full license information.
 
 import { isFormulaError, type Scalar, WorkbookEvaluator } from "./formula";
-import {
-    addressOf,
-    type CellRange,
-    columnName,
-    parseRange,
-    rangeText,
-    type SheetData,
-    type WorkbookData,
-} from "./model";
+import { translateFormula } from "./formulaText";
+import { addressOf, type CellRange, parseRange, rangeText, type SheetData, type WorkbookData } from "./model";
 import { contains, resolveRanges } from "./ranges";
 
-/** Excel relative references follow a moved/copied formula; absolute references do not. */
-export function translateFormula(formula: string, rows: number, cols = 0): string {
-    return formula.replace(
-        /"(?:[^"]|"")*"|'(?:[^']|'')*'!|\b[A-Za-z_][\w.]*!|(?<![\w.])(\$?)([A-Za-z]{1,3})(\$?)(\d+)(?![\w.(])/g,
-        (token, absoluteCol: string | undefined, letters: string, absoluteRow: string, digits: string) => {
-            if (absoluteCol === undefined) return token;
-            const c =
-                [...letters.toUpperCase()].reduce((n, v) => n * 26 + v.charCodeAt(0) - 64, 0) -
-                1 +
-                (absoluteCol ? 0 : cols);
-            const r = Number(digits) - 1 + (absoluteRow ? 0 : rows);
-            return r < 0 || c < 0 || c >= 16384 || r >= 1048576
-                ? "#REF!"
-                : `${absoluteCol}${columnName(c)}${absoluteRow}${r + 1}`;
-        },
-    );
-}
+export { translateFormula } from "./formulaText";
 
 export function sortRange(
     workbook: WorkbookData,

@@ -1,6 +1,14 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
+import {
+    ARGUMENT_DOCS,
+    FUNCTION_CATEGORIES,
+    FUNCTION_DETAILS,
+    type FunctionCategory,
+} from "./functionDetails";
+import { MORE_FUNCTION_CATEGORIES, MORE_FUNCTION_INFO } from "./functionInfoMore";
+
 /** Signatures describe functions that the local evaluator actually supports. */
 export const FUNCTION_INFO: Record<
     string,
@@ -156,3 +164,134 @@ export const FUNCTION_INFO: Record<
     EOMONTH: ["start_date, months", "Returns the last day of a shifted month.", 2, 2],
     DAYS: ["end_date, start_date", "Returns the number of days between two dates.", 2, 2],
 };
+
+Object.assign(FUNCTION_INFO, MORE_FUNCTION_INFO);
+
+export { FUNCTION_CATEGORIES, type FunctionCategory } from "./functionDetails";
+
+export interface FunctionArgumentDoc {
+    name: string;
+    optional: boolean;
+    /** The argument (with the ones before it in its group) may repeat. */
+    repeating: boolean;
+    description: string;
+}
+
+/** Everything the function browser shows about one function. */
+export interface FunctionDoc {
+    name: string;
+    category: FunctionCategory;
+    /** Parameters only, e.g. "number1, [number2], …". */
+    signature: string;
+    description: string;
+    example: string;
+    args: FunctionArgumentDoc[];
+    /** Takes no arguments (TODAY, PI, …). */
+    zeroArgs: boolean;
+}
+
+const CATEGORY_RULES: [RegExp, FunctionCategory][] = [
+    [/^IS|^ERROR\.TYPE$|^(N|NA|TYPE|CELL|INFO|SHEETS?)$/, "Information"],
+    [/^D(AVERAGE|COUNTA?|GET|MAX|MIN|PRODUCT|STDEVP?|SUM|VARP?)$/, "Database"],
+    [/^(BIN|DEC|HEX|OCT)2|^IM|^BESSEL|^BIT|^ERFC?(\.|$)|^(COMPLEX|CONVERT|DELTA|GESTEP)$/, "Engineering"],
+    [
+        /^(COUP|YIELD|PRICE|TBILL|ACCRINT|DOLLAR(DE|FR))|^(X?IRR|X?NPV|MIRR|N?PER|PMT|I?PPMT|PV|FV|RATE)$/,
+        "Financial",
+    ],
+    [/DIST|\.INV|TEST$|^(STDEV|VAR|COVAR|PERCENT|QUARTILE|RANK|MODE|SKEW|KURT)/, "Statistical"],
+    [/DATE|TIME|DAY|WEEK|MONTH|YEAR|^(NOW|HOUR|MINUTE|SECOND)$/, "Date & time"],
+    [/^TEXT|^REGEX|^(LEFT|RIGHT|MID|LEN|TRIM|UPPER|LOWER|PROPER|CHAR|CODE|UNICHAR|UNICODE)$/, "Text"],
+    [
+        /LOOKUP|MATCH|STACK$|^(CHOOSE|INDEX|INDIRECT|OFFSET|ROWS?|COLUMNS?|SORT|SORTBY|FILTER|UNIQUE)$/,
+        "Lookup & reference",
+    ],
+];
+
+function categoryOf(name: string): FunctionCategory {
+    const declared = MORE_FUNCTION_CATEGORIES[name];
+    if (declared && (FUNCTION_CATEGORIES as readonly string[]).includes(declared))
+        return declared as FunctionCategory;
+    const known = FUNCTION_DETAILS[name]?.category;
+    if (known) return known;
+    return CATEGORY_RULES.find(([pattern]) => pattern.test(name))?.[1] ?? "Other";
+}
+
+/** The browser category of a function: the engine's declaration, then the reference table, then a guess. */
+export function functionCategory(name: string): FunctionCategory {
+    return categoryOf(name.toUpperCase());
+}
+
+function argumentsOf(name: string, signature: string): FunctionArgumentDoc[] {
+    const notes = FUNCTION_DETAILS[name]?.args;
+    const args: FunctionArgumentDoc[] = [];
+    for (const raw of signature.split(",").map((part) => part.trim())) {
+        if (raw === "") continue;
+        if (raw === "…" || raw === "...") {
+            const last = args.at(-1);
+            if (last) last.repeating = true;
+            continue;
+        }
+        const optional = raw.startsWith("[");
+        const label = raw.replace(/[[\]…]/g, "").trim();
+        const base = label.replace(/\d+$/, "");
+        const description =
+            notes?.[label] ?? notes?.[base] ?? ARGUMENT_DOCS[label] ?? ARGUMENT_DOCS[base] ?? "";
+        args.push({ name: label, optional, repeating: false, description });
+    }
+    return args;
+}
+
+/** Merges the engine's own metadata (authoritative signature and arity) with the reference details. */
+export function functionDoc(name: string): FunctionDoc {
+    const key = name.toUpperCase();
+    const info = FUNCTION_INFO[key];
+    const detail = FUNCTION_DETAILS[key];
+    const signature = info?.[0] ?? detail?.signature ?? "";
+    return {
+        name: key,
+        category: categoryOf(key),
+        signature,
+        description: info?.[1] ?? detail?.description ?? "",
+        example: detail?.example ?? `=${key}(${signature ? "…" : ""})`,
+        args: argumentsOf(key, signature),
+        zeroArgs: info ? info[3] === 0 : signature === "",
+    };
+}
+
+function isSubsequence(query: string, text: string): boolean {
+    let i = 0;
+    for (const c of text) if (c === query[i]) i++;
+    return i === query.length;
+}
+
+/**
+ * Filters and ranks functions for a search: exact name, name prefix, prefix of a dotted
+ * part (`DIST` finds `NORM.DIST`), substring, letters in order from the first (`vlk` finds VLOOKUP), then
+ * descriptions containing every word. An empty query keeps alphabetical order.
+ */
+export function searchFunctions(docs: readonly FunctionDoc[], query: string, category = ""): FunctionDoc[] {
+    const pool = category ? docs.filter((doc) => doc.category === category) : [...docs];
+    const q = query.trim().toUpperCase();
+    if (q === "") return pool.sort((a, b) => a.name.localeCompare(b.name));
+    const words = q.split(/\s+/);
+    const score = (doc: FunctionDoc) => {
+        const name = doc.name;
+        if (name === q) return 0;
+        if (name.startsWith(q)) return 1;
+        if (name.split(/[._]/).some((part) => part.startsWith(q))) return 2;
+        if (name.includes(q)) return 3;
+        if (q.length > 1 && !q.includes(" ") && name[0] === q[0] && isSubsequence(q, name)) return 4;
+        const text = `${doc.description} ${doc.category} ${doc.signature}`.toUpperCase();
+        return words.every((word) => text.includes(word)) ? 5 : -1;
+    };
+    return pool
+        .map((doc) => ({ doc, rank: score(doc) }))
+        .filter((entry) => entry.rank >= 0)
+        .sort(
+            (a, b) =>
+                a.rank - b.rank ||
+                a.doc.name.length - b.doc.name.length ||
+                a.doc.name.localeCompare(b.doc.name),
+        )
+        .map((entry) => entry.doc);
+}

@@ -164,8 +164,8 @@
 }
 
 .error {
-    color: #d14343;
-    border-color: #d14343;
+    color: var(--danger-color);
+    border-color: var(--danger-color);
 }
 
 .mini {

@@ -97,11 +97,14 @@ describe("AppBuilder", () => {
     });
 
     describe("getServices", () => {
-        test("should return an array with CommandService and HotkeyService", () => {
+        test("should return the command, hotkey and autosave services", () => {
             const builder = new AppBuilder();
             const services = (builder as any).getServices();
-            expect(Array.isArray(services)).toBe(true);
-            expect(services.length).toBe(2);
+            expect(services.map((s: object) => s.constructor.name)).toEqual([
+                "CommandService",
+                "HotkeyService",
+                "AutosaveService",
+            ]);
         });
     });
 

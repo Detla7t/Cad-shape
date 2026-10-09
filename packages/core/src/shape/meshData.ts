@@ -223,6 +223,12 @@ export function concatTypedArrays<T extends Float32Array | Uint32Array>(arrays: 
 
 export interface FaceMeshData extends ShapeMeshData {
     texture?: string;
+    /**
+     * Translucent region shading (an inactive sketch's closed regions): the renderer draws
+     * the faces with this opacity and `color` instead of the node's material. Undefined
+     * keeps the node material.
+     */
+    opacity?: number;
     index: Uint32Array;
     normal: Float32Array;
     uv: Float32Array;

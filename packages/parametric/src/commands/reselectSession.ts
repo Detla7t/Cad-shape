@@ -265,24 +265,8 @@ export class EdgeReselectSession {
             .map((x) => this.captureRef(x));
     }
 
-    /**
-     * Displays `shape` as a temporary mesh and returns its id, or undefined when it carries no
-     * mesh data. The temp mesh renders in world space; the chain evaluates locally.
-     */
     private displayPreviewMesh(shape: IShape): number | undefined {
-        let previewShape = shape;
-        const transform = this.host.worldTransform();
-        if (!transform.equals(Matrix4.identity())) {
-            previewShape = shape.transformedMul(transform);
-        }
-        try {
-            const { faces, edges } = previewShape.mesh;
-            const datas = [faces, edges].filter((x) => x !== undefined);
-            return datas.length > 0 ? this.host.document.visual.context.displayMesh(datas) : undefined;
-        } finally {
-            previewShape.dispose();
-            if (previewShape !== shape) shape.dispose();
-        }
+        return displayChainPreview(this.host, shape);
     }
 
     /** Selects the edges the feature currently references so the pick starts from them. */
@@ -328,7 +312,11 @@ export class ProfileReselectSession {
         sketch: SketchNode,
         controller: AsyncController,
     ): Promise<ProfileRef[] | undefined> {
-        const original = this.host.features;
+        // Only this feature's profiles are previewed, so only they are restored: other edits
+        // made while the pick runs (the dialog's depth field, its arrow) are kept.
+        const current = this.host.features.find((x) => x.id === feature.id);
+        const originalProfiles =
+            current?.type === "extrude" || current?.type === "revolve" ? current.profiles : undefined;
         const owner = this.host.document.visual.context.getVisual(this.host);
         return runReselectSession(this.host, controller, {
             prompt: "prompt.select.faces",
@@ -359,7 +347,11 @@ export class ProfileReselectSession {
                         VisualStates.faceTransparent,
                         ShapeTypes.shape,
                     );
-                this.host.setFeaturesEmitShapeChanged(original);
+                this.host.setFeaturesEmitShapeChanged(
+                    this.host.features.map((x) =>
+                        x.id === feature.id ? ({ ...x, profiles: originalProfiles } as FeatureData) : x,
+                    ),
+                );
                 this.host.document.visual.context.setVisible(sketch, sketch.visible && sketch.parentVisible);
             },
         });
@@ -410,6 +402,27 @@ export class ProfileReselectSession {
             indexes: [index],
         }));
         this.host.document.selection.setSelectedShapes(picked, VisualStates.faceSelected, false);
+    }
+}
+
+/**
+ * Displays `shape` as a temporary mesh and returns its id, or undefined when it carries no
+ * mesh data. The temp mesh renders in world space; the chain evaluates locally. The shape
+ * is consumed: it is disposed once meshed.
+ */
+export function displayChainPreview(host: ReselectHost, shape: IShape): number | undefined {
+    let previewShape = shape;
+    const transform = host.worldTransform();
+    if (!transform.equals(Matrix4.identity())) {
+        previewShape = shape.transformedMul(transform);
+    }
+    try {
+        const { faces, edges } = previewShape.mesh;
+        const datas = [faces, edges].filter((x) => x !== undefined);
+        return datas.length > 0 ? host.document.visual.context.displayMesh(datas) : undefined;
+    } finally {
+        previewShape.dispose();
+        if (previewShape !== shape) shape.dispose();
     }
 }
 

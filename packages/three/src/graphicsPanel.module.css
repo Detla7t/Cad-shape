@@ -46,7 +46,7 @@
 }
 .cancel {
     background: transparent;
-    color: #cb3038;
+    color: var(--danger-color);
 }
 .tabs {
     display: flex;
@@ -61,8 +61,8 @@
     background: transparent;
 }
 .tabs button[aria-selected="true"] {
-    color: #1456c8;
-    border-bottom-color: #1456c8;
+    color: var(--accent-text-color);
+    border-bottom-color: var(--accent-text-color);
     font-weight: bold;
 }
 .content {

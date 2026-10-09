@@ -61,15 +61,15 @@
     border-left: 3px solid var(--primary-color);
 }
 .error {
-    color: #bf3030;
+    color: var(--danger-color);
     min-height: 16px;
     white-space: normal;
 }
 .empty {
-    background: #dff1fc;
-    color: #244a66;
+    background: var(--info-background-color);
+    color: var(--info-foreground-color);
     padding: 12px;
-    border: 1px solid #acd5ef;
+    border: 1px solid var(--info-border-color);
     line-height: 1.6;
 }
 
