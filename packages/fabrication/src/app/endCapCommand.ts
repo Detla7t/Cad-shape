@@ -3,6 +3,7 @@
 
 import { command, type IApplication, type ICommand, type IDocument, Transaction } from "@chili3d/core";
 import { ensureEndCapConfiguration } from "./endCapConfiguration";
+import { addNativeEndCap, type NativeEndCap } from "./endCapNative";
 import { EndCapSketchNode } from "./endCapSketchNode";
 
 /** Inches, like the Onshape workspace the end caps come from. */
@@ -13,8 +14,9 @@ export async function endCapDocument(application: IApplication, name = "End Cap"
 }
 
 /**
- * Adds a configured end cap to `document` as one undo step: the End Cap configuration inputs
- * (when the document lacks them) and an `EndCapSketchNode` following them.
+ * Adds a generated end cap to `document` as one undo step: the End Cap configuration inputs
+ * (when the document lacks them) and an `EndCapSketchNode` following them. The command builds
+ * the native model instead (`addNativeEndCap`); this node stays for documents that hold one.
  */
 export function addConfiguredEndCap(document: IDocument): EndCapSketchNode {
     let node: EndCapSketchNode | undefined;
@@ -28,16 +30,26 @@ export function addConfiguredEndCap(document: IDocument): EndCapSketchNode {
     return node!;
 }
 
+/** Adds the native end cap and selects the sketch the configuration shows. */
+export function addEndCap(document: IDocument): NativeEndCap {
+    const cap = addNativeEndCap(document);
+    const shown = cap.plain.suppressed ? cap.reducing : cap.plain;
+    document.selection.setSelectedNodes([shown], false);
+    document.visual.update();
+    return cap;
+}
+
 /**
- * Sheet Metal ▸ Round Duct ▸ End Cap: adds the end cap to the Part Studio. It is configured
- * where every Part Studio is — the Configurations panel (Endcap, OD, ID, Wall Height, as in
- * the Onshape End Cap Configurator) — and its values are in the properties panel.
+ * Sheet Metal ▸ Round Duct ▸ End Cap: adds the End Cap Configurator's Part Studio content —
+ * configuration inputs (Endcap, OD, ID, Wall Height, as in the Onshape document), variable
+ * features and the two constrained sketches. It is configured where every Part Studio is: the
+ * Configurations panel.
  */
 @command({ key: "sheetMetal.endCap", icon: "icon-arc" })
 export class EndCapCommand implements ICommand {
     async execute(application: IApplication): Promise<void> {
         const document = await endCapDocument(application);
-        addConfiguredEndCap(document);
+        addEndCap(document);
         application.activeView?.cameraController.fitContent();
     }
 }

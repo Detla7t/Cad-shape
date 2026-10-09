@@ -320,10 +320,13 @@ Not yet: press-pull extrudes (from body faces) show no arrow; revolve shows no a
 | Onshape | Chili3D |
 | --- | --- |
 | Part Studio Configurations panel: `Endcap` checkbox, `OD`/`ID` lists (4"–24", Custom), `Wall Height` | The same inputs in the Part Studio's Configurations panel (`Endcap`, `OD`, `ID`, `Custom_OD`, `Custom_ID`, `Wall_Height`, `Finish_Wall_Height`), each shown only when it applies; Onshape's option ids (`_9_5_8_`) |
-| "End Cap" / "Reducing End Cap" sketches driven by the configuration | One "End Cap" sketch feature that redraws when the configuration changes (Sheet Metal ▸ Round Duct ▸ End Cap adds it, with the inputs); its size shows read-only in Properties; an impossible pair (ID ≥ OD) badges the feature and keeps the last drawing |
-| Export as DXF (inch, `ModelSketch_Visible` layer); Order Library profile "End caps — all preset sizes" | The template's "End Cap Drawing" tab is the cut-ready DXF of the current configuration (download as DXF/SVG/DWG); geometry matches every Onshape export to 1e-6 in |
+| Variable features (`#var`) computed from the configuration | A "Variables" folder of assigned variable features (`#duct_od = configure(OD, …)`, `#flange = duct_od < 5.25 in ? 0.375 in : …`, `#tab_outer = sqrt(bend_radius * bend_radius - tab * tab) + 0.0625 in`, …): every rule of the flats is a variable, listed in `endCapNative.ts` |
+| "End Cap" / "Reducing End Cap" sketches, each suppressed in the other's configuration | The same two sketches, suppression `configure(Endcap, …)`, fully constrained (0 DOF): concentric arcs anchored at the origin, radius dimensions = the variables, coincident chains, horizontal/vertical edges, centers on their edge lines, signed horizontal/vertical distances from the centers for the tab corners and collar strips — no redundant constraint. Switching the configuration re-solves them: they land on the Onshape flats for all 253 presets, in any order of switching. Sheet Metal ▸ Round Duct ▸ End Cap adds the inputs, the variables (once per document) and the sketches |
+| Export as DXF (inch, `ModelSketch_Visible` layer); Order Library profile "End caps — all preset sizes" | The template's "End Cap Drawing" tab is the DXF of the sketch the configuration shows, named the Onshape way (`9.63in x 6.63in Reducing End Cap.dxf`); geometry matches every Onshape export to 1e-6 in |
 | Public document anyone can copy | Dashboard ▸ Public ▸ End Cap Configurator ▸ Open copy, or `/?template=end-cap-configurator` |
 | Custom Crimp, Wall Inner Edge | Not modelled: every reference export used their defaults, so their effect on the flats is unknown |
+
+The Onshape document's own constraint list could not be read (its API answered "API limit exceeded" on the Free plan), so the constraints are an equivalent set derived from the exported geometry. Two solver behaviours came out of it, both as Onshape does: a suppressed sketch is not re-solved (its dimensions may describe nothing valid in that configuration), and a re-solve after a parameter change walks each dimension from the value the geometry has to its new one, so a jump from 9 5/8" to 24" keeps every arc on the side it was drawn instead of flipping to the other root.
 
 ## Equal between a circle and an arc
 
@@ -340,3 +343,12 @@ Onshape's Equal accepts any two round entities: a circle and an arc (a trimmed c
 | Horizontal / Vertical: one tool, a line or two points | Horizontal/Vertical for lines plus separate Align Horizontally/Vertically for points | One Horizontal and one Vertical tool: a line (or every pre-selected line) is made horizontal/vertical, two points are aligned; existing align constraints show the H/V badge |
 
 The sketch toolbar's constraint row follows Onshape's: Coincident, Concentric, Horizontal, Vertical, Perpendicular, Parallel, Tangent, Equal, Normal, Fix, Curvature (Midpoint and Symmetric under More). Concentric, Normal and Curvature are stored as solver constraints with a `role`, so dragging and the solver treat them like the coincident/incidence constraints they reduce to, and one delete removes a two-part curvature constraint.
+
+## Measure
+
+| Onshape | Chili3D before | Chili3D now |
+| --- | --- | --- |
+| Measure card: distance with ΔX/ΔY/ΔZ, in the axis colours | One value (minimum distance) | A card under the readout lists every value of the selection: ΔX/ΔY/ΔZ of the distance in red/green/blue, also drawn in the view as dashed axis-coloured legs |
+| Minimum, maximum and center-to-center distance | Minimum and maximum | Center distance too, offered when both picks have a center (a vertex, circle, arc, sphere, cylinder) |
+| Angle between lines/faces | Separate tool | Angle in the card for two lines (0–90°), two planes, or a line and a plane |
+| Area of a face, coordinates of a point | Area only in the Geometry panel | A single face shows its area; a single vertex shows X/Y/Z (no distance, the variable button disabled) |

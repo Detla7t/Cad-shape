@@ -137,7 +137,9 @@ export class MeasuredVariableNode extends Node implements INodeIcon, INodeScenel
                   : this.measured.isOk
                     ? `${Number(this.measured.value.toPrecision(8))} mm`
                     : "unresolved";
-            this.setPrivateValue("name", `#${data.name} = ${value}`);
+            // A long expression (a configured list's every arm) is cut short in the label.
+            const label = value.length > 48 ? `${value.slice(0, 47).trimEnd()}…` : value;
+            this.setPrivateValue("name", `#${data.name} = ${label}`);
             if (oldName !== this.name) this.emitPropertyChanged("name", oldName);
             this.document.variables.notifyScopeChanged();
         } finally {

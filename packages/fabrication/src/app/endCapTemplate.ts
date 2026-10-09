@@ -2,12 +2,11 @@
 // See LICENSE file in the project root for full license information.
 
 import { type DocumentTemplate, type IApplication, type IDocument, Result, Transaction } from "@chili3d/core";
-import { DocumentFileNode } from "@chili3d/documents";
 import { writeSvg } from "@chili3d/drawing";
-import { endCapDxf } from "../endcap/batch";
 import { endCapPattern } from "../endcap/endCap";
 import { toDrawing } from "../geometry/toDrawing";
-import { addConfiguredEndCap } from "./endCapCommand";
+import { addEndCap } from "./endCapCommand";
+import { EndCapDrawingNode } from "./endCapDrawingNode";
 
 /** The default reducer's flat pattern, drawn for the dashboard. */
 function thumbnail(): string | undefined {
@@ -24,31 +23,20 @@ async function createEndCapDocument(application: IApplication): Promise<Result<I
         lengthPrecision: 4,
         anglePrecision: 1,
     });
-    const node = addConfiguredEndCap(document);
-    const params = node.resolve();
-    if (!params.isOk) return Result.err(params.error);
-    const dxf = endCapDxf(params.value);
-    if (!dxf.isOk) return Result.err(dxf.error);
+    const cap = addEndCap(document);
     Transaction.execute(document, "End Cap drawing", () => {
-        // The shop drawing: the cut-ready DXF, rewritten by the end cap on every configuration change.
-        const drawing = new DocumentFileNode({
-            document,
-            name: "End Cap Drawing",
-            fileName: dxf.value.name,
-            text: dxf.value.text,
-        });
-        document.modelManager.addNode(drawing);
-        node.drawingId = drawing.id;
+        // The shop drawing: the cut-ready DXF of the sketch the configuration shows.
+        document.modelManager.addNode(EndCapDrawingNode.create(document, [cap.plain, cap.reducing]));
     });
-    document.selection.setSelectedNodes([node], false);
     application.activeView?.cameraController.fitContent();
     return Result.ok(document);
 }
 
 /**
  * "End Cap Configurator" in the dashboard's Public section (and `/?template=end-cap-configurator`):
- * a Part Studio with the End Cap configuration (Endcap, OD, ID, Wall Height) driving an end cap
- * sketch, and its DXF drawing — like the Onshape document of the same name.
+ * a Part Studio with the End Cap configuration (Endcap, OD, ID, Wall Height), its variables and
+ * the two constrained sketches, plus a DXF drawing of the one shown — like the Onshape document
+ * of the same name.
  */
 export const END_CAP_TEMPLATE: DocumentTemplate = {
     id: "end-cap-configurator",

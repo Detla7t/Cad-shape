@@ -6,6 +6,8 @@ import { END_CAP_TEMPLATE } from "./endCapTemplate";
 
 export * from "./endCapCommand";
 export * from "./endCapConfiguration";
+export * from "./endCapDrawingNode";
+export * from "./endCapNative";
 export * from "./endCapSketch";
 export * from "./endCapSketchNode";
 export * from "./endCapTemplate";

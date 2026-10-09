@@ -243,6 +243,41 @@ export class SketchSolver implements ExternalEntityHost {
     }
 
     /**
+     * Moves every expression datum to its value in `scope` in `steps` equal increments,
+     * solving after each, then adopts `scope` (`setScope`) and solves. A large jump — a
+     * configuration switching a duct from 9 5/8" to 24" — then follows the solution branch the
+     * sketch is on, the way dragging the dimension there would, instead of letting one solve
+     * cross to another root (a hole arc flipping to its other half, a line folding back).
+     */
+    followScope(scope: Scope, steps = 16): SolveOutcome {
+        const moves: { param: number; from: number; to: number }[] = [];
+        for (const record of this.constraints.values()) {
+            const sources = record.datumSources;
+            const paramIds = record.datumParamIds;
+            if (sources === undefined || paramIds === undefined) continue;
+            for (let index = 0; index < sources.length; index++) {
+                const resolved = resolveDatumSource(record.kind, sources[index], scope);
+                if (!resolved.isOk) continue;
+                const from = this.system.get_params(new Uint32Array([paramIds[index]]))[0];
+                const to = resolved.value;
+                if (Math.abs(to - from) > 1e-9 * Math.max(1, Math.abs(to))) {
+                    moves.push({ param: paramIds[index], from, to });
+                }
+            }
+        }
+        if (moves.length > 0) {
+            for (let step = 1; step < steps; step++) {
+                const t = step / steps;
+                for (const move of moves)
+                    this.system.set_param(move.param, move.from + (move.to - move.from) * t);
+                this.solve(true);
+            }
+        }
+        this.setScope(scope);
+        return this.solve(true);
+    }
+
+    /**
      * Writes a user input as one of a constraint's datums: a literal is converted into
      * storage units, an expression is stored verbatim and resolved on the spot. A failed
      * resolve returns the error without touching the datum — the user is editing, so the

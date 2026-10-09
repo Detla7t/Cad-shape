@@ -4,6 +4,7 @@
 import {
     Config,
     type EdgeMeshData,
+    EMPTY_SCOPE,
     type FaceMeshData,
     type I18nKeys,
     type IDocument,
@@ -647,11 +648,13 @@ export class SketchNode extends ParameterShapeNode {
     private solveWithScope(data: SketchData): SketchData | undefined {
         let solved: SketchData;
         try {
-            // No explicit solve here: the constructor's loadData already ends with the
-            // full solve that pulls constrained entities onto the moved external
-            // geometry — a second solve(true) on unchanged state is a no-op.
-            const solver = new SketchSolver(this.plane, data, this.document.variables.evaluate().scope);
+            // Loaded without a scope, every expression dimension holds the value the drawn
+            // geometry measures (and the load's solve pulls constrained entities onto moved
+            // external geometry); `followScope` then walks the dimensions to their values
+            // in the document's scope, so a configuration jump stays on the drawn branch.
+            const solver = new SketchSolver(this.plane, data, EMPTY_SCOPE);
             try {
+                solver.followScope(this.document.variables.evaluate().scope);
                 solved = solver.toData();
             } finally {
                 solver.dispose();
@@ -678,6 +681,13 @@ export class SketchNode extends ParameterShapeNode {
         if (this._editingSession) return;
         const revision = this.document.variables.revision;
         if (this._variableRevision === revision) return;
+        if (this.suppressed) {
+            // A suppressed feature is not regenerated (as in Onshape): in this configuration
+            // its dimensions may describe no valid shape, and solving them would leave the
+            // sketch far from where it is unsuppressed again. It re-solves when it comes back.
+            this.withoutHistory(() => this.setShape(this.generateShape()));
+            return;
+        }
         this._variableRevision = revision;
         const solved = this.solveWithScope(this.data);
         this.withoutHistory(() => {

@@ -3,20 +3,27 @@
 
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { findDocumentTemplate, type INode, Serializer } from "@chili3d/core";
+import { FolderNode, findDocumentTemplate, type INode, Plane, Serializer } from "@chili3d/core";
 import { createMockApplication, createMockVisualWithDocument, TestDocument } from "@chili3d/core/test-utils";
-import { DocumentFileNode } from "@chili3d/documents";
+import { readDxf } from "@chili3d/drawing";
+import type { SketchNode } from "@chili3d/parametric";
 import { initWasm, ShapeFactory } from "@chili3d/wasm";
 import { sketchProfiles } from "../../parametric/src/features/profileBuilder";
+import { SketchSolver } from "../../parametric/src/sketch/solver";
 import "../../parametric/test/sketch/setup";
 import {
     addConfiguredEndCap,
+    addEndCap,
     END_CAP_TEMPLATE,
+    END_CAP_VARIABLES,
+    EndCapDrawingNode,
     EndCapSketchNode,
     endCapSketchData,
     END_CAP_INPUT_NAMES as N,
+    sketchFlatPattern,
 } from "../src/app";
-import { endCapDxf } from "../src/endcap/batch";
+import { type EndCapParams, endCapPattern } from "../src/endcap/endCap";
+import { sameGeometry } from "../src/geometry";
 
 beforeAll(async () => {
     await initWasm({
@@ -39,7 +46,7 @@ function configure(doc: TestDocument, active: Record<string, string | boolean>) 
     doc.variables.setActiveConfiguration({ ...doc.variables.activeConfiguration, ...active });
 }
 
-const regions = (node: EndCapSketchNode) => {
+const regions = (node: SketchNode) => {
     const profiles = sketchProfiles(node);
     expect(profiles.isOk).toBe(true);
     return profiles.value.outer.length;
@@ -155,8 +162,100 @@ describe("the configured end cap", () => {
     });
 });
 
+const flats = (node: SketchNode) => sketchFlatPattern(node.data, node.name).parts[0];
+const matches = (node: SketchNode, params: EndCapParams) => {
+    const pattern = endCapPattern(params);
+    expect(pattern.isOk).toBe(true);
+    if (!pattern.isOk) return false;
+    const part = flats(node);
+    return sameGeometry(
+        [...part.outline, ...part.bendLines],
+        pattern.value.parts.flatMap((p) => [...p.outline, ...p.bendLines]),
+    );
+};
+const dofs = (doc: TestDocument, node: SketchNode) =>
+    new SketchSolver(Plane.XY, node.data, doc.variables.evaluate().scope).dofs();
+
+describe("the native End Cap Configurator", () => {
+    test("adds the inputs, a Variables folder and two fully constrained sketches, one suppressed", () => {
+        const doc = document();
+        const cap = addEndCap(doc);
+        expect(doc.variables.configurationInputs.map((input) => input.name)).toEqual([
+            N.endcap,
+            N.od,
+            N.customOd,
+            N.id,
+            N.customId,
+            N.wall,
+            N.finishWall,
+        ]);
+        const [folder, plain, reducing] = children(doc);
+        expect(folder).toBeInstanceOf(FolderNode);
+        expect(folder.name).toBe("Variables");
+        expect(cap.variables.map((v) => v.definition.name)).toEqual(END_CAP_VARIABLES.map((v) => v.name));
+        expect(cap.variables.every((v) => v.parent === folder)).toBe(true);
+        expect(cap.variables[0].name).toMatch(/^#duct_od = configure\(OD, .*…$/);
+        expect(cap.variables[0].name.length).toBeLessThan(60);
+        expect(cap.variables[2].name).toBe("#bend_radius = duct_od / 2");
+        expect([plain, reducing]).toEqual([cap.plain, cap.reducing]);
+        expect([cap.plain.name, cap.reducing.name]).toEqual(["End Cap", "Reducing End Cap"]);
+        expect([cap.plain.suppressed, cap.reducing.suppressed]).toEqual([true, false]);
+        expect([...doc.variables.evaluate().errors]).toEqual([]);
+        expect([...doc.variables.evaluate().warnings]).toEqual([]);
+        expect(doc.variables.evaluate().scope.get("duct_od")?.value).toBeCloseTo(9.625 * 25.4, 9);
+        expect([dofs(doc, cap.plain), dofs(doc, cap.reducing)]).toEqual([0, 0]);
+        expect(matches(cap.reducing, { reducing: true, od: 9.625, id: 6.625 })).toBe(true);
+        expect(regions(cap.reducing)).toBe(4);
+    });
+
+    test("the Configurations panel switches sketches and re-solves them to every size asked", () => {
+        const doc = document();
+        const cap = addEndCap(doc);
+        configure(doc, { [N.endcap]: true, [N.od]: '16"' });
+        expect([cap.plain.suppressed, cap.reducing.suppressed]).toEqual([false, true]);
+        expect(matches(cap.plain, { reducing: false, od: 16 })).toBe(true);
+        expect(regions(cap.plain)).toBe(2);
+        // Away and back with a large jump: the suppressed sketch waited where it was.
+        configure(doc, { [N.endcap]: false, [N.od]: '24"', [N.id]: '4"' });
+        expect(matches(cap.reducing, { reducing: true, od: 24, id: 4 })).toBe(true);
+        configure(doc, { [N.wall]: true, [N.finishWall]: "1.5 in" });
+        expect(matches(cap.reducing, { reducing: true, od: 24, id: 4, wallHeight: 1.5 })).toBe(true);
+        configure(doc, { [N.od]: "Custom", [N.customOd]: "30 in", [N.id]: '23"' });
+        expect(matches(cap.reducing, { reducing: true, od: 30, id: 23, wallHeight: 1.5 })).toBe(true);
+    });
+
+    test("a second end cap reuses the variables; one undo removes an insertion", () => {
+        const doc = document();
+        addEndCap(doc);
+        const second = addEndCap(doc);
+        expect(second.variables).toHaveLength(0);
+        expect([...doc.variables.evaluate().warnings]).toEqual([]);
+        expect(children(doc)).toHaveLength(5);
+        doc.history.undo();
+        expect(children(doc)).toHaveLength(3);
+        doc.history.undo();
+        expect(children(doc)).toHaveLength(0);
+        expect(doc.variables.configurationInputs).toHaveLength(0);
+    });
+
+    test("saves and reloads its sketches with their expressions", () => {
+        const doc = document();
+        const cap = addEndCap(doc);
+        configure(doc, { [N.od]: '24"', [N.id]: '4"' });
+        const restored = Serializer.deserializeObject(
+            doc,
+            Serializer.serializeObject(cap.reducing),
+        ) as SketchNode;
+        expect(restored.data).toEqual(cap.reducing.data);
+        expect(restored.suppression).toBe(cap.reducing.suppression);
+        expect(restored.data.constraints.filter((c) => typeof c.datum === "string").length).toBeGreaterThan(
+            20,
+        );
+    });
+});
+
 describe("the public End Cap template", () => {
-    test("is a configured Part Studio whose DXF drawing follows the configuration", async () => {
+    test("is the native Part Studio plus a DXF drawing of the sketch the configuration shows", async () => {
         const app = createMockApplication();
         let created: TestDocument | undefined;
         let units: unknown;
@@ -172,15 +271,23 @@ describe("the public End Cap template", () => {
         expect(result.isOk).toBe(true);
         expect(units).toMatchObject({ length: "in" });
         const doc = created!;
-        const [cap, drawing] = children(doc);
-        expect(cap).toBeInstanceOf(EndCapSketchNode);
-        expect(drawing).toBeInstanceOf(DocumentFileNode);
-        const file = drawing as DocumentFileNode;
+        const [, plain, reducing, drawing] = children(doc);
+        expect(drawing).toBeInstanceOf(EndCapDrawingNode);
+        const file = drawing as EndCapDrawingNode;
         expect(file.fileName).toBe("9.63in x 6.63in Reducing End Cap.dxf");
+        expect(file.activeSketch()).toBe(reducing);
 
         configure(doc, { [N.endcap]: true, [N.od]: '16"' });
-        const expected = endCapDxf({ reducing: false, od: 16 });
         expect(file.fileName).toBe("16in End Cap.dxf");
-        expect(file.text).toBe(expected.isOk ? expected.value.text : "");
+        expect(file.activeSketch()).toBe(plain);
+        expect(matches(plain as SketchNode, { reducing: false, od: 16 })).toBe(true);
+        // The file is the shown sketch's cut outline (the bend arc is construction).
+        expect(readDxf(file.text).entities).toHaveLength(flats(plain as SketchNode).outline.length);
+        const restored = Serializer.deserializeObject(
+            doc,
+            Serializer.serializeObject(file),
+        ) as EndCapDrawingNode;
+        expect(restored).toBeInstanceOf(EndCapDrawingNode);
+        expect(restored.sketchIds).toBe(file.sketchIds);
     });
 });
