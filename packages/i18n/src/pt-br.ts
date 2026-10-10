@@ -337,5 +337,12 @@ export default {
         "timeline.show": "Mostrar linha do tempo",
         "timeline.rollbackFailed":
             "Esta posição da linha do tempo não pode ser reconstruída. A posição anterior foi restaurada.",
+        "sketch.export.layers": "Camadas (separadas por vírgula, vazio = todas)",
+        "sketch.export.colors": "Cores (#rrggbb, separadas por vírgula, vazio = todas)",
+        "documents.export.layers": "Camadas a exportar",
+        "documents.export.colors": "Cores a exportar",
+        "documents.export.selection": "O que exportar",
+        "documents.exportDialog.layers": "Camadas",
+        "documents.exportDialog.colors": "Cores",
     },
 } satisfies Locale;

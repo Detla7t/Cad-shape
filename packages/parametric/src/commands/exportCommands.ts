@@ -127,20 +127,33 @@ export class ExportSketchCommand extends MultistepCommand {
         this.setProperty("layers", value);
     }
 
+    /** Colours (`#rrggbb`: an entity's own colour, else its layer's), comma-separated; empty for every colour. */
+    @property("sketch.export.colors")
+    get colors(): string {
+        return this.getPrivateValue("colors", "");
+    }
+    set colors(value: string) {
+        this.setProperty("colors", value);
+    }
+
     protected override executeMainTask(): void {
         const editor = SketchEditor.getActive();
         const sketch = editor?.node ?? this.stepDatas[0]?.nodes?.[0];
         if (!(sketch instanceof SketchNode)) return;
         // While editing, the solver holds the latest geometry.
         const data = editor !== undefined ? editor.solver.toData() : sketch.data;
-        const layers = this.layers
-            .split(",")
-            .map((name) => name.trim())
-            .filter((name) => name !== "");
+        const list = (text: string) => {
+            const items = text
+                .split(",")
+                .map((item) => item.trim())
+                .filter((item) => item !== "");
+            return items.length === 0 ? undefined : items;
+        };
         const drawing = sketchDrawing(data, {
             construction: this.includeConstruction,
             external: this.includeExternal,
-            layers: layers.length === 0 ? undefined : layers,
+            layers: list(this.layers),
+            colors: list(this.colors),
         });
         download([writeDrawing(drawing, this.format, sketch.name)], `${sketch.name}${this.format}`);
     }

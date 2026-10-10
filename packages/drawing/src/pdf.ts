@@ -1,7 +1,15 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type Drawing, type DrawingLayer, drawingBounds, type Point2, unitScale } from "./drawing";
+import {
+    DEFAULT_DRAWING_COLOR,
+    type Drawing,
+    type DrawingEntity,
+    drawingBounds,
+    normalizeColor,
+    type Point2,
+    unitScale,
+} from "./drawing";
 
 export interface PdfOptions {
     /** The document's title. */
@@ -23,7 +31,7 @@ const f = (n: number) => String(Math.round(n * 1000) / 1000);
 
 /** A CSS `#rrggbb` colour as PDF's 0–1 components; black otherwise. */
 function rgb(color: string): [number, number, number] {
-    const match = /^#([0-9a-f]{6})$/i.exec(color.trim());
+    const match = /^#([0-9a-f]{6})$/.exec(normalizeColor(color));
     if (!match) return [0, 0, 0];
     const value = Number.parseInt(match[1], 16);
     return [((value >> 16) & 255) / 255, ((value >> 8) & 255) / 255, (value & 255) / 255];
@@ -68,14 +76,22 @@ export function writePdf(drawing: Drawing, options: PdfOptions = {}): Uint8Array
     const py = (v: number) => (v - bounds.min[1] + margin) * scale;
     const layers = new Map(drawing.layers.map((layer) => [layer.name, layer]));
     const ops: string[] = [`${f(strokeWidth * scale)} w 1 J 1 j`];
-    let current: DrawingLayer | undefined | null = null;
-    const useLayer = (name: string) => {
-        const layer = layers.get(name);
-        if (layer === current) return;
-        current = layer;
-        const [r, g, b] = rgb(layer?.color ?? "#000000");
-        ops.push(`${f(r)} ${f(g)} ${f(b)} RG ${f(r)} ${f(g)} ${f(b)} rg`);
-        ops.push(layer?.dashed ? `[${f(2 * perMm * scale)} ${f(perMm * scale)}] 0 d` : "[] 0 d");
+    let currentColor: string | undefined;
+    let currentDashed: boolean | undefined;
+    /** The entity's own colour, else its layer's; the dash is the layer's. */
+    const useStyle = (entity: DrawingEntity) => {
+        const layer = layers.get(entity.layer);
+        const color = entity.color ?? layer?.color ?? DEFAULT_DRAWING_COLOR;
+        const dashed = layer?.dashed === true;
+        if (color !== currentColor) {
+            currentColor = color;
+            const [r, g, b] = rgb(color);
+            ops.push(`${f(r)} ${f(g)} ${f(b)} RG ${f(r)} ${f(g)} ${f(b)} rg`);
+        }
+        if (dashed !== currentDashed) {
+            currentDashed = dashed;
+            ops.push(dashed ? `[${f(2 * perMm * scale)} ${f(perMm * scale)}] 0 d` : "[] 0 d");
+        }
     };
     const arc = (center: Point2, radius: number, start: number, sweep: number): string => {
         const parts: string[] = [];
@@ -102,7 +118,7 @@ export function writePdf(drawing: Drawing, options: PdfOptions = {}): Uint8Array
         return parts.join("\n");
     };
     for (const entity of drawing.entities) {
-        useLayer(entity.layer);
+        useStyle(entity);
         switch (entity.kind) {
             case "line":
                 ops.push(

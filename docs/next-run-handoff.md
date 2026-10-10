@@ -58,10 +58,11 @@ Start in `packages/ui/src/console/consoleEngine.ts`, `commandWindow.tsx`, and th
 
 ### Export selection
 
-- [ ] Add a color-selection control and shared filtering if the user's requested color-based export is to be fully supported. The current implementation filters by layer names and preserves colors.
-- [ ] Verify construction/external/layer/color combinations against the actual exported geometry and style, including entity color overrides and external references. Check both the sketch command and drawing/context-menu paths; a filter on one path does not prove every export path honors it.
+- [x] Colour selection with shared filtering. `@chili3d/drawing` owns the one pure filter: `filterDrawing(drawing, { layers?, colors? })` (`DrawingSelection`; `filterDrawingLayers` delegates to it). Each colour key is the entity's effective colour (`effectiveColor`: entity `color` override, else its layer's colour, else `DEFAULT_DRAWING_COLOR`), normalized to lowercase `#rrggbb` (`normalizeColor`); `drawingColors` lists them with counts. Layers and colours combine with AND; empty layer records survive only if selected. Every path filters through it: `sketchDrawing(data, { construction, external, layers, colors })` (sketch command, `sketch.export.colors` comma list), `exportDrawingFile(drawing, { selection })` (export dialog: sketch context menu, `drawing.exportViews`, viewer ribbon) and the drawing viewer's DXF/SVG/PDF/… exports (`chooseExportSelection`, a modal; Cancel aborts with `documents.export.cancelled`). Dialog UI: Layers and Colors checkbox lists (swatch, label, count; all ticked; shown only with more than one row). Writers emit overrides (DXF group 62 nearest ACI, SVG per-entity `stroke`, PDF stroke colour) and DXF import reads 62/420/ByBlock back, so imported drawings filter by colour too.
+- [x] Combinations verified on the written DXF/SVG text: `packages/drawing/test/drawing.test.ts`, `packages/parametric/test/sketch/sketchDrawingOptions.test.ts` (construction × external × layer × colour, override vs ByLayer, external refs) and `packages/documents/test/exportSelection.test.ts` (dialog, `chooseExportSelection`, viewer exports, DXF import colours).
+- [ ] Remaining: the sketch context menu's "create drawing" document file (`sketchActions.ts`) is written unfiltered (the filter applies when it is exported); DXF R12 has no true colour, so overrides map to the nearest ACI 1–8 and re-import as that colour; `sketchDrawing`'s own layer `colorIndex` mapping is unchanged.
 
-Start in `packages/parametric/src/commands/exportCommands.ts`, `sketch/sketchDrawing.ts`, `packages/documents/src/ui/viewers/drawingViewer.ts`, and `packages/drawing/src/drawing.ts`.
+Start in `packages/drawing/src/drawing.ts` (`filterDrawing`), `packages/parametric/src/sketch/sketchDrawing.ts`, `packages/documents/src/ui/exportDialog.ts` and `packages/documents/src/ui/viewers/drawingViewer.ts`.
 
 ### Known scope limits
 

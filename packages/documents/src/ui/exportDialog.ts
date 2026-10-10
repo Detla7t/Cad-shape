@@ -10,6 +10,7 @@ import {
     exportFileName,
     formatDocumentValue,
     I18n,
+    type I18nKeys,
     type IDocument,
     Localize,
     PubSub,
@@ -20,8 +21,11 @@ import {
 import {
     convertDrawing,
     type Drawing,
+    type DrawingSelection,
     type DrawingUnits,
     DXF_VERSIONS,
+    drawingColors,
+    filterDrawing,
     writeDxf,
     writePdf,
     writeSvg,
@@ -55,6 +59,8 @@ interface ExportSettings {
     readonly format: ExportDrawingFormat;
     readonly units: DrawingUnits;
     readonly properties: Record<string, string>;
+    /** Which layers and colours go into the file; everything when absent. */
+    readonly selection?: DrawingSelection;
 }
 
 /** The resolution a drawing is rasterised at. */
@@ -136,13 +142,17 @@ export function configurationProperties(document: IDocument): Record<string, str
     return properties;
 }
 
-/** Writes the drawing in the chosen format and hands the file out. */
+/**
+ * Writes the drawing in the chosen format and hands the file out: only the selected layers
+ * and colours (`filterDrawing`, before the units change), in every format.
+ */
 export async function exportDrawingFile(
     drawing: Drawing,
     settings: Omit<ExportSettings, "fileName"> & { fileName: string },
     rasterize: (drawing: Drawing, dpi?: number) => Promise<Blob> = rasterizeDrawing,
 ): Promise<void> {
-    const converted = drawing.units === settings.units ? drawing : convertDrawing(drawing, settings.units);
+    const selected = settings.selection === undefined ? drawing : filterDrawing(drawing, settings.selection);
+    const converted = selected.units === settings.units ? selected : convertDrawing(selected, settings.units);
     if (settings.format === ".dwg") {
         const bytes = await writeDwg(converted, { properties: settings.properties });
         if (!bytes.isOk) throw new Error(bytes.error);
@@ -157,6 +167,70 @@ export async function exportDrawingFile(
     } else if (settings.format === ".png") {
         download([await rasterize(converted, PNG_DPI)], settings.fileName);
     } else download([writeDxf(converted, { properties: settings.properties })], settings.fileName);
+}
+
+interface SelectionRow {
+    readonly row: HTMLElement;
+    readonly box: HTMLInputElement;
+}
+
+/**
+ * A checkbox row (all ticked) per layer that has entities and per colour drawn, each with its
+ * swatch, name and entity count; `selection()` is undefined while everything stays ticked.
+ */
+export function selectionControls(drawing: Drawing): {
+    layers: SelectionRow[];
+    colors: SelectionRow[];
+    selection: () => DrawingSelection | undefined;
+} {
+    const counts = new Map<string, number>();
+    for (const entity of drawing.entities) counts.set(entity.layer, (counts.get(entity.layer) ?? 0) + 1);
+    const row = (
+        value: string,
+        swatch: string,
+        text: string,
+        count: number,
+        kind: I18nKeys,
+    ): SelectionRow => {
+        const box = input({ type: "checkbox", checked: true, value });
+        box.setAttribute("aria-label", `${I18n.translate(kind)}: ${text}`);
+        return {
+            box,
+            row: label(
+                { className: style.exportCheck },
+                box,
+                span({ className: style.layerSwatch, style: `background-color: ${swatch}` }),
+                span({ textContent: text }),
+                span({ className: style.muted, textContent: `(${count})` }),
+            ),
+        };
+    };
+    const layers = drawing.layers
+        .filter((layer) => counts.has(layer.name))
+        .map((layer) =>
+            row(
+                layer.name,
+                layer.color,
+                layer.name,
+                counts.get(layer.name) ?? 0,
+                "documents.exportDialog.layers",
+            ),
+        );
+    const colors = drawingColors(drawing).map(({ color, count }) =>
+        row(color, color, color, count, "documents.exportDialog.colors"),
+    );
+    const ticked = (rows: SelectionRow[]) =>
+        rows.every((entry) => entry.box.checked)
+            ? undefined
+            : rows.filter((entry) => entry.box.checked).map((entry) => entry.box.value);
+    return {
+        layers,
+        colors,
+        selection: () => {
+            const chosen = { layers: ticked(layers), colors: ticked(colors) };
+            return chosen.layers === undefined && chosen.colors === undefined ? undefined : chosen;
+        },
+    };
 }
 
 export function showExportDrawingDialog(options: ExportDrawingOptions): void {
@@ -231,6 +305,8 @@ export function showExportDrawingDialog(options: ExportDrawingOptions): void {
         I18n.translate("documents.exportDialog.includeConfiguration"),
     );
 
+    const selection = selectionControls(options.drawing());
+
     const field = (title: string, ...controls: Node[]) =>
         div(
             { className: style.exportField },
@@ -246,6 +322,22 @@ export function showExportDrawingDialog(options: ExportDrawingOptions): void {
         span({ className: style.muted, textContent: new Localize("documents.exportDialog.nameHint") }),
         field(I18n.translate("documents.exportDialog.format"), formatSelect),
         field(I18n.translate("documents.exportDialog.version"), version),
+        ...(selection.layers.length > 1
+            ? [
+                  field(
+                      I18n.translate("documents.exportDialog.layers"),
+                      ...selection.layers.map((row) => row.row),
+                  ),
+              ]
+            : []),
+        ...(selection.colors.length > 1
+            ? [
+                  field(
+                      I18n.translate("documents.exportDialog.colors"),
+                      ...selection.colors.map((row) => row.row),
+                  ),
+              ]
+            : []),
         field(
             I18n.translate("documents.exportDialog.units"),
             label(
@@ -298,6 +390,7 @@ export function showExportDrawingDialog(options: ExportDrawingOptions): void {
             ...(includeConfiguration.checked ? configurationProperties(document) : {}),
             ...parseProperties(properties.value),
         },
+        selection: selection.selection(),
     });
     const buttons: DialogButton[] = [
         {

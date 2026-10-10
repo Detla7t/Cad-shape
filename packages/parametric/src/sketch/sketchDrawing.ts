@@ -6,6 +6,7 @@ import {
     type DrawingEntity,
     type DrawingLayer,
     degreesOf,
+    filterDrawing,
     normalizeDegrees,
 } from "@chili3d/drawing";
 import { sampleCurve } from "./curveGeometry";
@@ -28,6 +29,12 @@ export interface SketchDrawingOptions {
     readonly construction?: boolean;
     /** Only entities on these sketch layers (by name); every layer when absent. */
     readonly layers?: readonly string[];
+    /**
+     * Only entities drawn in these colours (`effectiveColor`: the entity's own colour, else its
+     * sketch layer's; external edges are EXTERNAL's grey); every colour when absent. Combines
+     * with the other filters (AND).
+     */
+    readonly colors?: readonly string[];
 }
 
 function entityOf(
@@ -119,5 +126,10 @@ export function sketchDrawing(data: SketchData, options: SketchDrawingOptions = 
             if (drawn !== undefined) entities.push(drawn);
         }
     }
-    return { layers: [...new Map(outputLayers.map((layer) => [layer.name, layer])).values()], entities };
+    const drawing: Drawing = {
+        layers: [...new Map(outputLayers.map((layer) => [layer.name, layer])).values()],
+        entities,
+    };
+    // Every entity sits on a layer carrying its effective colour, so the shared filter applies.
+    return options.colors === undefined ? drawing : filterDrawing(drawing, { colors: options.colors });
 }

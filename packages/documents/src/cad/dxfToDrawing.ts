@@ -209,6 +209,8 @@ interface Context {
     readonly insertLayer?: string;
     /** The type of the top-level entity whose block is being drawn (DIMENSION, INSERT). */
     readonly source?: string;
+    /** The colour override of the enclosing INSERT or DIMENSION: ByBlock entities take it. */
+    readonly insertColor?: string;
     readonly blocks: readonly string[];
 }
 
@@ -243,6 +245,8 @@ class DrawingBuilder {
     readonly sources: string[] = [];
     readonly skipped: Record<string, number> = {};
     readonly usedLayers = new Set<string>();
+    /** The colour override of the record being drawn (undefined = ByLayer). */
+    private color: string | undefined;
 
     constructor(
         private readonly file: DxfFile,
@@ -256,7 +260,7 @@ class DrawingBuilder {
     }
 
     private push(entity: DrawingEntity, source: string): void {
-        this.entities.push(entity);
+        this.entities.push(this.color === undefined ? entity : { ...entity, color: this.color });
         this.sources.push(source);
         this.usedLayers.add(entity.layer);
     }
@@ -417,6 +421,29 @@ class DrawingBuilder {
             this.skip(`${record.type} (hidden layer)`);
             return;
         }
+        const previous = this.color;
+        this.color = this.colorOf(record, context);
+        try {
+            this.draw(record, context, layer);
+        } finally {
+            this.color = previous;
+        }
+    }
+
+    /**
+     * The entity's own colour: a true colour (420) or an ACI (62); ByLayer (256 or none) is undefined
+     * and ByBlock (0) takes the enclosing INSERT's colour.
+     */
+    private colorOf(record: DxfRecord, context: Context): string | undefined {
+        const trueColor = num(record, 420, -1);
+        if (trueColor >= 0) return `#${(trueColor & 0xffffff).toString(16).padStart(6, "0")}`;
+        const aci = Math.abs(num(record, 62, 256));
+        if (aci >= 256) return undefined;
+        if (aci === 0) return context.insertColor;
+        return aciColor(aci);
+    }
+
+    private draw(record: DxfRecord, context: Context, layer: string): void {
         const source = context.source ?? record.type;
         const t = context.transform;
         switch (record.type) {
@@ -708,12 +735,14 @@ class DrawingBuilder {
                     transform: compose(base, compose(cell, inner)),
                     insertLayer: layer,
                     source: context.source ?? "INSERT",
+                    insertColor: this.color,
                     blocks: [...context.blocks, name],
                 });
             }
         }
         // Attribute values are placed in world coordinates already.
-        for (const attribute of record.children) this.entity(attribute, { ...context, insertLayer: layer });
+        for (const attribute of record.children)
+            this.entity(attribute, { ...context, insertLayer: layer, insertColor: this.color });
     }
 
     private dimension(record: DxfRecord, context: Context, layer: string): void {
@@ -728,6 +757,7 @@ class DrawingBuilder {
             transform: compose(context.transform, translation(num(record, 12), num(record, 22))),
             insertLayer: layer,
             source: "DIMENSION",
+            insertColor: this.color,
             blocks: [...context.blocks, name],
         });
     }

@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type Drawing, type DrawingEntity, drawingBounds, formatNumber } from "./drawing";
+import { type Drawing, type DrawingEntity, drawingBounds, formatNumber, nearestAci } from "./drawing";
 
 /**
  * ASCII DXF R12 (AC1009) — the dialect every CAD, CAM, laser and plasma package reads —
@@ -30,12 +30,21 @@ export function dxfText(text: string): string {
         .replace(/[^\x20-\x7e]/g, "?");
 }
 
+/** The layer and, for an entity with its own colour, the nearest colour index (else ByLayer). */
+const head = (entity: DrawingEntity): Group[] =>
+    entity.color === undefined
+        ? [[8, entity.layer]]
+        : [
+              [8, entity.layer],
+              [62, nearestAci(entity.color)],
+          ];
+
 function entityGroups(entity: DrawingEntity): Group[] {
     switch (entity.kind) {
         case "line":
             return [
                 [0, "LINE"],
-                [8, entity.layer],
+                ...head(entity),
                 [10, entity.a[0]],
                 [20, entity.a[1]],
                 [30, 0],
@@ -46,7 +55,7 @@ function entityGroups(entity: DrawingEntity): Group[] {
         case "arc":
             return [
                 [0, "ARC"],
-                [8, entity.layer],
+                ...head(entity),
                 [10, entity.center[0]],
                 [20, entity.center[1]],
                 [30, 0],
@@ -57,7 +66,7 @@ function entityGroups(entity: DrawingEntity): Group[] {
         case "circle":
             return [
                 [0, "CIRCLE"],
-                [8, entity.layer],
+                ...head(entity),
                 [10, entity.center[0]],
                 [20, entity.center[1]],
                 [30, 0],
@@ -66,7 +75,7 @@ function entityGroups(entity: DrawingEntity): Group[] {
         case "text":
             return [
                 [0, "TEXT"],
-                [8, entity.layer],
+                ...head(entity),
                 [10, entity.position[0]],
                 [20, entity.position[1]],
                 [30, 0],

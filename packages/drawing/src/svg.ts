@@ -7,6 +7,7 @@ import {
     type DrawingEntity,
     drawingBounds,
     formatNumber as f,
+    normalizeColor,
     type Point2,
     unitScale,
 } from "./drawing";
@@ -44,21 +45,25 @@ export function writeSvg(drawing: Drawing, options: SvgOptions = {}): string {
     const y = (v: number) => bounds.max[1] - v + margin;
     const at = (p: Point2) => [x(p[0]), y(p[1])] as const;
 
-    const element = (entity: DrawingEntity, color: string): string => {
+    /** An entity's own colour overrides its layer group's stroke; ByLayer it inherits. */
+    const element = (entity: DrawingEntity, layerColor: string): string => {
+        const color = entity.color === undefined ? layerColor : normalizeColor(entity.color);
+        const stroke = entity.color === undefined ? "" : ` stroke="${escapeXml(color)}"`;
         switch (entity.kind) {
             case "line": {
                 const [x1, y1] = at(entity.a);
                 const [x2, y2] = at(entity.b);
-                return `<line x1="${f(x1)}" y1="${f(y1)}" x2="${f(x2)}" y2="${f(y2)}"/>`;
+                return `<line x1="${f(x1)}" y1="${f(y1)}" x2="${f(x2)}" y2="${f(y2)}"${stroke}/>`;
             }
             case "circle": {
                 const [cx, cy] = at(entity.center);
-                return `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(entity.radius)}"/>`;
+                return `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(entity.radius)}"${stroke}/>`;
             }
             case "arc": {
                 const sweep = arcSweep(entity.startAngle, entity.endAngle);
                 const [cx, cy] = at(entity.center);
-                if (sweep >= 360) return `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(entity.radius)}"/>`;
+                if (sweep >= 360)
+                    return `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(entity.radius)}"${stroke}/>`;
                 const point = (deg: number) =>
                     at([
                         entity.center[0] + entity.radius * Math.cos((deg * Math.PI) / 180),
@@ -68,7 +73,7 @@ export function writeSvg(drawing: Drawing, options: SvgOptions = {}): string {
                 const [ex, ey] = point(entity.endAngle);
                 const r = f(entity.radius);
                 // Counter-clockwise with y up is counter-clockwise on screen: sweep-flag 0.
-                return `<path d="M ${f(sx)} ${f(sy)} A ${r} ${r} 0 ${sweep > 180 ? 1 : 0} 0 ${f(ex)} ${f(ey)}"/>`;
+                return `<path d="M ${f(sx)} ${f(sy)} A ${r} ${r} 0 ${sweep > 180 ? 1 : 0} 0 ${f(ex)} ${f(ey)}"${stroke}/>`;
             }
             case "text": {
                 const [tx, ty] = at(entity.position);
@@ -77,7 +82,7 @@ export function writeSvg(drawing: Drawing, options: SvgOptions = {}): string {
                         ? ""
                         : ` transform="rotate(${f(-entity.rotation)} ${f(tx)} ${f(ty)})"`;
                 return (
-                    `<text x="${f(tx)}" y="${f(ty)}" font-size="${f(entity.height)}" fill="${color}" stroke="none"` +
+                    `<text x="${f(tx)}" y="${f(ty)}" font-size="${f(entity.height)}" fill="${escapeXml(color)}" stroke="none"` +
                     ` text-anchor="middle" dominant-baseline="middle"${rotation}>${escapeXml(entity.text)}</text>`
                 );
             }

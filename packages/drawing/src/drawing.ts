@@ -20,28 +20,35 @@ export interface DrawingLayer {
     readonly dashed?: boolean;
 }
 
+/**
+ * What every entity carries: its layer, and an optional colour of its own (a CSS hex colour,
+ * DXF group 62) that overrides the layer's; without one it is drawn ByLayer.
+ */
+interface DrawingEntityBase {
+    readonly layer: string;
+    readonly color?: string;
+}
+
 export type DrawingEntity =
-    | { readonly kind: "line"; readonly layer: string; readonly a: Point2; readonly b: Point2 }
-    | {
+    | (DrawingEntityBase & { readonly kind: "line"; readonly a: Point2; readonly b: Point2 })
+    | (DrawingEntityBase & {
           readonly kind: "arc";
-          readonly layer: string;
           readonly center: Point2;
           readonly radius: number;
           /** Degrees in [0, 360); the arc runs counter-clockwise from start to end. */
           readonly startAngle: number;
           readonly endAngle: number;
-      }
-    | { readonly kind: "circle"; readonly layer: string; readonly center: Point2; readonly radius: number }
-    | {
+      })
+    | (DrawingEntityBase & { readonly kind: "circle"; readonly center: Point2; readonly radius: number })
+    | (DrawingEntityBase & {
           readonly kind: "text";
-          readonly layer: string;
           /** The middle of the text. */
           readonly position: Point2;
           readonly height: number;
           /** Degrees, counter-clockwise. */
           readonly rotation: number;
           readonly text: string;
-      };
+      });
 
 export type DrawingUnits = "mm" | "inch";
 
@@ -191,15 +198,137 @@ export function formatNumber(value: number): string {
     return text === "-0" ? "0" : text;
 }
 
+// ------------------------------------------------------------------ Colours and export selection
+
+/** The colour of an entity with neither its own colour nor a known layer. */
+export const DEFAULT_DRAWING_COLOR = "#000000";
+
+/**
+ * A colour as a comparable key: lowercase `#rrggbb` (`#RGB` expands, surrounding space
+ * goes); anything else (a CSS name) is only trimmed and lowercased.
+ */
+export function normalizeColor(color: string): string {
+    const text = color.trim().toLowerCase();
+    const short = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/.exec(text);
+    if (short !== null) return `#${short[1]}${short[1]}${short[2]}${short[2]}${short[3]}${short[3]}`;
+    return text;
+}
+
+/** The AutoCAD colour index (1–8) nearest a hex colour; black and white are both 7. */
+export function nearestAci(color: string): number {
+    const match = /^#([0-9a-f]{6})$/.exec(normalizeColor(color));
+    if (match === null) return 7;
+    const rgb = Number.parseInt(match[1], 16);
+    const channels = [(rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255];
+    const palette: readonly [number, number][] = [
+        [1, 0xff0000],
+        [2, 0xffff00],
+        [3, 0x00ff00],
+        [4, 0x00ffff],
+        [5, 0x0000ff],
+        [6, 0xff00ff],
+        [7, 0xffffff],
+        [7, 0x000000],
+        [8, 0x808080],
+    ];
+    let best = 7;
+    let distance = Number.POSITIVE_INFINITY;
+    for (const [aci, value] of palette) {
+        const d =
+            (((value >> 16) & 255) - channels[0]) ** 2 +
+            (((value >> 8) & 255) - channels[1]) ** 2 +
+            ((value & 255) - channels[2]) ** 2;
+        if (d < distance) {
+            best = aci;
+            distance = d;
+        }
+    }
+    return best;
+}
+
+/**
+ * The colour an entity is drawn in, normalized (`normalizeColor`): its own colour, else its
+ * layer's (ByLayer), else `DEFAULT_DRAWING_COLOR`.
+ */
+export function effectiveColor(entity: DrawingEntity, drawing: Pick<Drawing, "layers">): string {
+    const color =
+        entity.color ??
+        drawing.layers.find((layer) => layer.name === entity.layer)?.color ??
+        DEFAULT_DRAWING_COLOR;
+    return normalizeColor(color);
+}
+
+export interface DrawingColor {
+    /** The normalized colour (`normalizeColor`), the key a `DrawingSelection` lists. */
+    readonly color: string;
+    /** How many entities are drawn in it. */
+    readonly count: number;
+}
+
+/** The colours the drawing's entities are drawn in (`effectiveColor`), in first-seen order. */
+export function drawingColors(drawing: Drawing): DrawingColor[] {
+    const layerColors = new Map(drawing.layers.map((layer) => [layer.name, layer.color]));
+    const counts = new Map<string, number>();
+    for (const entity of drawing.entities) {
+        const color = normalizeColor(entity.color ?? layerColors.get(entity.layer) ?? DEFAULT_DRAWING_COLOR);
+        counts.set(color, (counts.get(color) ?? 0) + 1);
+    }
+    return [...counts].map(([color, count]) => ({ color, count }));
+}
+
+/**
+ * What an export keeps. Each list, when present, keeps only entities that match one of its
+ * values; the lists combine with AND. Absent lists keep everything.
+ */
+export interface DrawingSelection {
+    /** Layer names. */
+    readonly layers?: readonly string[];
+    /** Effective colours (`effectiveColor`); any CSS hex spelling, compared normalized. */
+    readonly colors?: readonly string[];
+}
+
+/**
+ * The drawing with only the selected entities, in order: on a selected layer AND drawn in a
+ * selected colour. Layer records stay for selected layers, except one whose entities the
+ * colour filter removed entirely (an empty layer before the filter stays). The one filter
+ * every export path applies — sketch export, the export dialog and the drawing viewer.
+ */
+export function filterDrawing(drawing: Drawing, selection: DrawingSelection): Drawing {
+    const layers = selection.layers === undefined ? undefined : new Set(selection.layers);
+    const colors = selection.colors === undefined ? undefined : new Set(selection.colors.map(normalizeColor));
+    if (layers === undefined && colors === undefined) return drawing;
+    const layerColors = new Map(drawing.layers.map((layer) => [layer.name, layer.color]));
+    const used = new Set<string>();
+    const removedByColor = new Set<string>();
+    const entities = drawing.entities.filter((entity) => {
+        if (layers !== undefined && !layers.has(entity.layer)) return false;
+        if (colors !== undefined) {
+            const color = normalizeColor(
+                entity.color ?? layerColors.get(entity.layer) ?? DEFAULT_DRAWING_COLOR,
+            );
+            if (!colors.has(color)) {
+                removedByColor.add(entity.layer);
+                return false;
+            }
+        }
+        used.add(entity.layer);
+        return true;
+    });
+    return {
+        ...drawing,
+        layers: drawing.layers.filter(
+            (layer) =>
+                (layers === undefined || layers.has(layer.name)) &&
+                (used.has(layer.name) || !removedByColor.has(layer.name)),
+        ),
+        entities,
+    };
+}
+
 /**
  * The drawing with only the named layers: their entities, in order, and their layer records
  * (an unknown name is ignored). Export dialogs use it to leave construction or notes out.
  */
 export function filterDrawingLayers(drawing: Drawing, names: readonly string[]): Drawing {
-    const wanted = new Set(names);
-    return {
-        ...drawing,
-        layers: drawing.layers.filter((layer) => wanted.has(layer.name)),
-        entities: drawing.entities.filter((entity) => wanted.has(entity.layer)),
-    };
+    return filterDrawing(drawing, { layers: names });
 }

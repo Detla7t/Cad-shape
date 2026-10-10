@@ -7,6 +7,7 @@ import {
     type DrawingTemplate,
     formatDocumentValue,
     I18n,
+    type I18nKeys,
     LENGTH_UNITS,
     Localize,
     PubSub,
@@ -16,12 +17,13 @@ import {
 import {
     type Drawing,
     type DrawingEntity,
+    type DrawingSelection,
     drawingBounds,
-    filterDrawingLayers,
+    filterDrawing,
     type Point2,
     writePdf,
 } from "@chili3d/drawing";
-import { button, div, input, label, option, p, select, span } from "@chili3d/element";
+import { button, dialog, div, h3, input, label, option, p, select, span } from "@chili3d/element";
 import { partStudioNodes, writeDxf, writeSvg } from "@chili3d/parametric";
 import { activeDrawing, type IActiveDrawing, setActiveDrawing } from "../../activeDrawing";
 import {
@@ -42,7 +44,7 @@ import { SHEET_SIZES, type SheetOptions, sheetLayout, sheetSizeNamed } from "../
 import { uniqueElementName } from "../../importers";
 import { labelButton, toolButton } from "../controls";
 import style from "../documents.module.css";
-import { rasterizeDrawing, showExportDrawingDialog } from "../exportDialog";
+import { rasterizeDrawing, selectionControls, showExportDrawingDialog } from "../exportDialog";
 import type { DocumentExport, IDocumentViewer, ViewerContext } from "../viewer";
 
 /**
@@ -559,13 +561,13 @@ export function createDrawingViewer({ node, document, changed }: ViewerContext):
             if (drawing === undefined) throw new Error(I18n.translate("documents.loading"));
             return drawing;
         };
-        // Which layers go into the file: all of them unless the user unticks some (construction,
-        // notes, a colour's layer).
+        // What goes into the file, in every format: all of it unless the user unticks layers
+        // (construction, notes) or colours — one shared filter (`filterDrawing`).
         const chosen = async () => {
             const drawing = current();
-            const names = await chooseLayers(drawing);
-            if (names === undefined) throw new Error(I18n.translate("documents.export.cancelled"));
-            return names.length === drawing.layers.length ? drawing : filterDrawingLayers(drawing, names);
+            const selection = await chooseExportSelection(drawing);
+            if (selection === undefined) throw new Error(I18n.translate("documents.export.cancelled"));
+            return filterDrawing(drawing, selection);
         };
         return [
             {
@@ -590,12 +592,13 @@ export function createDrawingViewer({ node, document, changed }: ViewerContext):
             {
                 label: "documents.export.pdf",
                 extension: ".pdf",
-                produce: async () => writePdf(current(), { title: node.name }),
+                produce: async () => writePdf(await chosen(), { title: node.name }),
             },
             {
                 label: "documents.export.png",
                 extension: ".png",
-                produce: async () => new Uint8Array(await (await rasterizeDrawing(current())).arrayBuffer()),
+                produce: async () =>
+                    new Uint8Array(await (await rasterizeDrawing(await chosen())).arrayBuffer()),
             },
         ];
     };
@@ -666,56 +669,51 @@ export function createDrawingViewer({ node, document, changed }: ViewerContext):
 }
 
 /**
- * A small dialog listing the drawing's layers with a checkbox each (all on); resolves with
- * the ticked names, or undefined when cancelled. A drawing with one layer asks nothing.
+ * A small dialog asking what goes into the file: a checkbox per layer that has entities and
+ * per colour drawn (swatch, name, entity count; all ticked). Resolves with the selection — an
+ * empty one when everything stays ticked or there is nothing to choose — or undefined when
+ * cancelled.
  */
-export function chooseLayers(drawing: Drawing): Promise<string[] | undefined> {
-    if (drawing.layers.length <= 1) return Promise.resolve(drawing.layers.map((layer) => layer.name));
+export function chooseExportSelection(drawing: Drawing): Promise<DrawingSelection | undefined> {
+    const controls = selectionControls(drawing);
+    if (controls.layers.length <= 1 && controls.colors.length <= 1) return Promise.resolve({});
     return new Promise((resolve) => {
-        const dialog = document.createElement("dialog");
-        dialog.setAttribute("aria-label", I18n.translate("documents.export.layers"));
-        dialog.className = style.layerDialog;
-        const title = document.createElement("h3");
-        title.textContent = I18n.translate("documents.export.layers");
-        const list = document.createElement("div");
-        list.className = style.layerChoices;
-        const boxes: HTMLInputElement[] = [];
-        for (const layer of drawing.layers) {
-            const label = document.createElement("label");
-            const box = document.createElement("input");
-            box.type = "checkbox";
-            box.checked = true;
-            box.value = layer.name;
-            boxes.push(box);
-            const swatch = document.createElement("span");
-            swatch.className = style.layerSwatch;
-            swatch.style.background = layer.color;
-            label.append(box, swatch, document.createTextNode(layer.name));
-            list.append(label);
-        }
-        const actions = document.createElement("div");
-        actions.className = style.layerActions;
-        const cancel = document.createElement("button");
-        cancel.type = "button";
-        cancel.textContent = I18n.translate("common.cancel");
-        const ok = document.createElement("button");
-        ok.type = "button";
-        ok.textContent = I18n.translate("common.confirm");
-        ok.className = style.primary;
-        actions.append(cancel, ok);
-        dialog.append(title, list, actions);
-        const finish = (names: string[] | undefined) => {
-            dialog.close();
-            dialog.remove();
-            resolve(names);
+        const section = (titleKey: I18nKeys, rows: readonly { row: HTMLElement }[]) =>
+            rows.length <= 1
+                ? []
+                : [
+                      span({ className: style.exportLabel, textContent: I18n.translate(titleKey) }),
+                      ...rows.map((entry) => entry.row),
+                  ];
+        const cancel = button({ type: "button", textContent: I18n.translate("common.cancel") });
+        const ok = button({
+            type: "button",
+            className: style.primary,
+            textContent: I18n.translate("common.confirm"),
+        });
+        const panel = dialog(
+            { className: style.layerDialog },
+            h3({ textContent: I18n.translate("documents.export.selection") }),
+            div(
+                { className: style.layerChoices },
+                ...section("documents.export.layers", controls.layers),
+                ...section("documents.export.colors", controls.colors),
+            ),
+            div({ className: style.layerActions }, cancel, ok),
+        );
+        panel.setAttribute("aria-label", I18n.translate("documents.export.selection"));
+        const finish = (selection: DrawingSelection | undefined) => {
+            panel.close();
+            panel.remove();
+            resolve(selection);
         };
         cancel.onclick = () => finish(undefined);
-        ok.onclick = () => finish(boxes.filter((box) => box.checked).map((box) => box.value));
-        dialog.addEventListener("cancel", (event) => {
+        ok.onclick = () => finish(controls.selection() ?? {});
+        panel.addEventListener("cancel", (event) => {
             event.preventDefault();
             finish(undefined);
         });
-        document.body.append(dialog);
-        dialog.showModal();
+        document.body.append(panel);
+        panel.showModal();
     });
 }
