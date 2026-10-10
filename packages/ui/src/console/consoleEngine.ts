@@ -5,7 +5,10 @@ import { standardView } from "@chili3d/ai";
 import {
     ANGLE_UNITS,
     type CommandKeys,
+    CommandRecorder,
     CommandStore,
+    canonicalSerializedTypeId,
+    clearRecording,
     download,
     evaluateExpression,
     FolderNode,
@@ -14,12 +17,19 @@ import {
     type I18nKeys,
     type IApplication,
     type IDocument,
+    Id,
     type INode,
+    InternalClassName,
     isFeatureListNode,
     isNodeIcon,
     LENGTH_UNITS,
     PubSub,
+    type RecordedStep,
     ReferencePlaneNode,
+    readRecording,
+    recordingToFeatureScript,
+    replayRecording,
+    Serializer,
     Transaction,
     UNITLESS,
     unitSpecEquals,
@@ -28,12 +38,14 @@ import {
 
 /**
  * The command window's engine (AutoCAD's command line for the Part Studio): typed lines are
- * console commands — LOOKUP, SELECT, SET, VIEW, UNDO/REDO, HELP, HISTORY — or any of the
+ * console commands — LOOKUP, SELECT, SET, VIEW, UNDO/REDO, HELP, HISTORY, RECORD — or any of the
  * application's commands by key or name, and a bare expression previews its value. Every
  * command carries its description, syntax, arguments and examples for the suggestions and the
  * explanation under the input. Mutations go through the normal commands and transactions, so
  * they are undo steps and operation-log events like any other edit; the history keeps every
- * line (with its result) and saves it as a script to replay by hand.
+ * line (with its result) and saves it as a script to replay by hand. RECORD is different: it
+ * records the document's modeling steps themselves (`CommandRecorder` in core), saved with the
+ * document and replayed as one undo step.
  */
 
 export interface ConsoleArgument {
@@ -361,13 +373,16 @@ function formatValue(
 export class ConsoleEngine {
     private readonly entries: ConsoleEntry[] = [];
     private readonly listeners = new Set<() => void>();
-    /** Whether typed lines are kept in the history (RECORD OFF for throwaway tests). */
-    recording = true;
-
     constructor(readonly app: IApplication) {}
 
     get history(): readonly ConsoleEntry[] {
         return this.entries;
+    }
+
+    /** Whether the active document's modeling steps are being recorded (RECORD on/off). */
+    get recording(): boolean {
+        const document = this.app.activeView?.document;
+        return document !== undefined && CommandRecorder.of(document).recording;
     }
 
     onChanged(listener: () => void): () => void {
@@ -417,18 +432,28 @@ export class ConsoleEngine {
         },
         {
             name: "record",
-            kind: "query",
+            kind: "mutation",
             description:
-                "Turns the history on or off: ON keeps every line for the script, OFF runs lines imperatively without keeping them (quick tests, measurements).",
-            syntax: "RECORD [on | off]",
-            examples: ["RECORD off", "RECORD on"],
-            run: (args) => {
-                const mode = args[0]?.toLowerCase();
-                if (mode === "on") this.recording = true;
-                else if (mode === "off") this.recording = false;
-                else if (mode !== undefined) return fail("Use RECORD on or RECORD off.");
-                return ok(`-> Recording ${this.recording ? "on" : "off"}`);
-            },
+                "Records the modeling steps of the open document — each completed command or edit with its parameters and picked references, never queries, previews, selection or undo — into the document, so the recording is saved and opened with it. REPLAY applies it again as one undo step; FEATURESCRIPT writes it to a Feature Studio (best effort, listing what FeatureScript cannot express).",
+            syntax: "RECORD [on | off | status | replay | save | clear | featurescript]",
+            arguments: [
+                { name: "on", description: "Start recording this document's modeling steps." },
+                { name: "off", description: "Stop recording; modeling goes on as usual, unrecorded." },
+                {
+                    name: "status",
+                    description: "Whether it is recording, and the recorded steps (the default).",
+                },
+                { name: "replay", description: "Apply the recorded steps again, as one undoable step." },
+                { name: "save", description: "Save the document, which stores the recording with it." },
+                { name: "clear", description: "Forget the recorded steps." },
+                {
+                    name: "featurescript",
+                    description:
+                        "Write the recording to a new Feature Studio and list what it could not express.",
+                },
+            ],
+            examples: ["RECORD on", "RECORD status", "RECORD replay", "RECORD featurescript", "RECORD off"],
+            run: (args, { document }) => this.record(args[0]?.toLowerCase() ?? "status", document),
         },
     ];
 
@@ -515,11 +540,9 @@ export class ConsoleEngine {
         return `= ${formatValue(document, evaluated.value.value, evaluated.value.unit)}`;
     }
 
-    /** Runs one line; the entry is kept in the history (while recording) and returned. */
+    /** Runs one line; the entry is kept in the history and returned. */
     async run(input: string): Promise<ConsoleEntry> {
         const line = input.trim();
-        // Whether this line is kept is decided before it runs: "RECORD off" itself is kept.
-        const keep = this.recording;
         const context: ConsoleContext = { app: this.app, document: this.app.activeView?.document };
         const tokens = tokenize(line.replace(/^=\s*/, ""));
         const first = tokens[0] ?? "";
@@ -545,7 +568,7 @@ export class ConsoleEngine {
                     : ok(`-> ${preview.slice(2)}`);
         }
         const entry: ConsoleEntry = { time: timeOf(new Date()), input: line, result, kind };
-        if ((keep && result.keep !== false) || result.error !== undefined) this.entries.push(entry);
+        if (result.keep !== false || result.error !== undefined) this.entries.push(entry);
         this.notify();
         return entry;
     }
@@ -572,7 +595,85 @@ export class ConsoleEngine {
         return ok(
             `${command.name.toUpperCase()}: ${command.description}`,
             `Syntax: ${command.syntax}`,
+            ...(command.arguments ?? []).map((argument) => `  ${argument.name}: ${argument.description}`),
             ...(command.examples ?? []).map((example) => `  ${example}`),
+        );
+    }
+
+    private record(action: string, document: IDocument | undefined): ConsoleResult {
+        if (document === undefined) return fail("No document is open.");
+        const recorder = CommandRecorder.of(document);
+        const steps = readRecording(document).steps;
+        switch (action) {
+            case "on":
+                recorder.start();
+                return ok(`-> Recording on (${steps.length} step(s) recorded)`);
+            case "off":
+                recorder.stop();
+                return ok(`-> Recording off (${steps.length} step(s) recorded)`);
+            case "status":
+                return {
+                    lines: [`-> Recording ${recorder.recording ? "on" : "off"}, ${steps.length} step(s)`],
+                    table: {
+                        columns: ["#", "Step", "Changes", "Not recorded"],
+                        rows: steps.map((step, i) => [
+                            String(i + 1),
+                            step.name,
+                            step.changes.map((change) => change.kind).join(", "),
+                            step.unsupported.join("; "),
+                        ]),
+                    },
+                };
+            case "clear":
+                clearRecording(document);
+                return ok(`-> Cleared ${steps.length} step(s)`);
+            case "save":
+                PubSub.default.pub("executeCommand", "doc.save");
+                return ok(`-> Saving the document with its ${steps.length} recorded step(s)`);
+            case "replay": {
+                const replayed = replayRecording(document, steps);
+                if (!replayed.isOk) return fail(replayed.error);
+                const { added, edited, moved, removed, variables, skipped } = replayed.value;
+                return ok(
+                    `-> Replayed ${replayed.value.steps} step(s) as one undo step: ${added} added, ${edited} edited, ${moved} moved, ${removed} removed, ${variables} variable change(s)`,
+                    ...skipped.map((reason) => `   skipped: ${reason}`),
+                );
+            }
+            case "featurescript":
+                return this.recordFeatureScript(document, steps);
+            default:
+                return fail("Use RECORD on, off, status, replay, save, clear or featurescript.");
+        }
+    }
+
+    private recordFeatureScript(document: IDocument, steps: readonly RecordedStep[]): ConsoleResult {
+        if (steps.length === 0) return fail("The recording is empty.");
+        const { source, unsupported } = recordingToFeatureScript(steps);
+        const notes = unsupported.map((reason) => `   not expressible: ${reason}`);
+        if (canonicalSerializedTypeId("FeatureStudioNode") === undefined) {
+            return ok("-> Feature Studios are not loaded; the source:", ...source.split("\n"), ...notes);
+        }
+        const name = I18n.translate("commandRecording.featureStudio");
+        // The studio is the recording's output, not a modeling step of it.
+        const recorder = CommandRecorder.of(document);
+        const wasRecording = recorder.recording;
+        recorder.stop();
+        try {
+            Transaction.execute(document, name, () => {
+                const studio = Serializer.deserializeObject(document, {
+                    [InternalClassName]: "FeatureStudioNode",
+                    id: Id.generate(),
+                    name,
+                    source,
+                }) as INode;
+                document.modelManager.addNode(studio);
+            });
+        } finally {
+            if (wasRecording) recorder.start();
+        }
+        return ok(
+            `-> Feature Studio "${name}": ${steps.length} step(s), ${unsupported.length} change(s) not expressible`,
+            ...notes,
         );
     }
 

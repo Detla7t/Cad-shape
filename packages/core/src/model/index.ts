@@ -3,6 +3,7 @@
 
 export * from "./annotation";
 export * from "./childList";
+export * from "./commandRecording";
 export * from "./component";
 export * from "./componentContext";
 export * from "./componentFolderNode";

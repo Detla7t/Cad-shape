@@ -1,7 +1,16 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { CommandStore, type IApplication, type IView, PubSub } from "@chili3d/core";
+import {
+    CommandRecorder,
+    CommandStore,
+    FolderNode,
+    type IApplication,
+    type IView,
+    PubSub,
+    readRecording,
+    Transaction,
+} from "@chili3d/core";
 import { TestDocument, TestFeatureListNode, TestStepNode } from "@chili3d/core/test-utils";
 import { rs } from "@rstest/core";
 import { ConsoleEngine, parseOptions, tokenize } from "../src/console/consoleEngine";
@@ -28,11 +37,15 @@ function fixture() {
     const view = { document, cameraController: camera, update: () => {} } as unknown as IView;
     const app = { activeView: view } as unknown as IApplication;
     const engine = new ConsoleEngine(app);
+    documents.push(document);
     return { document, sketch, body, engine, camera };
 }
 
+const documents: TestDocument[] = [];
+
 afterEach(() => {
     rs.restoreAllMocks();
+    for (const document of documents.splice(0)) CommandRecorder.of(document).stop();
 });
 
 test("lines tokenize with quotes and split into words and --options", () => {
@@ -175,11 +188,93 @@ test("HELP explains commands; a tool runs through the command service; HISTORY a
     expect(engine.recording).toBe(false);
     await engine.run("lookup sketch");
     await engine.run("record on");
+    expect(engine.recording).toBe(true);
     const history = await engine.run("history");
     const inputs = engine.history.map((entry) => entry.input);
-    expect(inputs).toEqual(["help set", "help", "doc.save", "record off", "history"]);
+    expect(inputs).toEqual([
+        "help set",
+        "help",
+        "doc.save",
+        "record off",
+        "lookup sketch",
+        "record on",
+        "history",
+    ]);
     expect(history.result.table?.columns).toEqual(["#", "Time", "Command", "Result"]);
     expect(engine.script()).toContain("doc.save\n; ");
     expect((await engine.run("history clear")).result.lines).toEqual(["-> Cleared"]);
     expect(engine.history).toHaveLength(0);
+});
+
+test("RECORD records modeling steps, not queries, and replays them as one undo step", async () => {
+    const { document, engine } = fixture();
+    const published: unknown[][] = [];
+    rs.spyOn(PubSub.default, "pub").mockImplementation(((...args: unknown[]) => {
+        published.push(args);
+    }) as typeof PubSub.default.pub);
+    const help = await engine.run("help record");
+    expect(help.result.lines[1]).toBe(
+        "Syntax: RECORD [on | off | status | replay | save | clear | featurescript]",
+    );
+    expect(help.result.lines).toContain("  replay: Apply the recorded steps again, as one undoable step.");
+    expect(help.result.lines).toContain("  RECORD featurescript");
+
+    expect((await engine.run("record on")).result.lines).toEqual(["-> Recording on (0 step(s) recorded)"]);
+    // Queries and previews leave no step.
+    await engine.run("lookup sketch");
+    await engine.run("= width * 2");
+    Transaction.execute(document, "add folder", () => {
+        document.modelManager.addNode(new FolderNode({ document, name: "Fixtures" }));
+    });
+    await engine.run("set width = 25 mm");
+    const steps = readRecording(document).steps;
+    expect(steps).toHaveLength(2);
+    expect(steps[0].name).toBe("add folder");
+    expect(steps[1].changes.map((change) => change.kind)).toEqual(["variables"]);
+
+    const status = await engine.run("record status");
+    expect(status.result.lines).toEqual(["-> Recording on, 2 step(s)"]);
+    expect(status.result.table?.columns).toEqual(["#", "Step", "Changes", "Not recorded"]);
+    expect(status.result.table?.rows.map((row) => [row[0], row[2]])).toEqual([
+        ["1", "add"],
+        ["2", "variables"],
+    ]);
+
+    const undoSteps = document.history.undoCount();
+    const replay = await engine.run("record replay");
+    expect(replay.result.error).toBeUndefined();
+    expect(replay.result.lines).toEqual([
+        "-> Replayed 2 step(s) as one undo step: 1 added, 0 edited, 0 moved, 0 removed, 1 variable change(s)",
+    ]);
+    expect(document.history.undoCount()).toBe(undoSteps + 1);
+    expect(document.modelManager.findNodes((node) => node.name === "Fixtures")).toHaveLength(2);
+    expect(readRecording(document).steps).toHaveLength(2);
+    document.history.undo();
+    expect(document.modelManager.findNodes((node) => node.name === "Fixtures")).toHaveLength(1);
+
+    // Without the parametric package the Feature Studio class is not registered: the source is shown.
+    const featureScript = await engine.run("record featurescript");
+    expect(featureScript.result.lines[0]).toBe("-> Feature Studios are not loaded; the source:");
+    expect(featureScript.result.lines).toContain('        setVariable(context, "width", 25 * millimeter);');
+    expect(featureScript.result.lines).toContain('   not expressible: add folder: add FolderNode "Fixtures"');
+
+    expect((await engine.run("record save")).result.lines).toEqual([
+        "-> Saving the document with its 2 recorded step(s)",
+    ]);
+    expect(published.at(-1)).toEqual(["executeCommand", "doc.save"]);
+
+    expect((await engine.run("record off")).result.lines).toEqual(["-> Recording off (2 step(s) recorded)"]);
+    expect(engine.recording).toBe(false);
+    Transaction.execute(document, "unrecorded", () => {
+        document.modelManager.addNode(new FolderNode({ document, name: "Loose" }));
+    });
+    expect(document.modelManager.findNode((node) => node.name === "Loose")).toBeInstanceOf(FolderNode);
+    expect(readRecording(document).steps).toHaveLength(2);
+
+    expect((await engine.run("record clear")).result.lines).toEqual(["-> Cleared 2 step(s)"]);
+    expect(readRecording(document).steps).toEqual([]);
+    expect((await engine.run("record replay")).result.error).toBe("The recording is empty.");
+    expect((await engine.run("record bogus")).result.error).toBe(
+        "Use RECORD on, off, status, replay, save, clear or featurescript.",
+    );
 });

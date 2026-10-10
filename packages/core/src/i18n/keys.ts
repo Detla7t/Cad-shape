@@ -1475,6 +1475,8 @@ export const I18N_KEYS = [
     "sketch.export.layers",
     "sketch.export.colors",
     "command.view.commandWindow",
+    "commandRecording.replay",
+    "commandRecording.featureStudio",
     "documents.export.layers",
     "documents.export.colors",
     "documents.export.selection",

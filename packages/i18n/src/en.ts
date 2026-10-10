@@ -1357,6 +1357,8 @@ export default {
         "sketch.export.layers": "Layers (comma-separated, empty = all)",
         "sketch.export.colors": "Colors (#rrggbb, comma-separated, empty = all)",
         "command.view.commandWindow": "Command window",
+        "commandRecording.replay": "Replay recording",
+        "commandRecording.featureStudio": "Recorded commands",
         "documents.export.layers": "Layers to export",
         "documents.export.colors": "Colors to export",
         "documents.export.selection": "What to export",

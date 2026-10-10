@@ -51,10 +51,10 @@ Read this file, `AGENTS.md`, and the relevant sections of [the interaction compa
 
 ### Command recording
 
-- [ ] Record modeling commands with their parameters and picked references into a persistent replayable representation and/or generated FeatureScript. Current `RECORD` controls the session log; `HISTORY save` writes text with result comments.
-- [ ] Test a recorded create/edit sequence, document save/reload and replay; verify equivalent geometry and normal undo/redo. Queries and previews must not become modeling features. `RECORD off` must still allow ordinary modeling transactions.
+- [x] Record modeling commands with their parameters and picked references into a persistent replayable representation and/or generated FeatureScript. `CommandRecorder` (`packages/core/src/model/commandRecording.ts`) listens to the document's history while `RECORD on`: each completed undo step becomes one step of node-graph changes (`add` with the serialized nodes — parameters and stored refs included —, `set` of a node property, `remove`, `move`, variable upserts/removals, configuration). They are stored in `document.userData["chili3d.commandRecording"]`, so save/reload keeps them. `RECORD replay` re-applies them as one transaction with fresh, remapped ids; `RECORD featurescript` writes a Feature Studio (plain variables become `setVariable`; everything else is listed as not expressible). `HISTORY` stays the typed-line log.
+- [x] Test a recorded create/edit sequence, document save/reload and replay; verify equivalent geometry and normal undo/redo. Queries and previews must not become modeling features. `RECORD off` must still allow ordinary modeling transactions. Covered by `packages/core/test/commandRecording.test.ts`, `packages/app/test/commandRecording.kernel.test.ts` (OCCT box create + edit → JSON → replay: same volume and bounds, undo/redo) and `packages/ui/test/consoleEngine.test.ts`.
 
-Start in `packages/ui/src/console/consoleEngine.ts`, `commandWindow.tsx`, and their tests. Interactive command dispatch already works; recording must preserve the resulting choices, not just the typed tool name.
+Open: non-node edits (material, document units, review/timeline state) are reported as "not recorded" and skipped; an edit to a node the target lacks is skipped and reported; the RECORD on/off state is per session (only the steps persist); configuration switches are not recorded; FeatureScript export expresses only plain variables, since Chili3d nodes (bodies, sketches, PMI) carry no FeatureScript counterpart.
 
 ### Export selection
 

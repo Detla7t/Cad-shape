@@ -147,6 +147,8 @@ export default {
         "circle.center": "Centro",
         "circle.radius": "Raio",
         "command.act.alignCamera": "Alinhar Câmera",
+        "commandRecording.featureStudio": "Comandos gravados",
+        "commandRecording.replay": "Reproduzir gravação",
         "command.ai.toggleChat": "Assistente IA",
         "command.boolean.common": "Interseção",
         "command.boolean.cut": "Cortar",

@@ -1343,6 +1343,8 @@ export default {
         "sketch.export.layers": "图层（逗号分隔，留空为全部）",
         "sketch.export.colors": "颜色（#rrggbb，逗号分隔，留空为全部）",
         "command.view.commandWindow": "命令窗口",
+        "commandRecording.replay": "重放录制",
+        "commandRecording.featureStudio": "录制的命令",
         "documents.export.layers": "要导出的图层",
         "documents.export.colors": "要导出的颜色",
         "documents.export.selection": "导出内容",
