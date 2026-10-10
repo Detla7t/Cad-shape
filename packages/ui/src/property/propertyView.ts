@@ -82,8 +82,8 @@ export class PropertyView extends HTMLElement {
 
     private addGeometry(nodes: INode[], document: IDocument) {
         const geometries = nodes.filter((x) => x instanceof VisualNode || x instanceof GroupNode);
-        if (geometries.length === 0 || !this.isAllElementsOfTypeFirstElement(geometries)) return;
-        this.addTransform(document, geometries);
+        if (geometries.length === 0) return;
+        if (this.isAllElementsOfTypeFirstElement(geometries)) this.addTransform(document, geometries);
         this.addParameters(geometries, document);
     }
 
@@ -94,16 +94,42 @@ export class PropertyView extends HTMLElement {
         matrix.contenxtPanel.append(new MatrixProperty(document, geometries, style.properties));
     }
 
+    /**
+     * The parameters every selected entity has: those of their nearest common class, so a
+     * mixed selection (a note, a datum and a feature control frame) still edits the properties
+     * their base class declares together.
+     */
     private addParameters(geometries: (VisualNode | GroupNode)[], document: IDocument) {
-        const entities = geometries.filter((x) => x instanceof VisualNode);
-        if (entities.length === 0 || !this.isAllElementsOfTypeFirstElement(entities)) return;
-        const parameters = new Expander(entities[0].display());
-        parameters.contenxtPanel.append(
-            ...PropertyUtils.getProperties(Object.getPrototypeOf(entities[0]), Node.prototype).map((x) =>
-                propertyControl(document, entities, x),
-            ),
-        );
+        if (geometries.length !== geometries.filter((x) => x instanceof VisualNode).length) return;
+        const entities = geometries as VisualNode[];
+        const common = this.nearestCommonPrototype(entities);
+        if (!common) return;
+        const properties = PropertyUtils.getProperties(common, Node.prototype);
+        if (properties.length === 0) return;
+        // a mixed selection is titled by the common class when it names itself (abstract ones may not)
+        const commonDisplay = (common as Partial<VisualNode>).display;
+        const title =
+            this.isAllElementsOfTypeFirstElement(entities) || typeof commonDisplay !== "function"
+                ? entities[0].display()
+                : commonDisplay.call(entities[0]);
+        const parameters = new Expander(title);
+        parameters.contenxtPanel.append(...properties.map((x) => propertyControl(document, entities, x)));
         this.panel.append(parameters);
+    }
+
+    /** The closest prototype on every item's chain, or undefined when they share none. */
+    private nearestCommonPrototype(items: readonly object[]): object | undefined {
+        const chains = items.slice(1).map((item) => {
+            const chain = new Set<object>();
+            for (let proto = Object.getPrototypeOf(item); proto; proto = Object.getPrototypeOf(proto)) {
+                chain.add(proto);
+            }
+            return chain;
+        });
+        for (let proto = Object.getPrototypeOf(items[0]); proto; proto = Object.getPrototypeOf(proto)) {
+            if (chains.every((chain) => chain.has(proto))) return proto;
+        }
+        return undefined;
     }
 
     private addFeatureList(document: IDocument, nodes: INode[]) {

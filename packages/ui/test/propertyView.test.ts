@@ -36,17 +36,20 @@ rs.mock("../src/property/complexPropertyUtils", () => ({
     },
 }));
 
-rs.mock("../src/property/matrixProperty", () => ({
-    MatrixProperty: class extends HTMLElement {
+rs.mock("../src/property/matrixProperty", () => {
+    class MatrixProperty extends HTMLElement {
         constructor(_doc: unknown, _geos: unknown, _cls: string) {
             super();
             this.textContent = "matrix";
         }
-    },
-}));
+    }
+    // happy-dom rejects `new` on unregistered HTMLElement subclasses
+    customElements.define("mock-matrix-property", MatrixProperty);
+    return { MatrixProperty };
+});
 
 // Now import the module under test
-import { type INode, Node } from "@chili3d/core";
+import { type INode, Node, PropertyUtils, VisualNode } from "@chili3d/core";
 import { PropertyView } from "../src/property/propertyView";
 import { mustQuery } from "./_helpers/domHelpers";
 
@@ -354,6 +357,62 @@ describe("PropertyView", () => {
 
             const controls = pv.querySelectorAll(".pv-panel .mock-property-control");
             expect(controls.length).toBe(1);
+        });
+    });
+
+    describe("mixed selections", () => {
+        // the shape of the PMI annotations: kinds of one base class that declares the shared properties
+        class Base extends (VisualNode as unknown as new () => { display(): string }) {
+            override display() {
+                return "annotation.pmi";
+            }
+        }
+        class Note extends Base {
+            override display() {
+                return "annotation.note";
+            }
+        }
+        class Datum extends Base {}
+        class Other extends (VisualNode as unknown as new () => object) {}
+
+        test("show the parameters of the nearest common class, without a transform", () => {
+            const pv = new PropertyView({ className: "test-panel" });
+            const handler = pubSubRecorder.handlers.get("showProperties");
+            expect(handler).toBeDefined();
+            const getProperties = rs.spyOn(PropertyUtils, "getProperties");
+            try {
+                handler!(createMockDocument(), [new Note(), new Datum()] as unknown as INode[]);
+                expect(getProperties).toHaveBeenCalledWith(Base.prototype, Node.prototype);
+            } finally {
+                getProperties.mockRestore();
+            }
+            const expander = mustQuery(pv, "chili-mock-expander");
+            // the mocked getProperties returns two properties: both edit every selected node
+            expect(expander.querySelectorAll(".mock-property-control")).toHaveLength(2);
+            expect(pv.textContent).not.toContain("matrix");
+        });
+
+        test("one kind keeps its own parameters and transform", () => {
+            const pv = new PropertyView({ className: "test-panel" });
+            const handler = pubSubRecorder.handlers.get("showProperties");
+            const getProperties = rs.spyOn(PropertyUtils, "getProperties");
+            try {
+                handler!(createMockDocument(), [new Note(), new Note()] as unknown as INode[]);
+                expect(getProperties).toHaveBeenCalledWith(Note.prototype, Node.prototype);
+            } finally {
+                getProperties.mockRestore();
+            }
+            expect(pv.textContent).toContain("matrix");
+            expect(pv.querySelectorAll("chili-mock-expander .mock-property-control")).toHaveLength(2);
+        });
+
+        test("the nearest common prototype walks up each chain", () => {
+            const pv = new PropertyView({ className: "test-panel" });
+            const common = (items: object[]) => (pv as any).nearestCommonPrototype(items);
+            expect(common([new Note(), new Datum()])).toBe(Base.prototype);
+            expect(common([new Note(), new Note()])).toBe(Note.prototype);
+            expect(common([new Note(), new Other()])).toBe(VisualNode.prototype);
+            expect(common([new Note(), Object.create(null)])).toBeUndefined();
         });
     });
 
