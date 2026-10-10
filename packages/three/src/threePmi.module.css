@@ -19,6 +19,13 @@
     pointer-events: auto;
 }
 
+/* Every part of a frame draws in the annotation's ink. The app's global element rule
+   (span/div take the theme's foreground colour, white in the dark theme) would otherwise
+   win over the ink inherited from the frame and leave white text on the white-backed boxes. */
+.pmi * {
+    color: var(--pmi-color);
+}
+
 .pmi.note {
     flex-direction: column;
     align-items: flex-start;

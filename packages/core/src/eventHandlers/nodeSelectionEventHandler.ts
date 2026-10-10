@@ -4,9 +4,10 @@
 import type { IDocument } from "../document";
 import type { AsyncController, IHistoryRecord } from "../foundation";
 import { Transaction } from "../foundation/transaction";
+import type { XYZ } from "../math";
 import type { INode } from "../model/node";
 import type { INodeFilter } from "../selectionFilter";
-import { ShapeTypes } from "../shape";
+import { type IVertex, ShapeTypes } from "../shape";
 import { selectsSubShapes } from "../subShapeSelection";
 import { type IView, type IVisualObject, type VisualShapeData, VisualStates } from "../visual";
 import { SelectionHandler } from "./selectionEventHandler";
@@ -158,7 +159,10 @@ export class NodeSelectionHandler extends SelectionHandler {
         );
         const own = picks.filter((pick) => pick.owner === visual || (pick.owner.node as INode) === node);
         // A point is the smaller target: when the cursor is on one, it wins over the curve it ends.
-        return own.find((pick) => pick.shape.shapeType === ShapeTypes.vertex) ?? own[0];
+        // The ray reports hits by depth, so among close points (or curves) the one nearest the
+        // cursor is taken, not the first one within the tolerance.
+        const vertices = own.filter((pick) => pick.shape.shapeType === ShapeTypes.vertex);
+        return nearestToPointer(view, vertices.length > 0 ? vertices : own, event.offsetX, event.offsetY);
     }
 
     protected override cleanHighlights(): void {
@@ -193,4 +197,52 @@ export class NodeSelectionHandler extends SelectionHandler {
             if (detected) this.highlightDetecteds(view, [detected]);
         }
     }
+}
+
+/** The pick closest to the pointer: on screen when the view projects, else by world distance to its ray. */
+function nearestToPointer(
+    view: IView,
+    picks: VisualShapeData[],
+    x: number,
+    y: number,
+): VisualShapeData | undefined {
+    if (picks.length < 2) return picks[0];
+    let nearest = picks[0];
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    for (const pick of picks) {
+        const distance = pointerDistance(view, pick, x, y);
+        if (distance < nearestDistance) {
+            nearest = pick;
+            nearestDistance = distance;
+        }
+    }
+    return nearest;
+}
+
+function pointerDistance(view: IView, pick: VisualShapeData, x: number, y: number): number {
+    const anchor = pickAnchor(pick);
+    if (anchor === undefined) return Number.POSITIVE_INFINITY;
+    if (typeof view.worldToScreen === "function") {
+        const screen = view.worldToScreen(anchor);
+        return Math.hypot(screen.x - x, screen.y - y);
+    }
+    if (typeof view.rayAt === "function") {
+        const ray = view.rayAt(x, y);
+        const direction = ray.direction.normalize();
+        if (direction === undefined) return Number.POSITIVE_INFINITY;
+        return anchor.sub(ray.point).cross(direction).length();
+    }
+    return Number.POSITIVE_INFINITY;
+}
+
+/**
+ * Where a pick lies: a vertex at its own point (a point hit's `point` is the nearest point on
+ * the ray, so the cursor itself), anything else at the hit point on it.
+ */
+function pickAnchor(pick: VisualShapeData): XYZ | undefined {
+    const shape = pick.shape as Partial<IVertex>;
+    if (pick.shape.shapeType === ShapeTypes.vertex && typeof shape.point === "function") {
+        return pick.transform.ofPoint(shape.point());
+    }
+    return pick.point;
 }

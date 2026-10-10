@@ -65,6 +65,7 @@ import { CSS2DObject, CSS2DRenderer } from "three/examples/jsm/renderers/CSS2DRe
 import { CameraController } from "./cameraController";
 import { Constants } from "./constants";
 import { renderModelThumbnail } from "./modelThumbnail";
+import { preferSmallerTargets } from "./pickPriority";
 import { FULL_QUALITY, QualityController, type QualityLevel } from "./renderQuality";
 import { ThreeRefSegmentAnnotation } from "./threeAnnotation";
 import { ThreeGeometry } from "./threeGeometry";
@@ -299,6 +300,7 @@ export class ThreeView extends Observable implements IView {
     }
 
     override disposeInternal(): void {
+        this.pmiDrag?.end();
         this.cancelFrame();
         if (this.settleTimer !== undefined) clearTimeout(this.settleTimer);
         this.settleTimer = undefined;
@@ -440,7 +442,10 @@ export class ThreeView extends Observable implements IView {
         const object = new CSS2DObject(label.build());
         object.position.set(label.position.x, label.position.y, label.position.z);
         object.center.set(label.center.x, label.center.y);
-        if (label.annotation !== undefined) this.wirePmiDrag(object.element, label.annotation);
+        if (label.annotation !== undefined) {
+            this.wirePmiDrag(object.element, label.annotation);
+            if (this.pmiDrag?.annotation === label.annotation) object.element.dataset["dragging"] = "true";
+        }
         if (label.beforeRender) {
             const beforeRender = label.beforeRender;
             object.onBeforeRender = (renderer, _scene, camera) => {
@@ -452,15 +457,23 @@ export class ThreeView extends Observable implements IView {
         return object;
     }
 
+    /** The annotation whose frame is being dragged, and how to end that drag (view disposal). */
+    private pmiDrag?: { annotation: PmiAnnotation; end: () => void };
+
     /**
      * Dragging a frame moves the annotation's frame point in the view plane (a general note,
      * anchorless, moves whole), at the depth it already has; a locked annotation stays. The
      * moves during the drag bypass the history, and the release records the whole move as
-     * one undo step.
+     * one undo step (none when it ends where it began; a cancelled pointer puts it back).
+     *
+     * Every move bumps the annotation's revision, so `syncPmiLabels` replaces the frame that
+     * took the pointerdown (and its pointer capture) with a new one mid-drag; the move and
+     * release are therefore followed on the frame's document, in the capture phase (frames
+     * stop their own pointerup from bubbling), never on the frame element itself.
      */
     private wirePmiDrag(element: HTMLElement, annotation: PmiAnnotation): void {
         element.addEventListener("pointerdown", (event: PointerEvent) => {
-            if (event.button !== 0 || annotation.locked) return;
+            if (event.button !== 0 || annotation.locked || this.pmiDrag !== undefined) return;
             const host = this.dom ?? this.renderer.domElement;
             const rect = host.getBoundingClientRect();
             if (!(rect.width > 0 && rect.height > 0)) return;
@@ -478,47 +491,80 @@ export class ThreeView extends Observable implements IView {
             };
             const startWorld = toWorld(event.clientX, event.clientY);
             const start = { x: event.clientX, y: event.clientY };
+            const pointerId = event.pointerId;
+            const target = element.ownerDocument;
             let moved = false;
             const history = this.document.history;
             const wasDisabled = history.disabled;
+            const setSilently = (position: XYZ, anchor: XYZ) => {
+                history.disabled = true;
+                try {
+                    annotation.position = position;
+                    if (!annotation.hasLeader) annotation.anchor = anchor;
+                } finally {
+                    history.disabled = wasDisabled;
+                }
+            };
             const move = (ev: PointerEvent) => {
+                if (ev.pointerId !== pointerId) return;
                 if (!moved && Math.hypot(ev.clientX - start.x, ev.clientY - start.y) < 3) return;
                 moved = true;
-                element.dataset["dragging"] = "true";
-                history.disabled = true;
+                ev.stopPropagation();
+                this.markPmiDragging(annotation, true);
                 const delta = toWorld(ev.clientX, ev.clientY).sub(startWorld);
-                annotation.position = origin.add(delta);
-                if (!annotation.hasLeader) annotation.anchor = originAnchor.add(delta);
-                history.disabled = wasDisabled;
+                setSilently(origin.add(delta), originAnchor.add(delta));
                 this.update();
             };
-            const up = () => {
-                element.removeEventListener("pointermove", move);
-                element.removeEventListener("pointerup", up);
-                element.removeEventListener("pointercancel", up);
-                delete element.dataset["dragging"];
+            const finish = (commit: boolean) => {
+                target.removeEventListener("pointermove", move, true);
+                target.removeEventListener("pointerup", up, true);
+                target.removeEventListener("pointercancel", cancel, true);
+                this.pmiDrag = undefined;
+                this.markPmiDragging(annotation, false);
                 if (!moved) return;
                 const final = annotation.position;
                 const finalAnchor = annotation.anchor;
-                history.disabled = true;
-                annotation.position = origin;
-                annotation.anchor = originAnchor;
-                history.disabled = wasDisabled;
-                Transaction.execute(this.document, "annotation.move", () => {
-                    annotation.position = final;
-                    if (!annotation.hasLeader) annotation.anchor = finalAnchor;
-                });
+                setSilently(origin, originAnchor);
+                const changed =
+                    !final.isEqualTo(origin) ||
+                    (!annotation.hasLeader && !finalAnchor.isEqualTo(originAnchor));
+                if (commit && changed) {
+                    Transaction.execute(this.document, "annotation.move", () => {
+                        annotation.position = final;
+                        if (!annotation.hasLeader) annotation.anchor = finalAnchor;
+                    });
+                }
                 this.update();
             };
+            const up = (ev: PointerEvent) => {
+                if (ev.pointerId !== pointerId) return;
+                if (moved) ev.stopPropagation();
+                finish(true);
+            };
+            const cancel = (ev: PointerEvent) => {
+                if (ev.pointerId === pointerId) finish(false);
+            };
+            this.pmiDrag = { annotation, end: () => finish(false) };
             try {
-                element.setPointerCapture?.(event.pointerId);
+                element.setPointerCapture?.(pointerId);
             } catch {
                 /* synthetic pointers have no capture */
             }
-            element.addEventListener("pointermove", move);
-            element.addEventListener("pointerup", up);
-            element.addEventListener("pointercancel", up);
+            target.addEventListener("pointermove", move, true);
+            target.addEventListener("pointerup", up, true);
+            target.addEventListener("pointercancel", cancel, true);
         });
+    }
+
+    /** Flags the annotation's current frames (rebuilt ones too, see `pmiLabel`) as dragging. */
+    private markPmiDragging(annotation: PmiAnnotation, dragging: boolean): void {
+        for (const entry of this.pmiLabels.values()) {
+            for (const object of entry.objects) {
+                if (object.element.dataset["nodeId"] !== annotation.id) continue;
+                if (dragging) object.element.dataset["dragging"] = "true";
+                else delete object.element.dataset["dragging"];
+            }
+        }
     }
 
     private dropPmiLabels(objects: CSS2DObject[]): void {
@@ -1385,7 +1431,10 @@ export class ThreeView extends Observable implements IView {
             }
         });
         visuals = visuals.filter((x) => x !== undefined && x !== null);
-        return this.initRaycaster(mx, my).intersectObjects(visuals, false);
+        const hits = this.initRaycaster(mx, my).intersectObjects(visuals, false);
+        // A curve or point drawn on a plane or face wins over it, half a pixel off still counting as on.
+        const pixel = this.pixelSize();
+        return preferSmallerTargets(hits, Number.isFinite(pixel) ? Math.max(1e-3, pixel / 2) : 1e-3);
     }
 
     private findIntersectedShapes(shapeType: ShapeType, mx: number, my: number) {

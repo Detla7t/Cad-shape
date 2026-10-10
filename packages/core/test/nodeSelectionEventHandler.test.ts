@@ -7,9 +7,12 @@ import {
     AsyncController,
     Matrix4,
     NodeSelectionHandler,
+    Ray,
     ShapeTypes,
     Transaction,
     VisualStates,
+    XY,
+    XYZ,
 } from "../src";
 import {
     createMockHighlighter,
@@ -795,6 +798,53 @@ describe("a node that selects its parts (a sketch's curves)", () => {
         handler.pointerDown(view, createPointerEvent({ button: 0, offsetX: 10, offsetY: 10 }));
         handler.pointerUp(view, createPointerEvent({ button: 0, offsetX: 10, offsetY: 10 }));
         expect(setSelectedShapes).toHaveBeenCalledWith([vertex], VisualStates.edgeSelected, true);
+    });
+
+    function closeSketchPoints() {
+        const setup = setupNodeSelectionHandler();
+        const visual = createMockVisualObject();
+        const sketch = {
+            ...createMockNode("Sketch 1"),
+            selectsSubShapes: ShapeTypes.edge | ShapeTypes.vertex,
+        } as INode;
+        setup.nodesByVisual.set(visual, sketch);
+        // Reported by depth along the ray, the farther point (from the cursor) first.
+        const vertexAt = (index: number, at: XYZ) => ({
+            shape: { shapeType: ShapeTypes.vertex, point: () => at },
+            owner: { node: sketch },
+            indexes: [index],
+            transform: Matrix4.identity(),
+            point: new XYZ(10, 10, 0),
+        });
+        const far = vertexAt(3, new XYZ(13, 10, 0));
+        const near = vertexAt(4, new XYZ(11, 10, 0));
+        setup.view.detectVisual = () => [visual];
+        setup.view.detectShapes = rs.fn(() => [far, near]);
+        return { ...setup, visual, far, near };
+    }
+
+    test("among close points the one nearest the cursor on screen is taken", () => {
+        const { handler, view, addCalls, selection, visual, near } = closeSketchPoints();
+        view.worldToScreen = (point: XYZ) => new XY(point.x, point.y);
+        const setSelectedShapes = rs.spyOn(selection, "setSelectedShapes");
+        handler.pointerMove(view, createPointerEvent({ buttons: 0, offsetX: 10, offsetY: 10 }));
+        expect(addCalls.at(-1)).toEqual({
+            shape: visual,
+            state: VisualStates.edgeHighlight,
+            type: ShapeTypes.vertex,
+            indexes: [4],
+        });
+        handler.pointerDown(view, createPointerEvent({ button: 0, offsetX: 10, offsetY: 10 }));
+        handler.pointerUp(view, createPointerEvent({ button: 0, offsetX: 10, offsetY: 10 }));
+        expect(setSelectedShapes).toHaveBeenCalledWith([near], VisualStates.edgeSelected, true);
+    });
+
+    test("without screen projection the point nearest the pointer ray is taken", () => {
+        const { handler, view, addCalls } = closeSketchPoints();
+        view.worldToScreen = undefined as unknown as typeof view.worldToScreen;
+        view.rayAt = () => new Ray({ point: new XYZ(10, 10, 50), direction: new XYZ(0, 0, -1) });
+        handler.pointerMove(view, createPointerEvent({ buttons: 0, offsetX: 10, offsetY: 10 }));
+        expect(addCalls.at(-1)?.indexes).toEqual([4]);
     });
 
     test("picked parts gather click by click; a click into the void clears them as an undo step", () => {

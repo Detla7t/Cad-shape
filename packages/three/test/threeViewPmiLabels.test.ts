@@ -106,6 +106,19 @@ describe("ThreeView PMI labels", () => {
 describe("ThreeView PMI dragging", () => {
     const pointer = (type: string, x: number, y: number) =>
         new PointerEvent(type, { bubbles: true, clientX: x, clientY: y, button: 0, pointerId: 1 });
+    /** Syncs the view's labels and connects their elements, as the CSS2D renderer does on render. */
+    const render = (view: TestView) => {
+        view["syncPmiLabels"]();
+        const objects = view["labelScene"].children.filter((x) => x instanceof CSS2DObject) as CSS2DObject[];
+        for (const object of objects) {
+            if (!object.element.isConnected) document.body.append(object.element);
+        }
+        return objects.map((x) => x.element).filter((e) => e.dataset["nodeId"] !== undefined);
+    };
+
+    afterEach(() => {
+        document.body.replaceChildren();
+    });
 
     test("dragging a frame moves the annotation's frame point in the view plane as one undo step", () => {
         const context = createThreeMockVisualContext();
@@ -120,10 +133,7 @@ describe("ThreeView PMI dragging", () => {
             });
             const visual = new ThreePmiAnnotation(context, note);
             context.visualShapes.add(visual);
-            view["syncPmiLabels"]();
-            const frame = (
-                view["labelScene"].children.filter((x) => x instanceof CSS2DObject) as CSS2DObject[]
-            )[0].element;
+            const frame = render(view)[0];
             const undos = doc.history.undoCount();
             frame.dispatchEvent(pointer("pointerdown", 50, 50));
             frame.dispatchEvent(pointer("pointermove", 51, 50)); // under the drag threshold
@@ -170,12 +180,7 @@ describe("ThreeView PMI dragging", () => {
             });
             context.visualShapes.add(new ThreePmiAnnotation(context, general));
             context.visualShapes.add(new ThreePmiAnnotation(context, locked));
-            view["syncPmiLabels"]();
-            const frames = (
-                view["labelScene"].children.filter((x) => x instanceof CSS2DObject) as CSS2DObject[]
-            )
-                .map((x) => x.element)
-                .filter((e) => e.dataset["kind"] === "note");
+            const frames = render(view);
             const generalFrame = frames.find((e) => e.textContent === "GENERAL")!;
             const lockedFrame = frames.find((e) => e.textContent === "LOCKED")!;
             generalFrame.dispatchEvent(pointer("pointerdown", 50, 50));
@@ -188,6 +193,81 @@ describe("ThreeView PMI dragging", () => {
             lockedFrame.dispatchEvent(pointer("pointerup", 80, 50));
             expect(locked.position.isEqualTo(p(10, 0, 0))).toBe(true);
             expect(lockedFrame.dataset["dragging"]).toBeUndefined();
+        } finally {
+            view.dispose();
+        }
+    });
+
+    test("the drag survives its frame being rebuilt mid-drag and the release records one undo step", () => {
+        const context = createThreeMockVisualContext();
+        const doc = new TestDocument();
+        const view = new TestView(doc, context);
+        try {
+            const note = new PmiNote({
+                document: doc,
+                anchor: p(0, 0, 0),
+                position: p(10, 0, 0),
+                text: "NOTE",
+            });
+            context.visualShapes.add(new ThreePmiAnnotation(context, note));
+            const first = render(view)[0];
+            const undos = doc.history.undoCount();
+            first.dispatchEvent(pointer("pointerdown", 50, 50));
+            first.dispatchEvent(pointer("pointermove", 60, 50));
+            // the move bumped the revision: the next render replaces the frame under the pointer
+            const second = render(view)[0];
+            expect(second).not.toBe(first);
+            expect(first.isConnected).toBe(false);
+            expect(second.dataset["dragging"]).toBe("true");
+            second.dispatchEvent(pointer("pointermove", 70, 40));
+            const during = note.position;
+            expect(during.x).toBeGreaterThan(note.anchor.x + 10);
+            const third = render(view)[0];
+            expect(doc.history.undoCount()).toBe(undos);
+            third.dispatchEvent(pointer("pointerup", 70, 40));
+            expect(third.dataset["dragging"]).toBeUndefined();
+            expect(note.position.isEqualTo(during)).toBe(true);
+            expect(doc.history.undoCount()).toBe(undos + 1);
+            // the drag is over: later moves do nothing
+            third.dispatchEvent(pointer("pointermove", 90, 90));
+            expect(note.position.isEqualTo(during)).toBe(true);
+            doc.history.undo();
+            expect(note.position.isEqualTo(p(10, 0, 0))).toBe(true);
+        } finally {
+            view.dispose();
+        }
+    });
+
+    test("a drag that ends where it began, or is cancelled, records nothing", () => {
+        const context = createThreeMockVisualContext();
+        const doc = new TestDocument();
+        const view = new TestView(doc, context);
+        try {
+            const note = new PmiNote({
+                document: doc,
+                anchor: p(0, 0, 0),
+                position: p(10, 0, 0),
+                text: "NOTE",
+            });
+            context.visualShapes.add(new ThreePmiAnnotation(context, note));
+            const undos = doc.history.undoCount();
+            let frame = render(view)[0];
+            frame.dispatchEvent(pointer("pointerdown", 50, 50));
+            frame.dispatchEvent(pointer("pointermove", 70, 50));
+            frame = render(view)[0];
+            frame.dispatchEvent(pointer("pointermove", 50, 50));
+            frame = render(view)[0];
+            frame.dispatchEvent(pointer("pointerup", 50, 50));
+            expect(note.position.isEqualTo(p(10, 0, 0))).toBe(true);
+            expect(doc.history.undoCount()).toBe(undos);
+
+            frame = render(view)[0];
+            frame.dispatchEvent(pointer("pointerdown", 50, 50));
+            frame.dispatchEvent(pointer("pointermove", 80, 50));
+            frame = render(view)[0];
+            frame.dispatchEvent(pointer("pointercancel", 80, 50));
+            expect(note.position.isEqualTo(p(10, 0, 0))).toBe(true);
+            expect(doc.history.undoCount()).toBe(undos);
         } finally {
             view.dispose();
         }
