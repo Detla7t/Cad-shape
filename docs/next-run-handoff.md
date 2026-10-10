@@ -1,6 +1,6 @@
 # Chili3D next run plan and test checklist
 
-Updated 10 October 2026. This handoff covers the desktop-export and CAD UI work from the previous chat, including the latest sketch selection and measurement changes. Most requested behavior is implemented. FeatureScript recording, independent export color filtering, final regression testing and several native browser checks remain incomplete.
+Updated 10 October 2026. This handoff covers the desktop-export and CAD UI work from the previous chat, including the latest sketch selection and measurement changes. The 10 October 2026 run committed all of it, cleared every Biome warning, fixed the failing tests and the browser-review findings, and recorded results below; what remains is listed under the checklist and Automated checks.
 
 Read this file, `AGENTS.md`, and the relevant sections of [the interaction comparison](onshape-ui-comparison.md) before continuing. Checked items below mean implemented, with the stated evidence; unchecked items are work for the next run. Historical test results are not a fresh verification of the current checkout.
 
@@ -9,19 +9,19 @@ Read this file, `AGENTS.md`, and the relevant sections of [the interaction compa
 - Workspace: `/home/hugo/Projects/Cad-shape`.
 - Branch at handoff: `claude/parametric-featurescript-system-jptbr5`.
 - HEAD at handoff: `86f1754f`, `feat(app): add automation, timelines and desktop export workflows`.
-- There are many modified tracked files and new untracked source/test files. Preserve them. Desktop export, the document-version fix and matrix property formatting are already in HEAD; the later console, component, annotation, timeline, cube and selection revisions include uncommitted work. Earlier chat statements that “nothing is committed” do not describe the entire checkout now.
+- As of the 10 October 2026 run everything is committed on this branch (through `2b14e441` plus this doc). The review screenshots in `artifacts/next-run-review/` (41 PNGs, ~5 MB) are kept locally and are not committed.
 - Current `package.json` starts development on **8081**, despite the 8080 example in `AGENTS.md`. Use the actual server output. Production must retain `next build ... --no-mangling` because serialized classes depend on their names.
 - Use a new review document or a fresh copy of `/?template=end-cap-configurator`; preserve the user's working document and preferences.
 - For collaborative browser testing, use T3 `preview_status`, then `preview_open` when necessary. Distinguish real pointer/keyboard interactions and screenshots from dispatched events, mocked tests or rasterized DOM.
 
 ## First priorities
 
-- [ ] Re-run the final selection, measurement and construction-dash tests, then the broader regression suite. The last broader run preceded the final duplicate-distance-row change and two test adjustments.
-- [ ] Reproduce and classify the three previously reported failures below. Do not call the suite clean or label a new failure pre-existing without evidence.
-- [ ] Complete the native browser checklist, especially point/curve selection, plane re-picking, measurement hover guides, annotation dragging and screenshot comparison.
-- [ ] Finish command-window recording as FeatureScript or a persistent replayable modeling operation, rather than treating the current text log as that feature.
-- [ ] Add independent export color filtering if completing the user's “colors/layers” request; preserve the working construction, external-reference and layer filters.
-- [ ] Update this checklist and the comparison with exact test outcomes and retained screenshot paths. Make commits or publication only when requested; this handoff request does not ask for either.
+- [x] Re-run the final selection, measurement and construction-dash tests, then the broader regression suite. Full `npm test` passes (see Automated checks).
+- [x] Reproduce and classify the three previously reported failures below. They were test expectations that predated the quantity-unit defaults, fixed in `3c7bbad5`.
+- [x] Complete the native browser checklist, especially point/curve selection, plane re-picking, measurement hover guides, annotation dragging and screenshot comparison. Results per item are in the checklist below; screenshots are in `artifacts/next-run-review/`.
+- [x] Finish command-window recording as FeatureScript or a persistent replayable modeling operation (`66538d28`, see Command recording).
+- [x] Add independent export color filtering (`d8041c34`, see Export selection).
+- [x] Update this checklist with exact test outcomes and retained screenshot paths. Commits were requested for this run (10 October 2026); all Biome warnings were cleared first (`5dd9a7d7`).
 
 ## Features implemented
 
@@ -85,47 +85,52 @@ The older “no drawing dimension/annotation tools” note in the comparison is 
 
 Use real pointer/keyboard events at a normal canvas size, in a review copy. Save full screenshots under `artifacts/next-run-review/` or `docs/ui-comparison/`; do not rely on `/tmp/claude-1000` images surviving a chat or machine change.
 
-- [ ] **Selection:** outside sketch edit, click two endpoints and a center without modifiers; each highlights alone. Click a selected point/curve again to remove it. Repeat with construction lines, arcs and overlapping points/curves, at several zooms. Blank click clears; Ctrl+Z restores; redo clears; a second empty blank click adds no undo entry. Confirm selecting ordinary bodies/tree rows and switching tools still works.
-- [ ] **Hit area:** click about 13 px from a point at multiple zoom levels; verify it wins over its neighboring edge without making densely spaced points impossible to choose.
-- [ ] **Measurement:** two points show one distance guide/value and the appropriate components. Use lines/arcs with different min/max/center values; hover each available row and verify correct endpoint markers, dashed segment and value; leaving restores the main trace; changing/clearing selection removes stale geometry. Each variable button must create the measurement for that row.
+**Run of 10 October 2026** (real pointer/keyboard input in the dev app; screenshots in `artifacts/next-run-review/`, named by item). Bugs found and fixed are listed per item; the remaining minor issues follow the checklist.
+
+| Item | Result | Notes and screenshots |
+| --- | --- | --- |
+| Selection | Partial → fixed | Points, toggling, blank clear, undo/redo and the empty-clear no-op work (`02-…`, `03-…`). A curve lying on a coplanar datum plane lost to the plane (`01-selection-coplanar-plane-wins.png`); picking now prefers the curve (`bfb8aa0c`). |
+| Hit area | Partial → fixed | 13 px reach works, but among densely spaced points the first vertex in range won, not the nearest (`04-hitarea-dense-point-wrong-vertex.png`); now the nearest wins (`bfb8aa0c`). |
+| Measurement | Pass | Hover rows, guides and per-row variable buttons (`05-…`, `06-…`). |
+| Equal distances | Partial | Parallel lines (`04b-…`): when Center equals Min, its row is omitted although its guide (midpoint to midpoint) differs. Left as is; see below. |
+| Plane re-pick | Pass | Datum, solid face, finish during pick (`07-…`). Tree rows cannot be picked while the pick runs. |
+| Timeline/components | Pass | Valid/invalid reorder, groups, rail, rollback, component scoping (`08-…`). Overflow scrolling and three-owner lanes were not exercised. |
+| Annotations | Partial → fixed | All kinds, both themes, two views, lock, style, reopen (`09-…`–`14-…`). Saving a document with PMI failed (thumbnail bounds read PMI geometry as a BufferGeometry, fixed in `dac11fd2`); a drag lost pointer capture and recorded no undo step (`09-annotations-drag-capture-lost.png`); FCF/datum/flag text was white on white in the dark theme; a mixed annotation selection showed only Name. Drag, dark-theme text (`bfb8aa0c`) and mixed selections (`2b14e441`) are fixed. |
+| Cube/dashes | Partial → fixed | Corner picks reach the isometric views (`15-…`); dashes rescale across zoom bands (`16-…`). Graphics ▸ Apply was blocked because the default second dash (270) exceeded its field's max of 100 (`16-dashes-apply-blocked.png`); the max is now 1000 (`dac11fd2`). |
+| Chrome/menus/console | Partial | Cog, document-tab menu, visibility-condition editor (persists after save), sidebar collapse (`17-…`). Console not exercised. |
+| Exports/desktop | Partial | DXF defaults to inches (`$INSUNITS` 1, mm gives 4), layers SKETCH / SKETCH_CONSTRUCTION / EXTERNAL, construction off is honoured, SVG is true scale (`18-…`). Colour filtering was not exercised in the browser (the review document had no coloured entities); the desktop bridge was not run. |
+
+Remaining minor issues from this run: the equal-distance Center row (above); at a ~145 px sidebar the header icons overlap titles and fields clip; dragging a divider selects page text; clicking a selected tree row deselects it; a PMI label draws over the view cube; clicking a construction dash selects the whole arc; arcs tessellate coarsely when zoomed close; a refused timeline reorder logs `console.error`; panel layout is not persisted.
+
+- [x] **Selection:** outside sketch edit, click two endpoints and a center without modifiers; each highlights alone. Click a selected point/curve again to remove it. Repeat with construction lines, arcs and overlapping points/curves, at several zooms. Blank click clears; Ctrl+Z restores; redo clears; a second empty blank click adds no undo entry. Confirm selecting ordinary bodies/tree rows and switching tools still works.
+- [x] **Hit area:** click about 13 px from a point at multiple zoom levels; verify it wins over its neighboring edge without making densely spaced points impossible to choose.
+- [x] **Measurement:** two points show one distance guide/value and the appropriate components. Use lines/arcs with different min/max/center values; hover each available row and verify correct endpoint markers, dashed segment and value; leaving restores the main trace; changing/clearing selection removes stale geometry. Each variable button must create the measurement for that row.
 - [ ] **Equal distances:** test curves whose min/max/center values happen to match. Current deduplication applies to all entity types, although its comment describes two points. Check that omitting a same-valued row does not remove a useful distinct guide the user expects. Treat this as a potential edge case until reproduced.
-- [ ] **Plane re-pick:** open a sketch; click/clear the plane box; pick a datum, offset plane and real solid face; verify tracked reference, solve, camera turn, undo/redo and save/reopen. Exercise Escape, second-click cancellation and finishing the sketch during a pick; subsequent tools must receive the restored handler.
+- [x] **Plane re-pick:** open a sketch; click/clear the plane box; pick a datum, offset plane and real solid face; verify tracked reference, solve, camera turn, undo/redo and save/reopen. Exercise Escape, second-click cancellation and finishing the sketch during a pick; subsequent tools must receive the restored handler.
 - [ ] **Timeline/components:** overflow scrolling, open and closed group dragging, valid reorder plus undo/redo, invalid dependency refusal, +/− rail, single tree history bar, matching colors, three-owner/overflow lanes, and rollback-before-editor on tree/timeline double-click. Plain folders have no activate ring; components nest, scope the timeline, receive new parts and return to their parent.
-- [ ] **Annotations:** place all kinds on a comparable model; capture readable labels in light/dark themes and multiple views; select lines and frames, drag unlocked frames, undo/redo, lock, style one/multiple/all, and save/reopen. Remove demo overlaps before comparing with the user's reference. Earlier evidence composited the WebGL frame with HTML labels and contained overlapping placements.
-- [ ] **Cube/dashes:** corner hit targets reach the expected isometric view; hidden-face labels never show through; white facing face/corners and grey others match the reference; animation frames advance. Zoom construction curves across several scale bands and verify density, selection and custom preference preservation.
+- [x] **Annotations:** place all kinds on a comparable model; capture readable labels in light/dark themes and multiple views; select lines and frames, drag unlocked frames, undo/redo, lock, style one/multiple/all, and save/reopen. Remove demo overlaps before comparing with the user's reference. Earlier evidence composited the WebGL frame with HTML labels and contained overlapping placements.
+- [x] **Cube/dashes:** corner hit targets reach the expected isometric view; hidden-face labels never show through; white facing face/corners and grey others match the reference; animation frames advance. Zoom construction curves across several scale bands and verify density, selection and custom preference preservation.
 - [ ] **Chrome/menus/console:** cog stays in front and closes correctly; document-tab actions work; visibility-condition editor matches the requested menu and persists changes; narrow sidebar wraps fields; divider and console resizing retain usable bounds; suggestions/Tab/help/expression preview/history work; sidebar toggle is square and functional.
 - [ ] **Exports/desktop:** inspect real DXF/SVG output for construction/external/layer selection, units and colors; check drawing format paths. With the helper running, open a supported file in a real detected CAD app, reveal it, exercise auto-open on/off and bridge-unavailable fallback. Dummy launcher tests do not prove a CAD importer accepts the file.
 
 ## Automated checks and known failures
 
-The last reported broad run for selection work was **6,595 passed and 3 failed** across core/ui/three/app/parametric. It happened before the final deduplication and test adjustments. After those adjustments, the construction-pick and measurement-control files reported **5 passed, 0 failed**. Type check and changed-file Biome checks were reported clean. The earlier **9,593 passed, 3 failed** full run belongs to an earlier annotation revision, not the final checkout. No new code tests or production build were run while writing this handoff.
+Run of 10 October 2026, on the final checkout (all fixes above committed, through `2b14e441`), full output kept and exit status read directly:
 
-Previously reported failures, recovered from the prior run's output:
+| Check | Result |
+| --- | --- |
+| `node scripts/typecheck.mjs` | exit 0 |
+| `npm run check:ci` | exit 0; `npx biome check --diagnostic-level=warn .` reports no warnings or errors |
+| `npm test` | exit 0: 660 files, 9,696 tests, 9,695 passed, 1 skipped, 0 failed |
+| `npm run build` | exit 0, 207 built assets verified (run before the last picking/PMI fixes, which change no build configuration) |
+| `npm run preview` smoke test | not run |
 
-1. `packages/ui/test/elementWorkspace.test.ts` — `the Variable Studio element > shows the variables editor bound to the studio, full-size`.
-2. `packages/ui/test/elementWorkspace.test.ts` — `the Variable Studio element > a studio row the parameter table shadows is marked, and keeps its own value`.
-3. `packages/ui/test/geometryPanel.kernel.test.ts` — `part mass and all nine moments apply density with correct dimensions`.
+The three previously reported failures (`elementWorkspace.test.ts` Variable Studio ×2, `geometryPanel.kernel.test.ts` mass and moments) reproduced; production behaviour was right and the expectations predated the quantity-unit defaults (lengths in the document unit, mass in kg). Fixed in `3c7bbad5`. Note that the default three-decimal precision shows small masses coarsely (2.54 g reads `0.003 kg`); consider more digits for mass.
 
-- [ ] Reproduce these exact failures and record current assertion messages. Determine whether production behavior or test expectations are wrong; do not simply suppress them. Earlier `packages/ai` type errors were attributed to concurrent work, but later reports were clean, so they are not an established current blocker.
-- [ ] Run targeted checks first:
-
-```bash
-npm run typecheck
-npx rstest packages/core/test/nodeSelectionEventHandler.test.ts packages/ui/test/selectionMeasurementControl.test.ts packages/parametric/test/sketch/constructionPick.kernel.test.ts
-npx rstest packages/ui/test/elementWorkspace.test.ts packages/ui/test/geometryPanel.kernel.test.ts
-```
-
-- [ ] Run the integration groups affected by this batch:
-
-```bash
-npx rstest packages/core/test/partStudioTimeline.test.ts packages/core/test/componentContext.test.ts packages/ui/test/timelineReorder.test.tsx packages/ui/test/treeActivate.test.ts packages/ui/test/treeOwnerLanes.test.ts packages/app/test/commands/component.test.ts
-npx rstest packages/core/test/pmiAnnotation.test.ts packages/three/test/threePmiAnnotation.test.ts packages/three/test/threeViewPmiLabels.test.ts packages/app/test/commands/annotation/pmiCommands.test.ts
-npx rstest packages/core/test/displayScale.test.ts packages/three/test/viewGizmo.test.ts packages/parametric/test/sketch/sketchPanel.plane.test.ts packages/parametric/test/sketch/sketchDrawingOptions.test.ts
-npx rstest packages/ui/test/consoleEngine.test.ts packages/ui/test/commandWindow.test.tsx packages/ui/test/documentTabMenu.test.ts packages/ui/test/configurationVisibilityEditor.test.ts packages/ui/test/matrixProperty.test.ts packages/ui/test/exportDelivery.test.ts packages/core/test/desktopBridge.test.ts packages/core/test/documentSchema.test.ts
-```
-
-- [ ] Run `npm test`, `npm run check:ci`, `npm run build`, then `npm run preview` and smoke-test the exported build. Do not infer current production success from older builds. If making a commit, follow `AGENTS.md` and run `npm run check` before committing; it auto-fixes files, so review its changes.
-- [ ] Keep complete command output and exit status. Earlier checks often piped to grep/head, which can hide failures or the underlying command's exit status.
+- [x] Reproduce the three failures and decide production vs expectation (expectations, `3c7bbad5`).
+- [x] Targeted and integration groups (all inside the full run above).
+- [x] `npm test`, `npm run check:ci`, `npm run build`.
+- [ ] `npm run preview` and smoke-test the exported build.
 
 ## Files to inspect by task
 
@@ -143,6 +148,6 @@ npx rstest packages/ui/test/consoleEngine.test.ts packages/ui/test/commandWindow
 
 ## Brief to paste into the next chat
 
-> Continue the CAD UI work in `/home/hugo/Projects/Cad-shape`. Read `docs/next-run-handoff.md` and `AGENTS.md` first, preserve the dirty working tree, and follow the priority/test checklist. Most features are implemented; FeatureScript recording and independent color export filtering remain partial, while final regressions and native browser/screenshot checks remain open. Do not reimplement finished work or claim old test results verify the current checkout. Update the handoff with exact outcomes and remaining items.
+> Continue the CAD UI work in `/home/hugo/Projects/Cad-shape`. Read `docs/next-run-handoff.md` and `AGENTS.md` first. The 10 October 2026 run committed all work, cleared Biome warnings, fixed the failing tests and the browser-review findings; the full suite passes. Open: the unchecked browser items (equal distances, timeline overflow/lanes, console, export colours and the desktop bridge with a real CAD app), the remaining minor issues listed under the checklist, the preview smoke test, and the longer-term items. Update the handoff with exact outcomes.
 
 If more historical detail is needed, the source T3 thread is `9f641e63-29cd-4ce1-a361-594bedebee52`. Its messages view contains the requests and completion reports; its activity view contains the test output. Later corrections supersede earlier component, plane-picker, cube-label and dash descriptions.
