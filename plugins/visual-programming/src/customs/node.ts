@@ -5,6 +5,10 @@ import type { ClassicScheme } from "@retejs/lit-plugin";
 import { css, html, LitElement } from "lit";
 
 type NodeExtraData = { width?: number; height?: number };
+type SchemeNode = ClassicScheme["Node"];
+type InputEntry = [string, SchemeNode["inputs"][string]];
+type OutputEntry = [string, SchemeNode["outputs"][string]];
+type ControlEntry = [string, SchemeNode["controls"][string]];
 
 export class CustomNodeElement extends LitElement {
     static override get properties() {
@@ -19,8 +23,8 @@ export class CustomNodeElement extends LitElement {
     declare width: number;
     declare height: number;
     declare data: (ClassicScheme["Node"] & NodeExtraData) | undefined;
-    declare styles: ((props: any) => any) | null;
-    declare emit: ((type: string, payload: any) => void) | null;
+    declare styles: ((props: unknown) => unknown) | null;
+    declare emit: ((type: string, payload: unknown) => void) | null;
 
     static override styles = css`
         :host {
@@ -137,7 +141,7 @@ export class CustomNodeElement extends LitElement {
         }
     `;
 
-    sortByIndex(entries: any[]) {
+    sortByIndex(entries: [string, { index?: number } | undefined][]) {
         entries.sort((a, b) => {
             const ai = a[1]?.index || 0;
             const bi = b[1]?.index || 0;
@@ -158,7 +162,7 @@ export class CustomNodeElement extends LitElement {
     }
 
     override render() {
-        if (!this.data || !this.data.id || !this.data.label) {
+        if (!this.data?.id || !this.data.label) {
             return html`<div></div>`;
         }
         if (this.data.selected) {
@@ -175,7 +179,7 @@ export class CustomNodeElement extends LitElement {
                     width: ${Number.isFinite(width) ? `${width}px` : "var(--node-width)"};
                     height: ${Number.isFinite(height) ? `${height}px` : "fit-content"};
                 }
-                ${this.styles && this.styles(this)}
+                ${this.styles?.(this)}
             </style>
             <div class="title">${label}</div>
             <div class="content">
@@ -192,8 +196,8 @@ export class CustomNodeElement extends LitElement {
             `;
     }
 
-    private control(controls: any): unknown {
-        return controls.map(([key, control]: any) =>
+    private control(controls: ControlEntry[]): unknown {
+        return controls.map(([key, control]) =>
             control
                 ? html`
                     <span class="control" data-testid="${`control-${key}`}">
@@ -207,8 +211,8 @@ export class CustomNodeElement extends LitElement {
         );
     }
 
-    private input(inputs: any, id: string): unknown {
-        return inputs.map(([key, input]: any) =>
+    private input(inputs: InputEntry[], id: string): unknown {
+        return inputs.map(([key, input]) =>
             input
                 ? html` <div class="input" key=${key}>
                             <span class="input-socket" data-testid="input-socket">
@@ -245,8 +249,8 @@ export class CustomNodeElement extends LitElement {
         );
     }
 
-    private output(outputs: any, id: string): unknown {
-        return outputs.map(([key, output]: any) =>
+    private output(outputs: OutputEntry[], id: string): unknown {
+        return outputs.map(([key, output]) =>
             output
                 ? html` <div class="output" key=${key}>
                     <div class="output-title">${output?.label}</div>

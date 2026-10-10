@@ -8,7 +8,7 @@ import style from "./radioGroup.module.css";
 export class RadioGroup extends HTMLElement {
     constructor(
         readonly header: string,
-        readonly context: SelectableItems<any>,
+        readonly context: SelectableItems<string>,
     ) {
         super();
         this.appendChild(this.render());

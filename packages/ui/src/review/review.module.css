@@ -183,6 +183,9 @@
     display: grid;
     grid-template-columns: 108px minmax(0, 1fr);
 }
+.analysisMenu small {
+    font-size: 10px;
+}
 .geometryPanel label small {
     grid-column: 1 / -1;
 }
@@ -203,9 +206,6 @@
 .analysisMenu button:disabled {
     opacity: 0.6;
     cursor: default;
-}
-.analysisMenu small {
-    font-size: 10px;
 }
 .toolbar [role="tab"][aria-selected="true"] {
     border-bottom: 2px solid var(--primary-color, #1651b0);

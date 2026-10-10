@@ -22,11 +22,25 @@ type RawUsage = {
     cache_creation_input_tokens?: number;
 };
 
+/** A streamed content block, as far as this provider reads it. */
+type RawContentBlock =
+    | { type: "tool_use"; id: string; name: string }
+    | { type: "thinking"; thinking?: string }
+    | { type: "redacted_thinking"; data: string };
+
+/** A streamed delta, as far as this provider reads it (`message_delta` carries only the stop reason). */
+type RawDelta =
+    | { type: "text_delta"; text: string }
+    | { type: "input_json_delta"; partial_json: string }
+    | { type: "thinking_delta"; thinking: string }
+    | { type: "signature_delta"; signature: string }
+    | { type?: undefined; stop_reason?: string };
+
 type RawStreamEvent = {
     type: string;
     index?: number;
-    content_block?: any;
-    delta?: any;
+    content_block?: RawContentBlock;
+    delta?: RawDelta;
     message?: { usage?: RawUsage };
     usage?: RawUsage;
 };
@@ -60,8 +74,8 @@ export class AnthropicProvider implements LLMProvider {
                 max_tokens: 64000,
                 thinking: { type: "adaptive" },
                 system: systemBlocks(opts.system),
-                messages: messages as any,
-                tools: opts.tools.map(toTool) as any,
+                messages: messages as Anthropic.MessageParam[],
+                tools: opts.tools.map(toTool),
                 disable_parallel_tool_use: true,
             },
             { signal: opts.signal },
@@ -125,7 +139,7 @@ export function markConversationTail(messages: MessageParam[]): void {
         return;
     }
 
-    const blocks = last.content as any[] | undefined;
+    const blocks = last.content as Record<string, unknown>[] | undefined;
     if (!Array.isArray(blocks) || blocks.length === 0) return;
     blocks[blocks.length - 1] = { ...blocks[blocks.length - 1], cache_control: TAIL_CACHE_CONTROL };
 }
@@ -152,7 +166,8 @@ export function* convertEvent(e: RawStreamEvent, state: StreamState): Iterable<S
         state.usage = toUsage(e.message?.usage);
     } else if (e.type === "message_delta") {
         // The real stop reason (end_turn / tool_use / max_tokens) only appears here.
-        if (e.delta?.stop_reason) state.stopReason = e.delta.stop_reason;
+        if (e.delta && "stop_reason" in e.delta && e.delta.stop_reason)
+            state.stopReason = e.delta.stop_reason;
         // Output tokens are only final here; the input and cache counts came from message_start.
         if (state.usage && typeof e.usage?.output_tokens === "number") {
             state.usage.outputTokens = e.usage.output_tokens;
@@ -206,8 +221,12 @@ function finishBlock(index: number, state: StreamState): StreamEvent | undefined
     return undefined;
 }
 
-function toTool(t: Tool): any {
-    return { name: t.name, description: t.description, input_schema: t.parameters };
+function toTool(t: Tool): Anthropic.Tool {
+    return {
+        name: t.name,
+        description: t.description,
+        input_schema: t.parameters as Anthropic.Tool.InputSchema,
+    };
 }
 
 export function toMessages(messages: ChatMessage[]): MessageParam[] {
@@ -247,8 +266,8 @@ function toAssistantMessage(m: ChatMessage & { role: "assistant" }): MessagePara
 function appendToolResult(out: MessageParam[], m: ChatMessage & { role: "tool" }): void {
     const resultContent = m.images?.length ? imageContent(m.content, m.images) : m.content;
     const last = out[out.length - 1];
-    const blocks = last?.content as any[] | undefined;
-    if (last?.role === "user" && Array.isArray(blocks) && blocks.every((b) => b.type === "tool_result")) {
+    const blocks = last?.content as Record<string, unknown>[] | undefined;
+    if (last?.role === "user" && Array.isArray(blocks) && blocks.every((b) => b["type"] === "tool_result")) {
         blocks.push({ type: "tool_result", tool_use_id: m.toolCallId, content: resultContent });
     } else {
         out.push({

@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 declare module "*.module.css" {
+    // biome-ignore lint/suspicious/noExplicitAny: class names are unknowable here and an index signature would break dot access under noPropertyAccessFromIndexSignature
     const classes: any;
     export default classes;
 }

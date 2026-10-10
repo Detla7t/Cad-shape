@@ -17,25 +17,25 @@ export class Logger {
         return LEVEL_PRIORITY[Logger.level] <= LEVEL_PRIORITY[level];
     }
 
-    static debug(message?: any, ...optionalParams: any[]) {
+    static debug(message?: unknown, ...optionalParams: unknown[]) {
         if (Logger.isEnabled("debug")) {
             console.debug(message, ...optionalParams);
         }
     }
 
-    static info(message?: any, ...optionalParams: any[]) {
+    static info(message?: unknown, ...optionalParams: unknown[]) {
         if (Logger.isEnabled("info")) {
             console.log(message, ...optionalParams);
         }
     }
 
-    static warn(message?: any, ...optionalParams: any[]) {
+    static warn(message?: unknown, ...optionalParams: unknown[]) {
         if (Logger.isEnabled("warn")) {
             console.warn(message, ...optionalParams);
         }
     }
 
-    static error(message?: any, ...optionalParams: any[]) {
+    static error(message?: unknown, ...optionalParams: unknown[]) {
         if (Logger.isEnabled("error")) {
             console.error(message, ...optionalParams);
         }

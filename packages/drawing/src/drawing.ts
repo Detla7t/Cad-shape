@@ -73,6 +73,8 @@ export function convertDrawing(drawing: Drawing, units: DrawingUnits): Drawing {
                 return { ...entity, center: p(entity.center), radius: entity.radius * factor };
             case "text":
                 return { ...entity, position: p(entity.position), height: entity.height * factor };
+            default:
+                return entity;
         }
     });
     return { ...drawing, units, entities };

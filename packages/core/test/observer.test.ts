@@ -54,7 +54,7 @@ test("should notify when a property changes", () => {
     let callCount = 0;
     let changedProperty: string | undefined;
     let changedSource: IPropertyChanged | undefined;
-    t.onPropertyChanged((p, s, o) => {
+    t.onPropertyChanged((p, s, _o) => {
         callCount++;
         changedProperty = p;
         changedSource = s;
@@ -68,7 +68,7 @@ test("should notify when a property changes", () => {
 test("deep observer", () => {
     const c = new TestClassC();
     let targetProperty: string | undefined;
-    const onPropertyChanged = (p: string, s: IPropertyChanged, o: any) => {
+    const onPropertyChanged = (p: string, _s: IPropertyChanged, _o: any) => {
         targetProperty = p;
     };
     const a = new TestClassA();

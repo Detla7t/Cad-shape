@@ -116,7 +116,7 @@ export class PropertyView extends HTMLElement {
         this.panel.append(features);
     }
 
-    private isAllElementsOfTypeFirstElement(arr: any[]): boolean {
+    private isAllElementsOfTypeFirstElement(arr: readonly object[]): boolean {
         if (arr.length <= 1) {
             return true;
         }

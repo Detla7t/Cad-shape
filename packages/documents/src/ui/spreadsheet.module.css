@@ -191,10 +191,6 @@
     min-width: 28px;
     padding: 0 5px;
 }
-.sheet .toolbar button:disabled {
-    opacity: 0.35;
-    cursor: default;
-}
 .sheet .toolbar select {
     border: 0;
     border-radius: 0;
@@ -749,4 +745,8 @@
 }
 .referenceLayer div[data-hot] {
     border-style: dashed;
+}
+.sheet .toolbar button:disabled {
+    opacity: 0.35;
+    cursor: default;
 }

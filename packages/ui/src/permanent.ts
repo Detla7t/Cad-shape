@@ -6,7 +6,7 @@ import { div, span } from "@chili3d/element";
 import style from "./permanent.module.css";
 
 export class Permanent {
-    static async show(action: () => Promise<void>, message: I18nKeys, ...args: any[]) {
+    static async show(action: () => Promise<void>, message: I18nKeys, ...args: unknown[]) {
         const dialog = document.createElement("dialog");
         dialog.appendChild(
             div(

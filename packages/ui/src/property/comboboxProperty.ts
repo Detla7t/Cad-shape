@@ -5,7 +5,7 @@ import { type Combobox, I18n, type IDocument, Localize, type Property, Transacti
 import { div, option, select, span } from "@chili3d/element";
 import commonStyle from "./common.module.css";
 import style from "./input.module.css";
-import { PropertyBase } from "./propertyBase";
+import { asPropertyHosts, PropertyBase } from "./propertyBase";
 
 /**
  * A property that offers a fixed list of values (`Property.combobox`) edits through a
@@ -17,12 +17,12 @@ export class ComboboxProperty extends PropertyBase {
 
     constructor(
         readonly document: IDocument,
-        objects: any[],
+        objects: readonly object[],
         readonly property: Property,
-        readonly combobox: Combobox<any>,
+        readonly combobox: Combobox<unknown>,
     ) {
-        super(objects);
-        const current = objects[0][property.name];
+        super(asPropertyHosts(objects));
+        const current = this.objects[0][property.name];
         this.select = select(
             {
                 className: style.box,

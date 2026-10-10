@@ -10,6 +10,7 @@ import {
     GeometryNode,
     GroupNode,
     type INode,
+    type IPropertyChanged,
     type IShapeFilter,
     type IVisual,
     type IVisualContext,
@@ -60,6 +61,9 @@ import { ThreePmiAnnotation } from "./threePmiAnnotation";
 import { ThreeReferencePlane } from "./threeReferencePlane";
 import { GroupVisualObject, ThreeComponentObject, ThreeMeshObject } from "./threeVisualObject";
 
+/** A three.js material (or core material) read and written by property path. */
+type ThreeMaterialProperties = Record<string, unknown>;
+
 export class ThreeVisualContext implements IVisualContext {
     private readonly _visualNodeMap = new Map<IVisualObject, INode>();
     private readonly _NodeVisualMap = new Map<INode, IVisualObject & Object3D>();
@@ -104,40 +108,48 @@ export class ThreeVisualContext implements IVisualContext {
         material?.dispose();
     }
 
-    private readonly onMaterialPropertyChanged = (path: string, source: any) => {
-        const material: any = this.materialMap.get(source?.id);
-        if (!material) return;
+    private readonly onMaterialPropertyChanged = (path: string, source: IPropertyChanged) => {
+        const id = (source as Partial<Material> | undefined)?.id;
+        const threeMaterial = id === undefined ? undefined : this.materialMap.get(id);
+        if (!threeMaterial) return;
+        const material = threeMaterial as unknown as ThreeMaterialProperties;
 
         const { isOk, value } = DeepObserver.getPathValue(source, path);
         if (!isOk) return;
 
         if (path === "color") {
-            material.color.set(value);
+            (material["color"] as { set(value: unknown): void }).set(value);
         } else if (!path.includes(".")) {
             material[path] = value instanceof Texture ? ThreeHelper.loadTexture(value) : value;
             if (path === "opacity") {
                 material["transparent"] = value < 1;
             }
         } else {
-            this.setTextureValue(source, material, path, value);
+            this.setTextureValue(source as unknown as ThreeMaterialProperties, material, path, value);
         }
     };
 
-    private setTextureValue(material: any, threeMaterial: any, path: string, value: any) {
+    private setTextureValue(
+        material: ThreeMaterialProperties,
+        threeMaterial: ThreeMaterialProperties,
+        path: string,
+        value: unknown,
+    ) {
         const paths = path.split(".");
-        if (path.endsWith(".image") && material[paths[0]] instanceof Texture && paths[0] in threeMaterial) {
-            threeMaterial[paths[0]] = ThreeHelper.loadTexture(material[paths[0]]);
+        const texture = material[paths[0]];
+        if (path.endsWith(".image") && texture instanceof Texture && paths[0] in threeMaterial) {
+            threeMaterial[paths[0]] = ThreeHelper.loadTexture(texture);
             return;
         }
 
         let obj = threeMaterial;
         for (let i = 0; i < paths.length - 1; i++) {
-            obj = obj[paths[i]];
+            obj = obj[paths[i]] as ThreeMaterialProperties;
         }
         if (obj === undefined) return;
 
         if (value instanceof XY) {
-            obj[paths.at(-1)!].set(value.x, value.y);
+            (obj[paths.at(-1)!] as { set(x: number, y: number): void }).set(value.x, value.y);
         } else {
             obj[paths.at(-1)!] = value;
         }
@@ -175,12 +187,14 @@ export class ThreeVisualContext implements IVisualContext {
         this.visualShapes.traverse((x) => {
             if (isDisposable(x)) x.dispose();
         });
-        this.visual.document.modelManager.materials.forEach((x) =>
-            x.removePropertyChanged(this.onMaterialPropertyChanged),
-        );
+        this.visual.document.modelManager.materials.forEach((x) => {
+            x.removePropertyChanged(this.onMaterialPropertyChanged);
+        });
         this.visual.document.modelManager.materials.removeCollectionChanged(this.onMaterialCollectionChanged);
         this.visual.document.modelManager.removeNodeObserver(this.handleNodeChanged);
-        this.materialMap.forEach((x) => x.dispose());
+        for (const material of this.materialMap.values()) {
+            material.dispose();
+        }
         this.materialMap.clear();
         this.visualShapes.clear();
         this.tempShapes.clear();
@@ -208,7 +222,9 @@ export class ThreeVisualContext implements IVisualContext {
 
     visuals(): IVisualObject[] {
         const shapes: IVisualObject[] = [];
-        this.visualShapes.children.forEach((x) => this._getVisualObject(shapes, x));
+        for (const child of this.visualShapes.children) {
+            this._getVisualObject(shapes, child);
+        }
         return shapes;
     }
 
@@ -246,7 +262,9 @@ export class ThreeVisualContext implements IVisualContext {
     private _getVisualObject(visuals: Array<IVisualObject>, obj: Object3D) {
         const group = obj as Group;
         if (group.type === "Group") {
-            group.children.forEach((x) => this._getVisualObject(visuals, x));
+            for (const child of group.children) {
+                this._getVisualObject(visuals, child);
+            }
         } else if (
             obj instanceof ThreeGeometry ||
             obj instanceof ThreeMeshObject ||
@@ -301,8 +319,8 @@ export class ThreeVisualContext implements IVisualContext {
         const group = this.tempShapes.getObjectById(id) as Group;
         if (!group) return;
 
-        group.children.forEach((mesh: any) => {
-            (mesh.material as MeshLambertMaterial).color.setHex(color);
+        group.children.forEach((mesh) => {
+            ((mesh as Mesh).material as MeshLambertMaterial).color.setHex(color);
         });
     }
 
@@ -386,7 +404,7 @@ export class ThreeVisualContext implements IVisualContext {
         if (oldParent === node.parent) return;
 
         const parentNode = this._NodeVisualMap.get(oldParent) ?? this.visualShapes;
-        const newParentNode = (this._NodeVisualMap.get(node.parent!) as any) ?? this.visualShapes;
+        const newParentNode = this._NodeVisualMap.get(node.parent!) ?? this.visualShapes;
         if (parentNode === newParentNode) {
             return;
         }

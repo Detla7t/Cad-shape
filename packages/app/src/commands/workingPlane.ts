@@ -50,7 +50,7 @@ export class SetWorkplane implements ICommand {
     private ui(vm: WorkingPlaneViewModel) {
         return div(
             ...PropertyUtils.getProperties(vm).map((x) => {
-                const value = (vm as any)[x.name];
+                const value = (vm as unknown as Record<string, unknown>)[x.name];
                 if (value instanceof SelectableItems) {
                     return new RadioGroup(I18n.translate(x.display), value);
                 }

@@ -8,7 +8,6 @@ import {
     type IDocument,
     type INode,
     type IShape,
-    type Serialized,
     ShapeNode,
     ShapeTypes,
 } from "@chili3d/core";

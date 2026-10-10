@@ -453,8 +453,8 @@ export class FsContext {
             this.bodies.push(body);
             return body;
         });
-        faces.forEach((face) => face.dispose());
-        edges.forEach((edge) => edge.dispose());
+        for (const face of faces) face.dispose();
+        for (const edge of edges) edge.dispose();
         return bodies;
     }
 
@@ -752,7 +752,7 @@ function hostParts(shape: IShape): IShape[] | undefined {
         return undefined;
     const count = (owner: IShape, type: ShapeType) => {
         const items = owner.findSubShapes(type);
-        items.forEach((item) => item.dispose());
+        for (const item of items) item.dispose();
         return items.length;
     };
     const solids = shape.findSubShapes(ShapeTypes.solid);
@@ -767,7 +767,7 @@ function hostParts(shape: IShape): IShape[] | undefined {
         solidFaces !== count(shape, ShapeTypes.face) ||
         solidEdges !== count(shape, ShapeTypes.edge)
     ) {
-        solids.forEach((solid) => solid.dispose());
+        for (const solid of solids) solid.dispose();
         return undefined;
     }
     return solids;

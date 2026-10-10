@@ -98,7 +98,9 @@ export function referencesInSnapshot(snapshot: UsageSnapshot, target: ReviewTarg
         ) => {
             const value = parsed(input);
             if (Array.isArray(value)) {
-                value.forEach((item, index) => walk(item, `${path}[${index}]`, documentId, feature, link));
+                value.forEach((item, index) => {
+                    walk(item, `${path}[${index}]`, documentId, feature, link);
+                });
             } else if (value && typeof value === "object") {
                 const obj = value as Properties;
                 const sourceDoc = typeof obj["documentId"] === "string" ? obj["documentId"] : documentId;

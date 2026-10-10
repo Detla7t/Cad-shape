@@ -395,7 +395,6 @@ describe("findSegments (via highlightDetecteds)", () => {
             point: new XYZ({ x: clickParam ?? 0, y: 0, z: 0 }),
         } as unknown as VisualShapeData;
 
-        // biome-ignore lint/suspicious/noExplicitAny: protected members accessed via test helper
         (handler as any).highlightDetecteds(view, [detected]);
 
         intersectsSpy.mockRestore();

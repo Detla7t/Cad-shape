@@ -40,14 +40,14 @@ export function sweepFaces(
             for (const vec of vecsOf(face)) {
                 const shape = shapeFactory.prism(sweptFace, vec);
                 if (!shape.isOk) {
-                    shapes.forEach((x) => x.dispose());
+                    for (const x of shapes) x.dispose();
                     return Result.err(shape.error);
                 }
                 shapes.push(shape.value);
             }
         }
     } finally {
-        owned.forEach((x) => x.dispose());
+        for (const x of owned) x.dispose();
     }
     return fuseProfiles(shapes);
 }
@@ -74,7 +74,7 @@ export function fuseProfiles(shapes: IShape[]): Result<IShape> {
     if (shapes.length > 1 && anyPairTouches(shapes)) {
         const fused = shapeFactory.booleanFuse([shapes[0]], shapes.slice(1), true);
         if (fused.isOk) {
-            shapes.forEach((x) => x.dispose());
+            for (const x of shapes) x.dispose();
             return Result.ok(fused.value);
         }
     }

@@ -36,7 +36,7 @@ export class ObjectTracking extends TrackingBase {
 
     getTrackingRays(view: IView) {
         const result: ObjectTrackingAxis[] = [];
-        this.trackings.get(view.document)?.map((x) => {
+        this.trackings.get(view.document)?.forEach((x) => {
             const plane = ViewUtils.ensurePlane(view, view.workplane);
             const axes = Axis.getAxiesAtPlane(x.snap.point!, plane, this.trackingZ);
             result.push({ axes, objectName: x.snap.info, snapType: x.snap.type });

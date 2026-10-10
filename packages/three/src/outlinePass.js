@@ -148,7 +148,7 @@ class OutlinePass extends Pass {
         this.textureMatrix.multiply(this.renderCamera.matrixWorldInverse);
     }
 
-    render(renderer, writeBuffer, readBuffer, deltaTime, maskActive) {
+    render(renderer, _writeBuffer, readBuffer, _deltaTime, _maskActive) {
         if (this.renderScene.children.length > 0) {
             renderer.getClearColor(this._oldClearColor);
             this.oldClearAlpha = renderer.getClearAlpha();
@@ -254,7 +254,7 @@ class OutlinePass extends Pass {
         });
 
         let idCounter = 0;
-        result.onBeforeRender = (renderer, scene, camera, geometry, object, group) => {
+        result.onBeforeRender = (_renderer, _scene, _camera, _geometry, _object, _group) => {
             result.uniforms.id.value = idCounter;
             result.uniformsNeedUpdate = true;
             idCounter += 100;

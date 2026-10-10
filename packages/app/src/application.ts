@@ -90,8 +90,12 @@ export class Application extends Observable implements IApplication {
         this.dataExchange = option.dataExchange;
         this.mainWindow = option.mainWindow;
         this.pluginManager = new PluginManager(this);
-        this.services.forEach((x) => x.register(this));
-        this.services.forEach((x) => x.start());
+        this.services.forEach((x) => {
+            x.register(this);
+        });
+        this.services.forEach((x) => {
+            x.start();
+        });
         this.initEvents();
     }
 
@@ -105,7 +109,9 @@ export class Application extends Observable implements IApplication {
 
     private readonly onVisualConfigChanged = (property: keyof VisualItemConfig) => {
         if (property === "defaultEdgeColor") {
-            this.views.forEach((x) => x.update());
+            this.views.forEach((x) => {
+                x.update();
+            });
         }
     };
 
@@ -292,7 +298,7 @@ export class Application extends Observable implements IApplication {
             // The extension picks the loader, so drop any query (`model.chili3d?raw=1`).
             const path = url.split(/[?#]/)[0];
             const filename = path.substring(path.lastIndexOf("/") + 1);
-            if (!filename || !filename.includes(".")) {
+            if (!filename?.includes(".")) {
                 throw new Error(`No file name in url: ${url}`);
             }
 

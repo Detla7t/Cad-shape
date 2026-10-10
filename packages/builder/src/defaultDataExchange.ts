@@ -214,19 +214,19 @@ export class DefaultDataExchange implements IDataExchange {
         return undefined;
     }
 
-    private exportStl(doc: IDocument, shapes: IShape[], binary: boolean): Result<BlobPart> {
+    private exportStl(_doc: IDocument, shapes: IShape[], binary: boolean): Result<BlobPart> {
         return shapeConverter.convertToSTL(shapes, { binary }) as Result<BlobPart>;
     }
 
-    private exportStep(doc: IDocument, shapes: IShape[]) {
+    private exportStep(_doc: IDocument, shapes: IShape[]) {
         return shapeConverter.convertToSTEP(...shapes);
     }
 
-    private exportIges(doc: IDocument, shapes: IShape[]) {
+    private exportIges(_doc: IDocument, shapes: IShape[]) {
         return shapeConverter.convertToIGES(...shapes);
     }
 
-    private exportBrep(document: IDocument, shapes: IShape[]) {
+    private exportBrep(_document: IDocument, shapes: IShape[]) {
         const comp = shapeFactory.combine(shapes);
         if (!comp.isOk) {
             return Result.err(comp.error);

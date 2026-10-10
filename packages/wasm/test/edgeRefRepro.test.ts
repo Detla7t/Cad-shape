@@ -5,7 +5,7 @@
 // fingerprint from a mesher-range sub-edge (what the picker returns) and re-matches
 // it against a freshly rebuilt prism (what the parametric rebuild does).
 
-import { type IEdge, type IShape, Plane, ShapeTypes, XYZ } from "@chili3d/core";
+import { type IEdge, type IShape, ShapeTypes, XYZ } from "@chili3d/core";
 import { captureEdgeRef, matchEdgeIndexes } from "@chili3d/parametric";
 import { createTestFactory, unwrapOk } from "./helpers";
 import "./setup";

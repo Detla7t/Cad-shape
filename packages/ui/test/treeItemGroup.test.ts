@@ -34,7 +34,6 @@ import "./_helpers/mockCoreBinding";
 import "./_helpers/mockElement";
 
 import { FolderNode } from "@chili3d/core";
-import type { TreeItem } from "../src/project/tree/treeItem";
 import { TreeGroup } from "../src/project/tree/treeItemGroup";
 import { TreeModel } from "../src/project/tree/treeModel";
 

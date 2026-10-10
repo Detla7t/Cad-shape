@@ -92,7 +92,8 @@ export class AngleMeasure extends MultistepCommand {
                 this.stepDatas[0].point!.add(v1.multiply(this.lineLength(point) * ARC_POSITION)),
                 angle,
             )
-            .unchecked()?.mesh.edges!;
+            .unchecked()?.mesh.edges;
+        if (!arc) return [line2, ...meshes];
         arc.lineWidth = 3;
         arc.color = VisualConfig.highlightEdgeColor;
         return [line2, arc, ...meshes];

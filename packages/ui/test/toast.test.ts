@@ -29,7 +29,9 @@ function getToasts(): NodeListOf<HTMLElement> {
 
 function clear() {
     Toast.dismiss();
-    document.body.querySelectorAll("[data-toast]").forEach((el) => el.remove());
+    document.body.querySelectorAll("[data-toast]").forEach((el) => {
+        el.remove();
+    });
 }
 
 describe("Toast", () => {

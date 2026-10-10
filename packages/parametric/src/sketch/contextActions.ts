@@ -17,13 +17,7 @@ import { ParametricBodyNode } from "../parametricBodyNode";
 import { SketchEditor } from "./editor/sketchEditor";
 import { SketchNode } from "./sketchNode";
 
-function editText(
-    node: SketchNode,
-    label: string,
-    value: string,
-    apply: (text: string) => void,
-    multiline = false,
-) {
+function editText(label: string, value: string, apply: (text: string) => void, multiline = false) {
     const root = document.createElement("label");
     root.textContent = label;
     const field = document.createElement(multiline ? "textarea" : "input");
@@ -62,7 +56,7 @@ NodeActions.register((node) => {
         const root = document.createElement("div");
         const input = document.createElement("select");
         input.setAttribute("aria-label", "Suppression configuration");
-        selectors.forEach((s) => input.add(new Option(s.name, s.id)));
+        for (const s of selectors) input.add(new Option(s.name, s.id));
         const rows = document.createElement("div");
         const checks = new Map<string, HTMLInputElement>();
         const render = () => {
@@ -109,7 +103,7 @@ NodeActions.register((node) => {
             id: "rename",
             label: "Rename",
             run: () =>
-                editText(node, "Sketch name", node.name, (text) =>
+                editText("Sketch name", node.name, (text) =>
                     change("Rename sketch", () => (node.name = text.trim() || node.name)),
                 ),
         },
@@ -124,7 +118,7 @@ NodeActions.register((node) => {
             id: "folder",
             label: "Add selection to folder…",
             run: () =>
-                editText(node, "Folder name", "Sketches", (name) =>
+                editText("Folder name", "Sketches", (name) =>
                     change("Move sketch to folder", () => {
                         const existing = doc.modelManager
                             .findNodes()
@@ -179,7 +173,6 @@ NodeActions.register((node) => {
             label: "Add comment",
             run: () =>
                 editText(
-                    node,
                     "Sketch comment",
                     node.comment,
                     (text) => change("Edit sketch comment", () => (node.comment = text)),

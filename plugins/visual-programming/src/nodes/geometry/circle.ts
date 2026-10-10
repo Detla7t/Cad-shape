@@ -3,7 +3,7 @@
 
 import { type IShape, XYZ } from "@chili3d/core";
 import { ClassicPreset } from "rete";
-import { zipTrees } from "../../tree";
+import { zipMixedTrees } from "../../tree";
 import type { INodeEditor } from "../../types";
 import { GeometryBaseNode } from "./base";
 
@@ -24,7 +24,7 @@ export class CircleNode extends GeometryBaseNode<
         const centers = (inputs.center ?? [[XYZ.zero]]).flat();
         const radii = (inputs.radius ?? [[1]]).flat();
 
-        return zipTrees([normals, centers, radii] as any, (normal: XYZ, center: XYZ, radius: any) => {
+        return zipMixedTrees([normals, centers, radii], (normal: XYZ, center: XYZ, radius: number) => {
             if (radius < 1e-6) {
                 return undefined;
             }

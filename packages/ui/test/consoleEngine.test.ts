@@ -4,7 +4,7 @@
 import { CommandStore, type IApplication, type IView, PubSub } from "@chili3d/core";
 import { TestDocument, TestFeatureListNode, TestStepNode } from "@chili3d/core/test-utils";
 import { rs } from "@rstest/core";
-import { ConsoleEngine, lookupRows, parseOptions, tokenize } from "../src/console/consoleEngine";
+import { ConsoleEngine, parseOptions, tokenize } from "../src/console/consoleEngine";
 
 /** A document with a sketch-like step, a body with two features and two variables. */
 function fixture() {

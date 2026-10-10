@@ -138,7 +138,7 @@ export function createMockVisualShapeData(config?: MockVisualShapeConfig): Visua
         shapeType,
         point: () => point,
         curve,
-        transformedMul: (t: Matrix4) => {
+        transformedMul: (_t: Matrix4) => {
             return {
                 shapeType,
                 intersect: () => [],

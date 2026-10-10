@@ -38,7 +38,6 @@ export interface MockDocumentOverrides {
  */
 export class TestNode extends VisualNode {
     constructor(name = "test", id = "test-id") {
-        // biome-ignore lint/suspicious/noExplicitAny: constructor args not needed for test
         super(null as any, name, id);
     }
     display(): I18nKeys {

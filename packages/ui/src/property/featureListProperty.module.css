@@ -14,13 +14,6 @@
     &[aria-selected="true"] {
         background: var(--hover-background-color);
     }
-    .header {
-        padding: 4px 6px;
-    }
-    .name {
-        font-size: 12px;
-        font-weight: 400;
-    }
 }
 .editHint {
     font-size: 12px;
@@ -110,6 +103,15 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.timelineRow .header {
+    padding: 4px 6px;
+}
+
+.timelineRow .name {
+    font-size: 12px;
+    font-weight: 400;
 }
 
 /* The "⋯" menu button stays out of the way until the row is hovered; an errored

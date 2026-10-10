@@ -10,7 +10,6 @@ import {
     Result,
     type ShapeType,
     ShapeTypes,
-    VisualStates,
     XYZ,
 } from "@chili3d/core";
 import { createMockApplication, nearestOnSegment, TestDocument } from "@chili3d/core/test-utils";

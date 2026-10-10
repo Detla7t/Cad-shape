@@ -314,9 +314,9 @@ export class ConfigurationTablePanel {
             );
             slots
                 .filter((s) => !isConfiguredValue(s.value))
-                .forEach((s) =>
-                    choose.append(makeOption({ textContent: `${s.node.name} / ${s.label}`, value: s.id })),
-                );
+                .forEach((s) => {
+                    choose.append(makeOption({ textContent: `${s.node.name} / ${s.label}`, value: s.id }));
+                });
             const add = document.createElement("button");
             add.textContent = I18n.translate("configuration.configure");
             add.onclick = () => {

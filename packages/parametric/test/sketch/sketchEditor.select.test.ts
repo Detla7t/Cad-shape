@@ -83,7 +83,7 @@ describe("SketchEditor entity selection", () => {
         "constraint",
         "pick",
     ] as const)("%s highlights follow a circle and chord after adding Horizontal", (kind) => {
-        const { doc, view, displayed, activeMeshes, restoreFactory } = setup();
+        const { doc, displayed, activeMeshes, restoreFactory } = setup();
         const editor = SketchEditor.enter(new SketchNode({ document: doc, plane: Plane.XY }));
         try {
             const circle = editor.solver.addCircle(0, 0, 100);
@@ -355,7 +355,7 @@ describe("SketchEditor entity selection", () => {
     });
 
     test("Escape clears the selection and keeps the session open on repeated presses", () => {
-        const { app, doc, view, restoreFactory } = setup();
+        const { doc, view, restoreFactory } = setup();
         try {
             const node = new SketchNode({ document: doc, plane: Plane.XY });
             const editor = SketchEditor.enter(node);

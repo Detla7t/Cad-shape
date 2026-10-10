@@ -32,7 +32,10 @@ const configChanged = rs.hoisted(() => {
         instance: {
             onPropertyChanged: (h: (prop: string) => void) => handlers.add(h),
         },
-        emit: (prop: string) => handlers.forEach((h) => h(prop)),
+        emit: (prop: string) =>
+            handlers.forEach((h) => {
+                h(prop);
+            }),
         clear: () => handlers.clear(),
     };
 });

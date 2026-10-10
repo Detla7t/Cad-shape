@@ -14,7 +14,7 @@ export class Collection<T> extends HTMLElement {
     private readonly _itemMap = new Map<T, HTMLElement | SVGSVGElement>();
     constructor(readonly props: CollectionProps<T>) {
         super();
-        setProperties(this, props as any);
+        setProperties(this, props as unknown as HTMLProps<this>);
     }
 
     getItem(item: T): HTMLElement | SVGSVGElement | undefined {
@@ -29,7 +29,9 @@ export class Collection<T> extends HTMLElement {
     }
 
     disconnectedCallback() {
-        this._itemMap.forEach((x) => x.remove());
+        this._itemMap.forEach((x) => {
+            x.remove();
+        });
         this._itemMap.clear();
         if (this.props.sources instanceof ObservableCollection)
             this.props.sources.removeCollectionChanged(this._onCollectionChanged);

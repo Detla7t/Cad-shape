@@ -2,7 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import { readFileSync } from "node:fs";
-import { EditableShapeNode, Plane, Result, Serializer, Transaction, XYZ } from "@chili3d/core";
+import { EditableShapeNode, Plane, Serializer, Transaction, XYZ } from "@chili3d/core";
 import { createMockApplication, TestDocument } from "@chili3d/core/test-utils";
 import { initWasm, ShapeFactory } from "@chili3d/wasm";
 import { rs } from "@rstest/core";

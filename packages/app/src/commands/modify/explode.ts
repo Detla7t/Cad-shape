@@ -100,6 +100,8 @@ export class Explode extends MultistepCommand {
         }
 
         x.parent?.remove(x);
-        x.shapes.forEach((x) => x.dispose());
+        x.shapes.forEach((x) => {
+            x.dispose();
+        });
     }
 }

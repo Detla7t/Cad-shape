@@ -21,6 +21,26 @@
         margin: 0px;
     }
 
+    h2 {
+        font-size: 14px;
+        width: 100%;
+        padding: 0;
+        margin: 12px;
+
+        &::before {
+            position: absolute;
+            left: 12px;
+            content: "= ";
+        }
+
+        span {
+            text-align: right;
+            display: block;
+            padding: 0px;
+            margin-right: 12px;
+        }
+    }
+
     ul {
         position: relative;
         list-style: none;
@@ -43,26 +63,6 @@
                 left: 16px;
                 content: "+ ";
             }
-        }
-    }
-
-    h2 {
-        font-size: 14px;
-        width: 100%;
-        padding: 0;
-        margin: 12px;
-
-        &::before {
-            position: absolute;
-            left: 12px;
-            content: "= ";
-        }
-
-        span {
-            text-align: right;
-            display: block;
-            padding: 0px;
-            margin-right: 12px;
         }
     }
 }

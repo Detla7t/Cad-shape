@@ -24,7 +24,9 @@ export abstract class BaseSnap implements ISnap {
 
     protected clearTempMeshes(): void {
         this._tempMeshIds.forEach((ids, view) => {
-            ids.forEach((id) => view.document.visual.context.removeMesh(id));
+            ids.forEach((id) => {
+                view.document.visual.context.removeMesh(id);
+            });
         });
         this._tempMeshIds.clear();
     }

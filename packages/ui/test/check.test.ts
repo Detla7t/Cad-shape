@@ -90,7 +90,7 @@ describe("CheckProperty", () => {
             const obj = { enabled: true };
             const prop = new CheckProperty(doc, [obj], propConfig);
 
-            expect(prop.objects[0].enabled).toBe(true);
+            expect(prop.objects[0]["enabled"]).toBe(true);
         });
 
         test("should toggle boolean value on single object when clicked", () => {

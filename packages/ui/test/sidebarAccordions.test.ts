@@ -42,9 +42,9 @@ test("collapsing one section preserves the other sections and restores its expan
 test("divider drag resizes adjacent sections, clamps at minimums, and remembers the result", () => {
     const view = panel();
     document.body.append(view);
-    [180, 360, 200].forEach((height, i) =>
-        rs.spyOn(view.sections[i].element, "getBoundingClientRect").mockReturnValue({ height } as DOMRect),
-    );
+    [180, 360, 200].forEach((height, i) => {
+        rs.spyOn(view.sections[i].element, "getBoundingClientRect").mockReturnValue({ height } as DOMRect);
+    });
     const dividers = view.querySelectorAll<HTMLElement>('[role="separator"]');
     expect(dividers).toHaveLength(2);
     dividers[0].dispatchEvent(new PointerEvent("pointerdown", { button: 0, pointerId: 1, clientY: 180 }));
@@ -64,9 +64,9 @@ test("divider drag resizes adjacent sections, clamps at minimums, and remembers 
 test("keyboard resizing skips a collapsed middle section and detached panels stop pointer tracking", () => {
     const view = panel();
     document.body.append(view);
-    [224, 28, 304].forEach((height, i) =>
-        rs.spyOn(view.sections[i].element, "getBoundingClientRect").mockReturnValue({ height } as DOMRect),
-    );
+    [224, 28, 304].forEach((height, i) => {
+        rs.spyOn(view.sections[i].element, "getBoundingClientRect").mockReturnValue({ height } as DOMRect);
+    });
     view.sections[1].toggle.click();
     const divider = view.querySelector<HTMLElement>('[role="separator"]');
     expect(divider).not.toBeNull();

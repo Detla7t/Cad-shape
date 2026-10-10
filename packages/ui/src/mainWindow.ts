@@ -30,7 +30,6 @@ export class MainWindow extends HTMLElement implements IWindow {
     readonly ribbon: Ribbon;
     private _inited: boolean = false;
     private _home?: Home;
-    private _editor?: Editor;
 
     constructor(
         readonly tabs: RibbonTabProfile[],
@@ -54,7 +53,7 @@ export class MainWindow extends HTMLElement implements IWindow {
             e.preventDefault();
             e.stopPropagation();
         };
-        this.addEventListener("scroll", (e) => {
+        this.addEventListener("scroll", () => {
             this.scrollTop = 0;
         });
     }
@@ -130,7 +129,7 @@ export class MainWindow extends HTMLElement implements IWindow {
     }
 
     private async _initEditor(app: IApplication) {
-        this._editor = new Editor(app, this.ribbon);
+        new Editor(app, this.ribbon);
     }
 
     private applyTheme() {

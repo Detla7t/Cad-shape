@@ -47,8 +47,8 @@ export class ResponsesProvider implements LLMProvider {
                 model: opts.model,
                 // One instruction string, stable half first — see `SystemPrompt`.
                 instructions: flattenSystem(opts.system),
-                input: input as any,
-                tools: opts.tools.map(toTool) as any,
+                input: input as OpenAI.Responses.ResponseInput,
+                tools: opts.tools.map(toTool),
                 stream: true,
             },
             { signal: opts.signal },

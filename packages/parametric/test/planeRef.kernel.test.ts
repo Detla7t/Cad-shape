@@ -64,7 +64,7 @@ function setup() {
 }
 
 /** Plane ref of the +X side face (x = 10 before the resize). */
-function sideFaceRef(doc: TestDocument, body: ParametricBodyNode): PlaneFaceRef {
+function sideFaceRef(body: ParametricBodyNode): PlaneFaceRef {
     expect(body.shape.isOk).toBe(true);
     const faces = body.shape.unchecked()!.findSubShapes(ShapeTypes.face) as IFace[];
     const sideIndex = faces.findIndex((face) => face.normal(0, 0)[1].x > 0.9);
@@ -91,7 +91,7 @@ function expectPlusXFace(doc: TestDocument, ref: PlaneFaceRef, offset: number) {
 describe("sketch plane follows the referenced face (real kernel)", () => {
     test("profile resize moves the plane along the face normal", () => {
         const { doc, sketch1, body } = setup();
-        const ref = sideFaceRef(doc, body);
+        const ref = sideFaceRef(body);
         expectPlusXFace(doc, ref, 10);
 
         sketch1.setDataEmitShapeChanged(square(20));
@@ -103,7 +103,7 @@ describe("sketch plane follows the referenced face (real kernel)", () => {
 
     test("mirrored profile reorders faces; the plane still tracks the same side", () => {
         const { doc, sketch1, body } = setup();
-        const ref = sideFaceRef(doc, body);
+        const ref = sideFaceRef(body);
         expectPlusXFace(doc, ref, 10);
 
         sketch1.setDataEmitShapeChanged(squareMirrored(20));

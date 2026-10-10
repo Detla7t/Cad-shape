@@ -178,7 +178,9 @@ export class ModelManager extends Observable {
         this.components.removeCollectionChanged(this.handleComponentChanged);
         this._rootNode?.removePropertyChanged(this.handleRootNodeNameChanged);
         this._rootNode?.dispose();
-        this.materials.forEach((x) => x.dispose());
+        this.materials.forEach((x) => {
+            x.dispose();
+        });
         this.materials.clear();
         this._rootNode = undefined;
         this._currentNode = undefined;

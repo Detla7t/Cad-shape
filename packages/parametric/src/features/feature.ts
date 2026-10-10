@@ -475,6 +475,7 @@ export interface FeatureNodeRef {
 }
 
 /** Per-feature-kind behavior. Implementations live next to their feature file. */
+// biome-ignore lint/suspicious/noExplicitAny: the registry and bare `FeatureHandler` references hold handlers of every feature kind; their methods take F as a parameter, so no concrete default is assignable from all of them
 export interface FeatureHandler<F extends FeatureData = any> {
     /** i18n key shown in the feature list; a function picks the key per feature (e.g. boolean operation). */
     readonly display: I18nKeys | ((feature: F) => I18nKeys);

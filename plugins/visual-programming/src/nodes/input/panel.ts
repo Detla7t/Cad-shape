@@ -26,7 +26,7 @@ export class PanelNode extends ClassicPreset.Node<
 
         if (control.hasInput) {
             const input = inputs.input![0];
-            const combineInput = (result: string[], input: any, prefix: string = "") => {
+            const combineInput = (result: string[], input: unknown, prefix: string = "") => {
                 if (Array.isArray(input)) {
                     result.push(`${prefix}[`);
                     for (const sub of input) {

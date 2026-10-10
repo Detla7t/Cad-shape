@@ -70,7 +70,9 @@ class MockNode {
         this.handlers.delete(handler);
     }
     emit(property: string) {
-        this.handlers.forEach((h) => h(property, this));
+        this.handlers.forEach((h) => {
+            h(property, this);
+        });
     }
     handlerCount() {
         return this.handlers.size;

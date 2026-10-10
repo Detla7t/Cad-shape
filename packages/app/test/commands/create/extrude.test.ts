@@ -79,7 +79,7 @@ describe("ExtrudeCommand", () => {
     });
 
     describe("getLengthStepData", () => {
-        function buildFaceCommand(planar: boolean, surface?: () => unknown) {
+        function buildFaceCommand(surface?: () => unknown) {
             const cmd = new ExtrudeCommand();
             wireCommand(cmd);
             const shapeOverride: any = {
@@ -94,7 +94,7 @@ describe("ExtrudeCommand", () => {
         }
 
         test("should expose a point and a direction equal to the face normal", () => {
-            const cmd = buildFaceCommand(true);
+            const cmd = buildFaceCommand();
             const data = (cmd as any).getLengthStepData();
             expect(data.point.isEqualTo(XYZ.zero)).toBe(true);
             expect(data.direction.isEqualTo(XYZ.unitZ)).toBe(true);
@@ -102,20 +102,20 @@ describe("ExtrudeCommand", () => {
         });
 
         test("preview should return [] when point is undefined", () => {
-            const cmd = buildFaceCommand(true);
+            const cmd = buildFaceCommand();
             const data = (cmd as any).getLengthStepData();
             expect(data.preview(undefined)).toEqual([]);
         });
 
         test("preview should return [] when the distance is below float precision", () => {
-            const cmd = buildFaceCommand(true);
+            const cmd = buildFaceCommand();
             const data = (cmd as any).getLengthStepData();
             // point essentially on the section plane → dist ≈ 0
             expect(data.preview(new XYZ({ x: 1, y: 2, z: 0 }))).toEqual([]);
         });
 
         test("preview of a planar face should mesh a prism", () => {
-            const cmd = buildFaceCommand(true, () => ({ isPlanar: () => true }));
+            const cmd = buildFaceCommand(() => ({ isPlanar: () => true }));
             const data = (cmd as any).getLengthStepData();
             const preview = data.preview(new XYZ({ x: 0, y: 0, z: 4 }));
             expect(Array.isArray(preview)).toBe(true);
@@ -123,7 +123,7 @@ describe("ExtrudeCommand", () => {
         });
 
         test("preview of a non-planar face should mesh a thick solid", () => {
-            const cmd = buildFaceCommand(false, () => ({ isPlanar: () => false }));
+            const cmd = buildFaceCommand(() => ({ isPlanar: () => false }));
             const data = (cmd as any).getLengthStepData();
             const preview = data.preview(new XYZ({ x: 0, y: 0, z: 4 }));
             expect(Array.isArray(preview)).toBe(true);

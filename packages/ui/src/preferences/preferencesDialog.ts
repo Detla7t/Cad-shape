@@ -2,7 +2,6 @@
 // See LICENSE file in the project root for full license information.
 
 import {
-    type CommandKeys,
     CommandStore,
     Config,
     DEFAULT_AUTOMATION_PREFERENCES,
@@ -163,7 +162,9 @@ export class PreferencesDialog {
     }
 
     dispose() {
-        this.cleanup.splice(0).forEach((dispose) => dispose());
+        this.cleanup.splice(0).forEach((dispose) => {
+            dispose();
+        });
         this.customization.dispose();
         this.dialog.remove();
     }
@@ -172,11 +173,9 @@ export class PreferencesDialog {
         const target = this.sections.get(id);
         if (!target) return;
         this.content.scrollTop = target.offsetTop - 20;
-        this.navigation
-            .querySelectorAll("button")
-            .forEach((button) =>
-                button.setAttribute("aria-current", String(button.dataset["section"] === id)),
-            );
+        this.navigation.querySelectorAll("button").forEach((button) => {
+            button.setAttribute("aria-current", String(button.dataset["section"] === id));
+        });
     }
 
     private section(id: string, title: string) {
@@ -614,9 +613,9 @@ export class PreferencesDialog {
                     }),
             );
             if (commands.length === 0) list.append(note("No matching commands."));
-            tabs.querySelectorAll("button").forEach((button) =>
-                button.setAttribute("aria-selected", String(button.textContent === active)),
-            );
+            tabs.querySelectorAll("button").forEach((button) => {
+                button.setAttribute("aria-selected", String(button.textContent === active));
+            });
         };
         for (const category of ["General", "Part Studio", "Assembly", "3D view", "Sketch", "Drawing"]) {
             const button = action(category, () => {

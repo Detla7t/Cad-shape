@@ -188,7 +188,7 @@ export class SketchEventHandler implements IEventHandler {
         if (this.controller === controller) {
             return;
         }
-        controller?.onCancelled((r) => this.handleEscape(view));
+        controller?.onCancelled((_r) => this.handleEscape(view));
         this.controller = controller;
     }
 

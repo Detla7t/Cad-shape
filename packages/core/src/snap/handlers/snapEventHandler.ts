@@ -67,7 +67,9 @@ export abstract class SnapEventHandler<D extends SnapData = SnapData> implements
         this.clearSnapPrompt();
         this.clearInput();
         this.removeTempVisuals();
-        this.snaps.forEach((snap) => snap.clear());
+        this.snaps.forEach((snap) => {
+            snap.clear();
+        });
     }
 
     private clearInput() {
@@ -98,12 +100,14 @@ export abstract class SnapEventHandler<D extends SnapData = SnapData> implements
     protected setSnaped(view: IView, event: PointerEvent) {
         this.findSnapPoint((ShapeTypes.edge | ShapeTypes.vertex | ShapeTypes.face) as ShapeType, view, event);
 
-        this.snaps.forEach((snap) => snap.handleSnaped?.(view.document.visual.document, this._snaped));
+        this.snaps.forEach((snap) => {
+            snap.handleSnaped?.(view.document.visual.document, this._snaped);
+        });
     }
 
     private findNearestFeaturePoint(view: IView, event: PointerEvent) {
         let minDist = Number.MAX_VALUE;
-        let nearest;
+        let nearest: NonNullable<SnapData["featurePoints"]>[number] | undefined;
 
         for (const point of this.data.featurePoints || []) {
             if (point.when && !point.when()) continue;
@@ -189,7 +193,9 @@ export abstract class SnapEventHandler<D extends SnapData = SnapData> implements
 
     private removeTempVisuals() {
         this.removeTempShapes();
-        this.snaps.forEach((snap) => snap.removeDynamicObject());
+        this.snaps.forEach((snap) => {
+            snap.removeDynamicObject();
+        });
     }
 
     private showTempShape(point: XYZ | undefined) {
@@ -219,7 +225,7 @@ export abstract class SnapEventHandler<D extends SnapData = SnapData> implements
         this._tempShapes = undefined;
     }
 
-    pointerDown(view: IView, event: PointerEvent): void {
+    pointerDown(_view: IView, event: PointerEvent): void {
         if (event.pointerType === "mouse" && event.button === 0) {
             if (this._snaped) {
                 this.handleSuccess();
@@ -229,17 +235,17 @@ export abstract class SnapEventHandler<D extends SnapData = SnapData> implements
         }
     }
 
-    pointerUp(view: IView, event: PointerEvent): void {
+    pointerUp(_view: IView, event: PointerEvent): void {
         if (event.pointerType !== "mouse" && event.isPrimary && this._snaped) {
             this.handleSuccess();
         }
     }
 
-    pointerOut(view: IView, event: PointerEvent) {
+    pointerOut(_view: IView, _event: PointerEvent) {
         this._snaped = undefined;
     }
 
-    mouseWheel(view: IView, event: WheelEvent): void {
+    mouseWheel(view: IView, _event: WheelEvent): void {
         view.update();
     }
 

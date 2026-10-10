@@ -38,7 +38,7 @@ export abstract class SelectionHandler implements IEventHandler {
         protected multiMode: boolean,
         readonly controller?: AsyncController,
     ) {
-        controller?.onCancelled((s) => {
+        controller?.onCancelled((_s) => {
             this.clearSelected(document);
             this.cleanHighlights();
         });
@@ -139,7 +139,7 @@ export abstract class SelectionHandler implements IEventHandler {
         this.pointerEventMap.delete(event.pointerId);
     }
 
-    protected removeRect(view: IView) {
+    protected removeRect(_view: IView) {
         this.rect?.element.remove();
         this.rect = undefined;
     }

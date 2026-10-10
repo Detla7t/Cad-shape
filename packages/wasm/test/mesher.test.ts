@@ -4,7 +4,6 @@
 import { ShapeTypes, XYZ } from "@chili3d/core";
 import type { ShapeFactory } from "../src/factory";
 import {
-    type OccFace,
     type OccShape,
     OccSubEdgeShape,
     OccSubFaceShape,

@@ -79,6 +79,12 @@
     line-height: 1.5;
 }
 
+.actions {
+    display: flex;
+    flex: 0 0 auto;
+    visibility: hidden;
+}
+
 .item {
     display: flex;
     align-items: center;
@@ -113,6 +119,14 @@
     padding-left: 22px;
 }
 
+.itemName {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .suppressed .itemName {
     text-decoration: line-through;
     opacity: 0.6;
@@ -125,14 +139,6 @@
     opacity: 0.7;
 }
 
-.itemName {
-    flex: 1 1 auto;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
 .itemMeta {
     flex: 0 1 auto;
     min-width: 0;
@@ -141,12 +147,6 @@
     white-space: nowrap;
     font-weight: normal;
     color: var(--foreground-muted-color);
-}
-
-.actions {
-    display: flex;
-    flex: 0 0 auto;
-    visibility: hidden;
 }
 
 .statusHost {

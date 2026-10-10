@@ -40,7 +40,9 @@ async function fixture() {
     return { home, app, records };
 }
 afterEach(() => {
-    document.querySelectorAll("chili-home, dialog").forEach((item) => item.remove());
+    document.querySelectorAll("chili-home, dialog").forEach((item) => {
+        item.remove();
+    });
     rs.restoreAllMocks();
 });
 

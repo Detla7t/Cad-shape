@@ -6,6 +6,11 @@ export interface IHighlightable {
     unhighlight(): void;
 }
 
-export function isHighlightable(value: any): value is IHighlightable {
-    return value && typeof value.highlight === "function" && typeof value.unhighlight === "function";
+export function isHighlightable(value: unknown): value is IHighlightable {
+    const candidate = value as Partial<IHighlightable> | null | undefined;
+    return (
+        !!candidate &&
+        typeof candidate.highlight === "function" &&
+        typeof candidate.unhighlight === "function"
+    );
 }

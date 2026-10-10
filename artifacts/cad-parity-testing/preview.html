@@ -41,7 +41,7 @@ let yaw=-.6,pitch=.52,drag=null;
 function draw(){
  const w=canvas.clientWidth,h=310,dpr=window.devicePixelRatio||1;canvas.width=w*dpr;canvas.height=h*dpr;ctx.scale(dpr,dpr);ctx.clearRect(0,0,w,h);
  const index=+select.value,tris=meshes[index],min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];
- tris.forEach(t=>t.forEach((v,j)=>{const k=j%3;min[k]=Math.min(min[k],v);max[k]=Math.max(max[k],v)}));const center=min.map((v,k)=>(v+max[k])/2);
+ tris.forEach(t=>{t.forEach((v,j)=>{const k=j%3;min[k]=Math.min(min[k],v);max[k]=Math.max(max[k],v)})});const center=min.map((v,k)=>(v+max[k])/2);
  const range=Math.hypot(...max.map((v,k)=>v-min[k])),scale=Math.min(w*.82,h*.8)/range;
  function project(x,y,z){x-=center[0];y-=center[1];z-=center[2];const a=x*Math.cos(yaw)-y*Math.sin(yaw),b=x*Math.sin(yaw)+y*Math.cos(yaw);return [w/2+a*scale,h/2+(b*Math.sin(pitch)-z*Math.cos(pitch))*scale,b*Math.cos(pitch)+z*Math.sin(pitch)];}
  const faces=tris.map(t=>{const p=[project(...t.slice(0,3)),project(...t.slice(3,6)),project(...t.slice(6,9))];return {p,z:p.reduce((s,v)=>s+v[2],0)/3}}).sort((a,b)=>a.z-b.z);

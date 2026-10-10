@@ -45,7 +45,9 @@ describe("Axis", () => {
             expect(axes[2].direction.isEqualTo(plane.yvec)).toBe(true);
             expect(axes[3].name).toBe("axis.y");
             expect(axes[3].direction.isEqualTo(plane.yvec.reverse())).toBe(true);
-            axes.forEach((a) => expect(a.point).toBe(origin));
+            axes.forEach((a) => {
+                expect(a.point).toBe(origin);
+            });
         });
 
         test("should return x, y and z axes when containsZ is true", () => {
@@ -55,7 +57,9 @@ describe("Axis", () => {
             expect(axes.length).toBe(6);
             const zAxes = axes.filter((a) => a.name === "axis.z");
             expect(zAxes.length).toBe(2);
-            axes.forEach((a) => expect(a.point).toBe(origin));
+            axes.forEach((a) => {
+                expect(a.point).toBe(origin);
+            });
         });
     });
 

@@ -198,7 +198,7 @@ class PickInsertPointCommand implements ICommand {
         readonly defination: GroupDefinition,
     ) {}
 
-    async execute(application: IApplication): Promise<void> {
+    async execute(_application: IApplication): Promise<void> {
         const pickPointStep = new PointStep("option.command.insertPoint");
         const controller = new AsyncController();
         const result = await pickPointStep.execute(this.document, controller);

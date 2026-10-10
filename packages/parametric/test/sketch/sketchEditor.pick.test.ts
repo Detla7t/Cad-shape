@@ -218,7 +218,7 @@ describe("SketchEditor picking", () => {
     });
 
     test("Escape cancels an active pick", async () => {
-        const { app, doc, view, restoreFactory } = setup();
+        const { doc, view, restoreFactory } = setup();
         try {
             const node = new SketchNode({ document: doc, plane: Plane.XY });
             const editor = SketchEditor.enter(node);
@@ -236,7 +236,7 @@ describe("SketchEditor picking", () => {
     });
 
     test("Escape without a pick keeps the sketch open for another tool", () => {
-        const { app, doc, view, restoreFactory } = setup();
+        const { doc, view, restoreFactory } = setup();
         try {
             const node = new SketchNode({ document: doc, plane: Plane.XY });
             const editor = SketchEditor.enter(node);

@@ -66,21 +66,26 @@ export class OccSurface extends OccGeometry implements ISurface {
 
     static wrap(surface: Geom_Surface): ISurface {
         const isType = (type: string) => wasm.Transient.isInstance(surface, type);
-        const actualSurface = surface as any;
-        if (isType("GeomPlate_Surface")) return new OccPlateSurface(actualSurface);
-        else if (isType("Geom_Plane")) return new OccPlane(actualSurface);
+        if (isType("GeomPlate_Surface")) return new OccPlateSurface(surface as GeomPlate_Surface);
+        else if (isType("Geom_Plane")) return new OccPlane(surface as Geom_Plane);
         else if (isType("Geom_SurfaceOfLinearExtrusion"))
-            return new OccSurfaceOfLinearExtrusion(actualSurface);
-        else if (isType("Geom_SurfaceOfRevolution")) return new OccSurfaceOfRevolution(actualSurface);
-        else if (isType("Geom_OffsetSurface")) return new OccOffsetSurface(actualSurface);
-        else if (isType("Geom_BSplineSurface")) return new OccBSplineSurface(actualSurface);
-        else if (isType("Geom_BezierSurface")) return new OccBezierSurface(actualSurface);
-        else if (isType("Geom_CylindricalSurface")) return new OccCylindricalSurface(actualSurface);
-        else if (isType("Geom_ConicalSurface")) return new OccConicalSurface(actualSurface);
-        else if (isType("Geom_SphericalSurface")) return new OccSphericalSurface(actualSurface);
-        else if (isType("Geom_RectangularTrimmedSurface")) return new OccRectangularSurface(actualSurface);
-        else if (isType("Geom_ToroidalSurface")) return new OccToroidalSurface(actualSurface);
-        else if (isType("ShapeExtent_CompositeSurface")) return new OccCompositeSurface(actualSurface);
+            return new OccSurfaceOfLinearExtrusion(surface as Geom_SurfaceOfLinearExtrusion);
+        else if (isType("Geom_SurfaceOfRevolution"))
+            return new OccSurfaceOfRevolution(surface as Geom_SurfaceOfRevolution);
+        else if (isType("Geom_OffsetSurface")) return new OccOffsetSurface(surface as Geom_OffsetSurface);
+        else if (isType("Geom_BSplineSurface")) return new OccBSplineSurface(surface as Geom_BSplineSurface);
+        else if (isType("Geom_BezierSurface")) return new OccBezierSurface(surface as Geom_BezierSurface);
+        else if (isType("Geom_CylindricalSurface"))
+            return new OccCylindricalSurface(surface as Geom_CylindricalSurface);
+        else if (isType("Geom_ConicalSurface")) return new OccConicalSurface(surface as Geom_ConicalSurface);
+        else if (isType("Geom_SphericalSurface"))
+            return new OccSphericalSurface(surface as Geom_SphericalSurface);
+        else if (isType("Geom_RectangularTrimmedSurface"))
+            return new OccRectangularSurface(surface as Geom_RectangularTrimmedSurface);
+        else if (isType("Geom_ToroidalSurface"))
+            return new OccToroidalSurface(surface as Geom_ToroidalSurface);
+        else if (isType("ShapeExtent_CompositeSurface"))
+            return new OccCompositeSurface(surface as ShapeExtend_CompositeSurface);
 
         throw new Error(`Unknown surface type: ${String(surface)}`);
     }
@@ -354,7 +359,7 @@ export class OccSweptSurface extends OccSurface implements ISweptSurface {
         });
     }
     basisCurve(): ICurve {
-        return gc((c) => {
+        return gc((_c) => {
             const handleCurve = this.sweptSurface.basisCurve();
             return OccCurve.wrap(handleCurve.get()!);
         });
@@ -363,18 +368,18 @@ export class OccSweptSurface extends OccSurface implements ISweptSurface {
 
 export class OccCompositeSurface extends OccSurface implements ICompositeSurface {
     constructor(compositeSurface: ShapeExtend_CompositeSurface) {
-        super(compositeSurface as any);
+        super(compositeSurface);
     }
 }
 
 export class OccBSplineSurface extends OccSurface implements IBSplineSurface {
-    constructor(private bsplineSurface: Geom_BSplineSurface) {
+    constructor(bsplineSurface: Geom_BSplineSurface) {
         super(bsplineSurface);
     }
 }
 
 export class OccBezierSurface extends OccSurface implements IBezierSurface {
-    constructor(private bezierSurface: Geom_BezierSurface) {
+    constructor(bezierSurface: Geom_BezierSurface) {
         super(bezierSurface);
     }
 }

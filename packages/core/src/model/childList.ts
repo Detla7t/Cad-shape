@@ -91,7 +91,9 @@ export class NodeChildList {
                     }) satisfies NodeRecord,
             );
 
-        records.forEach((record) => this.removeNode(record.node, true));
+        records.forEach((record) => {
+            this.removeNode(record.node, true);
+        });
         this.notify(records);
     }
 
@@ -110,7 +112,9 @@ export class NodeChildList {
                     }) satisfies NodeRecord,
             );
 
-        records.forEach((record) => this.removeNode(record.node, true));
+        records.forEach((record) => {
+            this.removeNode(record.node, true);
+        });
         this.notify(records);
     }
 

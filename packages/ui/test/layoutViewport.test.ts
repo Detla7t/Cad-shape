@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type IView, PubSub, XYZ } from "@chili3d/core";
+import { PubSub, XYZ } from "@chili3d/core";
 import { createMockApplication, createMockView, TestDocument } from "@chili3d/core/test-utils";
 import { afterEach, expect, rs, test } from "@rstest/core";
 import { LayoutViewport } from "../src/viewport/layoutViewport";

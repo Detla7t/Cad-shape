@@ -338,7 +338,7 @@ describe("Onshape-style measurement details", () => {
                 );
             expect(angles.sort((x, y) => x - y)).toEqual([0, 90, 90, 90, 90]);
         } finally {
-            faces.forEach((face) => face.dispose());
+            for (const face of faces) face.dispose();
         }
 
         const point = own(factory.point(new XYZ(1, 2, 3)));
@@ -397,7 +397,7 @@ describe("Onshape's other measure types and the reference coordinate system", ()
             // two planar faces report their angle, not a tangent angle
             expect(measurementDetails([first, neighbour]).map((d) => d.mode)).toEqual(["angle"]);
         } finally {
-            faces.forEach((face) => face.dispose());
+            for (const face of faces) face.dispose();
         }
         const l1 = own(factory.line(new XYZ(0, 0, 0), new XYZ(10, 0, 0)));
         expect(measureShapes("angle", [l1, a]).isOk).toBe(false);
@@ -507,7 +507,7 @@ describe("Onshape's other measure types and the reference coordinate system", ()
                 ["ΔZ", 0],
             ]);
         } finally {
-            vertices.forEach((v) => v.dispose());
+            for (const v of vertices) v.dispose();
         }
         Transaction.execute(model, "stretch", () => {
             const data = sketch.data;

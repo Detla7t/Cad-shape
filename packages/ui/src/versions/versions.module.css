@@ -511,6 +511,31 @@
     white-space: pre-wrap;
 }
 
+.viewBody {
+    flex: 1 1 auto;
+    overflow: auto;
+    padding: 8px 10px;
+}
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+
+    & input,
+    & textarea {
+        padding: 6px 8px;
+        border: 1px solid var(--input-border-color);
+        border-radius: 6px;
+        background-color: var(--input-background-color);
+        color: var(--input-text-color);
+        font: inherit;
+    }
+
+    & textarea {
+        min-height: 56px;
+        resize: vertical;
+    }
+}
 .changeDialog {
     width: min(580px, 90vw);
     max-height: 80vh;
@@ -665,27 +690,6 @@
     min-width: 320px;
 }
 
-.field {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-
-    & input,
-    & textarea {
-        padding: 6px 8px;
-        border: 1px solid var(--input-border-color);
-        border-radius: 6px;
-        background-color: var(--input-background-color);
-        color: var(--input-text-color);
-        font: inherit;
-    }
-
-    & textarea {
-        min-height: 56px;
-        resize: vertical;
-    }
-}
-
 .hint {
     color: var(--foreground-muted-color);
     font-size: 12px;
@@ -719,12 +723,6 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-}
-
-.viewBody {
-    flex: 1 1 auto;
-    overflow: auto;
-    padding: 8px 10px;
 }
 
 .viewFooter {

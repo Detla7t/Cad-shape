@@ -1,9 +1,9 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type ICurve, XYZ } from "@chili3d/core";
+import type { ICurve } from "@chili3d/core";
 import { ClassicPreset } from "rete";
-import { zipTrees } from "../../tree";
+import { zipMixedTrees } from "../../tree";
 import type { INodeEditor } from "../../types";
 
 export class DivideCurveNode extends ClassicPreset.Node<
@@ -22,7 +22,7 @@ export class DivideCurveNode extends ClassicPreset.Node<
         const count = inputs.count ?? [3];
 
         return {
-            value: zipTrees([curve, count as any], (curve, count) => {
+            value: zipMixedTrees([curve, count], (curve, count) => {
                 return curve.uniformAbscissaByCount(count);
             }),
         };

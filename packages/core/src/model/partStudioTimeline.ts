@@ -887,7 +887,9 @@ export function applyOrder(document: IDocument, order: readonly PartStudioTimeli
         const current = node.featureItems().map((item) => item.id);
         if (current.length === ids.length && current.every((id, i) => id === ids[i])) continue;
         if (node.moveFeatureTo !== undefined) {
-            ids.forEach((id, i) => node.moveFeatureTo?.(id, i));
+            ids.forEach((id, i) => {
+                node.moveFeatureTo?.(id, i);
+            });
             continue;
         }
         // Only steps of one: walk each feature up to its place.

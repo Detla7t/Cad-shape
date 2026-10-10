@@ -3,19 +3,16 @@
 
 import {
     type Component,
-    type ComponentNode,
-    type IApplication,
     type IStep,
     type IView,
     Matrix4,
     Plane,
     PubSub,
-    Transaction,
     type VisualNode,
     XYZ,
 } from "@chili3d/core";
 import { TestNode } from "@chili3d/core/test-utils";
-import { describe, expect, rs, test } from "@rstest/core";
+import { describe, expect, test } from "@rstest/core";
 import { GroupCommand } from "../../../src/commands/create/group";
 import {
     makeParent,

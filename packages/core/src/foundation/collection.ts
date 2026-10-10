@@ -4,16 +4,19 @@
 import type { IDisposable } from "./disposable";
 import { Observable } from "./observer";
 
+// biome-ignore lint/suspicious/noExplicitAny: change events are type-erased; listeners of a typed collection read items as its element type
+type CollectionItem = any;
+
 export type CollectionAction = "add" | "remove" | "move" | "replace";
 
 export type CollectionChangedArgs =
     | {
           action: "add";
-          items: any[];
+          items: CollectionItem[];
       }
     | {
           action: "remove";
-          items: any[];
+          items: CollectionItem[];
       }
     | {
           action: "move";
@@ -23,8 +26,8 @@ export type CollectionChangedArgs =
     | {
           action: "replace";
           index: number;
-          item: any;
-          items: any[];
+          item: CollectionItem;
+          items: CollectionItem[];
       };
 
 export interface ICollectionChanged {
@@ -108,7 +111,9 @@ export class ObservableCollection<T> extends Observable implements ICollectionCh
     }
 
     private notifyChange(args: CollectionChangedArgs) {
-        this._callbacks.forEach((callback) => callback(args));
+        this._callbacks.forEach((callback) => {
+            callback(args);
+        });
 
         if (args.action === "add") {
             this.emitPropertyChanged("length", this.length - args.items.length);
@@ -123,7 +128,7 @@ export class ObservableCollection<T> extends Observable implements ICollectionCh
         this._items.forEach(callback);
     }
 
-    map(callback: (item: T, index: number) => any) {
+    map<U>(callback: (item: T, index: number) => U): U[] {
         return this._items.map(callback);
     }
 

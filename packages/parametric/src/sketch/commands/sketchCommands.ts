@@ -180,7 +180,7 @@ async function pickSketch(document: IDocument, controller: AsyncController): Pro
 
 @command({ key: "sketch.exit", icon: "icon-back" })
 export class ExitSketch implements ICommand {
-    async execute(application: IApplication): Promise<void> {
+    async execute(_application: IApplication): Promise<void> {
         SketchEditor.exit();
     }
 }

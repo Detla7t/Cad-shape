@@ -42,20 +42,20 @@ export class PathBinding<T extends IPropertyChanged = IPropertyChanged> {
         this.removePropertyChangedHandler();
     }
 
-    private readonly handleAllPathPropertyChanged = (property: string, source: any) => {
+    private readonly handleAllPathPropertyChanged = (property: string, source: IPropertyChanged) => {
         if (this.shouldUpdateHandler(property, source)) {
             this.removePropertyChangedHandler();
             this.addPropertyChangedHandler();
         }
     };
 
-    private readonly handlePropertyChanged = (property: string, source: any) => {
+    private readonly handlePropertyChanged = (property: string, source: IPropertyChanged) => {
         if (this.path.endsWith(property) && this._target) {
             this.setValue(source, property);
         }
     };
 
-    private shouldUpdateHandler(property: string, source: any) {
+    private shouldUpdateHandler(property: string, source: IPropertyChanged) {
         if (this._oldPathObjects === undefined) {
             return true;
         }
@@ -75,7 +75,7 @@ export class PathBinding<T extends IPropertyChanged = IPropertyChanged> {
 
     private addPropertyChangedHandler() {
         const props = this.path.split(".");
-        let source: any = this.source;
+        let source: IPropertyChanged | undefined = this.source;
         this._oldPathObjects = [];
         for (let i = 0; i < props.length; i++) {
             if (!source || !(props[i] in source)) break;
@@ -90,37 +90,38 @@ export class PathBinding<T extends IPropertyChanged = IPropertyChanged> {
 
             source.onPropertyChanged(this.handleAllPathPropertyChanged);
             this._oldPathObjects.push(sourceProperty);
-            source = source[props[i]];
+            source = (source as unknown as Record<string, IPropertyChanged | undefined>)[props[i]];
         }
     }
 
     private removePropertyChangedHandler() {
         if (!this._oldPathObjects) return;
-        this._oldPathObjects.forEach((element) =>
-            element.source.removePropertyChanged(this.handleAllPathPropertyChanged),
-        );
+        this._oldPathObjects.forEach((element) => {
+            element.source.removePropertyChanged(this.handleAllPathPropertyChanged);
+        });
         this._actualSource?.source.removePropertyChanged(this.handlePropertyChanged);
         this._actualSource = undefined;
         this._oldPathObjects = undefined;
     }
 
-    private setValue(source: any, property: string) {
+    private setValue(source: object, property: string) {
         if (!this._target) return;
         const element = this._target.element.deref();
         if (!element) return;
 
-        const value = source[property];
+        const value = (source as Record<string, unknown>)[property];
         if (this.converter) {
             const converted = this.converter.convert(value);
-            if (converted.isOk) (element as any)[this._target.property] = converted.value;
+            if (converted.isOk)
+                (element as Record<PropertyKey, unknown>)[this._target.property] = converted.value;
         } else {
-            (element as any)[this._target.property] = value;
+            (element as Record<PropertyKey, unknown>)[this._target.property] = value;
         }
     }
 
     getPropertyValue() {
         return this._actualSource
-            ? (this._actualSource.source as any)[this._actualSource.property]
+            ? (this._actualSource.source as unknown as Record<string, unknown>)[this._actualSource.property]
             : undefined;
     }
 }

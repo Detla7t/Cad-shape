@@ -19,7 +19,9 @@ function fakeView(name = "Bracket") {
 }
 
 afterEach(() => {
-    document.body.querySelectorAll('[role="menu"]').forEach((el) => el.remove());
+    document.body.querySelectorAll('[role="menu"]').forEach((el) => {
+        el.remove();
+    });
     rs.restoreAllMocks();
 });
 

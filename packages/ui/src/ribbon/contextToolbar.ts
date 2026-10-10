@@ -76,7 +76,9 @@ export class ContextToolbar extends HTMLElement {
     }
 
     private clearSubscriptions(): void {
-        this.subscriptions.splice(0).forEach((dispose) => dispose());
+        this.subscriptions.splice(0).forEach((dispose) => {
+            dispose();
+        });
     }
 
     private readonly scheduleReconnect = () => {
@@ -153,7 +155,9 @@ export class ContextToolbar extends HTMLElement {
     private family(tools: Tool[], name?: string, remember = true): HTMLElement {
         tools = tools.filter((tool) => this.ribbon.isCommandAvailable(keyOf(tool)));
         if (!tools.length) return document.createElement("span");
-        tools.forEach((tool) => this.included.add(keyOf(tool)));
+        tools.forEach((tool) => {
+            this.included.add(keyOf(tool));
+        });
         const family = document.createElement("div");
         family.className = style.family;
         const id = tools.map(keyOf).join("|");

@@ -7,7 +7,6 @@ import { type LitArea2D, LitPlugin, Presets } from "@retejs/lit-plugin";
 import { html } from "lit";
 import { ClassicPreset, NodeEditor } from "rete";
 import { AreaExtensions, AreaPlugin } from "rete-area-plugin";
-import type { Selector } from "rete-area-plugin/_types/extensions";
 import { AutoArrangePlugin } from "rete-auto-arrange-plugin";
 import { CommentExtensions, CommentPlugin } from "rete-comment-plugin";
 import { ConnectionPlugin, Presets as ConnectionPresets } from "rete-connection-plugin";
@@ -19,7 +18,6 @@ import {
 } from "rete-context-menu-plugin";
 import { DataflowEngine } from "rete-engine";
 import { HistoryExtensions, HistoryPlugin, Presets as HistoryPresets } from "rete-history-plugin";
-import { MinimapPlugin } from "rete-minimap-plugin";
 import { PanelControl } from "./controls/panel";
 import { NumberSliderControl } from "./controls/slider";
 import { CustomConnectionElement } from "./customs/connection";
@@ -33,6 +31,18 @@ import type { INodeEditor, Schemes } from "./types";
 import "./asserts/iconfont.js";
 
 export type AreaExtra = LitArea2D<Schemes> | ContextMenuExtra;
+
+type MenuItem = { label: string; key: string; handler: () => void };
+// The classic preset types its entries as node factories; ours run a handler that adds the node itself.
+type ClassicMenuItems = Parameters<typeof ContextMenuPresets.classic.setup<Schemes>>[0];
+type SelectorOf = ReturnType<typeof AreaExtensions.selector>;
+type AccumulatingOf = ReturnType<typeof AreaExtensions.accumulateOnCtrl>;
+
+/**
+ * rete types `use()` so that a plugin whose signals differ from the parent scope's is refused, although
+ * these plugins connect fine at runtime; this is the one place that boundary is crossed.
+ */
+const asScope = (plugin: object): never => plugin as never;
 
 customElements.define("custom-node", CustomNodeElement);
 customElements.define("custom-connection", CustomConnectionElement);
@@ -178,7 +188,7 @@ export class Editor implements INodeEditor {
         const render = new LitPlugin<Schemes, AreaExtra>();
 
         this.editor.use(this.area);
-        this.editor.use(this.engine as any);
+        this.editor.use(asScope(this.engine));
         this.area.use(render);
         AreaExtensions.simpleNodesOrder(this.area);
         AreaExtensions.showInputControl(this.area);
@@ -197,7 +207,6 @@ export class Editor implements INodeEditor {
         this.initHistory();
         this.initConnection();
         this.initContextMenu(render);
-        //this.initMinimap(render);
         this.initPreset(render);
         this.initCommet(this.selector, selectorAccumulating);
         this.initRouter(render, this.selector, selectorAccumulating);
@@ -207,7 +216,7 @@ export class Editor implements INodeEditor {
 
     readonly process = () => {
         this.engine.reset();
-        this.editor.getNodes().forEach((n) => this.engine.fetch(n.id));
+        for (const n of this.editor.getNodes()) this.engine.fetch(n.id);
 
         this.document.visual.update();
     };
@@ -254,14 +263,6 @@ export class Editor implements INodeEditor {
         );
     }
 
-    private initMinimap(render: LitPlugin<Schemes, AreaExtra>) {
-        const minimap = new MinimapPlugin({
-            boundViewport: true,
-        });
-        render.addPreset(Presets.minimap.setup({ size: 150 }) as any);
-        this.area.use(minimap as any);
-    }
-
     private initHistory() {
         const history = new HistoryPlugin<Schemes>();
         HistoryExtensions.keyboard(history);
@@ -277,31 +278,33 @@ export class Editor implements INodeEditor {
 
     private initRouter(
         render: LitPlugin<Schemes, AreaExtra>,
-        selector: Selector<any>,
-        selectorAccumulating: any,
+        selector: SelectorOf,
+        selectorAccumulating: AccumulatingOf,
     ) {
         const reroutePlugin = new ReroutePlugin<Schemes>();
         RerouteExtensions.selectablePins(reroutePlugin, selector, selectorAccumulating);
-        render.use(reroutePlugin as any);
+        render.use(asScope(reroutePlugin));
         render.addPreset(
-            Presets.reroute.setup({
-                pointerdown(id: string) {
-                    reroutePlugin.unselect(id);
-                    reroutePlugin.select(id);
-                },
-                contextMenu(id: string) {
-                    reroutePlugin.remove(id);
-                },
-                translate(id: string, dx: number, dy: number) {
-                    reroutePlugin.translate(id, dx, dy);
-                },
-            }) as any,
+            asScope(
+                Presets.reroute.setup({
+                    pointerdown(id: string) {
+                        reroutePlugin.unselect(id);
+                        reroutePlugin.select(id);
+                    },
+                    contextMenu(id: string) {
+                        reroutePlugin.remove(id);
+                    },
+                    translate(id: string, dx: number, dy: number) {
+                        reroutePlugin.translate(id, dx, dy);
+                    },
+                }),
+            ),
         );
     }
 
-    private initCommet(selector: Selector<any>, selectorAccumulating: any) {
+    private initCommet(selector: SelectorOf, selectorAccumulating: AccumulatingOf) {
         const comment = new CommentPlugin();
-        this.area.use(comment as any);
+        this.area.use(asScope(comment));
         CommentExtensions.selectable(comment, selector, selectorAccumulating);
     }
 
@@ -314,7 +317,7 @@ export class Editor implements INodeEditor {
                     () => {
                         this.addNode(x.node);
                     },
-                ]) as any,
+                ]) as unknown as ClassicMenuItems,
         );
         const contextMenu = new ContextMenuPlugin<Schemes>({
             items: (context, plugin) => {
@@ -322,7 +325,7 @@ export class Editor implements INodeEditor {
                     return rootItems(context, plugin);
                 }
                 const node = context as Schemes["Node"];
-                const items: any[] = [];
+                const items: MenuItem[] = [];
                 if (node instanceof GeometryBaseNode) {
                     items.push({
                         label: node.visibility ? "Hide" : "Show",
@@ -359,7 +362,7 @@ export class Editor implements INodeEditor {
 
     private initArrange() {
         const arrange = new AutoArrangePlugin();
-        this.area.use(arrange as any);
+        this.area.use(asScope(arrange));
     }
 
     dispose() {

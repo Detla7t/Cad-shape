@@ -36,7 +36,7 @@ export class ViewDisplay {
     private readonly cache = new Map<ThreeGeometry, DisplayCache>();
     constructor(private readonly view: ThreeView) {}
     dispose() {
-        this.materials.forEach((material) => material.dispose());
+        for (const material of this.materials.values()) material.dispose();
         this.materials.clear();
         for (const entry of this.cache.values()) this.release(entry);
         this.cache.clear();

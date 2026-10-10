@@ -135,7 +135,7 @@ export class GeometryState {
 
     resetState() {
         this.highlighter.container.children.forEach((x) => {
-            (x as any).geometry?.dispose();
+            (x as Mesh).geometry?.dispose();
         });
         this.highlighter.container.clear();
         if (this.visual instanceof ThreeGeometry) {
@@ -380,7 +380,7 @@ export class ThreeHighlighter implements IHighlighter {
     }
 
     clear(): void {
-        this._stateMap.forEach((v, k) => {
+        this._stateMap.forEach((_v, k) => {
             this.resetState(k);
         });
         this._stateMap.clear();

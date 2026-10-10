@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type IStorage, Logger, type StorageOperation } from "@chili3d/core";
+import { type IStorage, Logger, type StorageOperation, type StoredRow } from "@chili3d/core";
 
 export class IndexedDBStorage implements IStorage {
     async createDBIfNeeded(database: string, tables: string[]): Promise<void> {
@@ -17,7 +17,7 @@ export class IndexedDBStorage implements IStorage {
         }
     }
 
-    async get(database: string, table: string, id: string): Promise<any> {
+    async get(database: string, table: string, id: string): Promise<StoredRow> {
         const db = await this.open(database);
         try {
             const transaction = db.transaction(table, "readonly");
@@ -73,7 +73,7 @@ export class IndexedDBStorage implements IStorage {
         }
     }
 
-    async page(database: string, table: string, page: number): Promise<any[]> {
+    async page(database: string, table: string, page: number): Promise<StoredRow[]> {
         const count = 20;
         if (!Number.isSafeInteger(page) || page < 0 || page * count > 0xffffffff)
             throw new Error("Page must be a non-negative integer within the cursor range");

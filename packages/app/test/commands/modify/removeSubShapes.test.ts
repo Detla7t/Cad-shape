@@ -1,15 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import {
-    type IApplication,
-    type IShape,
-    Matrix4,
-    PubSub,
-    Result,
-    ShapeTypes,
-    type VisualShapeData,
-} from "@chili3d/core";
+import { type IApplication, type IShape, Matrix4, PubSub, Result, ShapeTypes } from "@chili3d/core";
 import { describe, expect, rs, test } from "@rstest/core";
 import { RemoveSubShapesCommand } from "../../../src/commands/modify/removeSubShapes";
 import {

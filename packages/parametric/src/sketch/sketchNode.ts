@@ -31,7 +31,6 @@ import {
     serializable,
     serialize,
     type VertexMeshData,
-    VisualConfig,
     type XYZ,
 } from "@chili3d/core";
 import { allProfiles, sketchProfiles } from "../features/profileBuilder";
@@ -44,12 +43,10 @@ import { type PlaneFaceRef, resolveFacePlane } from "./planeRef";
 import { sketchEntityEdge } from "./sketchEntityEdge";
 import { sketchImageMeshes } from "./sketchImages";
 import {
-    arcAngles,
     DEFAULT_SKETCH_LAYER,
     type ExternalRefData,
     entityPointCount,
     profileExternalRefs,
-    rawArcSweep,
     type SketchConstraintData,
     type SketchData,
     type SketchEntityData,

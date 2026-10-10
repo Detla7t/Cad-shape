@@ -10,7 +10,7 @@ import { br, div, img, label } from "@chili3d/element";
     isApplicationCommand: true,
 })
 export class WeChatGroup implements ICommand {
-    async execute(app: IApplication): Promise<void> {
+    async execute(_app: IApplication): Promise<void> {
         PubSub.default.pub("showDialog", "command.wechat.group", this.ui());
     }
 

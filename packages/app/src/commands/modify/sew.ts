@@ -38,7 +38,9 @@ export class Sew extends MultistepCommand {
             });
             this.document.modelManager.rootNode.add(node);
 
-            this.stepDatas[0].nodes?.forEach((x) => x.parent?.remove(x));
+            this.stepDatas[0].nodes?.forEach((x) => {
+                x.parent?.remove(x);
+            });
 
             this.document.visual.update();
         });

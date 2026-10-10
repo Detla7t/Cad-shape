@@ -94,7 +94,9 @@ export class Polygon extends CreateFaceableCommand {
     private readonly preview = (point: XYZ | undefined): ShapeMeshData[] => {
         const ps = this.stepDatas.map((data) => this.meshPoint(data.point!));
         const edges = new EdgeMeshDataBuilder();
-        this.stepDatas.forEach((data) => edges.addPosition(data.point!.x, data.point!.y, data.point!.z));
+        this.stepDatas.forEach((data) => {
+            edges.addPosition(data.point!.x, data.point!.y, data.point!.z);
+        });
         if (point) {
             edges.addPosition(point.x, point.y, point.z);
         }

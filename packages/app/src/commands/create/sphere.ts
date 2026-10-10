@@ -40,7 +40,7 @@ export class Sphere extends CreateCommand {
             return [this.meshPoint(this.stepDatas[0].point!)];
         }
 
-        const radius = this.stepDatas[0].point?.distanceTo(end)!;
+        const radius = this.stepDatas[0].point!.distanceTo(end);
         return [
             this.meshPoint(this.stepDatas[0].point!),
             this.meshCreatedShape("circle", XYZ.unitZ, this.stepDatas[0].point!, radius),

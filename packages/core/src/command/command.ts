@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import type { IApplication } from "../application";
+import type { IDocument } from "../document";
 import { type AsyncController, type IDisposable, Observable, PubSub, type Result } from "../foundation";
 import { EMPTY_SCOPE, type ParameterValue, resolveUnitSpec, type Scope } from "../parameters/expression";
 import type { UnitSpec } from "../parameters/unitSpec";
@@ -21,7 +22,7 @@ export function isCancelableCommand(command: ICommand): command is ICancelableCo
 }
 
 export abstract class CancelableCommand extends Observable implements ICancelableCommand {
-    private static readonly _propertiesCache: Map<string, any> = new Map();
+    private static readonly _propertiesCache: Map<string, unknown> = new Map();
     protected readonly disposeStack: Set<IDisposable> = new Set();
 
     private _isCompleted: boolean = false;
@@ -43,7 +44,7 @@ export abstract class CancelableCommand extends Observable implements ICancelabl
     }
 
     get document() {
-        return this.application.activeView?.document!;
+        return this.application.activeView?.document as IDocument;
     }
 
     /**
@@ -148,7 +149,9 @@ export abstract class CancelableCommand extends Observable implements ICancelabl
         this.saveProperties();
         PubSub.default.pub("closeCommandContext");
         this.controller?.dispose();
-        this.disposeStack.forEach((x) => x.dispose());
+        this.disposeStack.forEach((x) => {
+            x.dispose();
+        });
         this.disposeStack.clear();
         this._isCompleted = true;
     }
@@ -157,14 +160,17 @@ export abstract class CancelableCommand extends Observable implements ICancelabl
         PropertyUtils.getProperties(this).forEach((x) => {
             const key = this.cacheKeyOfProperty(x);
             if (CancelableCommand._propertiesCache.has(key)) {
-                this.setPrivateValue(x.name as keyof this, CancelableCommand._propertiesCache.get(key));
+                this.setPrivateValue(
+                    x.name as keyof this,
+                    CancelableCommand._propertiesCache.get(key) as never,
+                );
             }
         });
     }
 
     private saveProperties() {
         PropertyUtils.getProperties(this).forEach((x) => {
-            const prop = (this as any)[x.name];
+            const prop = (this as Record<string, unknown>)[x.name];
             if (typeof prop === "function") return;
             CancelableCommand._propertiesCache.set(this.cacheKeyOfProperty(x), prop);
         });

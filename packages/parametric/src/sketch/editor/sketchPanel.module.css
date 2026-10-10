@@ -102,6 +102,9 @@
 .planeClear:hover {
     color: var(--foreground-color);
 }
+.hint {
+    color: var(--foreground-secondary-color);
+}
 .panel footer {
     border-top: 1px solid var(--border-color);
     padding-top: 7px;
@@ -125,9 +128,6 @@
 }
 .status[data-state="error"] {
     color: var(--danger-color);
-}
-.hint {
-    color: var(--foreground-secondary-color);
 }
 .row {
     display: flex;

@@ -41,7 +41,9 @@ export class Delete extends MultistepCommand {
 
         this.document.selection.clearSelection();
         Transaction.execute(this.document, "delete", () => {
-            deletable.forEach((model) => model.parent?.remove(model));
+            deletable.forEach((model) => {
+                model.parent?.remove(model);
+            });
         });
         this.document.visual.update();
         PubSub.default.pub("showToast", "toast.delete{0}Objects", deletable.length);

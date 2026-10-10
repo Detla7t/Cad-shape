@@ -57,7 +57,9 @@ export class HistoryBar {
         const focused = document.activeElement === this.element;
         parent.insertBefore(this.element, rows[position] ?? null);
         if (focused) this.element.focus();
-        rows.forEach((row, i) => row.classList.toggle(style.future, this.isFuture(i, position)));
+        rows.forEach((row, i) => {
+            row.classList.toggle(style.future, this.isFuture(i, position));
+        });
     }
     private readonly down = (event: PointerEvent) => {
         if (event.button !== 0) return;

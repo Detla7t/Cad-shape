@@ -95,7 +95,7 @@ export abstract class GeometryNode extends VisualNode {
     protected _mesh: IShapeMeshData | undefined;
     get mesh(): IShapeMeshData {
         this._mesh ??= this.createMesh();
-        return this._mesh as any;
+        return this._mesh;
     }
 
     override boundingBox(): BoundingBox | undefined {

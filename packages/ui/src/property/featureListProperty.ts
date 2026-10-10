@@ -18,7 +18,6 @@ import {
     type IFeatureListNode,
     type INode,
     isConfiguredValue,
-    isFeatureListNode,
     Localize,
     NodeEvaluation,
     PartStudioTimeline,
@@ -284,9 +283,9 @@ export class FeatureListProperty extends HTMLElement {
                     event.stopPropagation();
                     if (this.timeline) {
                         this.document.selection.setSelectedNodes([this.node], false);
-                        this.querySelectorAll('[aria-selected="true"]').forEach((row) =>
-                            row.removeAttribute("aria-selected"),
-                        );
+                        this.querySelectorAll('[aria-selected="true"]').forEach((row) => {
+                            row.removeAttribute("aria-selected");
+                        });
                         (event.currentTarget as HTMLElement).parentElement?.setAttribute(
                             "aria-selected",
                             "true",
@@ -756,9 +755,9 @@ export class FeatureListProperty extends HTMLElement {
     }
 
     private clearDropIndicators() {
-        this.querySelectorAll(`.${style.item}`).forEach((row) =>
-            row.classList.remove(style.dropBefore, style.dropAfter),
-        );
+        this.querySelectorAll(`.${style.item}`).forEach((row) => {
+            row.classList.remove(style.dropBefore, style.dropAfter);
+        });
     }
 
     // --- feature actions ---

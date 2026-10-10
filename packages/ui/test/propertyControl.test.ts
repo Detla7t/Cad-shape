@@ -71,7 +71,6 @@ describe("propertyControl", () => {
             const result = propertyControl(mockDocument, [obj], {
                 name: "texture",
                 display: "test.texture",
-                // biome-ignore lint/suspicious/noExplicitAny: test mock property
             } as any) as any;
 
             expect(result.document).toBe(mockDocument);
@@ -86,7 +85,6 @@ describe("propertyControl", () => {
                 name: "color",
                 type: "color",
                 display: "test.color",
-                // biome-ignore lint/suspicious/noExplicitAny: test mock property
             } as any);
             expect(result).toBeInstanceOf(ColorProperty);
         });
@@ -105,7 +103,6 @@ describe("basicPropertyControl", () => {
                 name: "test",
                 type: "string",
                 display: "test.label",
-                // biome-ignore lint/suspicious/noExplicitAny: test mock property
             } as any);
             expect(result).toBe("");
         });
@@ -118,7 +115,6 @@ describe("basicPropertyControl", () => {
                 name: "color",
                 type: "color",
                 display: "test.color",
-                // biome-ignore lint/suspicious/noExplicitAny: test mock property
             } as any);
             expect(result).toBeInstanceOf(ColorProperty);
         });
@@ -129,7 +125,6 @@ describe("basicPropertyControl", () => {
                 name: "materialId",
                 type: "materialId",
                 display: "test.material",
-                // biome-ignore lint/suspicious/noExplicitAny: test mock property
             } as any);
             expect(result).toBeInstanceOf(MaterialProperty);
         });
@@ -141,7 +136,6 @@ describe("basicPropertyControl", () => {
                 name: "materialId",
                 type: "materialId",
                 display: "test.material",
-                // biome-ignore lint/suspicious/noExplicitAny: test mock property
             } as any);
             expect(result).toBeInstanceOf(InputProperty);
         });
@@ -151,7 +145,6 @@ describe("basicPropertyControl", () => {
             const result = basicPropertyControl(mockDocument, [obj], {
                 name: "name",
                 display: "test.name",
-                // biome-ignore lint/suspicious/noExplicitAny: test mock property
             } as any);
             expect(result).toBeInstanceOf(InputProperty);
         });
@@ -161,7 +154,6 @@ describe("basicPropertyControl", () => {
             const result = basicPropertyControl(mockDocument, [obj], {
                 name: "count",
                 display: "test.count",
-                // biome-ignore lint/suspicious/noExplicitAny: test mock property
             } as any);
             expect(result).toBeInstanceOf(InputProperty);
         });
@@ -171,7 +163,6 @@ describe("basicPropertyControl", () => {
             const result = basicPropertyControl(mockDocument, [obj], {
                 name: "config",
                 display: "test.config",
-                // biome-ignore lint/suspicious/noExplicitAny: test mock property
             } as any);
             expect(result).toBeInstanceOf(InputProperty);
         });
@@ -181,7 +172,6 @@ describe("basicPropertyControl", () => {
             const result = basicPropertyControl(mockDocument, [obj], {
                 name: "enabled",
                 display: "test.enabled",
-                // biome-ignore lint/suspicious/noExplicitAny: test mock property
             } as any);
             expect(result).toBeInstanceOf(CheckProperty);
         });
@@ -191,7 +181,6 @@ describe("basicPropertyControl", () => {
             const result = basicPropertyControl(mockDocument, [obj], {
                 name: "sym",
                 display: "test.sym",
-                // biome-ignore lint/suspicious/noExplicitAny: test mock property
             } as any);
             expect(result).toBe("");
         });
@@ -204,7 +193,6 @@ describe("basicPropertyControl", () => {
                 name: "materialId",
                 type: "materialId",
                 display: "mat.label",
-                // biome-ignore lint/suspicious/noExplicitAny: test mock property
             } as any);
             expect(result).toBeInstanceOf(MaterialProperty);
         });
@@ -215,7 +203,6 @@ describe("basicPropertyControl", () => {
                 name: "materialId",
                 type: "materialId",
                 display: "mat.label",
-                // biome-ignore lint/suspicious/noExplicitAny: test mock property
             } as any);
             expect(result).toBeInstanceOf(MaterialProperty);
         });
@@ -226,7 +213,6 @@ describe("basicPropertyControl", () => {
                 name: "materialId",
                 type: "materialId",
                 display: "mat.label",
-                // biome-ignore lint/suspicious/noExplicitAny: test mock property
             } as any);
             expect(result).toBeInstanceOf(InputProperty);
         });

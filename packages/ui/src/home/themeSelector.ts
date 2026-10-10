@@ -12,15 +12,15 @@ export const ThemeSelector = (props: HTMLProps<HTMLElement>) => {
     ];
 
     const themeOptions: HTMLOptionElement[] = [];
-    themes.forEach((theme) =>
+    themes.forEach((theme) => {
         themeOptions.push(
             option({
                 selected: theme.value === Config.instance.themeMode,
                 textContent: new Localize(theme.key as I18nKeys),
                 value: theme.value,
             }),
-        ),
-    );
+        );
+    });
     return select(
         {
             onchange: (e) => {

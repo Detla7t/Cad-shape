@@ -135,7 +135,7 @@ export function measureShapes(
                     if (!faces.length) return Result.err("Area needs faces.");
                     for (const face of faces) value += face.area();
                 } finally {
-                    if (shape.shapeType !== ShapeTypes.face) faces.forEach((face) => face.dispose());
+                    if (shape.shapeType !== ShapeTypes.face) for (const face of faces) face.dispose();
                 }
             }
         } else if (axisIndex >= 0 && mode.startsWith("delta")) {
@@ -177,7 +177,7 @@ export function measureShapes(
                             ]);
                     }
                 } finally {
-                    if (shape.shapeType !== ShapeTypes.edge) edges.forEach((edge) => edge.dispose());
+                    if (shape.shapeType !== ShapeTypes.edge) for (const edge of edges) edge.dispose();
                 }
             }
         }
@@ -350,6 +350,6 @@ function roundGeometry(shape: IShape): { center: XYZ; offset: XYZ; radius: numbe
         // A disk's single circular boundary is also a useful diameter selection.
         return edges.length === 1 ? roundGeometry(edges[0]) : undefined;
     } finally {
-        edges.forEach((edge) => edge.dispose());
+        for (const edge of edges) edge.dispose();
     }
 }

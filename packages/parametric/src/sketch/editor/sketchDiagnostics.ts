@@ -142,11 +142,14 @@ export function showSketchDiagnostics(editor: SketchEditor, mode: "profiles" | "
             ? `${profiles.value.outer.length} closed outer profiles · ${ends.length} open endpoints`
             : `Profile error: ${profiles.error}`;
         panel.append(status);
-        ends.forEach((e) =>
-            row(`Open endpoint · entity ${e.id} (${e.point.map((x) => x.toFixed(3)).join(", ")})`, [e.id]),
-        );
-        if (profiles.isOk)
-            profiles.value.outerEntities.forEach((ids, i) => row(`Closed profile ${i + 1}`, ids ?? []));
+        for (const e of ends) {
+            row(`Open endpoint · entity ${e.id} (${e.point.map((x) => x.toFixed(3)).join(", ")})`, [e.id]);
+        }
+        if (profiles.isOk) {
+            for (const [i, ids] of profiles.value.outerEntities.entries()) {
+                row(`Closed profile ${i + 1}`, ids ?? []);
+            }
+        }
         const seen = new Map<string, number>();
         for (const e of data.entities) {
             const key = `${e.type}:${e.params.map((x) => x.toFixed(6)).join(",")}`,

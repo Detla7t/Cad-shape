@@ -142,9 +142,9 @@ export function ownershipLanes(
 ): { lanes: TimelineLanes[]; colors: Map<INode, string> } | undefined {
     if (ownership.owners.length === 0) return undefined;
     const colors = new Map<INode, string>();
-    ownership.owners.forEach((owner, index) =>
-        colors.set(owner, OWNER_PALETTE[index % OWNER_PALETTE.length]),
-    );
+    ownership.owners.forEach((owner, index) => {
+        colors.set(owner, OWNER_PALETTE[index % OWNER_PALETTE.length]);
+    });
     const lanes = entries.map((entry) => {
         const owners = (ownership.ownersOf.get(entry.node.id) ?? []).map((index) => ownership.owners[index]);
         return { owner: owners[0], users: owners.slice(1) };
@@ -272,7 +272,6 @@ export function TimelineBar({ document, playInterval = 400 }: TimelineBarProps) 
             });
             return kept.length === current.length ? current : kept;
         });
-        // biome-ignore lint/correctness/useExhaustiveDependencies: nodeOf reads the current entries
     }, [selected]);
     const pick = (index: number, event: MouseEvent) => {
         const key = entries[index].key;

@@ -6,14 +6,14 @@ import { type HTMLProps, option, select } from "@chili3d/element";
 
 export const Navigation3DSelector = (props: HTMLProps<HTMLElement>) => {
     const nav3DTypes: HTMLOptionElement[] = [];
-    Navigation3DTypes.forEach((nav3DType) =>
+    Navigation3DTypes.forEach((nav3DType) => {
         nav3DTypes.push(
             option({
                 selected: nav3DType === Config.instance.navigation3D,
                 textContent: nav3DType,
             }),
-        ),
-    );
+        );
+    });
     return select(
         {
             onchange: (e) => {

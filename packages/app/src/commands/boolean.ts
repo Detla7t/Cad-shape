@@ -40,10 +40,14 @@ export abstract class BooleanOperate extends MultistepCommand {
             const node = new BooleanNode({ document: this.document, booleanShape: booleanShape.value });
             this.document.modelManager.rootNode.add(node);
             if (this.keepTools) {
-                this.stepDatas[0].nodes?.forEach((x) => x.parent?.remove(x));
+                this.stepDatas[0].nodes?.forEach((x) => {
+                    x.parent?.remove(x);
+                });
             } else {
                 this.stepDatas.forEach((x) => {
-                    x.nodes?.forEach((n) => n.parent?.remove(n));
+                    x.nodes?.forEach((n) => {
+                        n.parent?.remove(n);
+                    });
                 });
             }
             this.document.visual.update();

@@ -151,6 +151,11 @@
     border-color: var(--primary-color);
     background: color-mix(in srgb, var(--selection-tint-strong) 55%, var(--panel-background-color));
 }
+.rowTitle {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
 .row[aria-current="page"] .rowTitle {
     font-weight: 600;
 }
@@ -173,11 +178,6 @@
 }
 .rowText {
     min-width: 0;
-}
-.rowTitle {
-    display: flex;
-    align-items: center;
-    gap: 4px;
 }
 .rowTitle svg,
 .previewTitle svg {

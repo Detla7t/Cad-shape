@@ -12,9 +12,9 @@ function fixture() {
         rows = Array.from({ length: 3 }, () => document.createElement("div"));
     parent.append(...rows);
     document.body.append(parent);
-    rows.forEach((row, i) =>
-        rs.spyOn(row, "getBoundingClientRect").mockReturnValue({ top: i * 30, height: 30 } as DOMRect),
-    );
+    rows.forEach((row, i) => {
+        rs.spyOn(row, "getBoundingClientRect").mockReturnValue({ top: i * 30, height: 30 } as DOMRect);
+    });
     let position = 3;
     const apply = rs.fn((value: number) => {
             position = value;

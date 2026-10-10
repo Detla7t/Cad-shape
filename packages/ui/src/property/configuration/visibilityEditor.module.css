@@ -28,6 +28,10 @@
 .dialog header {
     border-bottom: 1px solid var(--border-color);
 }
+.preview > strong {
+    display: block;
+    margin-bottom: 16px;
+}
 .dialog header strong {
     flex: 1;
     color: var(--accent-text-color);
@@ -99,6 +103,13 @@
 .condition > details {
     min-width: 140px;
 }
+.preview > label {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 14px;
+}
 .condition > details label {
     display: flex;
     gap: 6px;
@@ -111,17 +122,6 @@
     padding: 20px;
     background: var(--title-background);
     border-left: 1px solid var(--border-color);
-}
-.preview > strong {
-    display: block;
-    margin-bottom: 16px;
-}
-.preview > label {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 14px;
 }
 .preview > label span {
     flex: 1;

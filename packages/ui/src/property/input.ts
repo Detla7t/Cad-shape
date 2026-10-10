@@ -25,24 +25,24 @@ import {
 } from "@chili3d/element";
 import commonStyle from "./common.module.css";
 import style from "./input.module.css";
-import { PropertyBase } from "./propertyBase";
+import { asPropertyHosts, PropertyBase, type PropertyHost } from "./propertyBase";
 
 class ArrayValueConverter implements IConverter {
     constructor(
-        readonly objects: any[],
+        readonly objects: readonly PropertyHost[],
         readonly property: Property,
         readonly converter?: IConverter,
     ) {}
 
-    convert(value: any): Result<string> {
+    convert(_value: unknown): Result<string> {
         return Result.ok(this.getDefaultValue());
     }
 
-    convertBack?(value: string): Result<any> {
+    convertBack?(_value: string): Result<unknown> {
         throw new Error("Method not implemented.");
     }
 
-    private getValueString(obj: any): string {
+    private getValueString(obj: PropertyHost): string {
         const value = obj[this.property.name];
         const cvalue = this.converter?.convert(value);
         return cvalue?.isOk ? cvalue.value : String(value);
@@ -60,19 +60,19 @@ export class InputProperty extends PropertyBase {
 
     constructor(
         readonly document: IDocument,
-        objects: any[],
+        objects: readonly object[],
         readonly property: Property,
     ) {
-        super(objects);
+        super(asPropertyHosts(objects));
         this.converter = property.converter ?? this.getConverter();
-        const arrayConverter = new ArrayValueConverter(objects, property, this.converter);
+        const arrayConverter = new ArrayValueConverter(this.objects, property, this.converter);
         this.append(
             div(
                 { className: commonStyle.panel },
                 span({ className: commonStyle.propertyName, textContent: new Localize(property.display) }),
                 input({
                     className: style.box,
-                    value: new Binding(objects[0], property.name, arrayConverter),
+                    value: new Binding(this.objects[0], property.name, arrayConverter),
                     readOnly: this.isReadOnly(),
                     onkeydown: this.handleKeyDown,
                     onblur: this.handleBlur,
@@ -125,7 +125,7 @@ export class InputProperty extends PropertyBase {
     };
 
     private getConverter(): IConverter | undefined {
-        const name = this.objects[0][this.property.name].constructor.name;
+        const name = (this.objects[0][this.property.name] as object).constructor.name;
         const converters: { [key: string]: () => IConverter } = {
             [XYZ.name]: () => new XYZConverter(),
             [XY.name]: () => new XYConverter(),

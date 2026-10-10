@@ -41,7 +41,7 @@ export class PointOnCurveStep extends SnapStep<SnapPointOnCurveData> {
         super(tip, handleData, keepSelected);
     }
 
-    protected override validator(data: SnapPointOnCurveData, point: XYZ): boolean {
+    protected override validator(_data: SnapPointOnCurveData, _point: XYZ): boolean {
         return true;
     }
 
@@ -59,7 +59,7 @@ export class PointOnAxisStep extends SnapStep<SnapPointOnAxisData> {
         super(tip, handleData, keepSelected);
     }
 
-    protected override validator(data: SnapPointOnAxisData, point: XYZ): boolean {
+    protected override validator(_data: SnapPointOnAxisData, _point: XYZ): boolean {
         return true;
     }
 
@@ -77,7 +77,7 @@ export class PointOnPlaneStep extends SnapStep<PointSnapData> {
         super(tip, handleData, keepSelected);
     }
 
-    protected override validator(data: PointSnapData, point: XYZ): boolean {
+    protected override validator(_data: PointSnapData, _point: XYZ): boolean {
         return true;
     }
 

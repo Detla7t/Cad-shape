@@ -314,7 +314,7 @@ export class NodeUtils {
     }
 
     private static serializeNodeToArray(nodes: Serialized[], node: INode, parentId: string | undefined) {
-        const serialized: any = Serializer.serializeObject(node);
+        const serialized: Serialized = Serializer.serializeObject(node);
         if (parentId) serialized["parentId"] = parentId;
         nodes.push(serialized);
 
@@ -334,7 +334,7 @@ export class NodeUtils {
             if (NodeUtils.isLinkedListNode(node)) {
                 nodeMap.set(n["id"], node);
             }
-            const parentId = (n as any)["parentId"];
+            const parentId = n["parentId"];
             if (!parentId) return;
             if (nodeMap.has(parentId)) {
                 nodeMap.get(parentId)!.add(node);

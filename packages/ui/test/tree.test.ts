@@ -81,15 +81,6 @@ class MockNode {
 // real VisualNode type (with required constructor args and accessors).
 Object.setPrototypeOf(MockNode.prototype, VisualNode.prototype);
 
-/** A parametric-body-like node: linked list plus the real feature-list contract. */
-class MockBodyNode extends MockNode {
-    featureItems() {
-        return [];
-    }
-    setFeatureParameter() {}
-    removeFeature() {}
-}
-
 /** A node with nothing in the scene (a Feature Studio holds code): not a VisualNode. */
 class MockScenelessNode {
     readonly sceneless = true;
@@ -102,11 +93,6 @@ class MockScenelessNode {
 
     onPropertyChanged() {}
     removePropertyChanged() {}
-}
-
-function withId(node: MockNode, id: string) {
-    (node as unknown as { id: string }).id = id;
-    return node;
 }
 
 type NodeObserver = (records: NodeRecord[]) => void;
@@ -142,10 +128,18 @@ function makeDoc(rootNode: MockNode): DocHarness {
         } as unknown as MockDocumentOverrides["selection"],
     });
     return Object.assign(doc, {
-        emitNodeChanged: (records: NodeRecord[]) => nodeObservers.forEach((h) => h(records)),
+        emitNodeChanged: (records: NodeRecord[]) =>
+            nodeObservers.forEach((h) => {
+                h(records);
+            }),
         emitPropChanged: (prop: string, oldValue: unknown) =>
-            propHandlers.forEach((h) => h(prop, doc.modelManager, oldValue)),
-        emitSelection: (nodes: INode[]) => selectionHandlers.forEach((h) => h(nodes)),
+            propHandlers.forEach((h) => {
+                h(prop, doc.modelManager, oldValue);
+            }),
+        emitSelection: (nodes: INode[]) =>
+            selectionHandlers.forEach((h) => {
+                h(nodes);
+            }),
     });
 }
 

@@ -99,7 +99,7 @@ const booleanHandler: FeatureHandler<BooleanFeatureData> = {
                     return shapeFactory.booleanFuse([context.input], toolShapes, true);
             }
         } finally {
-            owned.forEach((x) => x.dispose());
+            for (const x of owned) x.dispose();
         }
     },
 };

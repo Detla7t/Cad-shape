@@ -1,18 +1,9 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import {
-    AsyncController,
-    CancelableCommand,
-    getCurrentApplication,
-    type IApplication,
-    PropertyUtils,
-    PubSub,
-    SelectNodeStep,
-    setCurrentApplication,
-} from "@chili3d/core";
-import { createMockApplication, createMockDocument } from "@chili3d/core/test-utils";
-import { describe, expect, rs, test } from "@rstest/core";
+import { CancelableCommand, getCurrentApplication, setCurrentApplication } from "@chili3d/core";
+import { createMockApplication } from "@chili3d/core/test-utils";
+import { describe, expect, test } from "@rstest/core";
 import { Export, Import } from "../../src/commands/importExport";
 
 // Ensure a mock application is set (Export constructor calls getCurrentApplication)
@@ -39,7 +30,6 @@ describe("Import", () => {
         const app = createMockApplication();
         app.dataExchange.importFormats = () => [".step", ".stl", ".iges"];
 
-        const cmd = new Import();
         // execute will call readFilesAsync which creates a file input in browser.
         // In test env (Happy-DOM), we can verify the format string is correct.
         expect(typeof app.dataExchange.importFormats().join(",")).toBe("string");

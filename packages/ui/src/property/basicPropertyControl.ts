@@ -7,8 +7,9 @@ import { ColorProperty } from "./colorProperty";
 import { ComboboxProperty } from "./comboboxProperty";
 import { InputProperty } from "./input";
 import { MaterialProperty } from "./materialProperty";
+import { asPropertyHosts } from "./propertyBase";
 
-export function basicPropertyControl(document: IDocument, objs: any[], prop: Property) {
+export function basicPropertyControl(document: IDocument, objs: readonly object[], prop: Property) {
     if (prop === undefined || objs.length === 0) return "";
 
     if (prop.type === "color") {
@@ -23,7 +24,7 @@ export function basicPropertyControl(document: IDocument, objs: any[], prop: Pro
         return new ComboboxProperty(document, objs, prop, prop.combobox);
     }
 
-    const value = objs[0][prop.name];
+    const value = asPropertyHosts(objs)[0][prop.name];
     if (["object", "string", "number"].includes(typeof value)) {
         return new InputProperty(document, objs, prop);
     }
@@ -36,8 +37,9 @@ export function basicPropertyControl(document: IDocument, objs: any[], prop: Pro
     return "";
 }
 
-function canShowMaterialProperty(objs: any[], prop: Property) {
+function canShowMaterialProperty(objs: readonly object[], prop: Property) {
     if (objs.length === 0) return false;
     if (objs.length === 1) return true;
-    return objs.every((obj) => obj[prop.name] === objs[0][prop.name]);
+    const hosts = asPropertyHosts(objs);
+    return hosts.every((obj) => obj[prop.name] === hosts[0][prop.name]);
 }

@@ -57,7 +57,9 @@ export class SelectMeasure extends CancelableCommand {
         this.controller?.cancel();
         this.#sumUI?.container.remove();
         this.#sumUI = undefined;
-        this.#disposeSet.forEach((d) => d.dispose());
+        this.#disposeSet.forEach((d) => {
+            d.dispose();
+        });
         this.#disposeSet.clear();
         this.#sum = 0;
     };
@@ -95,7 +97,9 @@ export class SelectMeasure extends CancelableCommand {
 
     protected override afterExecute(): void {
         super.afterExecute();
-        this.#disposeSet.forEach((d) => d.dispose());
+        this.#disposeSet.forEach((d) => {
+            d.dispose();
+        });
         this.#disposeSet.clear();
         this.#sumUI?.container.remove();
     }

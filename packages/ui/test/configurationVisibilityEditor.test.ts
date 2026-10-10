@@ -19,7 +19,11 @@ function setup() {
     ]);
     return model;
 }
-afterEach(() => document.querySelectorAll("dialog").forEach((dialog) => dialog.remove()));
+afterEach(() =>
+    document.querySelectorAll("dialog").forEach((dialog) => {
+        dialog.remove();
+    }),
+);
 
 test("preview changes are isolated, including hidden inputs; Cancel keeps the document unchanged", () => {
     const model = setup();

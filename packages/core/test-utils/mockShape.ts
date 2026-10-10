@@ -71,7 +71,7 @@ export class MockShape implements IShape {
         return this._mesh;
     }
 
-    setTolerance(tolerance: number): void {}
+    setTolerance(_tolerance: number): void {}
 
     transformed(_matrix: Matrix4): IShape {
         return new MockShape();
@@ -137,7 +137,7 @@ export class MockShape implements IShape {
         throw new Error("Method not implemented.");
     }
 
-    shellSewing(tolerance: number): IShape {
+    shellSewing(_tolerance: number): IShape {
         throw new Error("Method not implemented.");
     }
 

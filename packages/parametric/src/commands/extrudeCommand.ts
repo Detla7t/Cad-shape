@@ -362,7 +362,7 @@ export class ExtrudeFeatureCommand extends MultistepCommand {
                 hide: preview.target === undefined ? undefined : [preview.target],
             };
         } finally {
-            owned.forEach((x) => x.dispose());
+            for (const x of owned) x.dispose();
         }
     };
 
@@ -470,17 +470,17 @@ export class ExtrudeFeatureCommand extends MultistepCommand {
                 for (const vec of vecsOf(face)) {
                     const prism = shapeFactory.prism(sweptFace, vec);
                     if (!prism.isOk) {
-                        prisms.forEach((x) => x.dispose());
+                        for (const x of prisms) x.dispose();
                         return Result.err(prism.error);
                     }
                     prisms.push(prism.value);
                 }
             }
         } finally {
-            owned.forEach((x) => x.dispose());
+            for (const x of owned) x.dispose();
         }
         const merged = fuseProfiles(prisms);
-        if (!merged.isOk) prisms.forEach((x) => x.dispose());
+        if (!merged.isOk) for (const x of prisms) x.dispose();
         return merged;
     }
 
@@ -556,7 +556,7 @@ export class ExtrudeFeatureCommand extends MultistepCommand {
                 this.document.visual.update();
             });
         } finally {
-            owned.forEach((x) => x.dispose());
+            for (const x of owned) x.dispose();
         }
     }
 

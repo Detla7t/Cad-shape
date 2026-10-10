@@ -31,7 +31,8 @@ export class AddNode extends ClassicPreset.Node<
                 (typeof a === "number" || typeof a === "string") &&
                 (typeof b === "number" || typeof b === "string")
             ) {
-                return (a as any) + (b as any);
+                // number + number adds, anything with a string concatenates (JS semantics)
+                return (a as string) + b;
             }
 
             console.warn("AddNode: unknown type", a, b);

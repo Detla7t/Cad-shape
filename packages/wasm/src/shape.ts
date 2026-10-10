@@ -427,11 +427,12 @@ export class OccShape implements IShape {
         this.machiningMeshes.clear();
         this._shape.nullify();
         this._shape.delete();
+        // biome-ignore lint/suspicious/noExplicitAny: disposed handle is cleared; the field stays non-null typed for the live lifetime
         this._shape = null as any;
 
         if (this._mesh && isDisposable(this._mesh)) {
             this._mesh.dispose();
-            this._mesh = null as any;
+            this._mesh = null as unknown as undefined;
         }
     }
 }
@@ -568,7 +569,7 @@ export class OccEdge extends OccShape implements IEdge {
             if (edge.isNull()) {
                 return Result.err("Offset failed");
             }
-            return Result.ok(OccShape.wrap(edge));
+            return Result.ok(OccShape.wrap(edge) as IEdge);
         });
     }
 
@@ -599,7 +600,7 @@ export class OccEdge extends OccShape implements IEdge {
         super.disposeInternal();
         if (this._curve && isDisposable(this._curve)) {
             this._curve.dispose();
-            this._curve = null as any;
+            this._curve = null as unknown as undefined;
         }
     }
 }
@@ -974,12 +975,17 @@ export class Mesher implements IShapeMeshData, IDisposable {
     }
 
     dispose(): void {
-        this._faces?.range.forEach((g) => g.shape.dispose());
-        this._lines?.range.forEach((g) => g.shape.dispose());
+        this._faces?.range.forEach((g) => {
+            g.shape.dispose();
+        });
+        this._lines?.range.forEach((g) => {
+            g.shape.dispose();
+        });
 
+        // biome-ignore lint/suspicious/noExplicitAny: disposed handle is cleared; the field stays non-null typed for the live lifetime
         this.shape = null as any;
-        this._faces = null as any;
-        this._lines = null as any;
+        this._faces = null as unknown as undefined;
+        this._lines = null as unknown as undefined;
     }
 
     private getEdgeRanges(data: OccEdgeMeshData): ShapeMeshRange[] {

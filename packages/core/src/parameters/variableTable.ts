@@ -23,7 +23,6 @@ import {
     type EvaluatedValue,
     evaluateExpression,
     isConstantName,
-    resolveUnitSpec,
     type Scope,
     type ScopeContext,
     scopeContext,

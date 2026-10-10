@@ -108,7 +108,7 @@ export function captureMeasurement(data: VisualShapeData): Result<MeasurementRef
                 ),
             });
         } finally {
-            edges.forEach((edge) => edge.dispose());
+            for (const edge of edges) edge.dispose();
         }
     }
     if (shape.shapeType === ShapeTypes.face) {
@@ -127,7 +127,7 @@ export function captureMeasurement(data: VisualShapeData): Result<MeasurementRef
                 area: (shape as IFace).area(),
             });
         } finally {
-            faces.forEach((face) => face.dispose());
+            for (const face of faces) face.dispose();
         }
     }
     if (shape.shapeType === ShapeTypes.vertex) {
@@ -218,7 +218,7 @@ export function resolveMeasurementReference(document: IDocument, ref: Measuremen
             return Result.err(`Reference is missing or ambiguous: ${ref.label}. Reselect it.`);
         return Result.ok(shapes[indexes[0]].transformedMul(transform));
     } finally {
-        shapes.forEach((shape) => shape.dispose());
+        for (const shape of shapes) shape.dispose();
     }
 }
 
@@ -249,6 +249,6 @@ export function measureReferenceDetails(
     } catch (error) {
         return Result.err(`Measurement failed: ${String(error)}`);
     } finally {
-        owned.forEach((shape) => shape.dispose());
+        for (const shape of owned) shape.dispose();
     }
 }

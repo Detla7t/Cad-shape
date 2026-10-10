@@ -26,6 +26,7 @@ import {
     type XYZLike,
 } from "@chili3d/core";
 import type {
+    ExtremaCCResult,
     Geom_BezierCurve,
     Geom_BoundedCurve,
     Geom_BSplineCurve,
@@ -81,7 +82,7 @@ export class OccCurve extends OccGeometry implements ICurve, IDisposable {
 
     nearestExtrema(curve: ICurve | Line) {
         return gc((c) => {
-            let result;
+            let result: ExtremaCCResult | undefined;
             if (curve instanceof OccCurve) {
                 result = wasm.Curve.nearestExtremaCC(this.curve, curve.curve);
             } else if (curve instanceof Line) {

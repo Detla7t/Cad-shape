@@ -16,6 +16,30 @@
     }
 }
 
+/* The cube: grey glass — a face is a rounded square, white seams between the regions. */
+.surface {
+    fill: #cdd5de;
+    fill-opacity: 0.68;
+    stroke: #fff;
+    stroke-opacity: 0.75;
+    stroke-width: 0.9px;
+    stroke-linejoin: round;
+    pointer-events: none;
+}
+
+.axes {
+    pointer-events: none;
+    stroke-width: 1.3px;
+    stroke-linecap: round;
+
+    text {
+        font:
+            bold 10px Arial,
+            sans-serif;
+        stroke: none;
+    }
+}
+
 .region {
     cursor: pointer;
     outline: none;
@@ -62,18 +86,18 @@
         stroke: #a9d2f0;
     }
 
-    &:hover text,
-    &:focus-visible text,
-    &[data-hover="true"] text {
-        fill: #fff;
-    }
-
     text {
         fill: #39434d;
         font:
             500 11px Arial,
             sans-serif;
         pointer-events: none;
+    }
+
+    &:hover text,
+    &:focus-visible text,
+    &[data-hover="true"] text {
+        fill: #fff;
     }
 }
 
@@ -90,17 +114,6 @@
     pointer-events: auto;
 }
 
-/* The cube: grey glass — a face is a rounded square, white seams between the regions. */
-.surface {
-    fill: #cdd5de;
-    fill-opacity: 0.68;
-    stroke: #fff;
-    stroke-opacity: 0.75;
-    stroke-width: 0.9px;
-    stroke-linejoin: round;
-    pointer-events: none;
-}
-
 .control {
     cursor: pointer;
     outline: none;
@@ -112,18 +125,6 @@
     }
 }
 
-.axes {
-    pointer-events: none;
-    stroke-width: 1.3px;
-    stroke-linecap: round;
-
-    text {
-        font:
-            bold 10px Arial,
-            sans-serif;
-        stroke: none;
-    }
-}
 .menu {
     position: fixed;
     z-index: 10000;

@@ -108,7 +108,7 @@ describe("SketchEditor session statics", () => {
     });
 
     test("enter returns the editor and makes it the active editor", () => {
-        const { app, doc, view, camera, restoreFactory } = setup();
+        const { doc, view, camera, restoreFactory } = setup();
         try {
             const node = new SketchNode({ document: doc, plane: Plane.XY, data: DATA });
             const editor = SketchEditor.enter(node);
@@ -149,7 +149,7 @@ describe("SketchEditor session statics", () => {
     });
 
     test("entering a second sketch exits the first one", () => {
-        const { app, doc, restoreFactory } = setup();
+        const { doc, restoreFactory } = setup();
         try {
             const n1 = new SketchNode({ document: doc, plane: Plane.XY });
             const n2 = new SketchNode({ document: doc, plane: Plane.YZ });
@@ -205,7 +205,7 @@ describe("SketchEditor session statics", () => {
     });
 
     test("editor.exit commits node data and restores camera, workplane, handler", () => {
-        const { app, doc, view, camera, oldHandler, restoreFactory } = setup();
+        const { doc, view, camera, oldHandler, restoreFactory } = setup();
         try {
             const oldWorkplane = view.workplane;
             const node = new SketchNode({ document: doc, plane: Plane.XY });
@@ -228,7 +228,7 @@ describe("SketchEditor session statics", () => {
     });
 
     test("without a session getActive is undefined and exit is a no-op", () => {
-        const { app, restoreFactory } = setup();
+        const { restoreFactory } = setup();
         try {
             expect(SketchEditor.getActive()).toBeUndefined();
             SketchEditor.exit();
@@ -556,7 +556,7 @@ describe("SketchEditor session statics", () => {
     });
 
     test("exit exits the active session", () => {
-        const { app, doc, restoreFactory } = setup();
+        const { doc, restoreFactory } = setup();
         try {
             const node = new SketchNode({ document: doc, plane: Plane.XY });
             SketchEditor.enter(node);

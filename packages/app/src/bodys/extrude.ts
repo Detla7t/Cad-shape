@@ -66,7 +66,7 @@ export class ExtrudeNode extends ParameterShapeNode {
     }
 
     override generateShape(): Result<IShape> {
-        const normal = GeometryUtils.normal(this.section as any);
+        const normal = GeometryUtils.normal(this.section as IFace | IWire | IEdge);
         const vec = normal.multiply(this.length);
         if (this.section.shapeType === ShapeTypes.face) {
             const sur = (this.section as IFace).surface();

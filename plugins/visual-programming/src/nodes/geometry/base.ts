@@ -46,9 +46,9 @@ export abstract class GeometryBaseNode<
         super(name);
     }
 
-    abstract createShape(inputs: any): IShape | IShape[];
+    abstract createShape(inputs: unknown): IShape | IShape[];
 
-    data(inputs: any): { value: IShape | IShape[] } {
+    data(inputs: unknown): { value: IShape | IShape[] } {
         const shapes = this.createShape(inputs);
 
         this.updateVisual(shapes);

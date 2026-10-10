@@ -25,7 +25,8 @@ test("solid mass properties integrate volume, centroid and moments without consu
         expect(result.isOk).toBe(true);
         expect(result.value.dimension).toBe(3);
         expect(result.value.measure).toBeCloseTo(6000, 6);
-        result.value.centroid.forEach((value, i) => expect(value).toBeCloseTo([5, 10, 15][i], 6));
+        for (const [i, value] of result.value.centroid.entries())
+            expect(value).toBeCloseTo([5, 10, 15][i], 6);
         expect(result.value.inertia[0][0]).toBeCloseTo(650000, 4);
         expect(result.value.inertia[0][1]).toBeCloseTo(0, 5);
         expect(box.value.volume()).toBeCloseTo(6000, 6);
@@ -47,7 +48,7 @@ test("a selected planar face reports section area and centroidal area moments", 
         expect(result.value.inertia[0][0]).toBeCloseTo((200 * 400) / 12, 5);
         expect(result.value.inertia[1][1]).toBeCloseTo((200 * 100) / 12, 5);
     } finally {
-        faces.forEach((face) => face.dispose());
+        for (const face of faces) face.dispose();
         box.value.dispose();
     }
 });

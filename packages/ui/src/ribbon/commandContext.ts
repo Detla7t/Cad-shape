@@ -14,6 +14,7 @@ import {
     type ICommand,
     type IDisposable,
     type IDocument,
+    type IPropertyChanged,
     isCancelableCommand,
     Localize,
     Observable,
@@ -40,6 +41,13 @@ import {
     UrlStringConverter,
 } from "@chili3d/element";
 import style from "./commandContext.module.css";
+
+/** A command seen through its property names: values are read and written by `Property.name`. */
+type CommandProps = IPropertyChanged & Record<string, unknown>;
+
+function commandProps(command: ICommand): CommandProps {
+    return command as unknown as CommandProps;
+}
 
 export class CommandContext extends HTMLElement implements IDisposable {
     private readonly propMap: Map<string | number | symbol, [Property, HTMLElement][]> = new Map();
@@ -131,7 +139,7 @@ export class CommandContext extends HTMLElement implements IDisposable {
         this.selectionControlContainer?.remove();
         this.selectionControlContainer = undefined;
         if (this.closeIcon) this.closeIcon.style.display = "";
-        this.selectionCountCleanups.forEach((fn) => fn());
+        for (const cleanup of this.selectionCountCleanups) cleanup();
         this.selectionCountCleanups = [];
     };
 
@@ -195,7 +203,7 @@ export class CommandContext extends HTMLElement implements IDisposable {
         let visible = !PropertyUtils.isHiddenProperty(this.command, property.name);
         if (visible && property.dependencies) {
             for (const d of property.dependencies) {
-                if ((this.command as any)[d.property] !== d.value) {
+                if (Reflect.get(this.command, d.property) !== d.value) {
                     visible = false;
                     break;
                 }
@@ -215,7 +223,7 @@ export class CommandContext extends HTMLElement implements IDisposable {
     }
 
     private createItem(command: ICommand, g: Property) {
-        const noType = command as any;
+        const noType = commandProps(command);
         const type = typeof noType[g.name];
 
         if (g.type === "materialId") {
@@ -242,18 +250,19 @@ export class CommandContext extends HTMLElement implements IDisposable {
         }
     }
 
-    private newCombobox(g: Property, combobox: Combobox<any>) {
+    private newCombobox(g: Property, combobox: Combobox<unknown>) {
         // The command property is the source of truth (CancelableCommand restores it from the
         // properties cache), while the combobox is shared across command instances — derive the
         // selection from the property value instead of the shared combobox.selectedIndex.
-        const valueIndex = combobox.items.indexOf((this.command as any)[g.name]);
+        const valueIndex = combobox.items.indexOf(commandProps(this.command)[g.name]);
         const selectedIndex = valueIndex < 0 ? combobox.selectedIndex : valueIndex;
         const options = combobox.items.map((item, index) => {
             return option({
                 selected: index === selectedIndex,
-                textContent: I18n.isI18nKey(item)
-                    ? new Localize(item)
-                    : (combobox.converter?.convert(item).unchecked() ?? String(item)),
+                textContent:
+                    typeof item === "string" && I18n.isI18nKey(item)
+                        ? new Localize(item)
+                        : (combobox.converter?.convert(item).unchecked() ?? String(item)),
             });
         });
 
@@ -264,7 +273,7 @@ export class CommandContext extends HTMLElement implements IDisposable {
                     className: style.select,
                     onchange: (e) => {
                         combobox.selectedIndex = (e.target as HTMLSelectElement).selectedIndex;
-                        (this.command as any)[g.name] = combobox.selectedItem;
+                        commandProps(this.command)[g.name] = combobox.selectedItem;
                     },
                 },
                 ...options,
@@ -279,7 +288,7 @@ export class CommandContext extends HTMLElement implements IDisposable {
      * decide whether the text resolves at all; a value that will not resolve is refused
      * with a toast rather than written, because writing it would silently break the rebuild.
      */
-    private newExpressionInput(g: Property, noType: any, expected: UnitSpec) {
+    private newExpressionInput(g: Property, noType: CommandProps, expected: UnitSpec) {
         return div(
             label({ textContent: new Localize(g.display) }),
             input({
@@ -322,7 +331,7 @@ export class CommandContext extends HTMLElement implements IDisposable {
         return document?.variables.evaluate().scope ?? EMPTY_SCOPE;
     }
 
-    private newInput(g: Property, noType: any, converter?: (v: string) => any) {
+    private newInput(g: Property, noType: CommandProps, converter?: (v: string) => unknown) {
         return div(
             label({ textContent: new Localize(g.display) }),
             input({
@@ -344,7 +353,7 @@ export class CommandContext extends HTMLElement implements IDisposable {
         );
     }
 
-    private newCheckbox(g: Property, noType: any) {
+    private newCheckbox(g: Property, noType: CommandProps) {
         return div(
             label({ textContent: new Localize(g.display) }),
             input({
@@ -357,15 +366,15 @@ export class CommandContext extends HTMLElement implements IDisposable {
         );
     }
 
-    private newButton(g: Property, noType: any) {
+    private newButton(g: Property, noType: CommandProps) {
         return button({
             className: style.button,
             textContent: new Localize(g.display),
-            onclick: () => noType[g.name](),
+            onclick: () => (noType[g.name] as () => void)(),
         });
     }
 
-    private materialEditor(g: Property, noType: any) {
+    private materialEditor(g: Property, noType: CommandProps) {
         if (!(this.command instanceof CancelableCommand)) {
             throw new Error("MaterialEditor only support CancelableCommand");
         }

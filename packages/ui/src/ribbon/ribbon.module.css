@@ -12,11 +12,161 @@
     background-color: rgba(128, 128, 128, 0.45);
 }
 
+.documentHeader {
+    display: flex;
+    align-items: center;
+    height: 40px;
+    box-sizing: border-box;
+    padding: 0 8px;
+    gap: 14px;
+    background: var(--panel-background-color);
+    border-bottom: 1px solid var(--border-color);
+}
+.documentHeader > button {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 4px;
+    border: none;
+    background: transparent;
+    color: var(--foreground-color);
+    cursor: pointer;
+}
+.documentHeader > button:first-child {
+    color: #4b91cd;
+    font-size: 15px;
+    font-weight: 600;
+}
+.documentHeader > .center {
+    padding-right: 140px;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+.documentHeader .views {
+    display: flex;
+    align-items: center;
+    overflow-x: auto;
+    flex: 1;
+}
+.documentHeader .tab {
+    display: flex;
+    align-items: center;
+    min-width: 100px;
+    max-width: 240px;
+    height: 30px;
+    padding: 0 8px;
+    color: var(--foreground-secondary-color);
+}
+.documentHeader .active {
+    color: var(--foreground-color);
+    font-weight: 600;
+}
+.documentHeader .name {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: 13px;
+}
+.documentHeader .close,
+.documentHeader .new {
+    width: 12px;
+    height: 12px;
+    padding: 6px;
+    margin-left: 8px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+.documentHeader .close:hover,
+.documentHeader .new:hover {
+    background: var(--hover-background-color);
+}
+.ribbonTitlePanel {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    margin: 0px 4px;
+    flex: 0 0 auto;
+
+    .home {
+        width: 14px;
+        height: 14px;
+        padding: 6px;
+        border-radius: 4px;
+        margin: 0px 4px;
+
+        &:hover {
+            background-color: var(--hover-background-color);
+        }
+    }
+
+    & .quickCommands {
+        display: flex;
+        flex-direction: row;
+
+        svg {
+            width: 14px;
+            height: 14px;
+            padding: 6px;
+            border-radius: 4px;
+            margin: 0px 6px;
+
+            &:hover {
+                background-color: var(--hover-background-color);
+            }
+        }
+    }
+
+    .tabHeader {
+        color: var(--titlebar-forground-color);
+        padding: 5px 15px;
+
+        &:hover {
+            -webkit-text-stroke: 0.65px var(--foreground-color);
+            background-color: var(--hover-background-color);
+        }
+    }
+
+    .activedTab {
+        position: relative;
+
+        &::after {
+            content: "";
+            position: absolute;
+            bottom: -2px;
+            left: 8px;
+            right: 8px;
+            height: 3px;
+            background-color: var(--primary-color);
+        }
+    }
+}
+
 .titleBar {
     display: flex;
     flex-direction: row;
     align-items: center;
     margin: 2px 4px;
+
+    .right {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        margin: 2px 8px;
+        flex: 0 0 auto;
+
+        .icon {
+            width: 24px;
+            height: 24px;
+            padding: 4px;
+            border-radius: 4px;
+
+            &:hover {
+                background-color: var(--hover-background-color);
+            }
+        }
+    }
 
     /*
      * The ribbon tab labels may wrap, so the panel's minimum width is far below what it
@@ -155,86 +305,6 @@
             }
         }
     }
-
-    .right {
-        display: flex;
-        flex-direction: row;
-        align-items: center;
-        margin: 2px 8px;
-        flex: 0 0 auto;
-
-        .icon {
-            width: 24px;
-            height: 24px;
-            padding: 4px;
-            border-radius: 4px;
-
-            &:hover {
-                background-color: var(--hover-background-color);
-            }
-        }
-    }
-}
-
-.ribbonTitlePanel {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    margin: 0px 4px;
-    flex: 0 0 auto;
-
-    .home {
-        width: 14px;
-        height: 14px;
-        padding: 6px;
-        border-radius: 4px;
-        margin: 0px 4px;
-
-        &:hover {
-            background-color: var(--hover-background-color);
-        }
-    }
-
-    & .quickCommands {
-        display: flex;
-        flex-direction: row;
-
-        svg {
-            width: 14px;
-            height: 14px;
-            padding: 6px;
-            border-radius: 4px;
-            margin: 0px 6px;
-
-            &:hover {
-                background-color: var(--hover-background-color);
-            }
-        }
-    }
-
-    .tabHeader {
-        color: var(--titlebar-forground-color);
-        padding: 5px 15px;
-
-        &:hover {
-            -webkit-text-stroke: 0.65px var(--foreground-color);
-            background-color: var(--hover-background-color);
-        }
-    }
-
-    .activedTab {
-        position: relative;
-
-        &::after {
-            content: "";
-            position: absolute;
-            bottom: -2px;
-            left: 8px;
-            right: 8px;
-            height: 3px;
-            background-color: var(--primary-color);
-        }
-    }
 }
 
 .tabContentPanel {
@@ -331,76 +401,7 @@
 .root[data-layout="ribbon"] > .context {
     display: none;
 }
-.documentHeader {
-    display: flex;
-    align-items: center;
-    height: 40px;
-    box-sizing: border-box;
-    padding: 0 8px;
-    gap: 14px;
-    background: var(--panel-background-color);
-    border-bottom: 1px solid var(--border-color);
-}
-.documentHeader > button {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    padding: 4px;
-    border: none;
-    background: transparent;
-    color: var(--foreground-color);
-    cursor: pointer;
-}
-.documentHeader > button:first-child {
-    color: #4b91cd;
-    font-size: 15px;
-    font-weight: 600;
-}
-.documentHeader > .center {
-    padding-right: 140px;
-    flex: 1;
-    display: flex;
-    align-items: center;
-    min-width: 0;
-}
-.documentHeader .views {
-    display: flex;
-    align-items: center;
-    overflow-x: auto;
-    flex: 1;
-}
-.documentHeader .tab {
-    display: flex;
-    align-items: center;
-    min-width: 100px;
-    max-width: 240px;
-    height: 30px;
-    padding: 0 8px;
-    color: var(--foreground-secondary-color);
-}
-.documentHeader .active {
-    color: var(--foreground-color);
-    font-weight: 600;
-}
-.documentHeader .name {
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    font-size: 13px;
-}
-.documentHeader .close,
-.documentHeader .new {
-    width: 12px;
-    height: 12px;
-    padding: 6px;
-    margin-left: 8px;
-    cursor: pointer;
-    flex-shrink: 0;
-}
-.documentHeader .close:hover,
-.documentHeader .new:hover {
-    background: var(--hover-background-color);
-}
 .root [hidden] {
+    /* biome-ignore lint/complexity/noImportantStyles: the hidden attribute must beat every author display rule on any element in the panel */
     display: none !important;
 }

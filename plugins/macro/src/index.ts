@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import type { CommandKeys, Plugin, RibbonGroupKeys, RibbonTabKeys } from "@chili3d/core";
+import type { CommandKeys, Locale, Plugin, RibbonGroupKeys, RibbonTabKeys } from "@chili3d/core";
 import { MacroCommand } from "./commands/macro";
 
 const MacroPlugin: Plugin = {
@@ -44,7 +44,7 @@ const MacroPlugin: Plugin = {
                 "macro.editor.executed": "Macro executed successfully",
                 "macro.editor.error": "Execution error: ",
             },
-        } as any,
+        } as unknown as Locale,
         {
             language: "zh-CN",
             display: "简体中文",
@@ -71,7 +71,7 @@ const MacroPlugin: Plugin = {
                 "macro.editor.executed": "宏执行成功",
                 "macro.editor.error": "执行错误: ",
             },
-        } as any,
+        } as unknown as Locale,
     ],
 };
 

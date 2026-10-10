@@ -60,7 +60,9 @@ export class LayoutViewport extends HTMLElement {
 
     connectedCallback(): void {
         this.app.views.onCollectionChanged(this._handleViewCollectionChanged);
-        this.app.views.forEach((view) => this.createViewport(view));
+        this.app.views.forEach((view) => {
+            this.createViewport(view);
+        });
         PubSub.default.sub("activeViewChanged", this._handleActiveViewChanged);
         PubSub.default.sub("viewCursor", this._handleCursor);
         this._handleActiveViewChanged(this.app.activeView);

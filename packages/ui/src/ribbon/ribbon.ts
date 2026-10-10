@@ -20,7 +20,6 @@ import {
     type Ribbon,
     type RibbonGroup,
     type RibbonTab,
-    type RibbonTabKeys,
 } from "@chili3d/core";
 import { button, collection, createCadIcon, createIcon, div, label, span, svg } from "@chili3d/element";
 import { PreferencesDialog } from "../preferences/preferencesDialog";
@@ -32,7 +31,7 @@ import style from "./ribbon.module.css";
 import type { RibbonPushButton } from "./ribbonButton";
 import { RibbonGroupElement } from "./ribbonGroup";
 
-export const QuickButton = (command: ICommand) => {
+export const QuickButton = (command: ICommand | CommandKeys) => {
     const data = CommandStore.getComandData(command);
     if (!data) {
         Logger.warn("commandData is undefined");
@@ -198,7 +197,7 @@ export class RibbonUI extends HTMLElement {
                 collection({
                     className: style.quickCommands,
                     sources: this.dataContent.quickCommands,
-                    template: (command: CommandKeys) => QuickButton(command as any),
+                    template: (command: CommandKeys) => QuickButton(command),
                 }),
                 span({ className: style.split }),
                 this.createRibbonHeader(),

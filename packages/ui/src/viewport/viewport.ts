@@ -5,9 +5,7 @@ import {
     type Act,
     Binding,
     type CameraType,
-    I18n,
     type IConverter,
-    type IEventHandler,
     type IView,
     Localize,
     PubSub,
@@ -34,7 +32,7 @@ class CameraConverter implements IConverter<CameraType> {
 
 export class Viewport extends HTMLElement {
     private readonly _flyout: Flyout;
-    private readonly _eventCaches: [keyof HTMLElementEventMap, (e: any) => void][] = [];
+    private readonly _eventCaches: (() => void)[] = [];
     private readonly _acts: HTMLElement;
     private readonly utilities: ViewportUtilities;
 
@@ -241,47 +239,45 @@ export class Viewport extends HTMLElement {
     private selectionPointer?: number;
 
     private initEvent() {
-        const events: [keyof HTMLElementEventMap, (e: any) => any][] = [
-            ["pointerdown", this.pointerDown],
-            ["pointermove", this.pointerMove],
-            ["pointerout", this.pointerOut],
-            ["pointerup", this.pointerUp],
-            ["pointercancel", this.pointerCancel],
-            ["lostpointercapture", this.pointerCancel],
-            ["wheel", this.mouseWheel],
-            ["dblclick", this.doubleClick],
-        ];
-        events.forEach((v) => {
-            this.addEventListenerHandler(v[0], v[1]);
-        });
+        this.addEventListenerHandler("pointerdown", this.pointerDown);
+        this.addEventListenerHandler("pointermove", this.pointerMove);
+        this.addEventListenerHandler("pointerout", this.pointerOut);
+        this.addEventListenerHandler("pointerup", this.pointerUp);
+        this.addEventListenerHandler("pointercancel", this.pointerCancel);
+        this.addEventListenerHandler("lostpointercapture", this.pointerCancel);
+        this.addEventListenerHandler("wheel", this.mouseWheel);
+        this.addEventListenerHandler("dblclick", this.doubleClick);
     }
 
-    private addEventListenerHandler(type: keyof HTMLElementEventMap, handler: (e: any) => any) {
-        const listener = (e: any) => {
+    private addEventListenerHandler<K extends keyof HTMLElementEventMap>(
+        type: K,
+        handler: (e: HTMLElementEventMap[K]) => void,
+    ) {
+        const listener = (e: HTMLElementEventMap[K]) => {
             e.preventDefault();
             handler(e);
         };
         this.addEventListener(type, listener);
-        this._eventCaches.push([type, listener]);
+        this._eventCaches.push(() => this.removeEventListener(type, listener));
     }
 
     private removeEvents() {
         if (this.rightGesture) this.pointerCancel(this.rightGesture.down);
         this.selectionPointer = undefined;
-        this._eventCaches.forEach((x) => {
-            this.removeEventListener(x[0], x[1]);
-        });
+        for (const remove of this._eventCaches) remove();
         this._eventCaches.length = 0;
     }
 
     private readonly handleEvent = (
-        eventName: Exclude<keyof IEventHandler, "isEnabled" | "dispose" | "resolveCommand" | "treeSelection">,
+        eventName: "pointerMove" | "pointerDown" | "pointerUp" | "pointerOut" | "mouseWheel",
         event: PointerEvent | WheelEvent,
     ) => {
-        if (this.view.document.visual.eventHandler.isEnabled)
-            this.view.document.visual.eventHandler[eventName]?.(this.view, event as any);
-        if (this.view.document.visual.viewHandler.isEnabled)
-            this.view.document.visual.viewHandler[eventName]?.(this.view, event as any);
+        const { eventHandler, viewHandler } = this.view.document.visual;
+        for (const handler of [eventHandler, viewHandler]) {
+            if (!handler.isEnabled) continue;
+            if (eventName === "mouseWheel") handler.mouseWheel?.(this.view, event as WheelEvent);
+            else handler[eventName]?.(this.view, event as PointerEvent);
+        }
     };
 
     private readonly pointerMove = (event: PointerEvent) => {

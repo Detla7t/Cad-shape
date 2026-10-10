@@ -57,7 +57,7 @@ export function resolveSubShapes(
             for (const sub of subShapes) sub.dispose();
             throw new Error(`A picked ${kind} of "${node.name}" no longer exists — pick it again`);
         }
-        indexes.forEach((index) => result.push(subShapes[index]));
+        for (const index of indexes) result.push(subShapes[index]);
         subShapes.forEach((sub, index) => {
             if (indexes.includes(index)) geometry.own(sub);
             else sub.dispose();

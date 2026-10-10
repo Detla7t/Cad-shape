@@ -40,7 +40,9 @@ export class HotkeyService implements IService {
 
         for (const [command, keyOrKeys] of Object.entries(shortcuts)) {
             if (Array.isArray(keyOrKeys)) {
-                keyOrKeys.forEach((k) => this._keyMap.set(normalizeShortcut(k), command as CommandKeys));
+                keyOrKeys.forEach((k) => {
+                    this._keyMap.set(normalizeShortcut(k), command as CommandKeys);
+                });
             } else if (typeof keyOrKeys === "string" && keyOrKeys) {
                 this._keyMap.set(normalizeShortcut(keyOrKeys), command as CommandKeys);
             }

@@ -38,6 +38,15 @@ export function zipTrees<T, U>(
     return helper(trees);
 }
 
+/** Like zipTrees, for trees of different element types: the callback receives one value of each. */
+export function zipMixedTrees<A extends unknown[], U>(
+    trees: { [K in keyof A]: Tree<A[K]> },
+    fn: (...values: A) => U,
+    flatOne: boolean = true,
+): Tree<U> {
+    return zipTrees<unknown, U>(trees as unknown[], fn as (...values: unknown[]) => U, flatOne);
+}
+
 export function flatTree<T>(items: T | T[], filterUndefined = true) {
     const result: T[] = [];
 

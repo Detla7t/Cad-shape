@@ -10,6 +10,7 @@ import {
     type IVisualObject,
     isHistoryHidden,
     type Matrix4,
+    type MeshLike,
     type MeshNode,
     type ShapeMeshRange,
     type ShapeType,
@@ -28,7 +29,6 @@ import {
     type Points,
 } from "three";
 import { Line2 } from "three/examples/jsm/lines/Line2.js";
-import { LineGeometry } from "three/examples/jsm/lines/LineGeometry.js";
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js";
@@ -59,7 +59,7 @@ function setLocked(obj: Object3D, isLocked: boolean) {
     } else {
         obj.traverse((x) => {
             if (!x.userData["oldMaterial"]) return;
-            (x as any).material = x.userData["oldMaterial"];
+            (x as Mesh).material = x.userData["oldMaterial"];
             delete x.userData["oldMaterial"];
         });
     }
@@ -116,7 +116,7 @@ export abstract class ThreeVisualObject extends Object3D implements IVisualObjec
 
     dispose() {
         this.node.removePropertyChanged(this.handlePropertyChanged);
-        this._node = null as any;
+        this._node = null as unknown as VisualNode;
     }
 
     abstract getSubShapeAndIndex(
@@ -175,8 +175,8 @@ export class ThreeMeshObject extends ThreeVisualObject implements IHighlightable
     }
 
     getSubShapeAndIndex(
-        shapeType: "face" | "edge",
-        subVisualIndex: number,
+        _shapeType: "face" | "edge",
+        _subVisualIndex: number,
     ): {
         shape: IShape | undefined;
         subShape: ISubShape | undefined;
@@ -191,7 +191,7 @@ export class ThreeMeshObject extends ThreeVisualObject implements IHighlightable
         };
     }
 
-    override subShapeVisual(shapeType: ShapeType): (Mesh | LineSegments2)[] {
+    override subShapeVisual(_shapeType: ShapeType): (Mesh | LineSegments2)[] {
         return [];
     }
 
@@ -241,20 +241,6 @@ export class ThreeMeshObject extends ThreeVisualObject implements IHighlightable
         buff.setPositions(this.meshNode.mesh.position!);
         buff.computeBoundingBox();
         const line = new LineSegments2(buff, material);
-        line.layers.set(Constants.Layers.Wireframe);
-        return line;
-    }
-
-    private newLine() {
-        const material = new LineMaterial({
-            linewidth: 1,
-            color: this.meshNode.mesh.color as number,
-            side: DoubleSide,
-        });
-        const geometry = new LineGeometry();
-        geometry.setPositions(this.meshNode.mesh.position!);
-        geometry.computeBoundingBox();
-        const line = new Line2(geometry, material);
         line.layers.set(Constants.Layers.Wireframe);
         return line;
     }
@@ -390,7 +376,7 @@ export class ThreeComponentObject extends ThreeVisualObject implements IHighligh
             return;
         }
 
-        const buff = ThreeGeometryFactory.createFaceBufferGeometry(data as any);
+        const buff = ThreeGeometryFactory.createFaceBufferGeometry(data as MeshLike);
         if (data.groups.length > 1) buff.groups = data.groups;
         const materials = this.context.getMaterial(this.componentNode.component.mesh.surfaceMaterials);
         this._surfaces = new Mesh(buff, materials);

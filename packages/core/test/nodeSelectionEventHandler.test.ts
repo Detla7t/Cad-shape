@@ -261,7 +261,7 @@ describe("NodeSelectionHandler", () => {
         });
 
         test("should set selected nodes when highlights exist", () => {
-            const { handler, view, selection, context, nodesByVisual } = setupNodeSelectionHandler();
+            const { handler, view, selection, nodesByVisual } = setupNodeSelectionHandler();
 
             const visualObj = createMockVisualObject();
             const node = createMockNode("testNode");
@@ -314,7 +314,7 @@ describe("NodeSelectionHandler", () => {
 
     describe("cleanHighlights", () => {
         test("should remove highlight state from all highlighted objects", () => {
-            const { handler, addCalls, removeCalls } = setupNodeSelectionHandler();
+            const { handler, removeCalls } = setupNodeSelectionHandler();
 
             const visualObj1 = createMockVisualObject();
             const visualObj2 = createMockVisualObject();
@@ -491,11 +491,7 @@ describe("NodeSelectionHandler", () => {
             // Now _highlights should be set
             expect((handler as any)._highlights).not.toBeNull();
 
-            let selectedNodes: INode[] | undefined;
-            selection.setSelectedNodes = (nodes) => {
-                selectedNodes = nodes;
-                return 1;
-            };
+            selection.setSelectedNodes = () => 1;
 
             addCalls.length = 0;
             const upEvent = createPointerEvent({ pointerId: 1 });
@@ -540,7 +536,7 @@ describe("NodeSelectionHandler", () => {
             // Since multiMode is false and select returned >0, success should be called
             // But wait - the select method calls setSelectedNodes which returns 0 by default in our mock
             // So no success. Let me fix the mock.
-            selection.setSelectedNodes = (nodes) => {
+            selection.setSelectedNodes = (_nodes) => {
                 return 1;
             };
 
@@ -552,7 +548,7 @@ describe("NodeSelectionHandler", () => {
 
     describe("pointerOut", () => {
         test("should clean up on primary pointer out", () => {
-            const { handler, view, addCalls, removeCalls } = setupNodeSelectionHandler();
+            const { handler, view, removeCalls } = setupNodeSelectionHandler();
 
             // Set up some highlights
             const visualObj = createMockVisualObject();

@@ -91,7 +91,9 @@ describe("AutomationSession", () => {
 
     afterEach(() => {
         Config.instance.preferences = saved;
-        document.body.querySelectorAll("[data-automation-indicator]").forEach((element) => element.remove());
+        document.body.querySelectorAll("[data-automation-indicator]").forEach((element) => {
+            element.remove();
+        });
     });
 
     test("stays off unless the preference or the URL flag enables it, and Disconnect turns it off", () => {

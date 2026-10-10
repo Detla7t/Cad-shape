@@ -100,7 +100,9 @@ function clickMenuItem(menu: HTMLElement, index: number) {
 
 describe("FeatureListProperty", () => {
     afterEach(() => {
-        document.body.querySelectorAll(".fl-menu").forEach((x) => x.remove());
+        document.body.querySelectorAll(".fl-menu").forEach((x) => {
+            x.remove();
+        });
         showDialogMock.clear();
     });
 

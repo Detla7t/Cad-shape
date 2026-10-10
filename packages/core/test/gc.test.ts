@@ -31,7 +31,7 @@ describe("isDeletable", () => {
 
     test("should return false for object with delete method that has parameters", () => {
         const obj = {
-            delete(arg: string) {},
+            delete(_arg: string) {},
         };
         expect(isDeletable(obj)).toBe(false);
     });
@@ -71,7 +71,7 @@ describe("gc function", () => {
     });
 
     test("should return the result of the action", () => {
-        const result = gc((collect) => {
+        const result = gc((_collect) => {
             return "test result";
         });
 
@@ -105,7 +105,9 @@ describe("gc function", () => {
         }));
 
         gc((collect) => {
-            resources.forEach((r) => collect(r));
+            resources.forEach((r) => {
+                collect(r);
+            });
             return "result";
         });
 

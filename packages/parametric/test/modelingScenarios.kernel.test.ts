@@ -192,7 +192,7 @@ function expectClean(...bodies: ParametricBodyNode[]): void {
 
 /** Extent with a tolerance — revolved/cylindrical faces are B-spline approximations. */
 function expectExtent(body: ParametricBodyNode, expected: number[], digits = 1): void {
-    extent(body).forEach((value, index) => expect(value).toBeCloseTo(expected[index], digits));
+    for (const [index, value] of extent(body).entries()) expect(value).toBeCloseTo(expected[index], digits);
 }
 
 function setDepth(body: ParametricBodyNode, featureId: string, depth: number): void {

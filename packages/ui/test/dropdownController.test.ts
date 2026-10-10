@@ -39,7 +39,6 @@ describe("getItemData", () => {
         test("should fallback to default icon when CommandStore returns no data", () => {
             // Use a string that can be passed as CommandKeys — ts-ignore because the literal
             // isn't in the union, but we test the runtime fallback
-            // biome-ignore lint/suspicious/noExplicitAny: testing runtime fallback for unknown command key
             const result = getItemData("unknown.command" as any);
             expect(result.command).toBe("unknown.command");
             expect(result.icon).toBe("icon-command");
@@ -133,7 +132,9 @@ describe("DropdownController", () => {
     afterEach(() => {
         controller.dispose();
         // Clean up any leftover dropdowns in the DOM
-        document.body.querySelectorAll(".test-dropdown").forEach((el) => el.remove());
+        document.body.querySelectorAll(".test-dropdown").forEach((el) => {
+            el.remove();
+        });
     });
 
     describe("initial state", () => {

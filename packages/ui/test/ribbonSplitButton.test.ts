@@ -69,7 +69,9 @@ describe("RibbonSplitButton", () => {
     afterEach(() => {
         CommandStore.unregisterCommand(CMD_A);
         CommandStore.unregisterCommand(CMD_B);
-        document.body.querySelectorAll(".rsb-dropdown").forEach((el) => el.remove());
+        document.body.querySelectorAll(".rsb-dropdown").forEach((el) => {
+            el.remove();
+        });
     });
 
     describe("rendering", () => {

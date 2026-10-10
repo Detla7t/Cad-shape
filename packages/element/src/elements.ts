@@ -55,7 +55,7 @@ export function createElement<K extends keyof HTMLElementTagNameMap>(tag: K) {
                 setProperties(e, props);
             }
         }
-        children.forEach((c) => e.append(c));
+        for (const c of children) e.append(c);
         return e;
     };
 }
@@ -108,7 +108,7 @@ export function setSVGIcon(svg: SVGSVGElement, newIcon: string) {
 function addTitle(props: HTMLProps<HTMLElement> & { icon: string }, svg: SVGSVGElement) {
     const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
     if (props.title instanceof Localize) {
-        props.title.set(title as any, "textContent");
+        props.title.set(title as unknown as HTMLElement, "textContent");
     } else if (typeof props.title === "string") {
         title.textContent = props.title;
     } else {

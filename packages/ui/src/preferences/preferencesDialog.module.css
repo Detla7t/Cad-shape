@@ -45,6 +45,7 @@
     display: block;
     width: 100%;
     text-align: left;
+    /* biome-ignore lint/complexity/noImportantStyles: the later .dialog button rule has the same specificity and sets a border; reordering would also change its padding */
     border: 0 !important;
     background: transparent;
     padding: 9px 12px;

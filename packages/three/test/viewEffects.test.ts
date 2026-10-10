@@ -71,7 +71,9 @@ describe("viewport ambient occlusion", () => {
             if (object instanceof Mesh) {
                 object.geometry.dispose();
                 const materials = Array.isArray(object.material) ? object.material : [object.material];
-                materials.forEach((material) => material.dispose());
+                for (const material of materials) {
+                    material.dispose();
+                }
             }
         });
         rs.restoreAllMocks();

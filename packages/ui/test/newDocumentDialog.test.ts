@@ -9,7 +9,9 @@ import { showNewDocumentDialog } from "../src/home/newDocumentDialog";
 const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 const preferences = structuredClone(Config.instance.preferences);
 afterEach(() => {
-    document.querySelectorAll("dialog").forEach((dialog) => dialog.remove());
+    document.querySelectorAll("dialog").forEach((dialog) => {
+        dialog.remove();
+    });
     Config.instance.preferences = structuredClone(preferences);
     rs.restoreAllMocks();
 });

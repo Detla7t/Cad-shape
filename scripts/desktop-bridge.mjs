@@ -305,7 +305,9 @@ export function expandPattern(pattern, env) {
             entries
                 .filter((entry) => pattern.test(entry))
                 .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))
-                .forEach((entry) => next.push(path.join(base, entry)));
+                .forEach((entry) => {
+                    next.push(path.join(base, entry));
+                });
         }
         bases = next;
         if (bases.length === 0) break;

@@ -1,16 +1,23 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { command, type IApplication, type ICommand, PubSub } from "@chili3d/core";
+import {
+    type CommandKeys,
+    command,
+    type I18nKeys,
+    type IApplication,
+    type ICommand,
+    PubSub,
+} from "@chili3d/core";
 import { Editor } from "./editor";
 
 @command({
-    key: "vp.open" as any,
+    key: "vp.open" as CommandKeys,
     icon: {
         type: "path",
         value: "icons/visual-programming.svg",
     },
-    helpText: "vp.description" as any,
+    helpText: "vp.description" as I18nKeys,
 })
 export class OpenVisualProgrammingEditorCommand implements ICommand {
     async execute(application: IApplication): Promise<void> {

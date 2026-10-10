@@ -61,7 +61,7 @@ describe("DeepObserver", () => {
             let changedPath: string | undefined;
             let oldValue: any;
 
-            DeepObserver.addDeepPropertyChangedHandler(obj, (path, source, old) => {
+            DeepObserver.addDeepPropertyChangedHandler(obj, (path, _source, old) => {
                 changedPath = path;
                 oldValue = old;
             });

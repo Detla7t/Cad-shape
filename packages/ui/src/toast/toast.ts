@@ -22,7 +22,7 @@ export interface ToastOptions {
 export class Toast {
     private static _lastToast: [number, HTMLElement] | undefined;
 
-    static readonly info = (message: I18nKeys, ...args: any[]) => {
+    static readonly info = (message: I18nKeys, ...args: unknown[]) => {
         Toast.show({ message: I18n.translate(message, ...args) });
     };
 

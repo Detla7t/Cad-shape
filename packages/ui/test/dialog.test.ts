@@ -30,7 +30,9 @@ import { mustQuery } from "./_helpers/domHelpers";
 describe("showDialog", () => {
     // Cleanup dialogs after each test
     afterEach(() => {
-        document.body.querySelectorAll("dialog").forEach((d) => d.remove());
+        document.body.querySelectorAll("dialog").forEach((d) => {
+            d.remove();
+        });
     });
 
     test("should create a dialog element and append it to document.body", () => {

@@ -9,8 +9,8 @@ export async function runMacro(app: IApplication, code: string) {
         return;
     }
 
-    const fn = new Function("app", code);
-    await Promise.try(fn as any, app)
+    const fn = new Function("app", code) as (app: IApplication) => unknown;
+    await Promise.try(fn, app)
         .then(() => {
             PubSub.default.pub("showToast", "macro.editor.executed" as I18nKeys);
         })

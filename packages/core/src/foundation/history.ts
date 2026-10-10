@@ -44,7 +44,9 @@ export class History implements IDisposable {
         // Only the undo steps are disposed. Redo steps are dropped as `add()` drops them: a
         // node a redo step would remove again is live in the tree after its undo, and
         // disposing the step would dispose that live node.
-        this._undos.forEach((record) => record.dispose());
+        this._undos.forEach((record) => {
+            record.dispose();
+        });
         this.clear();
     }
 
@@ -159,10 +161,10 @@ export class History implements IDisposable {
 export class PropertyHistoryRecord implements IHistoryRecord {
     readonly name: string;
     constructor(
-        readonly object: any,
+        readonly object: object,
         readonly property: string | symbol | number,
-        readonly oldValue: any,
-        readonly newValue: any,
+        readonly oldValue: unknown,
+        readonly newValue: unknown,
     ) {
         this.name = `change ${String(property)} property`;
     }
@@ -170,11 +172,11 @@ export class PropertyHistoryRecord implements IHistoryRecord {
     dispose(): void {}
 
     undo(): void {
-        this.object[this.property] = this.oldValue;
+        (this.object as Record<string | symbol | number, unknown>)[this.property] = this.oldValue;
     }
 
     redo(): void {
-        this.object[this.property] = this.newValue;
+        (this.object as Record<string | symbol | number, unknown>)[this.property] = this.newValue;
     }
 }
 
@@ -285,7 +287,9 @@ export class NodeLinkedListHistoryRecord implements IHistoryRecord {
     }
 
     redo(): void {
-        this.records.forEach((record) => this.handleRedo(record));
+        this.records.forEach((record) => {
+            this.handleRedo(record);
+        });
     }
 }
 
@@ -295,7 +299,9 @@ export class ArrayRecord implements IHistoryRecord {
     constructor(readonly name: string) {}
 
     dispose(): void {
-        this.records.forEach((r) => r.dispose());
+        this.records.forEach((r) => {
+            r.dispose();
+        });
     }
 
     undo() {

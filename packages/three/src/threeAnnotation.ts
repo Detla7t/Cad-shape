@@ -29,7 +29,7 @@ export class ThreeRefSegmentAnnotation extends Object3D implements IVisualObject
     private _mesh: LineSegments2;
 
     constructor(
-        private context: ThreeVisualContext,
+        _context: ThreeVisualContext,
         readonly annotation: RefSegmentAnnotation,
     ) {
         super();

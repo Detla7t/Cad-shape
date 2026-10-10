@@ -83,7 +83,7 @@ describe("Result", () => {
 
         test("should return false when result is error", () => {
             const r = Result.err("error");
-            expect(r.isOkAnd((v) => true)).toBe(false);
+            expect(r.isOkAnd((_v) => true)).toBe(false);
         });
 
         test("should work with object values", () => {
@@ -95,7 +95,7 @@ describe("Result", () => {
     describe("isErrorOr", () => {
         test("should return true when result is error", () => {
             const r = Result.err("error");
-            expect(r.isErrorOr((v) => false)).toBe(true);
+            expect(r.isErrorOr((_v) => false)).toBe(true);
         });
 
         test("should return true when ok and predicate matches", () => {

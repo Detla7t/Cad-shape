@@ -210,7 +210,7 @@ export class Config extends Observable {
         const data = ObjectStorage.default.value<SerializedData>(this.storageKey);
         for (const key in data) {
             const thisKey = key as keyof Config;
-            this.setPrivateValue(thisKey, (data as any)[key]);
+            this.setPrivateValue(thisKey, (data as Record<string, unknown>)[key] as never);
         }
     }
 

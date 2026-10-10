@@ -73,9 +73,9 @@ export abstract class MultistepCommand extends CancelableCommand {
 
     protected meshCreatedShape<K extends keyof IShapeFactory>(
         method: K,
-        ...args: Parameters<IShapeFactory[K] extends (...args: any) => any ? IShapeFactory[K] : never>
+        ...args: Parameters<IShapeFactory[K] extends (...args: never[]) => unknown ? IShapeFactory[K] : never>
     ) {
-        const shape = (shapeFactory as any)[method](...args);
+        const shape = (shapeFactory[method] as (...args: unknown[]) => IShape)(...args);
         return this.meshShape(shape);
     }
 

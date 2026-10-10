@@ -5,7 +5,7 @@ import { Binding, type IDocument, Localize, type Property, PubSub, Transaction }
 import { ColorConverter, div, input, label } from "@chili3d/element";
 import colorStyle from "./colorPorperty.module.css";
 import commonStyle from "./common.module.css";
-import { PropertyBase } from "./propertyBase";
+import { asPropertyHosts, PropertyBase, type PropertyHost } from "./propertyBase";
 
 export class ColorProperty extends PropertyBase {
     readonly converter = new ColorConverter();
@@ -13,15 +13,15 @@ export class ColorProperty extends PropertyBase {
 
     constructor(
         readonly document: IDocument,
-        objects: any[],
+        objects: readonly object[],
         readonly property: Property,
     ) {
-        super(objects);
-        this.input = this.createInput(objects[0]);
+        super(asPropertyHosts(objects));
+        this.input = this.createInput(this.objects[0]);
         this.appendChild(this.createPanel());
     }
 
-    private createInput(object: any): HTMLInputElement {
+    private createInput(object: PropertyHost): HTMLInputElement {
         return input({
             className: colorStyle.color,
             type: "color",

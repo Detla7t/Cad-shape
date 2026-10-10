@@ -3,7 +3,7 @@
 
 import { type IShape, Plane } from "@chili3d/core";
 import { ClassicPreset } from "rete";
-import { zipTrees } from "../../tree";
+import { zipMixedTrees } from "../../tree";
 import type { INodeEditor } from "../../types";
 import { GeometryBaseNode } from "./base";
 
@@ -31,7 +31,7 @@ export class BoxNode extends GeometryBaseNode<
         const dys = (inputs.dy ?? [[1]]).flat();
         const dzs = (inputs.dz ?? [[1]]).flat();
 
-        return zipTrees([planes, dxs, dys, dzs] as any, (plane: any, dx: number, dy: number, dz: number) => {
+        return zipMixedTrees([planes, dxs, dys, dzs], (plane: Plane, dx: number, dy: number, dz: number) => {
             if (dx <= 0 || dy <= 0 || dz <= 0) return undefined;
             return shapeFactory.box(plane, dx, dy, dz).value;
         }) as IShape | IShape[];

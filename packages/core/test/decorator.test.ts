@@ -9,7 +9,7 @@ import { createMockCommand } from "../test-utils";
     icon: "test-icon",
 })
 class TestCommand implements ICommand {
-    async execute(application: IApplication): Promise<void> {}
+    async execute(_application: IApplication): Promise<void> {}
 }
 
 @command({
@@ -19,7 +19,7 @@ class TestCommand implements ICommand {
     helpUrl: "https://test.com/help",
 })
 class TestToggleCommand implements ICommand {
-    async execute(application: IApplication): Promise<void> {}
+    async execute(_application: IApplication): Promise<void> {}
 }
 
 describe("command decorator", () => {

@@ -6,7 +6,6 @@ import {
     Config,
     command,
     documentUnit,
-    download,
     GetOrSelectNodeStep,
     I18n,
     type IApplication,
@@ -24,13 +23,12 @@ import {
     unitSpecOfType,
 } from "@chili3d/core";
 import { convertDrawing } from "@chili3d/drawing";
-import { partStudioNodes, writeDxf, writeSvg } from "@chili3d/parametric";
+import { partStudioNodes, writeDxf } from "@chili3d/parametric";
 import { blocksToDocx } from "@chili3d/richtext/docx";
 import { emptyWorkbook } from "@chili3d/sheet/model";
 import { writeWorkbook } from "@chili3d/sheet/workbookIo";
 import { activeDrawing } from "./activeDrawing";
 import { ANNOTATION_LAYERS, withEntities } from "./cad/drawingAnnotations";
-import { writeDwg } from "./cad/dwg";
 import { importDxf } from "./cad/dxfToDrawing";
 import { type ProjectionAngle, projectionDrawing } from "./cad/projection";
 import { SHEET_SIZES, scaleLabel, sheetLayout, sheetSizeNamed } from "./cad/sheetDrawing";
@@ -78,7 +76,7 @@ export class NewDrawingCommand implements ICommand {
         const inch = documentUnit(document, unitSpecOfType("length")).suffix === "in";
         const nodes = partStudioNodes(document);
         const shapes: IShape[] = nodes.map((node) => node.shape.value.transformedMul(node.worldTransform()));
-        let views;
+        let views: ReturnType<typeof projectionDrawing> | undefined;
         try {
             if (shapes.length > 0) views = projectionDrawing(shapes, { angle: "third", iso: true });
         } finally {

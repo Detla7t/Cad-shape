@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { Matrix4, XYZ } from "@chili3d/core";
+import { XYZ } from "@chili3d/core";
 import { buildTransformMatrix, TRANSFORM_ORDER } from "../src/tools/transformMatrix";
 
 /** Where the matrix sends (1,0,0) — a placement, so a failure reads as geometry, not 16 floats. */

@@ -72,7 +72,7 @@ async function main() {
                 stdio: "inherit",
                 env: { ...process.env, NODE_ENV: process.env.NODE_ENV || "production" },
             });
-        } catch (err) {
+        } catch {
             console.error(`[build-plugins] ❌ Build failed for ${plugin.name}`);
             process.exit(1);
         }

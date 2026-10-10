@@ -21,7 +21,9 @@ export class ToolBar extends HTMLElement {
             { icon: "icon-unexpand", tip: "items.tool.unexpandAll", command: this.unExpandAll },
             { icon: "icon-expand", tip: "items.tool.expandAll", command: this.expandAll },
         ];
-        buttons.forEach(({ icon, tip, command }) => this.button(icon, tip as I18nKeys, command));
+        buttons.forEach(({ icon, tip, command }) => {
+            this.button(icon, tip as I18nKeys, command);
+        });
     }
 
     private button(icon: string, tip: I18nKeys, command: () => void) {

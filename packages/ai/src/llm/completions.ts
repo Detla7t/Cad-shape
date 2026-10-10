@@ -32,8 +32,11 @@ export class CompletionsProvider implements LLMProvider {
         const stream = await this.client.chat.completions.create(
             {
                 model: opts.model,
-                messages: toMessages(opts.system, opts.messages) as any,
-                tools: opts.tools.map(toTool) as any,
+                messages: toMessages(
+                    opts.system,
+                    opts.messages,
+                ) as unknown as OpenAI.Chat.Completions.ChatCompletionMessageParam[],
+                tools: opts.tools.map(toTool),
                 stream: true,
                 parallel_tool_calls: false,
             },
@@ -86,7 +89,7 @@ function* flushToolCalls(toolBuf: ToolCallBuffer): Iterable<StreamEvent> {
     }
 }
 
-function toTool(t: Tool) {
+function toTool(t: Tool): OpenAI.Chat.Completions.ChatCompletionTool {
     return {
         type: "function",
         function: { name: t.name, description: t.description, parameters: t.parameters },

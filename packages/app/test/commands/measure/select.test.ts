@@ -1,27 +1,10 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import {
-    AsyncController,
-    BoundingBox,
-    CancelableCommand,
-    type IApplication,
-    type ICurve,
-    type IEdge,
-    type IFace,
-    type ISolid,
-    type IView,
-    Matrix4,
-    Plane,
-    SelectShapeStep,
-    ShapeTypes,
-    VisualConfig,
-    type VisualShapeData,
-    XYZ,
-} from "@chili3d/core";
+import { CancelableCommand, Matrix4, Plane, ShapeTypes, type VisualShapeData, XYZ } from "@chili3d/core";
 import { describe, expect, rs, test } from "@rstest/core";
 import { SelectMeasure } from "../../../src/commands/measure/select";
-import { ensureGlobalStubApp, mockShape, wireCommand } from "../../commands/commandTestUtils";
+import { wireCommand } from "../../commands/commandTestUtils";
 
 describe("SelectMeasure", () => {
     test("should have command metadata", () => {

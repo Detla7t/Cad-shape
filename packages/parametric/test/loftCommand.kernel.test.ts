@@ -68,7 +68,7 @@ function setup() {
     return { app, doc, bottom, top };
 }
 
-function faceOf(doc: TestDocument, sketch: SketchNode): VisualShapeData {
+function faceOf(sketch: SketchNode): VisualShapeData {
     const range = sketch.mesh.faces!.range.find((x) => x.shape.shapeType === ShapeTypes.face)!;
     return {
         shape: range.shape as unknown as IFace,
@@ -96,7 +96,7 @@ describe("LoftFeatureCommand", () => {
 
     test("profiles picked in the viewport build an editable loft feature on accept", async () => {
         const { app, doc, bottom, top } = setup();
-        const faces = [faceOf(doc, bottom), faceOf(doc, top)];
+        const faces = [faceOf(bottom), faceOf(top)];
         let controller: AsyncController | undefined;
         doc.picker.pickShape = rs.fn((_prompt: I18nKeys, c: AsyncController) => {
             controller = c;

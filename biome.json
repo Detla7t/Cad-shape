@@ -14,7 +14,8 @@
             "!!**/build",
             "!!**/coverage",
             "!!**/lib",
-            "!!**/iconfont.js"
+            "!!**/iconfont.js",
+            "!!artifacts/**/report.html"
         ]
     },
     "css": {
@@ -61,6 +62,18 @@
             "quoteStyle": "double"
         }
     },
+    "overrides": [
+        {
+            "includes": ["**/test/**", "**/test-utils/**"],
+            "linter": {
+                "rules": {
+                    "suspicious": {
+                        "noExplicitAny": "off"
+                    }
+                }
+            }
+        }
+    ],
     "assist": {
         "enabled": true,
         "actions": {

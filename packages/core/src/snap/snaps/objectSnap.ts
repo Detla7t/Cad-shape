@@ -34,13 +34,15 @@ export class ObjectSnap extends BaseSnap {
     override clear() {
         super.clear();
         this._invisibleInfos.forEach((info) => {
-            info.displays.forEach((x) => info.view.document.visual.context.removeMesh(x));
+            info.displays.forEach((x) => {
+                info.view.document.visual.context.removeMesh(x);
+            });
         });
         this.removeHint();
         Config.instance.removePropertyChanged(this.onSnapTypeChanged);
     }
 
-    readonly handleSnaped = (document: IDocument, snaped?: SnapResult | undefined) => {
+    readonly handleSnaped = (_document: IDocument, snaped?: SnapResult | undefined) => {
         if (snaped?.shapes.length === 0 && this._lastDetected) {
             this.displayHint(this._lastDetected[0], this._lastDetected[1]);
             this._lastDetected = undefined;

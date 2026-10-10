@@ -69,10 +69,10 @@ class TestPanelFace implements ISubShape {
     }
     dispose(): void {}
 
-    transformed(matrix: Matrix4): IShape {
+    transformed(_matrix: Matrix4): IShape {
         throw new Error("Method not implemented.");
     }
-    transformedMul(matrix: Matrix4): IShape {
+    transformedMul(_matrix: Matrix4): IShape {
         throw new Error("Method not implemented.");
     }
     edgesMeshPosition(): EdgeMeshData {
@@ -84,19 +84,19 @@ class TestPanelFace implements ISubShape {
     isNull(): boolean {
         throw new Error("Method not implemented.");
     }
-    findAncestor(ancestorType: ShapeType, fromShape: IShape): IShape[] {
+    findAncestor(_ancestorType: ShapeType, _fromShape: IShape): IShape[] {
         throw new Error("Method not implemented.");
     }
-    findSubShapes(subshapeType: ShapeType): IShape[] {
+    findSubShapes(_subshapeType: ShapeType): IShape[] {
         throw new Error("Method not implemented.");
     }
     directSubShapes(): IShape[] {
         throw new Error("Method not implemented.");
     }
-    section(shape: IShape | Plane): IShape {
+    section(_shape: IShape | Plane): IShape {
         throw new Error("Method not implemented.");
     }
-    split(shapes: IShape[], tolerance?: number): IShape {
+    split(_shapes: IShape[], _tolerance?: number): IShape {
         throw new Error("Method not implemented.");
     }
     reserve(): void {
@@ -105,13 +105,13 @@ class TestPanelFace implements ISubShape {
     clone(): IShape {
         throw new Error("Method not implemented.");
     }
-    hlr(position: XYZLike, direction: XYZLike, xDir: XYZLike): IShape {
+    hlr(_position: XYZLike, _direction: XYZLike, _xDir: XYZLike): IShape {
         throw new Error("Method not implemented.");
     }
     orientedBoundingBox(): OrientedBoundingBox {
         throw new Error("Method not implemented.");
     }
-    extremaDistance(other: IShape): number {
+    extremaDistance(_other: IShape): number {
         throw new Error("Method not implemented.");
     }
     checkShape(): boolean {
@@ -120,19 +120,19 @@ class TestPanelFace implements ISubShape {
     checkFaces(): { index: number; isValid: boolean; status: string[] }[] {
         throw new Error("Method not implemented.");
     }
-    fixShape(tolerance: number): IShape {
+    fixShape(_tolerance: number): IShape {
         throw new Error("Method not implemented.");
     }
-    fixSmallFace(tolerance: number): IShape {
+    fixSmallFace(_tolerance: number): IShape {
         throw new Error("Method not implemented.");
     }
-    fixSolid(tolerance: number): IShape {
+    fixSolid(_tolerance: number): IShape {
         throw new Error("Method not implemented.");
     }
-    shellSewing(tolerance: number): IShape {
+    shellSewing(_tolerance: number): IShape {
         throw new Error("Method not implemented.");
     }
-    setTolerance(tolerance: number): void {
+    setTolerance(_tolerance: number): void {
         throw new Error("Method not implemented.");
     }
     get mesh(): IShapeMeshData {
@@ -194,10 +194,10 @@ class TestPanel implements IShape {
     }
     dispose(): void {}
 
-    transformed(matrix: Matrix4): IShape {
+    transformed(_matrix: Matrix4): IShape {
         throw new Error("Method not implemented.");
     }
-    transformedMul(matrix: Matrix4): IShape {
+    transformedMul(_matrix: Matrix4): IShape {
         throw new Error("Method not implemented.");
     }
     edgesMeshPosition(): EdgeMeshData {
@@ -209,19 +209,19 @@ class TestPanel implements IShape {
     isNull(): boolean {
         throw new Error("Method not implemented.");
     }
-    findAncestor(ancestorType: ShapeType, fromShape: IShape): IShape[] {
+    findAncestor(_ancestorType: ShapeType, _fromShape: IShape): IShape[] {
         throw new Error("Method not implemented.");
     }
-    findSubShapes(subshapeType: ShapeType): IShape[] {
+    findSubShapes(_subshapeType: ShapeType): IShape[] {
         throw new Error("Method not implemented.");
     }
     directSubShapes(): IShape[] {
         throw new Error("Method not implemented.");
     }
-    section(shape: IShape | Plane): IShape {
+    section(_shape: IShape | Plane): IShape {
         throw new Error("Method not implemented.");
     }
-    split(shapes: IShape[], tolerance?: number): IShape {
+    split(_shapes: IShape[], _tolerance?: number): IShape {
         throw new Error("Method not implemented.");
     }
     reserve(): void {
@@ -230,13 +230,13 @@ class TestPanel implements IShape {
     clone(): IShape {
         throw new Error("Method not implemented.");
     }
-    hlr(position: XYZLike, direction: XYZLike, xDir: XYZLike): IShape {
+    hlr(_position: XYZLike, _direction: XYZLike, _xDir: XYZLike): IShape {
         throw new Error("Method not implemented.");
     }
     orientedBoundingBox(): OrientedBoundingBox {
         throw new Error("Method not implemented.");
     }
-    extremaDistance(other: IShape): number {
+    extremaDistance(_other: IShape): number {
         throw new Error("Method not implemented.");
     }
     checkShape(): boolean {
@@ -245,19 +245,19 @@ class TestPanel implements IShape {
     checkFaces(): { index: number; isValid: boolean; status: string[] }[] {
         throw new Error("Method not implemented.");
     }
-    fixShape(tolerance: number): IShape {
+    fixShape(_tolerance: number): IShape {
         throw new Error("Method not implemented.");
     }
-    fixSmallFace(tolerance: number): IShape {
+    fixSmallFace(_tolerance: number): IShape {
         throw new Error("Method not implemented.");
     }
-    fixSolid(tolerance: number): IShape {
+    fixSolid(_tolerance: number): IShape {
         throw new Error("Method not implemented.");
     }
-    shellSewing(tolerance: number): IShape {
+    shellSewing(_tolerance: number): IShape {
         throw new Error("Method not implemented.");
     }
-    setTolerance(tolerance: number): void {
+    setTolerance(_tolerance: number): void {
         throw new Error("Method not implemented.");
     }
 }

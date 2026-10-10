@@ -2,7 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import { Plane, XYZ } from "../src";
-import { type Dimension, Dimensions, DimensionUtils } from "../src/snap/dimension";
+import { Dimensions, DimensionUtils } from "../src/snap/dimension";
 import { Axis } from "../src/snap/tracking/axis";
 
 // ============================================================================
@@ -92,7 +92,9 @@ describe("Axis", () => {
             expect(axes[3].direction.isEqualTo(plane.yvec.reverse())).toBe(true);
 
             // All axes should have the same origin
-            axes.forEach((a) => expect(a.point).toBe(origin));
+            axes.forEach((a) => {
+                expect(a.point).toBe(origin);
+            });
         });
 
         test("should return x, y and z axes when containsZ is true", () => {
@@ -107,7 +109,9 @@ describe("Axis", () => {
             expect(zAxes[1].direction.isEqualTo(plane.normal.reverse())).toBe(true);
 
             // All axes should have the same origin
-            axes.forEach((a) => expect(a.point).toBe(origin));
+            axes.forEach((a) => {
+                expect(a.point).toBe(origin);
+            });
         });
     });
 });

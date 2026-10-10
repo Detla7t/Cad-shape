@@ -29,7 +29,9 @@ export class Split extends MultistepCommand {
         ) as IEdge[];
         const result = shape1.split(edges);
 
-        edges.forEach((x) => x.dispose());
+        edges.forEach((x) => {
+            x.dispose();
+        });
 
         return result;
     }

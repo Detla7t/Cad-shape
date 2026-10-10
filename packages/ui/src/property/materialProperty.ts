@@ -14,18 +14,18 @@ import {
 } from "@chili3d/core";
 import { button, ColorConverter, collection, div, span, UrlStringConverter } from "@chili3d/element";
 import style from "./materialProperty.module.css";
-import { PropertyBase } from "./propertyBase";
+import { asPropertyHosts, PropertyBase } from "./propertyBase";
 
 export class MaterialProperty extends PropertyBase {
     private readonly materials: ObservableCollection<Material>;
 
     constructor(
         readonly document: IDocument,
-        objects: { materialId: string | string[] }[],
+        objects: readonly object[],
         readonly property: Property,
     ) {
-        super(objects);
-        this.materials = this.materialCollection(objects[0].materialId);
+        super(asPropertyHosts(objects));
+        this.materials = this.materialCollection(this.objects[0]["materialId"] as string | string[]);
         this.append(
             collection({
                 sources: this.materials,
@@ -59,14 +59,15 @@ export class MaterialProperty extends PropertyBase {
         );
     }
 
-    private setMaterial(e: MouseEvent, material: Material, index: number) {
+    private setMaterial(_e: MouseEvent, material: Material, index: number) {
         Transaction.execute(this.document, "change material", () => {
             this.materials.replace(index, material);
             this.objects.forEach((x) => {
                 if (this.property.name in x) {
-                    x.materialId =
-                        this.materials.length > 1
-                            ? x.materialId.toSpliced(index, 1, material.id)
+                    const ids = x["materialId"];
+                    x["materialId"] =
+                        this.materials.length > 1 && Array.isArray(ids)
+                            ? ids.toSpliced(index, 1, material.id)
                             : material.id;
                 }
             });

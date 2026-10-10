@@ -197,7 +197,7 @@ function matchAxis(
 ): { axis: Line; anchor?: EdgeRef } {
     let index: number;
     let anchor: EdgeRef;
-    if (ids !== undefined && ids.every((id) => id !== undefined)) {
+    if (ids?.every((id) => id !== undefined)) {
         const anchored = matchEdgesAnchored(shape, [ref], ids as string[]);
         if (!anchored.isOk) return fallback;
         index = anchored.value.indexes[0];

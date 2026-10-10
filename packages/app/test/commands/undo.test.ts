@@ -1,7 +1,6 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { PubSub } from "@chili3d/core";
 import { createMockApplication, createMockDocument } from "@chili3d/core/test-utils";
 import { describe, expect, test } from "@rstest/core";
 import { Undo } from "../../src/commands/undo";

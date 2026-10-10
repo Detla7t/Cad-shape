@@ -3,7 +3,7 @@
 
 import { type IShape, XYZ } from "@chili3d/core";
 import { ClassicPreset } from "rete";
-import { zipTrees } from "../../tree";
+import { zipMixedTrees } from "../../tree";
 import type { INodeEditor } from "../../types";
 import { GeometryBaseNode } from "./base";
 
@@ -36,9 +36,9 @@ export class ArcNode extends GeometryBaseNode<
         const starts = (inputs.start ?? [[XYZ.unitX]]).flat();
         const angles = (inputs.angle ?? [[Math.PI * 2]]).flat();
 
-        return zipTrees(
-            [normals, centers, starts, angles] as any,
-            (normal: XYZ, center: XYZ, start: XYZ, angle: any) => {
+        return zipMixedTrees(
+            [normals, centers, starts, angles],
+            (normal: XYZ, center: XYZ, start: XYZ, angle: number) => {
                 return shapeFactory.arc(normal, center, start, angle).value;
             },
         ) as IShape | IShape[];

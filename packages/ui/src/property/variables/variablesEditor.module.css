@@ -123,12 +123,6 @@
     color: var(--foreground-secondary-color);
     background-color: var(--title-background);
     border-bottom: 1px solid var(--border-color);
-
-    /* Line the labels up with the text inside the quiet cells below (6px padding + 1px border). */
-    .cell {
-        padding: 7px;
-        border-right: 1px solid var(--border-color);
-    }
 }
 
 .row {
@@ -150,6 +144,12 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     min-width: 0;
+}
+
+/* Line the labels up with the text inside the quiet cells below (6px padding + 1px border). */
+.header .cell {
+    padding: 7px;
+    border-right: 1px solid var(--border-color);
 }
 
 /* Quiet cells: a cell's box appears on hover/focus instead of shouting from every row at once. */

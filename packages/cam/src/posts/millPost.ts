@@ -575,7 +575,6 @@ class MillProgramWriter {
     }
 
     private drill(move: DrillMove): void {
-        const { w } = this;
         const { bottom, r } = drillPlanes(move);
         const code = drillCode(move);
         const canned = optionOf(this.options, "cannedCycles", true) && this.dialect.cycles.includes(code);

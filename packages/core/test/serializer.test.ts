@@ -27,7 +27,7 @@ class TestObject {
     public k3: string = "k3";
 
     @serialize()
-    private k1: string;
+    public k1: string;
     @serialize()
     private k4: string = "k4";
     @serialize()
@@ -37,6 +37,10 @@ class TestObject {
 
     constructor(options: TestObjectOptions) {
         this.k1 = options.k1;
+    }
+
+    get readK4(): string {
+        return this.k4;
     }
 
     serialize(): Serialized {
@@ -61,7 +65,7 @@ test("should serialize and deserialize an object", () => {
     const obj2 = Serializer.deserializeObject({} as any, s);
     expect(obj2).toBeInstanceOf(TestObject);
     expect(obj2.k1).toBe("222");
-    expect(obj2.k4).toBe("changed");
+    expect(obj2.readK4).toBe("changed");
 });
 
 test("should serialize and deserialize nodes", async () => {

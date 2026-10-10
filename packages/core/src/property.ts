@@ -25,8 +25,9 @@ export interface Property {
     unit?: UnitSpec;
     dependencies?: {
         property: string | number | symbol;
-        value: any;
+        value: unknown;
     }[];
+    // biome-ignore lint/suspicious/noExplicitAny: a property's combobox lists items of whatever type the property holds
     combobox?: Combobox<any>;
 }
 
@@ -54,19 +55,23 @@ export function hideCommandProperty<T extends object>(target: T, props: (keyof T
 }
 
 export class PropertyUtils {
-    static getProperties(target: any, until?: object): Property[] {
+    static getProperties(target: object | null | undefined, until?: object): Property[] {
         const result: Property[] = [];
         PropertyUtils.getAllKeysOfPrototypeChain(target, result, until);
         return result;
     }
 
-    static getOwnProperties(target: any): Property[] {
+    static getOwnProperties(target: object): Property[] {
         const properties = PropertyKeyMap.get(target);
         if (!properties) return [];
         return [...properties.values()];
     }
 
-    private static getAllKeysOfPrototypeChain(target: any, properties: Property[], until?: object) {
+    private static getAllKeysOfPrototypeChain(
+        target: object | null | undefined,
+        properties: Property[],
+        until?: object,
+    ) {
         if (!target || target === until) return;
         if (PropertyKeyMap.has(target)) {
             properties.splice(0, 0, ...PropertyKeyMap.get(target)!.values());
@@ -81,7 +86,7 @@ export class PropertyUtils {
         return PropertyUtils.getProperty(Object.getPrototypeOf(target), property);
     }
 
-    static isHiddenProperty(target: any, property: string | number | symbol): boolean {
+    static isHiddenProperty(target: object | null | undefined, property: string | number | symbol): boolean {
         if (!target) return false;
         const set = hiddenCommandPropertiesMap.get(target);
         if (set?.has(property)) return true;

@@ -6,7 +6,7 @@ import type { IViewGizmo } from "@chili3d/core";
 export class ViewGizmo extends HTMLElement implements IViewGizmo {
     update(): void {}
     dispose(): void {}
-    setDom(dom: HTMLElement) {}
+    setDom(_dom: HTMLElement) {}
 }
 
 // The real `src/viewGizmo` module also registers the "view-gizmo" tag. Depending on the

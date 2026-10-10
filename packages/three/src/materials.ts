@@ -77,7 +77,9 @@ VisualConfig.onPropertyChanged((property: keyof VisualItemConfig) => {
         defaultEdgeMaterial.color.set(VisualConfig.defaultEdgeColor);
         defaultVertexMaterial.color.set(VisualConfig.defaultEdgeColor);
         originVertexMaterial.color.set(VisualConfig.defaultEdgeColor);
-        edgeMaterialsByWidth.forEach((material) => material.color.set(VisualConfig.defaultEdgeColor));
+        for (const material of edgeMaterialsByWidth.values()) {
+            material.color.set(VisualConfig.defaultEdgeColor);
+        }
     }
 });
 

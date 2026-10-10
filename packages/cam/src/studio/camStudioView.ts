@@ -331,9 +331,9 @@ export class CamStudioView implements IElementView, StudioHost {
             );
             children.push(item);
             if (collapsed) return;
-            setup.operations.forEach((op) =>
-                children.push(this.operationItem(setup, op, op.id === operation?.id)),
-            );
+            for (const op of setup.operations) {
+                children.push(this.operationItem(setup, op, op.id === operation?.id));
+            }
             children.push(this.addOperationRow(setup));
         });
         this.tree.replaceChildren(...children);

@@ -25,7 +25,7 @@ export function isPropertyChanged(obj: object): obj is IPropertyChanged {
 }
 
 export class Observable implements IPropertyChanged {
-    protected readonly propertyChangedHandlers = new Set<PropertyChangedHandler<any, any>>();
+    protected readonly propertyChangedHandlers = new Set<PropertyChangedHandler<never, never>>();
     protected _isDisposed = false;
 
     private getPrivateKey<K extends keyof this>(pubKey: K) {
@@ -48,12 +48,12 @@ export class Observable implements IPropertyChanged {
         }
 
         const privateKey = this.getPrivateKey(pubKey);
-        (this as any)[privateKey] = defaultValue;
+        (this as Record<string, unknown>)[privateKey] = defaultValue;
         return defaultValue;
     }
 
     setPrivateValue<K extends keyof this>(pubKey: K, newValue: this[K]): void {
-        (this as any)[this.getPrivateKey(pubKey)] = newValue;
+        (this as Record<string, unknown>)[this.getPrivateKey(pubKey)] = newValue;
     }
 
     /**
@@ -87,7 +87,7 @@ export class Observable implements IPropertyChanged {
     protected emitPropertyChanged<K extends keyof this>(property: K, oldValue: this[K]) {
         Array.from(this.propertyChangedHandlers).forEach((cb) => {
             try {
-                cb(property, this, oldValue);
+                cb(property as never, this as never, oldValue as never);
             } catch (error) {
                 console.error(
                     `${this.constructor.name}: an observer of property "${String(property)}" threw`,
@@ -151,6 +151,6 @@ export abstract class HistoryObservable extends Observable {
 
     override disposeInternal() {
         super.disposeInternal();
-        this._document = null as any;
+        this._document = null as unknown as IDocument;
     }
 }

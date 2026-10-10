@@ -104,6 +104,11 @@
 .root [hidden] {
     display: none;
 }
+.configurationSections {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+}
 .configuration {
     height: 100%;
     min-height: 0;
@@ -114,11 +119,6 @@
     > .configurationSections {
         padding: 0 6px;
     }
-}
-.configurationSections {
-    flex: 1;
-    min-height: 0;
-    overflow: auto;
 }
 /* Onshape's input section: "⌄ OD   Default: 9 5/8"      [+ Configure features] ⋯" */
 .inputSection {

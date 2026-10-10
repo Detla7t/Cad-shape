@@ -7,10 +7,6 @@ import type { ChatMessage, LLMProvider, StreamEvent, SystemPrompt, Tool } from "
 /** The system prompt is irrelevant to these tests — one stable half, no snapshot. */
 const SYSTEM: SystemPrompt = { stable: "sys", volatile: "" };
 
-async function* fakeStream(events: StreamEvent[]): AsyncIterable<StreamEvent> {
-    for (const e of events) yield e;
-}
-
 /** An async iterable that runs `before` then fails on first pull, like an SDK abort mid-stream. */
 function failingStream(before: () => void, message: string): AsyncIterable<StreamEvent> {
     return {

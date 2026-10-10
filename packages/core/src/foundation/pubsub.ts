@@ -54,10 +54,10 @@ export interface PubSubEventMap {
     showFloatPanel: (options: FloatPanelOptions) => void;
     showFloatTip: (dom: HTMLElement | { level: MessageType; msg: string }) => void;
     showInput: (text: string, handler: (text: string) => Result<string, I18nKeys>) => void;
-    showPermanent: (action: () => Promise<void>, message: I18nKeys, ...args: any[]) => void;
+    showPermanent: (action: () => Promise<void>, message: I18nKeys, ...args: unknown[]) => void;
     showProperties(document: IDocument, nodes: INode[]): void;
     showSelectionControl: (controller: AsyncController) => void;
-    showToast: (message: I18nKeys, ...args: any[]) => void;
+    showToast: (message: I18nKeys, ...args: unknown[]) => void;
     statusBarTip: (tip: I18nKeys) => void;
     toggleChatPanel: () => void;
     toggleCommandWindow: () => void;
@@ -67,7 +67,7 @@ export interface PubSubEventMap {
     visibleChanged: (model: INode) => void;
 }
 
-type EventCallback = (...args: any[]) => void;
+type EventCallback = (...args: never[]) => void;
 type EventMap = Map<keyof PubSubEventMap, Set<EventCallback>>;
 
 export class PubSub implements IDisposable {
@@ -77,7 +77,9 @@ export class PubSub implements IDisposable {
 
     dispose(): void {
         this.isDisposed = true;
-        this.events.forEach((callbacks) => callbacks.clear());
+        this.events.forEach((callbacks) => {
+            callbacks.clear();
+        });
         this.events.clear();
     }
 
@@ -98,7 +100,7 @@ export class PubSub implements IDisposable {
 
         this.events.get(event)?.forEach((callback) => {
             try {
-                callback(...args);
+                callback(...(args as never[]));
             } catch (error) {
                 console.error(`PubSub: a subscriber of "${String(event)}" threw`, error);
             }

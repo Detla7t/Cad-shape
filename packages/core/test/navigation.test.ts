@@ -86,10 +86,8 @@ describe("Navigation3D.getKey", () => {
 });
 
 describe("Navigation3D.navigationKeyMap", () => {
-    let localStorageMock: any;
-
     beforeEach(() => {
-        localStorageMock = mockLocalStorage();
+        mockLocalStorage();
     });
 
     afterEach(() => {

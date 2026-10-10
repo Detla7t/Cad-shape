@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import { Line, Matrix4, Plane, ShapeTypes, XYZ } from "@chili3d/core";
+import type { Geom_Curve } from "../lib/chili-wasm";
 import {
     convertFromContinuity,
     convertFromMatrix,
@@ -279,7 +280,9 @@ describe("helper — curve type detection", () => {
         const edges = wasm.Shape.findSubShapes(box, wasm.TopAbs_ShapeEnum.TopAbs_EDGE);
         const trimmedCurve = wasm.Edge.curve(wasm.TopoDS.edge(edges[0]));
         const basisCurve = trimmedCurve.get()?.basisCurve();
-        expect(getCurveType(basisCurve?.get()!)).toBe("line");
+        const basisGeom = basisCurve?.get();
+        expect(basisGeom).toBeTruthy();
+        expect(getCurveType(basisGeom as Geom_Curve)).toBe("line");
     });
 
     test("detects circle curve type from circle edge", () => {

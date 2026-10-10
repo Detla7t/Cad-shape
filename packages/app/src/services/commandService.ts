@@ -44,7 +44,7 @@ export class CommandService implements IService {
         Logger.info(`${CommandService.name} registed`);
     }
 
-    private readonly onActiveViewChanged = async (view: IView | undefined) => {
+    private readonly onActiveViewChanged = async (_view: IView | undefined) => {
         if (this.app.executingCommand && isCancelableCommand(this.app.executingCommand))
             await this.app.executingCommand.cancel();
     };
@@ -82,7 +82,7 @@ export class CommandService implements IService {
         let failure: unknown;
         const command = new commandCtor();
         this.app.executingCommand = command;
-        PubSub.default.pub("showProperties", this.app.activeView?.document!, []);
+        PubSub.default.pub("showProperties", document!, []);
 
         await Promise.try(command.execute.bind(command), this.app)
             .catch((err) => {

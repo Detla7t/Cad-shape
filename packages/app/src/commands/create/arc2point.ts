@@ -7,7 +7,6 @@ import {
     type GeometryNode,
     type IStep,
     LengthAtPlaneStep,
-    Plane,
     type PointSnapData,
     PointStep,
     Precision,

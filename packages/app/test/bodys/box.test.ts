@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import type { IDocument, IShape } from "@chili3d/core";
+import type { IDocument } from "@chili3d/core";
 import { Plane, Result, Serializer, XYZ } from "@chili3d/core";
 import { createMockDocument } from "@chili3d/core/test-utils";
 import { beforeEach, describe, expect, rs, test } from "@rstest/core";

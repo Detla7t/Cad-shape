@@ -8,7 +8,8 @@ export interface Deletable {
 }
 
 export function isDeletable(value: unknown): value is Deletable {
-    return typeof (value as any)?.delete === "function" && (value as any).delete.length === 0;
+    const candidate = value as { delete?: unknown } | null | undefined;
+    return typeof candidate?.delete === "function" && candidate.delete.length === 0;
 }
 
 export const gc = <R>(action: (collect: <T extends Deletable | IDisposable>(resource: T) => T) => R): R => {

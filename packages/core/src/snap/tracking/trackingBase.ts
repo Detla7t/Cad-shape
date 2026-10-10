@@ -18,7 +18,9 @@ export abstract class TrackingBase {
 
     protected clearTempMeshes(): void {
         this.tempMeshes.forEach((ids, document) => {
-            ids.forEach((id) => document.visual.context.removeMesh(id));
+            ids.forEach((id) => {
+                document.visual.context.removeMesh(id);
+            });
         });
         this.tempMeshes.clear();
     }

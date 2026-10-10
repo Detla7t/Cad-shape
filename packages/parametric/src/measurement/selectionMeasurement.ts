@@ -122,7 +122,7 @@ export function measureSelection(
     } catch (error) {
         return Result.err(`Measurement unavailable: ${String(error)}`);
     } finally {
-        shapes.forEach((shape) => shape.dispose());
+        for (const shape of shapes) shape.dispose();
     }
 }
 

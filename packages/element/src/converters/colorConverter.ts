@@ -23,7 +23,7 @@ export class ColorConverter implements IConverter<number | string> {
             return Result.ok("#808080");
         }
 
-        if (typeof value === "number" && !isNaN(value)) {
+        if (typeof value === "number" && !Number.isNaN(value)) {
             return Result.ok(`#${value.toString(16).padStart(6, "0")}`);
         }
 

@@ -360,13 +360,11 @@ describe("PropertyView", () => {
     describe("isAllElementsOfTypeFirstElement", () => {
         test("should return true for empty array", () => {
             const pv = new PropertyView({ className: "test-panel" });
-            // biome-ignore lint/suspicious/noExplicitAny: accessing private method for testing
             expect((pv as any).isAllElementsOfTypeFirstElement([])).toBe(true);
         });
 
         test("should return true for single element array", () => {
             const pv = new PropertyView({ className: "test-panel" });
-            // biome-ignore lint/suspicious/noExplicitAny: accessing private method for testing
             expect((pv as any).isAllElementsOfTypeFirstElement([{ name: "x" }])).toBe(true);
         });
 
@@ -374,7 +372,6 @@ describe("PropertyView", () => {
             const pv = new PropertyView({ className: "test-panel" });
             class Same {}
             const arr = [new Same(), new Same(), new Same()];
-            // biome-ignore lint/suspicious/noExplicitAny: accessing private method for testing
             expect((pv as any).isAllElementsOfTypeFirstElement(arr)).toBe(true);
         });
 
@@ -383,7 +380,6 @@ describe("PropertyView", () => {
             class A {}
             class B {}
             const arr = [new A(), new B()];
-            // biome-ignore lint/suspicious/noExplicitAny: accessing private method for testing
             expect((pv as any).isAllElementsOfTypeFirstElement(arr)).toBe(false);
         });
 
@@ -392,7 +388,6 @@ describe("PropertyView", () => {
             class A {}
             class B {}
             const arr = [new A(), new A(), new B()];
-            // biome-ignore lint/suspicious/noExplicitAny: accessing private method for testing
             expect((pv as any).isAllElementsOfTypeFirstElement(arr)).toBe(false);
         });
 
@@ -400,7 +395,6 @@ describe("PropertyView", () => {
             const pv = new PropertyView({ className: "test-panel" });
             class Same {}
             const arr = [new Same(), new Same()];
-            // biome-ignore lint/suspicious/noExplicitAny: accessing private method for testing
             expect((pv as any).isAllElementsOfTypeFirstElement(arr)).toBe(true);
         });
     });

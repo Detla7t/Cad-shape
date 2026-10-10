@@ -4,13 +4,7 @@
 import { EditableShapeNode, Result, ShapeTypes, XYZ } from "@chili3d/core";
 import { afterAll, beforeAll, describe, expect, test } from "@rstest/core";
 import { OffsetCommand } from "../../../src/commands/create/offset";
-import {
-    ensureGlobalStubApp,
-    seedStepDatas,
-    shapeData,
-    shapeStepResult,
-    wireCommand,
-} from "../commandTestUtils";
+import { ensureGlobalStubApp, seedStepDatas, shapeStepResult, wireCommand } from "../commandTestUtils";
 
 let restoreApp: () => void;
 beforeAll(() => {

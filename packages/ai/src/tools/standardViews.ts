@@ -39,7 +39,10 @@ export function standardView(name: string): StandardView | string {
     const axes = words.map((word) => AXIS_OF[word]);
     if (new Set(axes).size !== axes.length) return `"${name}" names two sides along one axis`;
     const vector = [0, 0, 0];
-    for (const word of words) WORDS[word].forEach((v, i) => (vector[i] += v));
+    for (const word of words)
+        WORDS[word].forEach((v, i) => {
+            vector[i] += v;
+        });
     const length = Math.hypot(...vector);
     const direction = { x: vector[0] / length, y: vector[1] / length, z: vector[2] / length };
     const vertical = vector[0] === 0 && vector[1] === 0;

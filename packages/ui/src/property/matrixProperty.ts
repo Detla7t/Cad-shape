@@ -28,7 +28,7 @@ import { PropertyBase } from "./propertyBase";
  * selected node, written in the document's units and precision (Preferences ▸ Units, the
  * decimal comma) and re-rendered when those change. Edits apply to every selected node.
  */
-export class MatrixProperty extends PropertyBase {
+export class MatrixProperty extends PropertyBase<VisualNode | GroupNode> {
     readonly first: VisualNode | GroupNode;
 
     constructor(

@@ -21,7 +21,7 @@ import { shapesToStl } from "./stlWriter";
 
 export class OccShapeConverter implements IShapeConverter {
     private readonly addShapeNode = (
-        collector: (d: Deletable | IDisposable) => any,
+        collector: (d: Deletable | IDisposable) => unknown,
         folder: FolderNode,
         node: ShapeNode,
         children: ShapeNode[],

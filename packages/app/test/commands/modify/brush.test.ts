@@ -51,7 +51,7 @@ describe("AddBrushCommand", () => {
 
     test("materialId should default to first document material", () => {
         const cmd = new AddBrushCommand();
-        const { doc } = wireCommand(cmd);
+        wireCommand(cmd);
         expect(cmd.materialId).toBe("mat-default");
     });
 

@@ -40,7 +40,9 @@ abstract class ConvertCommand extends CancelableCommand {
                 PubSub.default.pub("showToast", "error.default:{0}", node.error);
             } else {
                 this.document.modelManager.rootNode.add(node.value);
-                models.forEach((x) => x.parent?.remove(x));
+                models.forEach((x) => {
+                    x.parent?.remove(x);
+                });
                 this.document.visual.update();
                 PubSub.default.pub("showToast", "toast.success");
             }
@@ -138,7 +140,9 @@ export class ConvertToShell extends ConvertCommand {
     protected override create(document: IDocument, models: ShapeNode[]): Result<GeometryNode> {
         const faces = models.map((x) => x.shape.value.transformedMul(x.worldTransform())) as IFace[];
         const shape = shapeFactory.shell(faces);
-        faces.forEach((x) => x.dispose());
+        faces.forEach((x) => {
+            x.dispose();
+        });
         if (!shape.isOk) return Result.err(shape.error);
 
         const shell = new EditableShapeNode({ document, name: "shell", shape });
@@ -160,7 +164,9 @@ export class ConvertToSolid extends ConvertCommand {
     protected override create(document: IDocument, models: ShapeNode[]): Result<GeometryNode> {
         const faces = models.map((x) => x.shape.value.transformedMul(x.worldTransform())) as IShell[];
         const shape = shapeFactory.solid(faces);
-        faces.forEach((x) => x.dispose());
+        faces.forEach((x) => {
+            x.dispose();
+        });
         if (!shape.isOk) return Result.err(shape.error);
 
         const repaired = repairShape(shape.value, 1e-7);
@@ -184,7 +190,9 @@ export class ConvertToCompound extends ConvertCommand {
     protected override create(document: IDocument, models: ShapeNode[]): Result<GeometryNode> {
         const shapes = models.map((x) => x.shape.value.transformedMul(x.worldTransform()));
         const shape = shapeFactory.combine(shapes);
-        shapes.forEach((x) => x.dispose());
+        shapes.forEach((x) => {
+            x.dispose();
+        });
         if (!shape.isOk) return Result.err(shape.error);
 
         const compound = new EditableShapeNode({ document, name: "compound", shape });

@@ -238,7 +238,8 @@ describe("SketchSolver", () => {
             for (let i = 0; i < expected.length; i++) {
                 expect(actual[i].id).toBe(expected[i].id);
                 expect(actual[i].type).toBe(expected[i].type);
-                expected[i].params.forEach((p, j) => expect(actual[i].params[j]).toBeCloseTo(p, 6));
+                for (const [j, p] of expected[i].params.entries())
+                    expect(actual[i].params[j]).toBeCloseTo(p, 6);
             }
             expect(restored.toData().constraints).toEqual(data.constraints);
         });
@@ -381,7 +382,8 @@ describe("SketchSolver", () => {
 
             const restoredArc = restored.entities().find((e) => e.id === arc)!;
             expect(restoredArc.type).toBe("arc");
-            restoredArc.params.forEach((p, i) => expect(p).toBeCloseTo(data.entities[0].params[i], 6));
+            for (const [i, p] of restoredArc.params.entries())
+                expect(p).toBeCloseTo(data.entities[0].params[i], 6);
             expect(restored.toData().constraints).toEqual(data.constraints);
             solver.dispose();
             restored.dispose();

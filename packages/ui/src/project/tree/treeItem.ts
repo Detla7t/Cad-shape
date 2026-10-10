@@ -167,7 +167,9 @@ export abstract class TreeItem extends HTMLElement {
         this.remove();
         this.node.removePropertyChanged(this.onPropertyChanged);
         this.visibleIcon.removeEventListener("click", this.onVisibleIconClick);
+        // biome-ignore lint/suspicious/noExplicitAny: dispose drops the references; the fields are non-optional because no live code sees them unset
         this.document = null as any;
+        // biome-ignore lint/suspicious/noExplicitAny: same as above
         this._node = null as any;
     }
 

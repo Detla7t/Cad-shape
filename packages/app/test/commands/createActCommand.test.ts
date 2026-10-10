@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type Act, I18n } from "@chili3d/core";
+import type { Act } from "@chili3d/core";
 import { createMockApplication } from "@chili3d/core/test-utils";
 import { describe, expect, test } from "@rstest/core";
 import { ActAlignCameraCommand } from "../../src/commands/createActCommand";

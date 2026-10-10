@@ -207,7 +207,8 @@ class CuttingProgramWriter {
     }
 
     write(): string {
-        const { w, dialect } = this;
+        const { dialect } = this;
+        const w = this.w;
         if (dialect.percent) w.raw("%");
         w.comment(this.program.setup.programName ?? this.program.name);
         const kerf = this.program.machine.cutting?.kerf;
@@ -226,7 +227,7 @@ class CuttingProgramWriter {
     }
 
     private move(move: ToolpathMove): void {
-        const { w } = this;
+        const w = this.w;
         switch (move.kind) {
             case "rapid":
                 this.motion("G0", move.to);
@@ -267,7 +268,7 @@ class CuttingProgramWriter {
     }
 
     private motion(code: "G0" | "G1", to: readonly number[], feed?: number): void {
-        const { w } = this;
+        const w = this.w;
         const words = [w.axis("X", to[0]), w.axis("Y", to[1]), this.outputZ ? w.axis("Z", to[2]) : undefined];
         if (words.some((word) => word !== undefined)) {
             w.block(w.motion(code), ...words, code === "G1" ? w.feed(feed) : undefined);
@@ -276,7 +277,7 @@ class CuttingProgramWriter {
     }
 
     private arc(move: ArcMove): void {
-        const { w } = this;
+        const w = this.w;
         const from = this.position;
         if (from === undefined)
             throw new CuttingPostError("An arc cannot start a program: position the cutter first");
@@ -297,7 +298,7 @@ class CuttingProgramWriter {
     }
 
     private cutterOn(pierceDelay: number | undefined): void {
-        const { w } = this;
+        const w = this.w;
         if (this.beam === "cut") return;
         this.cutterOff();
         const power = optionOf(this.options, "power", 1000);
@@ -317,7 +318,7 @@ class CuttingProgramWriter {
 
     /** A marking pass: the marker's code (a laser at the marking power), no pierce, no THC. */
     private markerOn(): void {
-        const { w } = this;
+        const w = this.w;
         if (this.beam === "mark") return;
         this.cutterOff();
         const code = optionOf(this.options, "markOn", this.dialect.mark?.on ?? "").trim();
@@ -331,7 +332,7 @@ class CuttingProgramWriter {
     }
 
     private cutterOff(): void {
-        const { w } = this;
+        const w = this.w;
         if (this.beam === "off") return;
         if (this.beam === "mark") {
             const code = optionOf(this.options, "markOff", this.dialect.mark?.off ?? "").trim();

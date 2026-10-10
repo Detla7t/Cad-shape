@@ -4,7 +4,7 @@
 import { type IPropertyChanged, isPropertyChanged } from "./observer";
 import { Result } from "./result";
 
-export type DeepPropertyChangedHandler = (path: string, source: IPropertyChanged, oldValue: any) => void;
+export type DeepPropertyChangedHandler = (path: string, source: IPropertyChanged, oldValue: unknown) => void;
 
 export type SourceHandler = {
     handler: DeepPropertyChangedHandler;
@@ -20,13 +20,14 @@ export class DeepObserver {
         Map<DeepPropertyChangedHandler, SourceHandler>
     >();
 
+    // biome-ignore lint/suspicious/noExplicitAny: the value type is whatever the caller's path leads to
     static getPathValue(instance: IPropertyChanged, path: string): Result<any> {
         const parts = path.split(".");
 
-        let value = instance;
+        let value: unknown = instance;
         for (let i = 0; i < parts.length; i++) {
-            value = (value as any)[parts[i]];
-            if (i < parts.length - 1 && !isPropertyChanged(value)) {
+            value = (value as Record<string, unknown>)[parts[i]];
+            if (i < parts.length - 1 && !isPropertyChanged(value as object)) {
                 return Result.err(`Path ${path} is not valid`);
             }
         }
@@ -52,7 +53,7 @@ export class DeepObserver {
             if (key === "constructor" || key.startsWith("_")) {
                 continue;
             }
-            const subSource = (source as any)[key];
+            const subSource = (source as unknown as Record<string, object>)[key];
             if (isPropertyChanged(subSource)) {
                 DeepObserver.deepHandlePropertyChanged(
                     sourceHandler,
@@ -105,7 +106,7 @@ export class DeepObserver {
     }
 
     private static initSourceHandler(instance: IPropertyChanged, deepHandler: DeepPropertyChangedHandler) {
-        const handler = (property: string, target: IPropertyChanged, oldValue: any) => {
+        const handler = (property: string, target: IPropertyChanged, oldValue: unknown) => {
             const sourceHandler = DeepObserver.handlers.get(instance)?.get(deepHandler);
             if (!sourceHandler) {
                 return;
@@ -133,7 +134,7 @@ export class DeepObserver {
         property: string,
         prefix: string | undefined,
     ) {
-        const value = (target as any)[property];
+        const value = (target as unknown as Record<string, object | undefined>)[property];
         if (value === undefined && prefix !== undefined) {
             const sources = [];
             for (const source of sourceHandler.sources) {
@@ -147,7 +148,7 @@ export class DeepObserver {
             return;
         }
 
-        if (isPropertyChanged(value)) {
+        if (value !== undefined && isPropertyChanged(value)) {
             DeepObserver.deepHandlePropertyChanged(sourceHandler, value, prefix);
         }
     }

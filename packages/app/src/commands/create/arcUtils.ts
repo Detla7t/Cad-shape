@@ -167,9 +167,7 @@ function tangentPlaneNormal(curve1: ICurve, curve2: ICurve): XYZ | undefined {
         if (!CurveUtils.isLine(line)) return undefined;
         const axis = circle.axis.normalize();
         const direction = line.direction.normalize();
-        return axis !== undefined && direction !== undefined && direction.isPerpendicularTo(axis)
-            ? axis
-            : undefined;
+        return axis !== undefined && direction?.isPerpendicularTo(axis) ? axis : undefined;
     }
 
     if (!CurveUtils.isLine(curve1) || !CurveUtils.isLine(curve2)) return undefined;

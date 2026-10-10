@@ -59,6 +59,6 @@ export function extrudeFromSourceFaces(
             (face) => face.normal(0, 0)[1].multiply(startOffset),
         );
     } finally {
-        owned.forEach((x) => x.dispose());
+        for (const x of owned) x.dispose();
     }
 }

@@ -2,25 +2,17 @@
 // See LICENSE file in the project root for full license information.
 
 import {
-    type IEdge,
     type IStep,
     type IView,
-    Matrix4,
     Plane,
     type PointSnapData,
     PointStep,
-    Result,
     type SnapResult,
     XYZ,
 } from "@chili3d/core";
-import { describe, expect, rs, test } from "@rstest/core";
+import { describe, expect, test } from "@rstest/core";
 import { Pipe } from "../../../src/commands/create/pipe";
-import {
-    ensureGlobalStubApp,
-    seedStepDatas,
-    stubTransactionRun,
-    wireCommand,
-} from "../../commands/commandTestUtils";
+import { seedStepDatas, wireCommand } from "../../commands/commandTestUtils";
 
 describe("Pipe", () => {
     test("should have command metadata", () => {

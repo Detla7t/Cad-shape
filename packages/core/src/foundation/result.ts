@@ -57,11 +57,11 @@ export class Result<T, E = string> {
     }
 
     static ok<T>(value: T): Result<T, never> {
-        return new Result({ isOk: true, value, error: undefined }) as any;
+        return new Result({ isOk: true, value, error: undefined }) as unknown as Result<T, never>;
     }
 
-    static err<E>(error: E): Result<any, E> {
-        return new Result({ isOk: false, value: undefined, error }) as any;
+    static err<E>(error: E): Result<never, E> {
+        return new Result({ isOk: false, value: undefined, error }) as unknown as Result<never, E>;
     }
 }
 

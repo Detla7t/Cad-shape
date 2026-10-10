@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-export class Signal<T extends (...args: any[]) => void> {
+export class Signal<T extends (...args: never[]) => void> {
     private _listeners = new Set<T>();
 
     sub(listener: T): void {

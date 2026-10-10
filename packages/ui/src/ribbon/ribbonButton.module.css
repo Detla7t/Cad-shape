@@ -43,6 +43,11 @@
     background-color: var(--active-background-color);
 }
 
+.smallButtonText {
+    font-size: 12px;
+    text-align: left;
+}
+
 .largeButtonText .smallButtonText {
     color: var(--foreground-color);
     white-space: normal;
@@ -55,11 +60,6 @@
 .largeButtonText {
     font-size: 12px;
     text-align: center;
-}
-
-.smallButtonText {
-    font-size: 12px;
-    text-align: left;
 }
 
 .icon {

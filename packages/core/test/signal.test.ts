@@ -138,6 +138,7 @@ describe("Signal", () => {
             expect(() => signal.emit()).toThrow("listener error");
             // The error propagates, so second listener is not reached
             // This is expected behavior — Signal does not catch errors
+            expect(secondCalled).toBe(false);
         });
 
         test("should work with zero-argument emit", () => {

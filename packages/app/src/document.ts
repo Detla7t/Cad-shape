@@ -109,7 +109,9 @@ export class Document extends Observable implements IDocument {
         this.history.dispose();
         this.variables.dispose();
         this.selection.dispose();
-        this.acts.forEach((x) => x.dispose());
+        this.acts.forEach((x) => {
+            x.dispose();
+        });
         this.acts.clear();
     }
 
@@ -203,7 +205,9 @@ export class Document extends Observable implements IDocument {
         const views = this.application.views.filter((x) => x.document === this);
         this.application.views.remove(...views);
         this.application.activeView = this.application.views.at(0);
-        views.forEach((view) => view.dispose());
+        views.forEach((view) => {
+            view.dispose();
+        });
         this.application.documents.delete(this);
 
         PubSub.default.pub("documentClosed", this);

@@ -2,59 +2,11 @@
 // See LICENSE file in the project root for full license information.
 
 import { TestDocument } from "@chili3d/core/test-utils";
-import { FormulaError, WorkbookEvaluator } from "@chili3d/sheet/formula";
-import { acceptFormulaCompletion, formulaCompletion } from "@chili3d/sheet/formulaSuggestions";
-import { cloneWorkbook, type WorkbookData } from "@chili3d/sheet/model";
-import { adjustDecimalPlaces } from "@chili3d/sheet/numberFormat";
-import {
-    alternateColors,
-    dropdownValues,
-    setValidation,
-    sortRange,
-    translateFormula,
-} from "@chili3d/sheet/operations";
-import { renameWorkbookSheet, resolveRanges, validRangeName, validSheetName } from "@chili3d/sheet/ranges";
+import { WorkbookEvaluator } from "@chili3d/sheet/formula";
+import { dropdownValues } from "@chili3d/sheet/operations";
 import { readWorkbook } from "@chili3d/sheet/workbookIo";
-import { readXlsx, writeXlsx } from "@chili3d/sheet/xlsx";
 import { DocumentFileNode } from "../src/documentFileNode";
 import { createSpreadsheetViewer } from "../src/ui/viewers/spreadsheetViewer";
-
-const workbook: WorkbookData = {
-    sheets: [
-        {
-            name: "Bank Transactions",
-            cells: {
-                A1: { v: "Category" },
-                B1: { v: "Amount" },
-                C1: { v: "Double" },
-                A2: { v: "Food" },
-                B2: { v: 10 },
-                C2: { f: "B2*2+$F$1", z: "0.00" },
-                A3: { v: "Rent" },
-                B3: { v: 50 },
-                C3: { f: "B3*2+$F$1", z: "0.00" },
-                A4: { v: "Fuel" },
-                B4: { v: 20 },
-                C4: { f: "B4*2+$F$1", z: "0.00" },
-                F1: { v: 1 },
-            },
-            validations: {
-                "A2:A4": {
-                    type: "list",
-                    formulae: ['"Food,Rent,Fuel"'],
-                    showErrorMessage: true,
-                    allowBlank: true,
-                },
-            },
-            autoFilter: "A1:C4",
-            frozen: { rows: 1, cols: 1 },
-            hiddenRows: [2],
-            hiddenCols: [4],
-        },
-        { name: "Report", cells: { A1: { f: "SUM(Expenses)" }, A2: { f: '"Bank Transactions!B2"' } } },
-    ],
-    names: [{ name: "Expenses", ranges: ["'Bank Transactions'!$B$2:$B$4"] }],
-};
 
 describe("spreadsheet menu interactions", () => {
     async function setup() {

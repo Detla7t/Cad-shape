@@ -129,7 +129,7 @@ export class MaterialEditor extends HTMLElement {
         this.editingControl.innerHTML = "";
 
         const isTexture = (p: Property) => {
-            return (material as any)[p.name] instanceof Texture;
+            return Reflect.get(material, p.name) instanceof Texture;
         };
 
         const properties = PropertyUtils.getProperties(material);

@@ -69,8 +69,8 @@ export class AppBuilder {
         this.init("api", async () => {
             Logger.info("initializing api");
 
-            (globalThis as any).Chili3dCore = await import("@chili3d/core");
-            (globalThis as any).Chili3dElement = await import("@chili3d/element");
+            Reflect.set(globalThis, "Chili3dCore", await import("@chili3d/core"));
+            Reflect.set(globalThis, "Chili3dElement", await import("@chili3d/element"));
         });
     }
 
@@ -174,7 +174,7 @@ export class AppBuilder {
 
             // plugins reach the registries (operations, posts, machines) through the global
             const cam = await loading;
-            (globalThis as any).Chili3dCam = cam;
+            Reflect.set(globalThis, "Chili3dCam", cam);
             this._ribbonExtras.push(...CamRibbonProfiles);
         });
         return this;

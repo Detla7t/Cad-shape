@@ -4,27 +4,27 @@
 import { Binding, type IDocument, Localize, type Property, Transaction } from "@chili3d/core";
 import { div, input, span } from "@chili3d/element";
 import commonStyle from "./common.module.css";
-import { PropertyBase } from "./propertyBase";
+import { asPropertyHosts, PropertyBase } from "./propertyBase";
 
 export class CheckProperty extends PropertyBase {
     constructor(
         readonly document: IDocument,
-        objects: any[],
+        objects: readonly object[],
         readonly property: Property,
     ) {
-        super(objects);
+        super(asPropertyHosts(objects));
         this.appendChild(
             div(
                 { className: commonStyle.panel },
                 span({ className: commonStyle.propertyName, textContent: new Localize(property.display) }),
                 input({
                     type: "checkbox",
-                    checked: new Binding(objects[0], property.name),
+                    checked: new Binding(this.objects[0], property.name),
                     onclick: () => {
-                        const value = !objects[0][property.name];
+                        const value = !this.objects[0][property.name];
 
                         Transaction.execute(document, "modify property", () => {
-                            objects.forEach((x) => {
+                            this.objects.forEach((x) => {
                                 x[property.name] = value;
                             });
                             document.visual.update();

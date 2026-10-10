@@ -4,7 +4,11 @@
 import { Localize, PathBinding } from "@chili3d/core";
 import type { HTMLProps } from "./htmlProps";
 
-export function setProperties<T extends { [K: string]: any }>(left: T, prop: HTMLProps<T>) {
+export function setProperties<T extends object>(left: T, prop: HTMLProps<T>) {
+    assignProperties(left as HTMLElement & Record<string, unknown>, prop as Record<string, unknown>);
+}
+
+function assignProperties(left: HTMLElement & Record<string, unknown>, prop: Record<string, unknown>) {
     for (const key in prop) {
         const value = prop[key];
         if (value instanceof Localize && (key === "textContent" || key === "title")) {
@@ -12,9 +16,12 @@ export function setProperties<T extends { [K: string]: any }>(left: T, prop: HTM
         } else if (value instanceof PathBinding) {
             value.setBinding(left, key);
         } else if (typeof value === "object" && typeof left[key] === "object") {
-            setProperties(left[key], value);
+            assignProperties(
+                left[key] as HTMLElement & Record<string, unknown>,
+                value as Record<string, unknown>,
+            );
         } else {
-            (left as any)[key] = value;
+            left[key] = value;
         }
     }
 }

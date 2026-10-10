@@ -1,12 +1,18 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
+/**
+ * A persisted record. Tables are schemaless; each caller narrows what it reads to its own shape.
+ */
+// biome-ignore lint/suspicious/noExplicitAny: schemaless stored rows that callers read with their own shape
+export type StoredRow = any;
+
 export interface IStorage {
     createDBIfNeeded(database: string, tables: string[]): Promise<void>;
-    get(database: string, table: string, id: string): Promise<any>;
-    put(database: string, table: string, id: string, value: any): Promise<boolean>;
+    get(database: string, table: string, id: string): Promise<StoredRow>;
+    put(database: string, table: string, id: string, value: unknown): Promise<boolean>;
     delete(database: string, table: string, id: string): Promise<boolean>;
-    page(database: string, table: string, page: number): Promise<any[]>;
+    page(database: string, table: string, page: number): Promise<StoredRow[]>;
     /** All operations commit together, or none do. Resolves only after transaction completion. */
     writeBatch?(database: string, operations: readonly StorageOperation[]): Promise<boolean>;
 }

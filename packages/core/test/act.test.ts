@@ -217,7 +217,7 @@ describe("Act class tests", () => {
         test("should handle floating point precision", () => {
             const precisePosition = new XYZ({ x: 0.123456789, y: 0.987654321, z: 0.555555555 });
             const preciseTarget = new XYZ({ x: 1.111111111, y: 2.222222222, z: 3.333333333 });
-            const preciseUp = new XYZ({ x: 0, y: 0.707106781, z: 0.707106781 });
+            const preciseUp = new XYZ({ x: 0, y: Math.SQRT1_2, z: Math.SQRT1_2 });
 
             const act = new Act({
                 name: "Precise",

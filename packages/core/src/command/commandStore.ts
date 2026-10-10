@@ -6,7 +6,7 @@ import type { ICommand } from "./command";
 import type { CommandData } from "./commandData";
 import type { CommandKeys } from "./commandKeys";
 
-export type CommandConstructor = new (...args: any[]) => ICommand;
+export type CommandConstructor = new (...args: never[]) => ICommand;
 
 const commandRegistry = new Map<string, CommandConstructor>();
 

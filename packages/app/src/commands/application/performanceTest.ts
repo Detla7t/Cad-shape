@@ -48,7 +48,6 @@ export abstract class PerformanceTestCommand implements ICommand {
 })
 export class OccPerformanceTestCommand extends PerformanceTestCommand {
     private index = 1;
-    shapes: any[] = [];
 
     protected override createShape(document: IDocument, material: Material, position: XYZ): void {
         const plane = Plane.XY.translateTo(position);

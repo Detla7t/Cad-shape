@@ -1414,7 +1414,9 @@ export class WorkbookEvaluator {
         if (!(fn instanceof LambdaValue)) return ERR("#VALUE!");
         if (args.length > fn.params.length) return ERR("#VALUE!");
         const scope = new Map(fn.closure);
-        fn.params.forEach((param, i) => scope.set(param, args[i] ?? null));
+        fn.params.forEach((param, i) => {
+            scope.set(param, args[i] ?? null);
+        });
         return this.plain(this.evaluate(fn.body, { ...frame, scope }));
     }
 

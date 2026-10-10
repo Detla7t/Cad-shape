@@ -96,7 +96,9 @@ class FakeTab {
                             if (event && data) {
                                 this.events.push({ event, data: JSON.parse(data) });
                                 if (event === "hello") this.key = JSON.parse(data).key;
-                                this.waiters.splice(0).forEach((wake) => wake());
+                                this.waiters.splice(0).forEach((wake) => {
+                                    wake();
+                                });
                             }
                             end = buffer.indexOf("\n\n");
                         }
@@ -298,7 +300,9 @@ describe("automation bridge: routing and security", () => {
     });
 
     afterEach(async () => {
-        tabs.splice(0).forEach((tab) => tab.close());
+        tabs.splice(0).forEach((tab) => {
+            tab.close();
+        });
         hub.close();
         await new Promise((resolve) => server.close(resolve));
     });

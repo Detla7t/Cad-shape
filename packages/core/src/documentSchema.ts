@@ -199,7 +199,7 @@ export class DocumentMigrationRegistry {
         kind: DocumentSchemaErrorKind,
         message: string,
         details: Partial<Pick<DocumentSchemaError, "schemaVersion" | "appVersion" | "migration">> = {},
-    ): Result<any, DocumentSchemaError> {
+    ): Result<never, DocumentSchemaError> {
         const error: DocumentSchemaError = {
             kind,
             supportedVersion: this.supportedVersion,

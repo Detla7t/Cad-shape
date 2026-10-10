@@ -5,9 +5,11 @@ import {
     command,
     type GeometryNode,
     GeometryUtils,
+    type IEdge,
     type IFace,
     type IShape,
     type IStep,
+    type IWire,
     type LengthAtAxisSnapData,
     LengthAtAxisStep,
     Precision,
@@ -72,7 +74,7 @@ export class ExtrudeCommand extends CreateFromSelectionCommand {
 
     private getAxis(shape: IShape) {
         const point = this.stepDatas[0].shapes[0].point!;
-        const normal = GeometryUtils.normal(shape as any);
+        const normal = GeometryUtils.normal(shape as IFace | IWire | IEdge);
         return { point, normal };
     }
 }

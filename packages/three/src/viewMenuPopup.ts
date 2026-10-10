@@ -24,15 +24,14 @@ export function openViewMenu(anchor: Element, items: ViewMenuItem[], onClose: ()
     const close = () => {
         if (closed) return;
         closed = true;
-        menus.forEach((menu) => menu.remove());
+        for (const menu of menus) menu.remove();
         events.abort();
         onClose();
     };
     const trim = (level: number) => {
-        menus.splice(level).forEach((menu) => menu.remove());
-        menus[level - 1]
-            ?.querySelectorAll('[aria-expanded="true"]')
-            .forEach((button) => button.setAttribute("aria-expanded", "false"));
+        for (const menu of menus.splice(level)) menu.remove();
+        const expanded = menus[level - 1]?.querySelectorAll('[aria-expanded="true"]') ?? [];
+        for (const button of expanded) button.setAttribute("aria-expanded", "false");
     };
     const create = (entries: ViewMenuItem[], level: number, parent?: HTMLButtonElement): HTMLElement => {
         trim(level);

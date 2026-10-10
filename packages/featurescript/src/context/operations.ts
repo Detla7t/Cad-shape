@@ -925,7 +925,7 @@ function collapsedBlendShell(
         cavity.value.dispose();
         return result.isOk && result.value.checkShape() ? result : failure;
     } finally {
-        sharpFaces.forEach((face) => face.dispose());
+        for (const face of sharpFaces) face.dispose();
         sharp.value.dispose();
     }
 }

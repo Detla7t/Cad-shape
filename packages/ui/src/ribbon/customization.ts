@@ -30,21 +30,32 @@ export function tabLabel(tab: RibbonTab): string {
 export function toolCategories(ribbon: Ribbon): Map<CommandKeys, Set<string>> {
     const result = new Map<CommandKeys, Set<string>>();
     const add = (item: RibbonCommand, categories: string[]) => {
-        if (item instanceof ObservableCollection) item.forEach((key) => add(key, categories));
+        if (item instanceof ObservableCollection)
+            item.forEach((key) => {
+                add(key, categories);
+            });
         else if (typeof item !== "string" && item.type !== "push")
-            item.items.forEach((child) => add(child, categories));
+            item.items.forEach((child) => {
+                add(child, categories);
+            });
         else {
             const key = typeof item === "string" ? item : item.command;
             const names = result.get(key) ?? new Set<string>();
-            categories.forEach((name) => names.add(name));
+            categories.forEach((name) => {
+                names.add(name);
+            });
             result.set(key, names);
         }
     };
     for (const tab of ribbon.tabs)
         for (const group of tab.groups) {
             const names = [tabLabel(tab), I18n.translate(group.groupName)];
-            group.items.forEach((item) => add(item, names));
-            group.collapsedItems.forEach((item) => add(item, names));
+            group.items.forEach((item) => {
+                add(item, names);
+            });
+            group.collapsedItems.forEach((item) => {
+                add(item, names);
+            });
         }
     return result;
 }

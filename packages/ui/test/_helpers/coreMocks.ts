@@ -124,7 +124,6 @@ export function createPubSubRecorder() {
 export type PubSubRecorder = ReturnType<typeof createPubSubRecorder>;
 
 /** Minimal ObservableCollection stub backed by a plain array. */
-// biome-ignore lint/suspicious/noExplicitAny: test mock
 export class ObservableCollectionMock<T = any> {
     private items: T[];
     constructor(...items: T[]) {

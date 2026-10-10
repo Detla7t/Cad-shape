@@ -13,19 +13,16 @@ import {
     Result,
     type ShapeNode,
     ShapeTypes,
-    type VisualNode,
     XY,
     XYZ,
 } from "@chili3d/core";
 import { TestDocument } from "@chili3d/core/test-utils";
 import { rs } from "@rstest/core";
 import {
-    BufferGeometry,
     DirectionalLight,
     Group,
     Layers,
     type Mesh,
-    MeshBasicMaterial,
     OrthographicCamera,
     type PerspectiveCamera,
     Raycaster,
@@ -34,7 +31,6 @@ import {
 import { CSS2DRenderer } from "three/examples/jsm/renderers/CSS2DRenderer.js";
 import { Constants } from "../src/constants";
 import { ThreeGeometry } from "../src/threeGeometry";
-import { ThreeView } from "../src/threeView";
 import type { ThreeVisualContext } from "../src/threeVisualContext";
 import { ThreeComponentObject, ThreeMeshObject, type ThreeVisualObject } from "../src/threeVisualObject";
 import {
@@ -443,7 +439,7 @@ describe("ThreeView — isolate / unisolate", () => {
 
 describe("ThreeView — htmlText", () => {
     test("htmlText adds a disposable css object to the scene", () => {
-        const { view, context } = createTestView();
+        const { view } = createTestView();
         const before = view["labelScene"].children.length;
 
         const result = view.htmlText("Hello", new XYZ({ x: 0, y: 0, z: 0 }));
@@ -455,7 +451,7 @@ describe("ThreeView — htmlText", () => {
     });
 
     test("htmlText with className option applies the class", () => {
-        const { view, context } = createTestView();
+        const { view } = createTestView();
         const result = view.htmlText("Test", new XYZ({ x: 10, y: 20, z: 30 }), {
             className: "custom",
         });
@@ -466,7 +462,7 @@ describe("ThreeView — htmlText", () => {
     });
 
     test("htmlText dispose removes the css object", () => {
-        const { view, context } = createTestView();
+        const { view } = createTestView();
         const before = view["labelScene"].children.length;
 
         const result = view.htmlText("Disposable", new XYZ({ x: 0, y: 0, z: 0 }));
@@ -477,7 +473,7 @@ describe("ThreeView — htmlText", () => {
     });
 
     test("htmlText with center option sets the css object center", () => {
-        const { view, context } = createTestView();
+        const { view } = createTestView();
         const result = view.htmlText("Centered", new XYZ({ x: 0, y: 0, z: 0 }), {
             center: new XY({ x: 0.5, y: 0.5 }),
         });
@@ -489,7 +485,7 @@ describe("ThreeView — htmlText", () => {
     });
 
     test("htmlText with hideDelete option creates no delete icon", () => {
-        const { view, context } = createTestView();
+        const { view } = createTestView();
         const result = view.htmlText("No Delete", new XYZ({ x: 0, y: 0, z: 0 }), {
             hideDelete: true,
         });
@@ -831,7 +827,7 @@ describe("ThreeView — disposeInternal", () => {
 
 describe("ThreeView — htmlText advanced", () => {
     test("htmlText with hideDelete creates element without delete button", () => {
-        const { view, context } = createTestView();
+        const { view } = createTestView();
         const result = view.htmlText("No Delete", new XYZ({ x: 0, y: 0, z: 0 }), {
             hideDelete: true,
             className: "my-custom-class",
@@ -844,7 +840,7 @@ describe("ThreeView — htmlText advanced", () => {
     });
 
     test("htmlText interactive wires click and dblclick handlers", () => {
-        const { view, context } = createTestView();
+        const { view } = createTestView();
         const events: string[] = [];
         const result = view.htmlText("Badge", new XYZ({ x: 0, y: 0, z: 0 }), {
             hideDelete: true,
@@ -863,7 +859,7 @@ describe("ThreeView — htmlText advanced", () => {
     });
 
     test("htmlText dispose is idempotent", () => {
-        const { view, context } = createTestView();
+        const { view } = createTestView();
         const before = view["labelScene"].children.length;
 
         const result = view.htmlText("Cleanup", new XYZ({ x: 0, y: 0, z: 0 }));
@@ -874,7 +870,7 @@ describe("ThreeView — htmlText advanced", () => {
     });
 
     test("htmlText with all options combined", () => {
-        const { view, context } = createTestView();
+        const { view } = createTestView();
         let disposed = false;
         const result = view.htmlText("All Options", new XYZ({ x: 5, y: 10, z: 15 }), {
             center: new XY({ x: 0.5, y: 0 }),

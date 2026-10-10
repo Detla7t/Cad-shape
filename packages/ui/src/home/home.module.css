@@ -39,6 +39,7 @@
     flex-shrink: 0;
 }
 .root [hidden] {
+    /* biome-ignore lint/complexity/noImportantStyles: the hidden attribute must beat every author display rule on any element in the panel */
     display: none !important;
 }
 .header {
@@ -71,6 +72,28 @@
     color: inherit;
     font: inherit;
 }
+.textButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    background: none;
+    border: none;
+    padding: 6px 9px;
+    border-radius: 3px;
+}
+.iconButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border: none;
+    padding: 5px;
+    width: 29px;
+    height: 29px;
+    background: none;
+    border-radius: 3px;
+}
 .header > .iconButton {
     margin-left: auto;
 }
@@ -95,6 +118,7 @@
     border: none;
     border-radius: 4px;
     background: #2056b5;
+    /* biome-ignore lint/complexity/noImportantStyles: .root button sets color: inherit with higher specificity than .create */
     color: #fff !important;
 }
 .create:hover,
@@ -338,16 +362,6 @@
 .listToolbar small {
     color: var(--foreground-secondary-color);
 }
-.textButton {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 5px;
-    background: none;
-    border: none;
-    padding: 6px 9px;
-    border-radius: 3px;
-}
 .textButton:hover,
 .iconButton:hover {
     background: color-mix(in srgb, var(--selection-tint) 35%, var(--panel-background-color));
@@ -397,6 +411,7 @@
     padding: 0;
     border: 0;
     background: none;
+    /* biome-ignore lint/complexity/noImportantStyles: .root button sets the font shorthand (resetting weight) with higher specificity than .sortButton */
     font-weight: 600 !important;
 }
 .table th[aria-sort="ascending"] .sortButton::after {
@@ -494,18 +509,6 @@
     opacity: 1;
     pointer-events: auto;
 }
-.iconButton {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    border: none;
-    padding: 5px;
-    width: 29px;
-    height: 29px;
-    background: none;
-    border-radius: 3px;
-}
 .iconButton svg {
     width: 19px;
     height: 19px;
@@ -590,6 +593,7 @@
     border-radius: 4px;
     padding: 8px 16px;
     background: #2056b5;
+    /* biome-ignore lint/complexity/noImportantStyles: .root button sets color: inherit with higher specificity than .primary */
     color: white !important;
 }
 .secondary {

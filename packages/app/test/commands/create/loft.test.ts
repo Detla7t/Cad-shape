@@ -234,5 +234,5 @@ describe("LoftCommand", () => {
 
 /** Minimal stand-in for Matrix4.worldTransform() used by the loft loop. */
 function identityLikeMatrix() {
-    return { multiply: (m: unknown) => identityLikeMatrix() } as any;
+    return { multiply: (_m: unknown) => identityLikeMatrix() } as any;
 }

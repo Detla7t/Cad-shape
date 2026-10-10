@@ -68,7 +68,9 @@ export class Input extends HTMLElement implements IDisposable {
         if (e.key === "Enter") {
             this.processEnterKey();
         } else if (e.key === "Escape") {
-            this._cancelledCallbacks.forEach((callback) => callback());
+            this._cancelledCallbacks.forEach((callback) => {
+                callback();
+            });
         } else {
             this.removeTip();
         }
@@ -78,7 +80,9 @@ export class Input extends HTMLElement implements IDisposable {
         this.textbox.readOnly = true;
         const error = this.handler(this.textbox.value);
         if (error.isOk) {
-            this._completedCallbacks.forEach((callback) => callback());
+            this._completedCallbacks.forEach((callback) => {
+                callback();
+            });
         } else {
             this.textbox.readOnly = false;
             this.showTip(error.error);

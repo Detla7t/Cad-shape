@@ -127,7 +127,7 @@ function operationParameter(item: JsonValue, path: string) {
 }
 
 VersioningRoles.register("camOperation", {
-    itemLabel(value, items, index) {
+    itemLabel(value, _items, index) {
         if (isJsonObject(value) && typeof value["name"] === "string" && value["name"] !== "")
             return value["name"];
         const type = isJsonObject(value) && typeof value["type"] === "string" ? value["type"] : "Operation";

@@ -42,7 +42,7 @@ import type { SketchNode } from "../sketchNode";
 import { computeSketchRollback, rollbackRestoreOrder } from "../sketchRollback";
 import { type SketchConstraintStatus, SketchSolver, type SolveOutcome } from "../solver";
 import * as datumPrompt from "./datumPrompt";
-import { type DimensionAnchor, toDisplayDatum, toStorageDatum } from "./dimensionLayout";
+import { type DimensionAnchor, toDisplayDatum } from "./dimensionLayout";
 import { SketchAnnotationManager } from "./sketchAnnotations";
 import { SketchEventHandler } from "./sketchEventHandler";
 import { SketchPanel } from "./sketchPanel";
@@ -98,7 +98,7 @@ interface PickRequest {
     /** Entity picks only: also allow picking the datum X/Y axes. */
     datum?: boolean;
     preview?: SketchPickPreview;
-    resolve: (value: any) => void;
+    resolve: (value: unknown) => void;
 }
 
 interface SavedCamera {
@@ -1185,7 +1185,14 @@ export class SketchEditor implements IDisposable {
         this.cancelPick();
         PubSub.default.pub("statusBarTip", prompt);
         return new Promise<T>((resolve) => {
-            this.pickRequest = { kind, entityType, datum, preview, resolve, exclude };
+            this.pickRequest = {
+                kind,
+                entityType,
+                datum,
+                preview,
+                resolve: (value) => resolve(value as T),
+                exclude,
+            };
             this.eventHandler.setController(this.view, controller);
             this.annotations.suppressConstraintSymbols = true;
         });

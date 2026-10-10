@@ -4,7 +4,7 @@
 import { I18N_KEYS, type I18nKeys } from "./keys";
 
 const I18nId = "chili18n";
-const I18nArgs = new WeakMap<HTMLElement, any[]>();
+const I18nArgs = new WeakMap<HTMLElement, unknown[]>();
 
 export type Locale = {
     display: string;
@@ -88,7 +88,7 @@ export class I18n {
         }
     }
 
-    static translate(key: I18nKeys, ...args: any[]) {
+    static translate(key: I18nKeys, ...args: unknown[]) {
         const language = languages.get(I18n.currentLanguage());
         if (!language) {
             console.warn(`No translation for ${key} in ${language}`);
@@ -97,14 +97,14 @@ export class I18n {
         return I18n.translateLanguage(language, key, ...args);
     }
 
-    static translateLanguage(language: Locale, key: I18nKeys, ...args: any[]) {
+    static translateLanguage(language: Locale, key: I18nKeys, ...args: unknown[]) {
         let text = language.translation[key] ?? languages.get("en")!.translation[key];
         if (text === undefined) {
             console.warn(`No translation for ${key} in ${language}`);
             return key;
         }
         if (args.length > 0) {
-            text = text.replace(/\{(\d+)\}/g, (_, index) => args[index]);
+            text = text.replace(/\{(\d+)\}/g, (_, index) => String(args[index]));
         }
         return text;
     }
@@ -114,7 +114,7 @@ export class I18n {
         return i18nKeySet.has(key);
     }
 
-    static set(dom: HTMLElement, path: I18nPath, key: I18nKeys, ...args: any[]) {
+    static set(dom: HTMLElement, path: I18nPath, key: I18nKeys, ...args: unknown[]) {
         dom[path] = I18n.translate(key, ...args);
         dom.dataset[I18nId] = `${key}${DATASET_LINK_KEY}${path}`;
         if (args.length > 0) {

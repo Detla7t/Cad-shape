@@ -18,7 +18,9 @@ describe("viewport render scheduling", () => {
     function frame() {
         const callbacks = [...frames.values()];
         frames.clear();
-        callbacks.forEach((callback) => callback(performance.now()));
+        for (const callback of callbacks) {
+            callback(performance.now());
+        }
     }
 
     function intersect(isIntersecting: boolean) {

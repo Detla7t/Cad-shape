@@ -96,8 +96,8 @@ export class SliderElement extends LitElement {
 
     updateParam(key: "min" | "max" | "step", event: Event) {
         const value = parseFloat((event.target as HTMLInputElement).value);
-        if (!isNaN(value)) {
-            (this.data as any)[key] = value;
+        if (!Number.isNaN(value)) {
+            this.data[key] = value;
             this.data.change();
         }
     }

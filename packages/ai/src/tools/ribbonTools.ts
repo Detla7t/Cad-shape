@@ -77,7 +77,9 @@ function commandsOnRibbon(ribbon: Ribbon): Set<string> {
         } else if (item.type === "push") {
             ids.add(item.command);
         } else {
-            item.items.forEach((entry) => add(entry));
+            item.items.forEach((entry) => {
+                add(entry);
+            });
         }
     };
 
@@ -108,18 +110,26 @@ export function ribbonLocations(ribbon: Ribbon): Map<string, string[]> {
     };
     const add = (item: RibbonCommand, place: string): void => {
         if (typeof item === "string") at(item, place);
-        else if (item instanceof ObservableCollection) item.forEach((command) => add(command, place));
+        else if (item instanceof ObservableCollection)
+            item.forEach((command) => {
+                add(command, place);
+            });
         else if (item.type === "push") at(item.command, place);
         else if (item.type === "pulldown")
-            item.items.forEach((entry) =>
-                add(entry as RibbonCommand, `${place} ▸ ${translate(item.display)}`),
-            );
-        else item.items.forEach((entry) => add(entry as RibbonCommand, place));
+            item.items.forEach((entry) => {
+                add(entry as RibbonCommand, `${place} ▸ ${translate(item.display)}`);
+            });
+        else
+            item.items.forEach((entry) => {
+                add(entry as RibbonCommand, place);
+            });
     };
     for (const tab of ribbon.tabs) {
         for (const group of tab.groups) {
             const place = `${translate(tab.tabName)} ▸ ${translate(group.groupName)}`;
-            group.items.forEach((item) => add(item, place));
+            group.items.forEach((item) => {
+                add(item, place);
+            });
             for (const command of group.collapsedItems) at(command, `${place} (overflow)`);
         }
     }

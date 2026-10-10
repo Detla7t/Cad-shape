@@ -19,6 +19,7 @@ import {
     type ShapeMeshData,
     ShapeTypes,
     type SnapResult,
+    type VisualNode,
     type VisualShapeData,
     VisualStates,
     VisualStateUtils,
@@ -61,7 +62,7 @@ export function extrudeArrowSegment(state: ExtrudeDragState): { start: XYZ; end:
  */
 export interface ExtrudeDragState {
     /** The sketch or parametric body the current faces belong to. */
-    node: INode;
+    node: VisualNode;
     faces: VisualShapeData[];
     origin: XYZ;
     normal: XYZ;
@@ -87,7 +88,7 @@ export interface ExtrudePreview {
 }
 
 export interface ExtrudeDragData {
-    node: INode;
+    node: VisualNode;
     /** Initial profile faces from the pick step; empty means the whole sketch. */
     faces: VisualShapeData[];
     origin: XYZ;
@@ -153,7 +154,7 @@ export class ExtrudeDragStep implements IStep {
             point: state.origin.add(state.normal.multiply(state.dist)),
             distance: Math.abs(state.dist),
             shapes: state.faces,
-            nodes: [state.node as any],
+            nodes: [state.node],
             type: "input",
             // The live drag plane (it changes when the user switches faces mid-drag),
             // so the command can recover the signed length and direction.
@@ -293,7 +294,7 @@ export class ExtrudeDragHandler implements IEventHandler {
         view.update();
     }
 
-    mouseWheel(view: IView, event: WheelEvent): void {
+    mouseWheel(view: IView, _event: WheelEvent): void {
         this.trackCamera(view);
         view.update();
     }

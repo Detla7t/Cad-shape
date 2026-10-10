@@ -193,11 +193,11 @@ export class Tree extends HTMLElement {
     private readonly handleCurrentNodeChanged = (
         prop: keyof ModelManager,
         source: ModelManager,
-        oldValue: any,
+        oldValue: ModelManager[keyof ModelManager],
     ) => {
         if (prop === "currentNode") {
             if (oldValue !== undefined) {
-                this.nodeMap.get(oldValue)?.removeStyle(style.current);
+                this.nodeMap.get(oldValue as INode)?.removeStyle(style.current);
             }
             if (source.currentNode) {
                 this.nodeMap.get(source.currentNode)?.addStyle(style.current);
@@ -252,6 +252,7 @@ export class Tree extends HTMLElement {
         this.document.modelManager.removeNodeObserver(this.handleNodeChanged);
         this.document.modelManager.removePropertyChanged(this.handleCurrentNodeChanged);
         this.document.selection.onNodeChanged.remove(this.handleSelectionChanged);
+        // biome-ignore lint/suspicious/noExplicitAny: dispose drops the reference; the field is non-optional because no live code sees it unset
         this.document = null as any;
     }
 

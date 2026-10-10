@@ -128,7 +128,7 @@ export abstract class ShapeSelectionHandler extends SelectionHandler {
 export class SubshapeSelectionHandler extends ShapeSelectionHandler {
     selectedState: VisualState = VisualStates.edgeSelected;
 
-    protected override select(view: IView, event: PointerEvent): number {
+    protected override select(_view: IView, _event: PointerEvent): number {
         if (!this._highlights?.length) {
             return 0;
         }

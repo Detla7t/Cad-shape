@@ -554,7 +554,7 @@ function sweepProfileTracked(
         seedSweptEdges(edgeIds, outputEdges, edgeMap, faceEdges, edgeSeeds, (point) => point.add(vec));
         return Result.ok({ shape: result.value.shape, faceIds, edgeIds });
     } finally {
-        owned.forEach((x) => x.dispose());
+        for (const x of owned) x.dispose();
     }
 }
 

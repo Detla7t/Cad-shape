@@ -4,7 +4,7 @@
 import { VisualConfig } from "../config";
 import type { IDocument } from "../document";
 import { type IEqualityComparer, Logger, PubSub, Result } from "../foundation";
-import { I18n, type I18nKeys } from "../i18n";
+import type { I18nKeys } from "../i18n";
 import { Matrix4 } from "../math";
 import { property } from "../property";
 import { serializable, serialize } from "../serialize";
@@ -107,7 +107,7 @@ export abstract class ShapeNode extends GeometryNode {
     override disposeInternal(): void {
         super.disposeInternal();
         this._shape.unchecked()?.dispose();
-        this._shape = null as any;
+        this._shape = null as unknown as Result<IShape>;
     }
 }
 

@@ -11,7 +11,9 @@ export const mockLocalStorage = () => {
             },
             removeItem: (key: string) => delete localStorageData[key],
             clear: () => {
-                Object.keys(localStorageData).forEach((k) => delete localStorageData[k]);
+                Object.keys(localStorageData).forEach((k) => {
+                    delete localStorageData[k];
+                });
             },
             get length() {
                 return Object.keys(localStorageData).length;

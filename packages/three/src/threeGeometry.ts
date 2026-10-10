@@ -12,7 +12,6 @@ import {
     type Matrix4,
     MeshUtils,
     OriginNode,
-    type ShapeMeshRange,
     ShapeNode,
     type ShapeType,
     ShapeTypes,
@@ -103,11 +102,11 @@ export class ThreeGeometry extends ThreeVisualObject implements IVisualGeometry 
             const onTopMaterial = Array.isArray(normalMaterial)
                 ? normalMaterial.map((x) => ThreeGeometryFactory.createOnTopMaterial(x))
                 : ThreeGeometryFactory.createOnTopMaterial(normalMaterial);
-            object.material = onTopMaterial as any;
+            (object as Mesh).material = onTopMaterial;
             object.userData[OnTopMaterialKey] = onTopMaterial;
         } else {
             object.renderOrder = 0;
-            object.material = normalMaterial as any;
+            (object as Mesh).material = normalMaterial;
         }
     }
 
@@ -182,7 +181,7 @@ export class ThreeGeometry extends ThreeVisualObject implements IVisualGeometry 
             if (this.ownsVertexMaterial) this._vertexMaterial?.dispose();
             this._vertexMaterial = undefined;
             this.ownsVertexMaterial = false;
-            this._vertexs = null as any;
+            this._vertexs = undefined;
         }
         if (this._edges) {
             this.disposeOnTopMaterial(this._edges);
@@ -190,7 +189,7 @@ export class ThreeGeometry extends ThreeVisualObject implements IVisualGeometry 
             this._edges.geometry.dispose();
             if (this.ownsEdgeMaterial) this._edgeMaterial.dispose();
             this.ownsEdgeMaterial = false;
-            this._edges = null as any;
+            this._edges = undefined;
         }
         if (this._faces) {
             this.disposeOnTopMaterial(this._faces);
@@ -202,7 +201,7 @@ export class ThreeGeometry extends ThreeVisualObject implements IVisualGeometry 
                 this._faceMaterial = this.context.getMaterial(this.geometryNode.materialId);
                 this.ownsFaceMaterial = false;
             }
-            this._faces = null as any;
+            this._faces = undefined;
         }
     }
 

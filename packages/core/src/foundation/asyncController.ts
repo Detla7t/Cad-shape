@@ -37,7 +37,9 @@ export class AsyncController implements IDisposable {
     ) {
         if (this._result === undefined) {
             this._result = { status, message };
-            listeners.forEach((listener) => listener(this._result!));
+            listeners.forEach((listener) => {
+                listener(this._result!);
+            });
         }
     }
 

@@ -55,7 +55,7 @@ export const contrastFn = () => {
     };
     const bgOf = (el) => {
         const layers = [];
-        for (let e = el; e; e = e.parentElement || (e.getRootNode && e.getRootNode().host)) {
+        for (let e = el; e; e = e.parentElement || e.getRootNode?.().host) {
             if (!(e instanceof Element)) break;
             const cs = getComputedStyle(e);
             if (
@@ -164,8 +164,6 @@ export const contrastFn = () => {
         const o = s.options[0];
         if (!o) continue;
         const ocs = getComputedStyle(o);
-        const ob = parse(ocs.backgroundColor),
-            oc = parse(ocs.color);
         const scheme = cs.colorScheme;
         if (s.getBoundingClientRect().width > 0)
             out.push({
