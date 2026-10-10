@@ -1,7 +1,8 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { createElement, div } from "@chili3d/element";
+import type { EvaluationState, IEvaluationStateSource } from "@chili3d/core";
+import { createElement, div, span } from "@chili3d/element";
 import { resolveMachine } from "../machines";
 import { postProcessors } from "../model/post";
 import type { SetupData } from "../model/setup";
@@ -84,6 +85,7 @@ export function renderPostPanel(host: StudioHost, setup: SetupData): HTMLElement
             { className: style.buttons },
             textButton(t("cam.postAndDownload"), () => void postSetup(host, setup.id, post.id), true, "post"),
         ),
+        renderPostReadiness(host, setup.id),
     );
     const posted = host.state.posted;
     if (posted !== undefined && posted.setupId === setup.id) {
@@ -92,6 +94,45 @@ export function renderPostPanel(host: StudioHost, setup: SetupData): HTMLElement
             lines.length > PREVIEW_LINES ? `${lines.slice(0, PREVIEW_LINES).join("\n")}\n…` : posted.text;
         element.append(section(posted.fileName, pre({ className: style.program, textContent: shown })));
     }
+    return element;
+}
+
+const STATIC_SOURCE = (state: EvaluationState): IEvaluationStateSource => ({
+    state: () => state,
+    subscribe: () => () => {},
+});
+
+/**
+ * Why the setup cannot be posted right now, at the post action: the generator's own
+ * `postBlockers` (what `program` refuses with), each with the shared evaluation indicator —
+ * the operation's live one, or the blocker's state for a part, machine or empty setup.
+ * Re-rendered alone when the generator reports.
+ */
+export function renderPostReadiness(host: StudioHost, setupId: string): HTMLElement {
+    const blockers = host.generator.postBlockers(setupId);
+    const element = div({ className: style.postReadiness });
+    element.dataset["postReadiness"] = setupId;
+    element.dataset["blocked"] = String(blockers.length > 0);
+    if (blockers.length === 0) return element;
+    element.append(div({ className: style.sectionTitle, textContent: t("cam.postBlocked") }));
+    for (const [index, blocker] of blockers.entries()) {
+        const source =
+            blocker.operationId === undefined
+                ? STATIC_SOURCE(blocker.state)
+                : host.generator.evaluationSource(blocker.operationId);
+        const row = div(
+            { className: style.blocker },
+            host.detailIndicators.element(
+                `post:${blocker.operationId ?? `${blocker.kind}:${index}`}`,
+                source,
+            ),
+            span({ textContent: blocker.message }),
+        );
+        row.dataset["blocker"] = blocker.kind;
+        element.append(row);
+    }
+    if (blockers.some((blocker) => blocker.kind === "missing" || blocker.kind === "stale"))
+        element.append(div({ className: style.note, textContent: t("cam.postRegenerates") }));
     return element;
 }
 

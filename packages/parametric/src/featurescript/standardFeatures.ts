@@ -2,10 +2,10 @@
 // See LICENSE file in the project root for full license information.
 
 import { type IDocument, Result, Transaction } from "@chili3d/core";
+import { providedOnshapeStd } from "@chili3d/featurescript";
 import type { ParametricBodyNode } from "../parametricBodyNode";
 import { FeatureStudioNode } from "./featureStudioNode";
 import { insertCustomFeature } from "./insertFeature";
-import { providedOnshapeStd } from "./runtime";
 import { compileStudioSource, documentStudios } from "./studioCompiler";
 
 /** Supported modes with the same replay/selection/undo path as document Feature Studios. */

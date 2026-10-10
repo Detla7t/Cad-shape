@@ -2,24 +2,32 @@
 // See LICENSE file in the project root for full license information.
 
 import { I18n, type IDocument, Transaction } from "@chili3d/core";
+import { providedOnshapeStd } from "@chili3d/featurescript";
+import {
+    type DefinitionLocation,
+    diagnosticsFor,
+    editorBasics,
+    FsAnalyzer,
+    type FsEditorHost,
+    formatDocument,
+    languageService,
+    normalizeNewlines,
+    type OutlineItem,
+    outlineOf,
+    revealRange,
+    type StdIndex,
+    type SymbolEnvironment,
+    showStdSource,
+    stdIndexFor,
+    ideStyle as style,
+    THEME_CLASS,
+} from "@chili3d/featurescript/ide";
 import { setDiagnostics } from "@codemirror/lint";
 import { Transaction as CmTransaction, EditorState, Prec } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
 import type { FeatureStudioNode } from "../../featureStudioNode";
-import { providedOnshapeStd } from "../../runtime";
 import { type CompiledStudio, compileStudioSource, documentStudios, findStudio } from "../../studioCompiler";
 import { showInsertFeatureDialog } from "../insertFeatureDialog";
-import { diagnosticsFor } from "./diagnostics";
-import { FsAnalyzer, type FsEditorHost, formatDocument, languageService, revealRange } from "./extensions";
-import style from "./ide.module.css";
-import type { DefinitionLocation } from "./navigation";
-import { type OutlineItem, outlineOf } from "./outline";
-import { normalizeNewlines } from "./scanner";
-import { editorBasics } from "./setup";
-import { type StdIndex, stdIndexFor } from "./stdIndex";
-import { showStdSource } from "./stdViewer";
-import type { SymbolEnvironment } from "./symbols";
-import { THEME_CLASS } from "./theme";
 
 /**
  * The FeatureScript IDE for one Feature Studio: a CodeMirror editor with FeatureScript

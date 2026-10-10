@@ -6,11 +6,13 @@ import type { ToolpathData } from "../model/toolpath";
 import { type GcodeStats, printerGcodeStats } from "./gcode/parse";
 
 /**
- * Client of the local PrusaSlicer bridge (`scripts/prusa-slicer-bridge.mjs`): a small Node
- * HTTP server on the user's machine that runs the installed `prusa-slicer` CLI. The app posts
- * the job's 3MF project and INI; the bridge answers with the G-code.
+ * Slicing client of the local desktop bridge (`scripts/desktop-bridge.mjs`, formerly
+ * `prusa-slicer-bridge.mjs`): a small Node HTTP server on the user's machine that runs the
+ * installed `prusa-slicer` CLI. The app posts the job's 3MF project and INI; the bridge answers
+ * with the G-code. (`@chili3d/core`'s `probeDesktopBridge` / `openOnDesktop` are the same
+ * bridge's export side.)
  *
- * Protocol: `GET /health` → `{ ok, slicer, version }`; `POST /slice` with JSON
+ * Protocol: `GET /health` → `{ ok, slicer, version | null, slicerError? }`; `POST /slice` with JSON
  * `{ model: <base64>, modelName: "job.3mf" | "part.stl", config: <ini text>, arrange?: boolean }`
  * → `{ ok: true, gcode, log }` or `{ ok: false, error, log }` (HTTP 4xx/5xx).
  */
@@ -49,11 +51,16 @@ export async function bridgeHealth(
         const body = (await response.json()) as {
             ok?: boolean;
             slicer?: string;
-            version?: string;
+            version?: string | null;
+            slicerError?: string;
             error?: string;
         };
         if (!response.ok || !body.ok) return Result.err(body.error ?? `bridge answered ${response.status}`);
-        return Result.ok({ slicer: body.slicer ?? "", version: body.version ?? "" });
+        // The bridge runs without PrusaSlicer (it also opens exports); slicing needs one.
+        if (typeof body.version !== "string") {
+            return Result.err(body.slicerError ?? `the bridge at ${url} has no PrusaSlicer`);
+        }
+        return Result.ok({ slicer: body.slicer ?? "", version: body.version });
     } catch (error) {
         return Result.err(
             `PrusaSlicer bridge not reachable at ${url}: ${error instanceof Error ? error.message : String(error)}`,
@@ -82,7 +89,7 @@ export async function sliceWithBridge(
         });
     } catch (error) {
         return Result.err(
-            `PrusaSlicer bridge not reachable at ${url} (start it with "node scripts/prusa-slicer-bridge.mjs"): ${
+            `PrusaSlicer bridge not reachable at ${url} (start it with "node scripts/desktop-bridge.mjs"): ${
                 error instanceof Error ? error.message : String(error)
             }`,
         );

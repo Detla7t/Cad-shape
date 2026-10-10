@@ -32,13 +32,31 @@ and "Export views" in the 2D export group).
   viewer or editor that loads on first use:
   - Markdown: CodeMirror editor with a sanitized live preview; exports .md and .html.
   - DOCX and ODT: an editable rich-text view (mammoth for DOCX), saved back through
-    `docx` or the built-in ODT writer. Formatting the editor does not model is dropped, and
-    the view says so.
-  - Spreadsheets: CSV/TSV/XLSX/ODS in a grid with sheet tabs, a formula bar, about 50 Excel
-    functions (`sheet/formula.ts`), number formats, column widths and copy/paste. Files save
-    in their own format. XLSX goes through ExcelJS; ODS through the built-in reader and
-    writer. Excel 97–2003 `.xls` files are kept in the project but not opened.
+    `docx` or the built-in ODT writer (`@chili3d/richtext`). Formatting the editor does not
+    model is dropped, and the view says so.
+  - Spreadsheets: CSV/TSV/XLSX/ODS in a grid with sheet tabs, a formula bar, the Excel
+    function library of `@chili3d/sheet` (`formula.ts`), number formats, column widths and
+    copy/paste. Files save in their own format. XLSX goes through ExcelJS; ODS through the
+    built-in reader and writer. Excel 97–2003 `.xls` files are kept in the project but not
+    opened.
   - PDF (pdf.js, with its own worker), images, and plain text/JSON/XML.
+
+## Engines and viewers
+
+The file engines are separate packages without UI; this package holds the viewers, the
+document element and the CAD formats, and imports the engines module by module
+(`@chili3d/sheet/formula`, `@chili3d/richtext/docx`, …) so each viewer chunk stays as small as
+before:
+
+- `@chili3d/sheet` — workbook model, formula engine, number formats, range operations,
+  CSV/TSV/XLSX/ODS read/write (`readWorkbook` / `writeWorkbook`; XLSX and ODS load lazily).
+- `@chili3d/richtext` — the rich-text block model, the HTML sanitizer, DOCX and ODT.
+- `@chili3d/office-io` — what both share: XML escapes, the OpenDocument package (read and
+  write), picture media types, office lengths, legacy (UTF-8 / Windows-1252) text decoding,
+  which the DXF reader uses too.
+
+`index.ts` still re-exports `WorkbookEvaluator`, `formatCellValue`, `readWorkbook`,
+`writeWorkbook`, `XLS_UNSUPPORTED` and the workbook types for existing importers.
 
 ## Storage
 

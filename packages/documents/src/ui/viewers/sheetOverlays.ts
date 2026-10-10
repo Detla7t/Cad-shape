@@ -1,8 +1,8 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import type { CellRange, HyperlinkData, SheetData, SheetImage, WorkbookData } from "../../sheet/model";
-import { resolveRanges } from "../../sheet/ranges";
+import type { CellRange, HyperlinkData, SheetData, SheetImage, WorkbookData } from "@chili3d/sheet/model";
+import { resolveRanges } from "@chili3d/sheet/ranges";
 import chrome from "../spreadsheet.module.css";
 
 /**

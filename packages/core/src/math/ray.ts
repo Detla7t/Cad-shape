@@ -10,7 +10,7 @@ export interface RayOptions {
     direction: XYZ;
 }
 
-@serializable()
+@serializable({ id: "Ray" })
 export class Ray {
     @serialize()
     readonly point: XYZ;

@@ -5,6 +5,7 @@ export * from "./autoConstraints";
 export * from "./editor/sketchEditor";
 export * from "./externalRef";
 export * from "./garlic";
+export { type PlaneFaceRef, resolveFacePlane } from "./planeRef";
 export * from "./ribbon";
 export * from "./sketchDrawing";
 export * from "./sketchModel";

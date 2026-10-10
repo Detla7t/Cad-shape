@@ -110,6 +110,47 @@ export interface ExportRule {
     extension: string;
     template: string;
 }
+/** The local desktop bridge (`scripts/desktop-bridge.mjs`) that opens exports in desktop programs. */
+export interface DesktopPreferences {
+    /** Where the bridge listens. */
+    bridgeUrl: string;
+    /**
+     * Hand exports to the bridge, which saves them to its folder and opens them in the default
+     * program, instead of the browser download (when the bridge is running and opens the type).
+     */
+    openExports: boolean;
+}
+export const DEFAULT_DESKTOP_PREFERENCES: Readonly<DesktopPreferences> = {
+    bridgeUrl: "http://127.0.0.1:7781",
+    openExports: false,
+};
+/**
+ * The local automation bridge (`scripts/automation-bridge.mjs`): when enabled, this tab connects
+ * to it so Claude Code (or a shell with the bridge's token) can drive the app like the user.
+ */
+export interface AutomationPreferences {
+    enabled: boolean;
+    bridgeUrl: string;
+}
+export const DEFAULT_AUTOMATION_PREFERENCES: Readonly<AutomationPreferences> = {
+    enabled: false,
+    bridgeUrl: "http://127.0.0.1:7782",
+};
+/**
+ * A drawing template: the sheet layout a new drawing starts from — its size and title
+ * block fields — and, imported from a DXF, art drawn behind the sheet (a company frame).
+ */
+export interface DrawingTemplate {
+    name: string;
+    /** `A4` or `A` (ANSI A). */
+    sheet: string;
+    drawnBy?: string;
+    number?: string;
+    revision?: string;
+    /** A DXF whose geometry is drawn behind the sheet. */
+    frameDxf?: string;
+}
+
 export interface UserPreferences {
     decimalComma: boolean;
     defaultUnits: DocumentUnits;
@@ -125,6 +166,17 @@ export interface UserPreferences {
     exportRules: ExportRule[];
     /** Write a recovery save of each document shortly after every change. */
     autosave: boolean;
+    /**
+     * Colour the model tree's rows by what uses them (Fusion's component colour cycling):
+     * each solid result, each top-level part, or not at all.
+     */
+    treeOwnerColors: "off" | "solid" | "part";
+    /** Show the Part Studio timeline (Fusion's history bar) along the bottom of the viewport. */
+    showTimeline: boolean;
+    /** Drawing templates; the first is what a new drawing uses. */
+    drawingTemplates: DrawingTemplate[];
+    desktop: DesktopPreferences;
+    automation: AutomationPreferences;
 }
 
 export function defaultUserPreferences(): UserPreferences {
@@ -147,18 +199,36 @@ export function defaultUserPreferences(): UserPreferences {
         materialLibraries: [],
         exportRules: [],
         autosave: true,
+        treeOwnerColors: "solid",
+        showTimeline: true,
+        drawingTemplates: [],
+        desktop: { ...DEFAULT_DESKTOP_PREFERENCES },
+        automation: { ...DEFAULT_AUTOMATION_PREFERENCES },
     };
 }
 
 /** Merge additions without resetting preferences saved by an earlier application version. */
 export function mergeUserPreferences(value?: Partial<UserPreferences>): UserPreferences {
     const defaults = defaultUserPreferences();
+    // An earlier version stored the tree colouring as a boolean.
+    const owners = (value as { treeOwnerColors?: unknown } | undefined)?.treeOwnerColors;
+    const treeOwnerColors =
+        owners === true
+            ? "solid"
+            : owners === false
+              ? "off"
+              : owners === "off" || owners === "part"
+                ? owners
+                : "solid";
     return {
         ...defaults,
         ...value,
+        treeOwnerColors,
         defaultUnits: { ...defaults.defaultUnits, ...value?.defaultUnits },
         quantities: { ...defaults.quantities, ...value?.quantities },
         mouse: { ...defaults.mouse, ...value?.mouse },
+        desktop: { ...defaults.desktop, ...value?.desktop },
+        automation: { ...defaults.automation, ...value?.automation },
     };
 }
 
@@ -167,20 +237,51 @@ export function displayPixelRatio(mode: UserPreferences["pixelDensity"], deviceR
     return mode === "standard" ? 1 : mode === "device" ? Math.min(4, ratio) : Math.min(2, ratio);
 }
 
+/**
+ * Resolves the extra placeholders of an export name — `{document}`, `{#variable}`,
+ * `{config:Input}`, `{config}`, `{format}` — for one document; undefined leaves the
+ * placeholder as written.
+ */
+export type ExportNameResolver = (placeholder: string) => string | undefined;
+
+/** Every placeholder a template may use, for the rules editor's check and hint. */
+export const EXPORT_NAME_PLACEHOLDER =
+    /\{(name|date|document|format|#[A-Za-z_]\w*|config(?::[A-Za-z_]\w*)?)\}/g;
+
+/**
+ * A file name from the export rules: the rule for `extension` (its template, `{name}` when
+ * there is none) with `{name}` and `{date}` filled in, the document's placeholders through
+ * `resolve`, and every character a file system refuses replaced.
+ */
 export function exportFileName(
     name: string,
     extension: string,
     rules: ExportRule[],
     date = new Date(),
+    resolve?: ExportNameResolver,
 ): string {
     const suffix = extension.startsWith(".") ? extension : `.${extension}`;
     const rule = rules.find(
         (rule) => rule.extension.toLowerCase().replace(/^\./, "") === suffix.slice(1).toLowerCase(),
     );
     const template = rule?.template.trim() || "{name}";
-    const base = template.replace(/\{(name|date)\}/g, (_, key) =>
-        key === "name" ? name : date.toISOString().slice(0, 10),
-    );
+    return formatExportName(template, name, suffix, date, resolve);
+}
+
+/** `template` with its placeholders filled in and `suffix` appended, as a safe file name. */
+export function formatExportName(
+    template: string,
+    name: string,
+    suffix: string,
+    date = new Date(),
+    resolve?: ExportNameResolver,
+): string {
+    const base = template.replace(EXPORT_NAME_PLACEHOLDER, (whole, key: string) => {
+        if (key === "name") return name;
+        if (key === "date") return date.toISOString().slice(0, 10);
+        if (key === "format") return suffix.replace(/^\./, "").toUpperCase();
+        return resolve?.(key) ?? whole;
+    });
     const clean = [...base]
         .map((char) => (char.charCodeAt(0) < 32 || /[<>:"/\\|?*]/.test(char) ? "_" : char))
         .join("");

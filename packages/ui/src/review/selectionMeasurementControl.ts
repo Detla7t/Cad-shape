@@ -22,6 +22,12 @@ import { createCadIcon } from "@chili3d/element";
 import { MeasurementGuide } from "./measurementGuide";
 import style from "./viewportUtilities.module.css";
 
+function textNode(text: string): HTMLSpanElement {
+    const span = document.createElement("span");
+    span.textContent = text;
+    return span;
+}
+
 /** A detail's value in the document's units (areas in the squared length unit). */
 export function formatMeasurementDetail(detail: MeasurementDetail, doc: IDocument): string {
     if (detail.quantity === "angle") return formatDocumentValue(detail.value, doc, ANGLE_UNITS);
@@ -113,11 +119,17 @@ export class SelectionMeasurementControl {
     }
     private async create() {
         if (!this.current || this.variable.disabled) return;
+        const mode = this.current.measurement?.mode;
+        if (mode !== undefined) await this.createFrom(mode);
+    }
+    /** Turns one value of the selection into a measured variable (the card's (x) buttons). */
+    private async createFrom(mode: MeasurementMode) {
+        if (!this.current) return;
         this.view.document.application.activeView = this.view;
         const captured = this.current;
         this.close();
         try {
-            if (captured.measurement) await captured.createVariable(captured.measurement.mode);
+            await captured.createVariable(mode);
         } catch (error) {
             PubSub.default.pub("showToast", "error.default:{0}", String(error));
         }
@@ -210,7 +222,18 @@ export class SelectionMeasurementControl {
                 term.textContent = detail.label;
                 if (detail.axis) term.dataset["axis"] = detail.axis;
                 const value = document.createElement("dd");
-                value.textContent = formatMeasurementDetail(detail, doc);
+                value.append(textNode(formatMeasurementDetail(detail, doc)));
+                const mode = detail.mode;
+                if (mode !== undefined) {
+                    const make = document.createElement("button");
+                    make.type = "button";
+                    make.className = style.rowVariable;
+                    make.textContent = "(x)";
+                    make.title = `Create variable from ${detail.label}`;
+                    make.setAttribute("aria-label", `Create variable from ${detail.label}`);
+                    make.onclick = () => void this.createFrom(mode);
+                    value.append(make);
+                }
                 return [term, value];
             }),
         );

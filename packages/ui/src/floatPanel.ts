@@ -4,6 +4,7 @@
 import { type FloatPanelOptions, type IDocument, Localize, PubSub } from "@chili3d/core";
 import { div, label, svg } from "@chili3d/element";
 import style from "./floatPanel.module.css";
+import { leave } from "./motion";
 
 const DEFAULT_WIDTH = 300;
 const DEFAULT_HEIGHT = 200;
@@ -46,14 +47,25 @@ export class FloatPanel extends HTMLElement {
         this.addEventListener("keydown", this.handleKeyEvent);
     }
 
-    /** Closes the panel the way its close button does (running `onClose`). */
+    /** Closes the panel the way its close button does (running `onClose`); it fades out first. */
     close(): void {
         try {
             this.options.onClose?.();
         } finally {
-            this.remove();
-            this.dispose();
+            this.fadeOut();
         }
+    }
+
+    /** Plays the leave animation, then removes and disposes the panel (at once without motion). */
+    fadeOut(): void {
+        leave(
+            this,
+            () => {
+                this.remove();
+                this.dispose();
+            },
+            style.leaving,
+        );
     }
 
     private createHeader(options: FloatPanelOptions): HTMLElement {
@@ -184,8 +196,7 @@ export function showFloatPanel(options: FloatPanelOptions): FloatPanel {
         const handleDocumentClosed = (closed: IDocument) => {
             if (closed !== boundDocument) return;
             stopWatching();
-            panel.remove();
-            panel.dispose();
+            panel.fadeOut();
         };
         PubSub.default.sub("documentClosed", handleDocumentClosed);
         stopWatching = () => PubSub.default.remove("documentClosed", handleDocumentClosed);

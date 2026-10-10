@@ -732,3 +732,21 @@
     text-overflow: clip;
     z-index: 1;
 }
+/* The range finder: while a formula is edited, each reference's cells are framed in its colour; the
+   reference just pointed (replaceable by the next click) has a dashed frame. */
+.referenceLayer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 2;
+    pointer-events: none;
+}
+.referenceLayer div {
+    position: absolute;
+    box-sizing: border-box;
+    border: 2px solid;
+    border-radius: 2px;
+}
+.referenceLayer div[data-hot] {
+    border-style: dashed;
+}

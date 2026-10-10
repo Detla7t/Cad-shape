@@ -6,17 +6,20 @@ import { createCadIcon } from "@chili3d/element";
 import { analysisMenu } from "./analysisMenu";
 import { GeometryPanel, type GeometryPanelKind } from "./geometryPanel";
 import { action, textElement } from "./helpers";
+import { MeasurePanel } from "./measurePanel";
 import panelStyle from "./review.module.css";
 import { SelectionMeasurementControl } from "./selectionMeasurementControl";
 import style from "./viewportUtilities.module.css";
+
+type UtilityKind = GeometryPanelKind | "measure";
 
 export class ViewportUtilities {
     readonly selection: SelectionMeasurementControl;
     readonly element = document.createElement("div");
     private readonly popup = document.createElement("section");
-    private mounted?: GeometryPanel;
-    private active?: GeometryPanelKind;
-    private readonly buttons = new Map<GeometryPanelKind, HTMLButtonElement>();
+    private mounted?: { element: HTMLElement; dispose(): void };
+    private active?: UtilityKind;
+    private readonly buttons = new Map<UtilityKind, HTMLButtonElement>();
     constructor(private readonly view: IView) {
         this.element.className = style.root;
         const toolbar = document.createElement("div");
@@ -53,7 +56,7 @@ export class ViewportUtilities {
         ])
             this.element.addEventListener(event, (e) => e.stopPropagation());
     }
-    private toggle(kind: GeometryPanelKind) {
+    private toggle(kind: UtilityKind) {
         const was = this.active;
         this.close();
         if (was === kind) return;
@@ -76,17 +79,21 @@ export class ViewportUtilities {
         this.showPanel(kind, kind === "measure" ? "Measure" : "Mass and section properties");
     }
     private showPanel(
-        kind: GeometryPanelKind,
+        kind: UtilityKind,
         title: string,
         analysisTool: "geometry" | "interference" = "geometry",
     ) {
         const heading = document.createElement("header");
         heading.className = panelStyle.header;
-        heading.append(
-            textElement("strong", title),
-            action("Close", () => this.close()),
-        );
-        this.mounted = new GeometryPanel(this.view, kind, analysisTool);
+        const close = action("×", () => this.close());
+        close.title = "Close";
+        close.setAttribute("aria-label", "Close");
+        close.className = panelStyle.close;
+        heading.append(textElement("strong", title), close);
+        this.mounted =
+            kind === "measure"
+                ? new MeasurePanel(this.view)
+                : new GeometryPanel(this.view, kind, analysisTool);
         this.popup.replaceChildren(heading, this.mounted.element);
         this.popup.hidden = false;
         this.popup.querySelector<HTMLElement>("button:not(:disabled), select")?.focus();

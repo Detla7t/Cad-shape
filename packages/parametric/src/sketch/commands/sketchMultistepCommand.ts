@@ -52,13 +52,16 @@ export abstract class SketchMultistepCommand extends MultistepCommand {
         super.afterExecute();
     }
 
-    /** Applies auto-constraints to a freshly added entity, then solves and commits. */
-    protected commitNewEntity(entityId: number): void {
-        applyAutoConstraints(
-            this.editor.solver,
-            entityId,
-            sketchSnapOptions(this.editor.screenTolerance(), this.inferenceSuppressed()),
-        );
+    /**
+     * Applies auto-constraints to a freshly added entity, then solves and commits.
+     * `pointIndices` limits inference to the points the tool left free, when the tool
+     * already attached the others itself.
+     */
+    protected commitNewEntity(entityId: number, pointIndices?: number[]): void {
+        applyAutoConstraints(this.editor.solver, entityId, {
+            ...sketchSnapOptions(this.editor.screenTolerance(), this.inferenceSuppressed()),
+            pointIndices,
+        });
         this.editor.solve(true);
         this.editor.commit();
     }

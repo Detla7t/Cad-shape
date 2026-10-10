@@ -17,7 +17,7 @@ export interface WireOptions {
     edges: IEdge[];
 }
 
-@serializable()
+@serializable({ id: "WireNode" })
 export class WireNode extends ParameterShapeNode {
     override display(): I18nKeys {
         return "body.wire";

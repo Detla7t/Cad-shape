@@ -1,8 +1,8 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { FORMULA_FUNCTIONS, WorkbookEvaluator } from "../../sheet/formula";
-import { FUNCTION_INFO } from "../../sheet/functionInfo";
+import { FORMULA_FUNCTIONS, WorkbookEvaluator } from "@chili3d/sheet/formula";
+import { FUNCTION_INFO } from "@chili3d/sheet/functionInfo";
 import {
     addressOf,
     type CellAddress,
@@ -13,14 +13,14 @@ import {
     type SheetData,
     usedSize,
     type WorkbookData,
-} from "../../sheet/model";
+} from "@chili3d/sheet/model";
 import {
     alternateColors,
     BAND_COLORS,
     dropdownValues,
     setValidation,
     sortRange,
-} from "../../sheet/operations";
+} from "@chili3d/sheet/operations";
 import {
     quoteSheet,
     renameSheetReferences,
@@ -28,7 +28,7 @@ import {
     resolveRanges,
     validRangeName,
     validSheetName,
-} from "../../sheet/ranges";
+} from "@chili3d/sheet/ranges";
 import style from "../spreadsheet.module.css";
 import { createSheetOverlays, type SheetMenuItem, sheetButton, sheetField } from "./sheetControls";
 

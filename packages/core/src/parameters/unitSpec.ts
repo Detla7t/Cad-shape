@@ -63,9 +63,10 @@ export function unitSpecLabel(value: UnitSpec): string {
 
 /**
  * The unit specs a user may declare for a variable. Areas and volumes are not
- * offered — they only arise from expressions.
+ * offered — they only arise from expressions. `function` is a value a feature stored
+ * (Onshape's "Unspecified"): callable from expressions, never typed by hand.
  */
-export type VariableType = "length" | "angle" | "unitless";
+export type VariableType = "length" | "angle" | "unitless" | "function";
 
 /**
  * Guards a row's `type` field. A stored table is JSON, so the declared type arrives as
@@ -73,7 +74,7 @@ export type VariableType = "length" | "angle" | "unitless";
  * outside the union, which would hand an `undefined` unit to every arithmetic check.
  */
 export function isVariableType(value: unknown): value is VariableType {
-    return value === "length" || value === "angle" || value === "unitless";
+    return value === "length" || value === "angle" || value === "unitless" || value === "function";
 }
 
 export function unitSpecOfType(type: VariableType): UnitSpec {
@@ -83,6 +84,7 @@ export function unitSpecOfType(type: VariableType): UnitSpec {
         case "angle":
             return ANGLE_UNITS;
         case "unitless":
+        case "function":
             return UNITLESS;
     }
 }

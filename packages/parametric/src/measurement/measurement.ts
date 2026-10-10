@@ -8,18 +8,22 @@ import {
     type IFace,
     type IShape,
     type IVertex,
+    MEASUREMENT_LABELS,
+    type MeasurementFrame,
     type MeasurementMode,
     type MeasurementResult,
+    measurementQuantity,
     Result,
     ShapeNode,
     ShapeTypes,
+    type VariableType,
     type VisualShapeData,
     type XYZLike,
 } from "@chili3d/core";
 import { isBodyTrackingNode } from "../features/bodyTracking";
 import { matchEdgesAnchored } from "../features/edgeMatcher";
 import { captureEdgeRef, type EdgeRef } from "../features/edgeRef";
-import { shapeEntityIds, toWorld } from "../sketch/sketchModel";
+import { entityPointCount, shapeEntityIds, toWorld } from "../sketch/sketchModel";
 import { SketchNode } from "../sketch/sketchNode";
 
 export type { MeasurementMode } from "@chili3d/core";
@@ -40,8 +44,42 @@ export interface MeasuredVariableData {
     expression?: string;
     mode: MeasurementMode;
     entities: MeasurementReference[];
+    /** The coordinate system a component or position is measured in; the world when absent. */
+    frame?: MeasurementFrame;
     suppression?: boolean | string;
     comment?: string;
+}
+
+/** The variable editor's tabs: each family is one way of measuring, refined by its method list. */
+export type MeasurementFamily = "distance" | "length" | "diameter" | "angle" | "area" | "position";
+export const MEASUREMENT_FAMILIES: Record<MeasurementFamily, readonly MeasurementMode[]> = {
+    distance: ["distance", "maxDistance", "centerDistance", "deltaX", "deltaY", "deltaZ"],
+    length: ["length"],
+    diameter: ["diameter", "radius"],
+    angle: ["angle", "tangentAngle"],
+    area: ["area"],
+    position: ["positionX", "positionY", "positionZ"],
+};
+export function measurementFamily(mode: MeasurementMode): MeasurementFamily {
+    return (
+        (Object.keys(MEASUREMENT_FAMILIES) as MeasurementFamily[]).find((family) =>
+            MEASUREMENT_FAMILIES[family].includes(mode),
+        ) ?? "length"
+    );
+}
+/** The variable type a measurement's row declares: an area has no declarable unit, so it is a plain number of mm². */
+export function measuredVariableType(mode: MeasurementMode): VariableType {
+    const quantity = measurementQuantity(mode);
+    return quantity === "angle" ? "angle" : quantity === "area" ? "unitless" : "length";
+}
+/** A measured value as the expression its row stores: millimetres, degrees, or a plain number. */
+export function measuredExpression(mode: MeasurementMode, value: number): string {
+    const quantity = measurementQuantity(mode);
+    return quantity === "length" ? `${value} mm` : quantity === "angle" ? `${value} deg` : `${value}`;
+}
+/** A default name for a variable of the mode, as an identifier ("Delta_X", "Minimum_distance"). */
+export function measuredVariableName(mode: MeasurementMode): string {
+    return MEASUREMENT_LABELS[mode].replace(/Δ/g, "Delta_").replace(/ /g, "_");
 }
 
 export function captureMeasurement(data: VisualShapeData): Result<MeasurementReference> {
@@ -92,8 +130,29 @@ export function captureMeasurement(data: VisualShapeData): Result<MeasurementRef
             faces.forEach((face) => face.dispose());
         }
     }
-    if (shape.shapeType === ShapeTypes.vertex)
-        return Result.ok({ ...base, kind: "vertex", point: (shape as IVertex).point() });
+    if (shape.shapeType === ShapeTypes.vertex) {
+        const point = (shape as IVertex).point();
+        const label = `Vertex of ${node.name}`;
+        // A sketch's point is referenced through its entity, which survives the sketch's edits.
+        if (node instanceof SketchNode)
+            for (const entity of node.data.entities)
+                for (let index = 0; index < entityPointCount(entity.type, entity.params); index++)
+                    if (
+                        toWorld(
+                            node.plane,
+                            entity.params[index * 2],
+                            entity.params[index * 2 + 1],
+                        ).distanceTo(point) < 1e-5
+                    )
+                        return Result.ok({
+                            ...base,
+                            label,
+                            kind: "entity",
+                            entityId: entity.id,
+                            pointIndex: index,
+                        });
+        return Result.ok({ ...base, label, kind: "vertex", point });
+    }
     if (node instanceof ShapeNode) return Result.ok({ ...base, kind: "node" });
     return Result.err("Select a sketch entity, edge, face, vertex, or part.");
 }
@@ -167,8 +226,9 @@ export function measureReferences(
     document: IDocument,
     mode: MeasurementMode,
     refs: readonly MeasurementReference[],
+    frame?: MeasurementFrame,
 ): Result<number> {
-    const measured = measureReferenceDetails(document, mode, refs);
+    const measured = measureReferenceDetails(document, mode, refs, frame);
     return measured.isOk ? Result.ok(measured.value.value) : Result.err(measured.error);
 }
 
@@ -176,6 +236,7 @@ export function measureReferenceDetails(
     document: IDocument,
     mode: MeasurementMode,
     refs: readonly MeasurementReference[],
+    frame?: MeasurementFrame,
 ): Result<MeasurementResult> {
     const owned: IShape[] = [];
     try {
@@ -184,7 +245,7 @@ export function measureReferenceDetails(
             if (!result.isOk) return Result.err(result.error);
             owned.push(result.value);
         }
-        return measureShapes(mode, owned);
+        return measureShapes(mode, owned, frame);
     } catch (error) {
         return Result.err(`Measurement failed: ${String(error)}`);
     } finally {

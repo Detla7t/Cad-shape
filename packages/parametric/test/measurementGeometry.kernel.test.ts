@@ -9,6 +9,7 @@ import {
     type IFace,
     type IShape,
     type ISubFaceShape,
+    type IVertex,
     Matrix4,
     Plane,
     PubSub,
@@ -354,5 +355,173 @@ describe("Onshape-style measurement details", () => {
         expect(measureShapes("centerDistance", [c1, c2]).value.value).toBeCloseTo(50, 9);
         // minimum distance between the circles themselves is center distance minus both radii
         expect(measureShapes("distance", [c1, c2]).value.value).toBeCloseTo(35, 6);
+    });
+});
+
+describe("Onshape's other measure types and the reference coordinate system", () => {
+    test("components, positions, areas and angles are modes of their own, signed where a coordinate is", () => {
+        const a = own(factory.point(new XYZ(1, 2, 3)));
+        const b = own(factory.point(new XYZ(4, -2, 15)));
+        expect(
+            ["deltaX", "deltaY", "deltaZ"].map((mode) => measureShapes(mode as "deltaX", [a, b]).value.value),
+        ).toEqual([3, 4, 12]);
+        const legX = measureShapes("deltaX", [a, b]).value.segments[0];
+        expect(new XYZ(legX[0]).isEqualTo(new XYZ(1, 2, 3))).toBe(true);
+        expect(new XYZ(legX[1]).isEqualTo(new XYZ(4, 2, 3))).toBe(true);
+        const minus = own(factory.point(new XYZ(-5, 0, 0)));
+        expect(measureShapes("positionX", [minus]).value.value).toBe(-5);
+        expect(measureShapes("positionX", [minus]).value.label).toBe("X");
+        const circle = own(factory.circle(XYZ.unitZ, new XYZ(30, 40, 0), 5));
+        expect(measureShapes("positionY", [circle]).value).toMatchObject({ value: 40, label: "Center Y" });
+        expect(measureShapes("positionX", [a, b]).isOk).toBe(false);
+
+        const box = own(factory.box(Plane.XY, 10, 20, 30));
+        expect(measureShapes("area", [box]).value.value).toBeCloseTo(2200, 6);
+        const faces = box.findSubShapes(ShapeTypes.face) as IFace[];
+        try {
+            const first = faces[0];
+            const [opposite] = faces
+                .slice(1)
+                .filter((f) => measureShapes("angle", [first, f]).value.value < 1e-6);
+            const [neighbour] = faces
+                .slice(1)
+                .filter((f) => measureShapes("angle", [first, f]).value.value > 89);
+            expect(opposite).toBeDefined();
+            expect(neighbour).toBeDefined();
+            expect(measureShapes("tangentAngle", [first, neighbour]).value.value).toBeCloseTo(90, 6);
+            expect(measureShapes("tangentAngle", [first, opposite]).value.value).toBeCloseTo(0, 6);
+            expect(measureShapes("area", [first]).value.value).toBeCloseTo(
+                measurementDetails([first])[0].value,
+                9,
+            );
+            // two planar faces report their angle, not a tangent angle
+            expect(measurementDetails([first, neighbour]).map((d) => d.mode)).toEqual(["angle"]);
+        } finally {
+            faces.forEach((face) => face.dispose());
+        }
+        const l1 = own(factory.line(new XYZ(0, 0, 0), new XYZ(10, 0, 0)));
+        expect(measureShapes("angle", [l1, a]).isOk).toBe(false);
+        expect(measureShapes("tangentAngle", [l1, box]).isOk).toBe(false);
+        // every detail names the mode a variable of it reads
+        expect(measurementDetails([a]).map((d) => [d.label, d.mode])).toEqual([
+            ["X", "positionX"],
+            ["Y", "positionY"],
+            ["Z", "positionZ"],
+        ]);
+        expect(measurementDetails([circle]).map((d) => d.label)).toEqual([
+            "Center X",
+            "Center Y",
+            "Center Z",
+        ]);
+    });
+
+    test("a reference frame turns the staircase and the coordinates to its axes", () => {
+        const a = own(factory.point(new XYZ(1, 2, 3)));
+        const b = own(factory.point(new XYZ(4, -2, 15)));
+        // X along world Y, Y along world Z, Z along world X, from (0, 0, 10)
+        const frame = { origin: new XYZ(0, 0, 10), xvec: XYZ.unitY, yvec: XYZ.unitZ, zvec: XYZ.unitX };
+        expect(
+            ["deltaX", "deltaY", "deltaZ"].map(
+                (mode) => measureShapes(mode as "deltaX", [a, b], frame).value.value,
+            ),
+        ).toEqual([4, 12, 3]);
+        const distance = measureShapes("distance", [a, b], frame);
+        const legs = measurementDetails([a, b], distance.value, frame).filter((d) => d.axis);
+        expect(legs.map((d) => d.value)).toEqual([4, 12, 3]);
+        // the first leg runs along the frame's X, which is the world's Y
+        const [from, to] = legs[0].segments![0];
+        expect(new XYZ(to).sub(new XYZ(from)).isEqualTo(new XYZ(0, -4, 0))).toBe(true);
+        expect(new XYZ(legs[2].segments![0][1]).isEqualTo(new XYZ(4, -2, 15))).toBe(true);
+        expect(
+            ["positionX", "positionY", "positionZ"].map(
+                (mode) => measureShapes(mode as "positionX", [a], frame).value.value,
+            ),
+        ).toEqual([2, -7, 1]);
+        expect(measurementDetails([a], undefined, frame).map((d) => d.value)).toEqual([2, -7, 1]);
+    });
+
+    test("a sketch's vertex is captured through its entity's point and follows the sketch's edits", () => {
+        const model = new TestDocument({
+            application: createMockApplication({ shapeProvider: { factory } }),
+            selection: createMockSelection(),
+        });
+        const sketch = new SketchNode({
+            document: model,
+            plane: Plane.XY,
+            data: {
+                entities: [
+                    { id: 1, type: "line", params: [0, 0, 30, 40] },
+                    { id: 2, type: "arc", params: [100, 0, 110, 0, 100, 10] },
+                ],
+                constraints: [],
+            },
+        });
+        model.modelManager.addNode(sketch);
+        expect(sketch.shape.isOk).toBe(true);
+        const vertices = sketch.shape.value.findSubShapes(ShapeTypes.vertex);
+        const at = (x: number, y: number) => {
+            const index = vertices.findIndex(
+                (v) => (v as IVertex).point().distanceTo(new XYZ(x, y, 0)) < 1e-6,
+            );
+            expect(index).toBeGreaterThanOrEqual(0);
+            const pick = createMockVisualShapeData();
+            pick.owner = { ...pick.owner, node: sketch };
+            pick.shape = vertices[index];
+            pick.indexes = [index];
+            return pick;
+        };
+        try {
+            const end = captureMeasurement(at(30, 40));
+            expect(end.isOk).toBe(true);
+            expect(end.value).toMatchObject({
+                kind: "entity",
+                entityId: 1,
+                pointIndex: 1,
+                label: `Vertex of ${sketch.name}`,
+            });
+            const start = captureMeasurement(at(110, 0));
+            expect(start.value).toMatchObject({ kind: "entity", entityId: 2, pointIndex: 1 });
+            expect(measureReferences(model, "distance", [end.value, start.value]).value).toBeCloseTo(
+                Math.hypot(80, 40),
+                6,
+            );
+            expect(measureReferences(model, "positionX", [end.value]).value).toBeCloseTo(30, 9);
+            model.selection.getSelectedShapes = () => [at(30, 40), at(110, 0)];
+            const measured = measureSelection(model);
+            expect(measured.isOk).toBe(true);
+            expect(measured.value.entities?.map((e) => e.label)).toEqual([
+                `Vertex of ${sketch.name}`,
+                `Vertex of ${sketch.name}`,
+            ]);
+            expect(measured.value.modes).toEqual([
+                "distance",
+                "maxDistance",
+                "centerDistance",
+                "deltaX",
+                "deltaY",
+                "deltaZ",
+            ]);
+            expect(measured.value.details?.map((d) => [d.label, d.value])).toEqual([
+                ["ΔX", 80],
+                ["ΔY", 40],
+                ["ΔZ", 0],
+            ]);
+        } finally {
+            vertices.forEach((v) => v.dispose());
+        }
+        Transaction.execute(model, "stretch", () => {
+            const data = sketch.data;
+            data.entities[0].params = [0, 0, 60, 80];
+            sketch.setDataEmitShapeChanged(data);
+        });
+        const ref = {
+            kind: "entity" as const,
+            nodeId: sketch.id,
+            entityId: 1,
+            pointIndex: 1,
+            label: "Vertex",
+        };
+        expect(measureReferences(model, "positionX", [ref]).value).toBeCloseTo(60, 9);
+        expect(measureReferences(model, "positionY", [ref]).value).toBeCloseTo(80, 9);
     });
 });

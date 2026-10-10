@@ -3,9 +3,12 @@
 
 import {
     type AsyncController,
+    type EvaluatedValue,
+    expressionIdentifiers,
     type FeatureEditOptions,
     type FeatureItem,
     type FeatureReference,
+    type FunctionVariable,
     type I18nKeys,
     type IDocument,
     type IEqualityComparer,
@@ -13,19 +16,26 @@ import {
     type INode,
     type INodeLinkedList,
     type IShape,
+    type IVariableFeatureNode,
     isConfiguredValue,
     isPropertyChanged,
     NodeChildList,
+    type NodeDependencies,
     type NodeRecord,
     ParameterShapeNode,
     PubSub,
     Result,
+    resolveUnitSpec,
     type Scope,
     ShapeNode,
     scopeContext,
     serializable,
     serialize,
     Transaction,
+    UNITLESS,
+    unitSpecOfType,
+    type VariableData,
+    withScopeContext,
 } from "@chili3d/core";
 import { reselectBodyFaces } from "./commands/bodyFaceReselectSession";
 import { FeatureEditSession } from "./commands/featureEditSession";
@@ -50,7 +60,9 @@ import { findSketch } from "./features/extrude";
 import {
     type BooleanFeatureData,
     type ExtrudeFeatureData,
+    type FeatureContext,
     type FeatureScriptFeatureData,
+    type FeatureVariables,
     featureSuppression,
     isFeatureSuppressed,
 } from "./features/feature";
@@ -112,12 +124,80 @@ export interface ParametricBodyNodeOptions {
     id?: string;
 }
 
+/** A variable a feature of the running chain stored: its row, and its function value when it is one. */
+interface RunVariable {
+    readonly item: VariableData;
+    readonly value: EvaluatedValue | undefined;
+}
+
+/** The document scope plus the variables stored so far in this run, for the next feature. */
+function withRunVariables(scope: Scope, variables: ReadonlyMap<string, RunVariable>): Scope {
+    const merged = new Map(scope);
+    for (const [name, { item, value }] of variables) {
+        if (value !== undefined) {
+            merged.set(name, value);
+            continue;
+        }
+        const resolved = resolveUnitSpec(item.expression, scope, unitSpecOfType(item.type));
+        if (resolved.isOk) merged.set(name, { value: resolved.value, unit: unitSpecOfType(item.type) });
+    }
+    return withScopeContext(merged, scopeContext(scope));
+}
+
 /** A body whose shape is replayed from its feature list — see the module header above. */
-@serializable()
+@serializable({ id: "ParametricBodyNode" })
 export class ParametricBodyNode
     extends ParameterShapeNode
-    implements IFeatureListNode, INodeLinkedList, IBodyTimelineNode
+    implements IFeatureListNode, INodeLinkedList, IBodyTimelineNode, IVariableFeatureNode
 {
+    /**
+     * The variables each feature's last run stored (`FeatureContext.setVariables`), by
+     * feature id — what this body contributes to the document's variable scope as a
+     * variable source (Onshape: a feature's `setVariable` reaches the variable table).
+     */
+    private _featureVariables = new Map<string, FeatureVariables>();
+    /**
+     * A variable source once a feature has stored something: a body that stores nothing
+     * must not be a layer of the scope (adding it would re-scope the document, and every
+     * body in it, for no variable at all).
+     */
+    get variableSource(): true {
+        return (this._featureVariables.size > 0) as true;
+    }
+
+    /** The stored variables of the unsuppressed features, in feature order. */
+    get items(): readonly VariableData[] {
+        const rows: VariableData[] = [];
+        for (const feature of this.features) {
+            const stored = this._featureVariables.get(feature.id);
+            if (stored !== undefined)
+                rows.push(...stored.items.map((item) => ({ ...item, id: `${feature.id}:${item.id}` })));
+        }
+        return rows;
+    }
+
+    get variablesJson(): string {
+        return JSON.stringify(this.items);
+    }
+
+    functionValues(): ReadonlyMap<string, FunctionVariable> {
+        const functions = new Map<string, FunctionVariable>();
+        for (const feature of this.features) {
+            const stored = this._featureVariables.get(feature.id);
+            if (stored !== undefined) for (const [name, fn] of stored.functions) functions.set(name, fn);
+        }
+        return functions;
+    }
+
+    /** After a run: the stored variables of this run replace the last run's; the scope re-derives on a change. */
+    private publishVariables(next: Map<string, FeatureVariables>): void {
+        const before = this.variablesJson;
+        const had = this._featureVariables.size > 0;
+        this._featureVariables = next;
+        if (this.variablesJson !== before || had !== next.size > 0)
+            this.document.variables.notifyScopeChanged();
+    }
+
     /**
      * Consumed boolean tools live under the body (see `syncConsumedTools`). Children
      * never render in the scene — the tree lists them grayed under the body, where
@@ -404,6 +484,7 @@ export class ParametricBodyNode
                 warning: this._featureWarnings.get(feature.id),
                 reselectable: handler?.reselectable === true,
                 references: this.featureReferences(feature),
+                nodeIds: handler?.nodeIds(feature),
                 parameters: handler ? configuredFeatureParameters(feature, handler, this.document) : [],
             };
         });
@@ -772,6 +853,8 @@ export class ParametricBodyNode
         const nextCache: FeatureCacheEntry[] = [];
         const resolvedProfiles = new Map<string, ProfileRef[]>();
         const resolvedEdges = new Map<string, EdgeRef[]>();
+        const nextVariables = new Map<string, FeatureVariables>();
+        const runVariables = new Map<string, RunVariable>();
         const features = this.features;
         const stop = this._rollbackIndex ?? features.length;
         // Sketches already re-resolved this run (see followReferencedSketches): a
@@ -797,7 +880,28 @@ export class ParametricBodyNode
                 try {
                     this.followReferencedSketches(feature, followedSketches);
                     this.refreshConsumedTools(feature);
-                    step = this.evaluateFeatureStep(feature, scope, input, faceIds, edgeIds, nextCache);
+                    // Variables stored by the features before this one in this run are in
+                    // scope for it, as Onshape's later features see an earlier setVariable.
+                    const stepScope = runVariables.size === 0 ? scope : withRunVariables(scope, runVariables);
+                    step = this.evaluateFeatureStep(feature, stepScope, input, faceIds, edgeIds, nextCache, {
+                        setVariables: (variables) => {
+                            nextVariables.set(feature.id, variables);
+                            for (const item of variables.items) {
+                                const fn = variables.functions.get(item.name);
+                                runVariables.set(item.name, {
+                                    item,
+                                    value: fn
+                                        ? {
+                                              value: Number.NaN,
+                                              unit: UNITLESS,
+                                              call: fn.call,
+                                              native: fn.native,
+                                          }
+                                        : undefined,
+                                });
+                            }
+                        },
+                    });
                 } catch (error) {
                     // A kernel query that throws (reading a degenerate edge's curve) fails this
                     // feature like any other error, instead of escaping the run and leaving the
@@ -818,6 +922,7 @@ export class ParametricBodyNode
             }
         } finally {
             this._timeline.endRun();
+            this.publishVariables(nextVariables);
         }
         this._timeline.commit(nextCache, timeline, this.currentShape());
         this.refreshAnchoredRefs(resolvedProfiles, resolvedEdges);
@@ -882,6 +987,21 @@ export class ParametricBodyNode
         return new Set(
             this.features.flatMap((feature) => featureHandler(feature.type)?.nodeIds(feature) ?? []),
         );
+    }
+
+    /** The sketches and tools its features read, and the variables their parameters and suppressions read. */
+    dependencies(): NodeDependencies {
+        const variables = new Set<string>();
+        for (const feature of this.featureItems()) {
+            for (const parameter of feature.parameters) {
+                const value = parameter.configured ?? parameter.value;
+                if (typeof value === "string")
+                    for (const name of expressionIdentifiers(value)) variables.add(name);
+            }
+            if (feature.suppressionConfigured !== undefined)
+                for (const name of expressionIdentifiers(feature.suppressionConfigured)) variables.add(name);
+        }
+        return { nodeIds: [...this.referencedIds()], variables: [...variables] };
     }
 
     /**
@@ -1030,6 +1150,7 @@ export class ParametricBodyNode
         faceIds: string[] | undefined,
         edgeIds: string[] | undefined,
         nextCache: FeatureCacheEntry[],
+        hooks?: Pick<FeatureContext, "setVariables">,
     ): Result<FeatureStepOutput> {
         for (const id of featureHandler(feature.type)?.nodeIds(feature) ?? []) {
             if (id === this.id) continue;
@@ -1047,9 +1168,12 @@ export class ParametricBodyNode
         if (cached !== undefined) {
             nextCache.push(cached);
             if (cached.warning !== undefined) this._featureWarnings.set(feature.id, cached.warning);
+            // A cached step keeps the variables its run stored.
+            const stored = this._featureVariables.get(feature.id);
+            if (stored !== undefined) hooks?.setVariables?.(stored);
             return Result.ok({ shape: cached.shape, faceIds: cached.faceIds, edgeIds: cached.edgeIds });
         }
-        return this.evaluateAndCache(feature, key, scope, input, faceIds, edgeIds, nextCache);
+        return this.evaluateAndCache(feature, key, scope, input, faceIds, edgeIds, nextCache, hooks);
     }
 
     /** Cache-miss path of `evaluateFeatureStep`: evaluates the feature and stores the result. */
@@ -1061,6 +1185,7 @@ export class ParametricBodyNode
         faceIds: string[] | undefined,
         edgeIds: string[] | undefined,
         nextCache: FeatureCacheEntry[],
+        hooks?: Pick<FeatureContext, "setVariables">,
     ): Result<FeatureStepOutput> {
         const tracking: ShapeTracking = {
             inputFaceIds: faceIds ?? [],
@@ -1074,6 +1199,7 @@ export class ParametricBodyNode
             input,
             scope,
             tracking,
+            setVariables: hooks?.setVariables,
         });
         if (!result.isOk) return Result.err(result.error);
         // A handler that cannot track (e.g. the kernel lacks history) leaves the

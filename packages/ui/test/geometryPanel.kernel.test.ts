@@ -4,7 +4,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { type IShape, Matrix4, Plane, type VisualShapeData, XYZ } from "@chili3d/core";
+import { type IShape, Matrix4, Plane, type VisualShapeData } from "@chili3d/core";
 import { createMockDocument, createMockView } from "@chili3d/core/test-utils";
 import { initWasm, ShapeFactory } from "@chili3d/wasm";
 import "../../parametric/src/measurement/shapeProperties";
@@ -43,7 +43,7 @@ function box() {
 }
 function inspector(
     shapes: IShape[],
-    kind: "measure" | "mass" | "analysis",
+    kind: "mass" | "analysis",
     tool: "geometry" | "interference" = "geometry",
 ) {
     const doc = createMockDocument({
@@ -76,34 +76,6 @@ function select(root: HTMLElement, label: string, value: string) {
     input!.value = value;
     input!.dispatchEvent(new Event("change"));
 }
-
-test("measurement unit changes convert volume by the cube of the length factor and filter rows", () => {
-    const root = inspector([box()], "measure");
-    expect(root.textContent).toContain("2540.00 mm³");
-    expect(row(root, "Volume")).toBe("2540.00 mm³");
-    select(root, "Length unit", "in");
-    expect(row(root, "Volume")).toBe("0.16 in³");
-    select(root, "Measure type", "volume");
-    expect(row(root, "Total edge length")).toBeUndefined();
-    expect(row(root, "Volume")).toBe("0.16 in³");
-    select(root, "Measure type", "radius");
-    expect(root.textContent).toContain("does not apply");
-});
-
-test("straight edge angles convert between degrees and radians", () => {
-    const lines = [XYZ.unitX, XYZ.unitY].map((end) => {
-        const result = shapeFactory.line(XYZ.zero, end);
-        expect(result.isOk).toBe(true);
-        if (!result.isOk) throw new Error(result.error);
-        owned.push(result.value);
-        return result.value;
-    });
-    const root = inspector(lines, "measure");
-    expect(root.textContent).toContain("90.000°");
-    expect(row(root, "Angle")).toBe("90.000°");
-    select(root, "Angle unit", "rad");
-    expect(row(root, "Angle")).toBe("1.570796 rad");
-});
 
 test("part mass and all nine moments apply density with correct dimensions", () => {
     const root = inspector([box()], "mass");

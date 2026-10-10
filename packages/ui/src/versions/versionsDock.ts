@@ -3,6 +3,7 @@
 
 import type { IApplication } from "@chili3d/core";
 import { div } from "@chili3d/element";
+import { leave } from "../motion";
 import style from "./versions.module.css";
 import { VersionsPanel } from "./versionsPanel";
 
@@ -43,8 +44,9 @@ export class VersionsDock {
     }
 
     hide(): void {
-        this.dock?.remove();
+        const dock = this.dock;
         this.dock = undefined;
+        if (dock !== undefined) leave(dock, () => dock.remove());
     }
 
     private startResize(e: PointerEvent): void {

@@ -10,7 +10,7 @@ export interface LineSegmentOptions {
     end: XYZ;
 }
 
-@serializable()
+@serializable({ id: "LineSegment" })
 export class LineSegment {
     @serialize()
     readonly start: XYZ;

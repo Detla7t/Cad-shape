@@ -6,7 +6,7 @@ import {
     type FunctionDoc,
     functionDoc,
     searchFunctions,
-} from "../../sheet/functionInfo";
+} from "@chili3d/sheet/functionInfo";
 import style from "../spreadsheet.module.css";
 
 const ROW_HEIGHT = 28;

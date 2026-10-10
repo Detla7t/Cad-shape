@@ -2,24 +2,22 @@
 // See LICENSE file in the project root for full license information.
 
 import { I18n, type IDocument, Material, Transaction, type XYZLike } from "@chili3d/core";
+import { captureElement, cropImage } from "../automation/domCapture";
+import {
+    describeElement,
+    findElement,
+    TARGET_PROPERTIES,
+    type TargetSpec,
+    targetSpecOf,
+} from "../automation/uiElements";
 import type { Tool, ToolResult } from "../llm/types";
 import { getDocument } from "./documentContext";
+import { standardView } from "./standardViews";
 
 const Z_UP: XYZLike = { x: 0, y: 0, z: 1 };
 
 /** The gray a node shows when no colour was ever set. */
 const DEFAULT_MATERIAL_COLOR = 0xcccccc;
-
-/** Preset standard views: dir is the camera offset from the target (Z-up world). */
-const VIEW_PRESETS: Record<string, { dir: [number, number, number]; up: XYZLike }> = {
-    front: { dir: [0, -1, 0], up: Z_UP },
-    back: { dir: [0, 1, 0], up: Z_UP },
-    left: { dir: [-1, 0, 0], up: Z_UP },
-    right: { dir: [1, 0, 0], up: Z_UP },
-    top: { dir: [0, 0, 1], up: { x: 0, y: 1, z: 0 } },
-    bottom: { dir: [0, 0, -1], up: { x: 0, y: -1, z: 0 } },
-    iso: { dir: [1, -1, 1], up: Z_UP },
-};
 
 const NAMED_COLORS: Record<string, number> = {
     red: 0xff0000,
@@ -92,14 +90,86 @@ function textResult(value: unknown): ToolResult {
 function captureScreenshotTool(): Tool {
     return {
         name: "capture_screenshot",
-        description: "Capture the current viewport as an image so you can see the model's current state.",
-        parameters: { type: "object", properties: {} },
-        handler: async () => {
+        description:
+            "Capture the current viewport as an image so you can see the model's current state. Optionally only a region of it (view pixels), or instead any part of the UI — a panel, dialog or the whole window — picked like ui_click picks (ref, selector, label, text; best effort: page icons and fonts may be missing).",
+        parameters: {
+            type: "object",
+            properties: {
+                region: {
+                    type: "object",
+                    description: "Crop of the viewport in view pixels",
+                    properties: {
+                        x: { type: "number" },
+                        y: { type: "number" },
+                        width: { type: "number" },
+                        height: { type: "number" },
+                    },
+                    required: ["x", "y", "width", "height"],
+                },
+                ...TARGET_PROPERTIES,
+                maxWidth: {
+                    type: "number",
+                    description: "Scale the image down to this width (default 1600)",
+                },
+            },
+        },
+        handler: async (args) => {
+            const target = targetSpecOf(args);
+            if (target !== undefined) return captureUi(target, args);
             const view = globalThis.app.activeView;
             if (!view) return textResult({ error: "no active view" });
-            return imageResult(view, { ok: true });
+            const region = args["region"] as
+                | { x: number; y: number; width: number; height: number }
+                | undefined;
+            if (region === undefined) return imageResult(view, { ok: true });
+            if (![region.x, region.y, region.width, region.height].every(Number.isFinite)) {
+                return textResult({ error: "region needs numeric x, y, width and height" });
+            }
+            const dataUrl = view.toImage();
+            const canvas = view.dom?.querySelector("canvas");
+            const scale = canvas && view.width > 0 ? canvas.width / view.width : 1;
+            const image = await cropImage(dataUrl, region, scale, Number(args["maxWidth"]) || undefined);
+            return dataUrlResult(image.dataUrl, {
+                ok: true,
+                region,
+                width: image.width,
+                height: image.height,
+            });
         },
     };
+}
+
+/** A data URL image as a tool result, with the payload as its text. */
+export function dataUrlResult(dataUrl: string, payload: Record<string, unknown>): ToolResult {
+    return imageResult({ toImage: () => dataUrl }, payload);
+}
+
+async function captureUi(target: TargetSpec, args: Record<string, unknown>): Promise<ToolResult> {
+    const element = findElement(target);
+    if (typeof element === "string") return textResult({ error: element });
+    // A WebGL canvas reads back blank unless it is read right after a render: the views render
+    // on demand, so their canvases are taken from the views themselves.
+    const views = globalThis.app?.views ? [...globalThis.app.views] : [];
+    const canvasImage = (canvas: HTMLCanvasElement) => {
+        const view = views.find((v) => v.dom?.contains(canvas) && v.dom.querySelector("canvas") === canvas);
+        return view?.toImage();
+    };
+    try {
+        const image = await captureElement(element, {
+            maxWidth: Number(args["maxWidth"]) || undefined,
+            canvasImage,
+        });
+        return dataUrlResult(image.dataUrl, {
+            ok: true,
+            element: describeElement(element),
+            width: image.width,
+            height: image.height,
+        });
+    } catch (error) {
+        return textResult({
+            error: `could not capture the element: ${error instanceof Error ? error.message : error}`,
+        });
+    }
 }
 
 function setMaterialTool(): Tool {
@@ -303,14 +373,18 @@ function rotateViewTool(): Tool {
     return {
         name: "rotate_view",
         description:
-            "Rotate the viewport camera around the current target, keeping its distance. Either a preset standard view, or relative orbit angles in degrees (azimuth orbits around the Z axis, elevation climbs above the XY plane). Combine with capture_screenshot to inspect the model from another angle.",
+            "Rotate the viewport camera around the current target, keeping its distance. Either a standard view of the view cube, or relative orbit angles in degrees (azimuth orbits around the Z axis, elevation climbs above the XY plane). Combine with capture_screenshot to inspect the model from another angle.",
         parameters: {
             type: "object",
             properties: {
                 view: {
                     type: "string",
-                    enum: ["front", "back", "left", "right", "top", "bottom", "iso"],
-                    description: "Preset standard view; takes precedence over azimuth/elevation",
+                    description:
+                        'Standard view, as on the view cube: a face (front, back, left, right, top, bottom), an edge ("top front"), a corner ("top front right") or iso; takes precedence over azimuth/elevation',
+                },
+                animate: {
+                    type: "boolean",
+                    description: "Turn over the cube's short tween instead of jumping (default false)",
                 },
                 azimuth: {
                     type: "number",
@@ -343,12 +417,13 @@ const rotateViewHandler: Tool["handler"] = async (args) => {
     );
     if (typeof orientation === "string") return textResult({ error: orientation });
 
-    camera.lookAt(orientation.eye, target, orientation.up);
+    if (args["animate"] === true) await camera.animateLookAt(orientation.eye, target, orientation.up);
+    else camera.lookAt(orientation.eye, target, orientation.up);
     view.update();
-    return textResult({ ok: true, eye: toPlainPoint(orientation.eye) });
+    return textResult({ ok: true, eye: toPlainPoint(orientation.eye), ...orientation.named });
 };
 
-type CameraOrientation = { eye: XYZLike; up: XYZLike };
+type CameraOrientation = { eye: XYZLike; up: XYZLike; named?: { view: string } };
 
 /** Resolves a preset or relative orbit; returns the message to report when the args are unusable. */
 function resolveOrientation(
@@ -358,11 +433,14 @@ function resolveOrientation(
     distance: number,
 ): CameraOrientation | string {
     if (a.view !== undefined) {
-        const preset = VIEW_PRESETS[a.view];
-        if (!preset) {
-            return `unknown view "${a.view}", expected one of ${Object.keys(VIEW_PRESETS).join("|")}`;
-        }
-        return presetEye(preset, target, distance);
+        const preset = standardView(String(a.view));
+        if (typeof preset === "string") return preset;
+        const eye = {
+            x: target.x + preset.direction.x * distance,
+            y: target.y + preset.direction.y * distance,
+            z: target.z + preset.direction.z * distance,
+        };
+        return { eye, up: preset.up, named: { view: preset.name } };
     }
     if (a.azimuth === undefined && a.elevation === undefined) {
         return "provide view or azimuth/elevation";
@@ -403,20 +481,6 @@ const setCameraTypeHandler: Tool["handler"] = async (args) => {
     view.update();
     return textResult({ ok: true, cameraType: camera.cameraType });
 };
-
-function presetEye(
-    preset: { dir: [number, number, number]; up: XYZLike },
-    target: XYZLike,
-    distance: number,
-): { eye: XYZLike; up: XYZLike } {
-    const len = Math.hypot(...preset.dir);
-    const eye = {
-        x: target.x + (preset.dir[0] / len) * distance,
-        y: target.y + (preset.dir[1] / len) * distance,
-        z: target.z + (preset.dir[2] / len) * distance,
-    };
-    return { eye, up: preset.up };
-}
 
 function orbitEye(
     a: { azimuth?: number; elevation?: number },

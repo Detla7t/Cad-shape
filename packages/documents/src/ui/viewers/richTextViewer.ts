@@ -3,11 +3,11 @@
 
 import { I18n, type I18nKeys, Localize, readFilesAsync, Transaction } from "@chili3d/core";
 import { div, option, select } from "@chili3d/element";
-import { blocksToText, htmlToBlocks } from "../../richtext/blocks";
-import { blocksToDocx, docxToHtml } from "../../richtext/docx";
-import { blocksToOdt, odtToHtml } from "../../richtext/odt";
+import { blocksToText, htmlToBlocks } from "@chili3d/richtext/blocks";
+import { blocksToDocx, docxToHtml } from "@chili3d/richtext/docx";
+import { blocksToOdt, odtToHtml } from "@chili3d/richtext/odt";
+import { sanitizeHtml } from "@chili3d/richtext/sanitize";
 import { htmlPage } from "../../text/markdown";
-import { sanitizeHtml } from "../../text/sanitize";
 import { toolButton } from "../controls";
 import style from "../documents.module.css";
 import type { DocumentExport, IDocumentViewer, ViewerContext } from "../viewer";
@@ -80,7 +80,7 @@ export function createRichTextViewer({ node, document, changed }: ViewerContext)
         edited = false;
         changed();
     };
-    void load();
+    let loading = load();
 
     page.addEventListener("input", () => {
         edited = true;
@@ -163,9 +163,10 @@ export function createRichTextViewer({ node, document, changed }: ViewerContext)
         },
     ];
 
+    const isDirty = () => edited && page.innerHTML !== savedHtml;
     return {
         element: div({ className: style.body }, notice, toolbar, div({ className: style.richText }, page)),
-        isDirty: () => edited && page.innerHTML !== savedHtml,
+        isDirty,
         save: async () => {
             const bytes = await write(isOdt ? "odt" : "docx");
             Transaction.execute(document, "edit document", () => node.setBytes(bytes));
@@ -173,7 +174,18 @@ export function createRichTextViewer({ node, document, changed }: ViewerContext)
             edited = false;
             changed();
         },
-        reload: () => void load(),
+        reload: () => {
+            loading = load();
+        },
+        snapshot: () => (isDirty() ? { data: page.innerHTML } : undefined),
+        restore: async (draft) => {
+            await loading;
+            // A file that failed to load stays as it is; the draft is sanitized like a paste.
+            if (page.contentEditable !== "true") return;
+            page.innerHTML = sanitizeHtml(draft.data);
+            edited = true;
+            changed();
+        },
         exports,
         activated: () => page.focus(),
         dispose: () => page.replaceChildren(),

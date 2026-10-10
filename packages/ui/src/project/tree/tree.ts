@@ -2,6 +2,8 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    Config,
+    DocumentElements,
     FolderNode,
     I18n,
     type IDocument,
@@ -10,17 +12,30 @@ import {
     isFeatureListNode,
     type ModelManager,
     type NodeRecord,
-    NodeSelectionHandler,
     NodeUtils,
+    PartStudioTimeline,
     PubSub,
     ReferencePlaneNode,
-    ShapeSelectionHandler,
-    ShapeTypes,
-    setHistoryHidden,
     Transaction,
 } from "@chili3d/core";
 import { HistoryBar } from "../historyBar";
 import { showNodeContextMenu } from "../nodeContextMenu";
+import { canSelectNodes } from "../treeSelection";
+import { computeOwnership, ownerBars } from "./ownerColors";
+
+/** The configuration, when one exists (UI tests may run the tree over a stand-in core). */
+function config(): Config | undefined {
+    return (Config as { instance?: Config } | undefined)?.instance;
+}
+
+/** The document's Part Studio timeline, when the core and document are real (see `config`). */
+function partStudioTimeline(document: IDocument): PartStudioTimeline | undefined {
+    if (typeof (PartStudioTimeline as Partial<typeof PartStudioTimeline> | undefined)?.of !== "function")
+        return undefined;
+    if (typeof document.modelManager?.addNodeObserver !== "function") return undefined;
+    return PartStudioTimeline.of(document);
+}
+
 import style from "./tree.module.css";
 import { TreeItem } from "./treeItem";
 import { TreeGroup } from "./treeItemGroup";
@@ -34,27 +49,56 @@ export class Tree extends HTMLElement {
     private lastClicked: INode | undefined;
     private lastSelected: INode[] | undefined;
     private filterText = "";
-    private historyPosition?: number;
     private historyBar?: HistoryBar;
+    private timeline?: PartStudioTimeline;
+    /** The bar's position at rest (the last read), told apart from a drag preview. */
+    private restingHistoryPosition = 0;
     private historyRows(): TreeItem[] {
         const root = this.nodeMap.get(this.document.modelManager.rootNode);
         const parent = root instanceof TreeGroup ? root.items : this;
         return [...parent.children].filter(
-            (e): e is TreeItem => e instanceof TreeItem && !(e.node instanceof ReferencePlaneNode),
+            (e): e is TreeItem =>
+                e instanceof TreeItem && !e.hidden && !(e.node instanceof ReferencePlaneNode),
         );
     }
+    /**
+     * The document-level bar between top-level rows: a view of the Part Studio timeline. It
+     * sits before the first row not fully applied; a body the marker splits shows the marker
+     * in its own feature list (and is not dimmed here).
+     */
+    private historyPosition(timeline: PartStudioTimeline): number {
+        const rows = this.historyRows();
+        const index = rows.findIndex((row) => timeline.nodeState(row.node) !== "applied");
+        return index < 0 ? rows.length : index;
+    }
     private refreshHistory(): void {
+        this.timeline ??= partStudioTimeline(this.document);
+        const timeline = this.timeline;
+        if (timeline === undefined) return;
         this.historyBar ??= new HistoryBar(
             () => this.historyRows(),
-            () => this.historyPosition ?? this.historyRows().length,
+            () => {
+                this.restingHistoryPosition = this.historyPosition(timeline);
+                return this.restingHistoryPosition;
+            },
             (position) => {
                 const rows = this.historyRows();
-                this.historyPosition = position === rows.length ? undefined : position;
-                rows.forEach((row, i) => setHistoryHidden(this.document, row.node, i >= position));
+                if (position >= rows.length) timeline.end();
+                else timeline.rollBefore(rows.slice(position).map((row) => row.node));
+            },
+            (index, position) => {
+                if (index < position) return false;
+                // While dragging, everything past the preview; at rest, what the timeline says.
+                if (position !== this.restingHistoryPosition) return true;
+                const row = this.historyRows()[index];
+                return row === undefined || timeline.nodeState(row.node) === "future";
             },
         );
         this.historyBar.refresh();
     }
+    private readonly handleTimelineChanged = (property: string) => {
+        if (property === "position" || property === "entries") this.historyBar?.refresh();
+    };
 
     constructor(private document: IDocument) {
         super();
@@ -72,13 +116,47 @@ export class Tree extends HTMLElement {
         this.document.modelManager.addNodeObserver(this.handleNodeChanged);
         this.document.modelManager.onPropertyChanged(this.handleCurrentNodeChanged);
         this.document.selection.onNodeChanged.sub(this.handleSelectionChanged);
+        // Guarded: a test's document or configuration may be a partial stand-in.
+        this.document.variables?.onPropertyChanged?.(this.handleScopeChanged);
+        config()?.onPropertyChanged(this.handlePreferencesChanged);
+        this.timeline?.onPropertyChanged(this.handleTimelineChanged);
+        this.scheduleOwnerColors();
     }
 
     disconnectedCallback() {
         this.historyBar?.dispose();
+        this.timeline?.removePropertyChanged(this.handleTimelineChanged);
         this.document.modelManager.removeNodeObserver(this.handleNodeChanged);
         this.document.modelManager.removePropertyChanged(this.handleCurrentNodeChanged);
         this.document.selection.onNodeChanged.remove(this.handleSelectionChanged);
+        this.document.variables?.removePropertyChanged?.(this.handleScopeChanged);
+        config()?.removePropertyChanged(this.handlePreferencesChanged);
+    }
+
+    private ownerColorsQueued = false;
+    private readonly handleScopeChanged = (property: string) => {
+        if (property === "scope") this.scheduleOwnerColors();
+    };
+    private readonly handlePreferencesChanged = (property: keyof Config) => {
+        if (property === "preferences") this.scheduleOwnerColors();
+    };
+
+    /** Recolours the rows by owner once the burst of changes settles. */
+    private scheduleOwnerColors(): void {
+        if (this.ownerColorsQueued) return;
+        this.ownerColorsQueued = true;
+        queueMicrotask(() => {
+            this.ownerColorsQueued = false;
+            if (this.document === null || !this.isConnected) return;
+            this.applyOwnerColors();
+        });
+    }
+
+    private applyOwnerColors(): void {
+        if (typeof this.document.modelManager?.findNodes !== "function") return;
+        const mode = config()?.preferences.treeOwnerColors ?? "solid";
+        const ownership = computeOwnership(this.document, mode);
+        for (const [node, row] of this.nodeMap) row.setOwnerBars?.(ownerBars(ownership, node));
     }
 
     private readonly handleCurrentNodeChanged = (
@@ -132,8 +210,9 @@ export class Tree extends HTMLElement {
         this.lastClicked = undefined;
         this.dragging = undefined;
         this.highlightedGroup = undefined;
+        this.timeline?.removePropertyChanged(this.handleTimelineChanged);
+        // The rollback belongs to the document's timeline, not to this view: it stays.
         this.nodeMap.forEach((x) => {
-            setHistoryHidden(this.document, x.node, false);
             x.dispose();
         });
         this.nodeMap.clear();
@@ -166,6 +245,7 @@ export class Tree extends HTMLElement {
         });
         this.filter(this.filterText);
         this.refreshHistory();
+        this.scheduleOwnerColors();
     };
 
     private refreshGroupExpander(parent: INodeLinkedList | undefined) {
@@ -232,9 +312,13 @@ export class Tree extends HTMLElement {
 
     private createHTMLElement(document: IDocument, node: INode): TreeItem {
         // Groups nest; every other node — visual or not (a Feature Studio holds code, not
-        // geometry) — is a plain row.
-        if (NodeUtils.isLinkedListNode(node)) return new TreeGroup(document, node);
-        return new TreeModel(document, node);
+        // geometry) — is a plain row. A file element (a drawing, an attached document) is a
+        // tab of the document, not a feature: its row exists for the maps but stays hidden.
+        const item = NodeUtils.isLinkedListNode(node)
+            ? new TreeGroup(document, node)
+            : new TreeModel(document, node);
+        if (DocumentElements.hiddenInTree(node)) item.hidden = true;
+        return item;
     }
 
     private addEvents(item: HTMLElement) {
@@ -332,18 +416,7 @@ export class Tree extends HTMLElement {
     };
 
     private canSelect() {
-        if (this.document.visual.eventHandler instanceof NodeSelectionHandler) {
-            return true;
-        }
-        if (this.document.visual.eventHandler.treeSelection === true) {
-            return true;
-        }
-
-        if (this.document.visual.eventHandler instanceof ShapeSelectionHandler) {
-            return this.document.visual.eventHandler.shapeType === ShapeTypes.shape;
-        }
-
-        return false;
+        return canSelectNodes(this.document);
     }
 
     private handleLastClickItem(item: INode | undefined) {

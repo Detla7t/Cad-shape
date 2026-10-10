@@ -4,15 +4,21 @@
 import {
     Config,
     download,
+    type EditorBufferRegistration,
+    EditorBuffers,
     exportFileName,
     I18n,
     type IDocument,
+    type IEditorBuffer,
     type IElementView,
     Localize,
     Logger,
     PubSub,
+    Result,
 } from "@chili3d/core";
-import { button, div, option, select, span, svg } from "@chili3d/element";
+import { div, option, select, span, svg } from "@chili3d/element";
+import { EditorBufferControls, mountIsland, type ReactIsland } from "@chili3d/react";
+import { createElement } from "react";
 import type { DocumentFileNode } from "../documentFileNode";
 import { type DocumentViewKind, formatOf } from "../documentFormats";
 import { formatBytes } from "./controls";
@@ -21,10 +27,16 @@ import type { DocumentExport, IDocumentViewer, ViewerContext, ViewerFactory } fr
 
 /**
  * The frame every document element shares: a header with the element's name, its
- * format and size, an unsaved-changes marker, Save and an export menu; the format's
+ * format and size, the shared save bar (`EditorBufferControls`: unsaved mark, Discard,
+ * Save) for editing viewers, and an export menu; the format's
  * viewer (its own lazily loaded chunk) fills the rest. Keystrokes stay inside the view,
  * so the Part Studio's hotkeys (Delete, Ctrl+Z, …) never act behind a document; Ctrl+S
  * saves.
+ *
+ * The shell is the one adapter from a document viewer to the app's editor-buffer contract
+ * (`IEditorBuffer`, editor id `document.<viewKind>`): an editing viewer's draft is registered
+ * with `EditorBuffers` while it is mounted, so its tab is marked, closing asks about it and
+ * the recovery autosave keeps it.
  */
 
 const VIEWERS: Record<DocumentViewKind, () => Promise<ViewerFactory>> = {
@@ -41,14 +53,15 @@ const VIEWERS: Record<DocumentViewKind, () => Promise<ViewerFactory>> = {
 export function createDocumentView(node: DocumentFileNode, document: IDocument): IElementView {
     const title = span({ className: style.title, textContent: node.name });
     const info = span({ className: style.info });
-    const dirtyMark = span({ className: style.dirty, textContent: new Localize("documents.unsaved") });
-    const saveButton = button({ className: style.primary, textContent: new Localize("documents.save") });
+    const controls = span();
+    let controlsIsland: ReactIsland | undefined;
     const exportMenu = select({ className: style.select, title: new Localize("documents.export") });
     const body = div(
         { className: style.body },
         div({ className: style.message, textContent: new Localize("documents.loading") }),
     );
     let viewer: IDocumentViewer | undefined;
+    let registration: EditorBufferRegistration | undefined;
     let exports: DocumentExport[] = [];
     let saving = false;
     let disposed = false;
@@ -60,11 +73,9 @@ export function createDocumentView(node: DocumentFileNode, document: IDocument):
         info.textContent = `${format?.name ?? node.format} · ${formatBytes(node.size)}`;
     };
 
+    /** The draft may have changed: the save bar and the element tab follow the registry. */
     const refreshState = () => {
-        const dirty = viewer?.isDirty?.() === true;
-        dirtyMark.style.display = dirty ? "" : "none";
-        saveButton.style.display = viewer?.save === undefined ? "none" : "";
-        saveButton.disabled = !dirty || saving;
+        registration?.changed();
     };
 
     const fillExports = () => {
@@ -85,20 +96,18 @@ export function createDocumentView(node: DocumentFileNode, document: IDocument):
         );
     };
 
-    const save = async () => {
-        if (viewer?.save === undefined || viewer.isDirty?.() !== true || saving) return;
+    /** Writes the viewer's draft into the node (one undo step); an error leaves the draft. */
+    const commit = async (): Promise<Result<void>> => {
+        if (viewer?.save === undefined || viewer.isDirty?.() !== true) return Result.ok(undefined);
+        if (saving) return Result.err("A save is already running");
         saving = true;
         refreshState();
         try {
             await viewer.save();
-            PubSub.default.pub("showToast", "documents.saved{0}", node.name);
+            return Result.ok(undefined);
         } catch (error) {
             Logger.error(error);
-            PubSub.default.pub(
-                "showToast",
-                "error.default:{0}",
-                error instanceof Error ? error.message : String(error),
-            );
+            return Result.err(error instanceof Error ? error.message : String(error));
         } finally {
             saving = false;
             refreshInfo();
@@ -106,7 +115,30 @@ export function createDocumentView(node: DocumentFileNode, document: IDocument):
         }
     };
 
-    saveButton.onclick = () => void save();
+    const save = async () => {
+        if (viewer?.save === undefined || viewer.isDirty?.() !== true || saving) return;
+        const result = await commit();
+        if (result.isOk) PubSub.default.pub("showToast", "documents.saved{0}", node.name);
+        else PubSub.default.pub("showToast", "error.default:{0}", result.error);
+    };
+
+    const buffer: IEditorBuffer = {
+        document,
+        node,
+        editor: `document.${node.viewKind}`,
+        isDirty: () => viewer?.isDirty?.() === true,
+        commit,
+        revert: () => {
+            viewer?.reload?.();
+            refreshState();
+        },
+        snapshot: () => viewer?.snapshot?.(),
+        restore: async (draft) => {
+            await viewer?.restore?.(draft);
+            refreshState();
+        },
+    };
+
     exportMenu.onchange = async () => {
         const item = exports[Number(exportMenu.value)];
         exportMenu.value = "";
@@ -132,6 +164,13 @@ export function createDocumentView(node: DocumentFileNode, document: IDocument):
             if (disposed) return;
             viewer = factory(context);
             body.replaceChildren(viewer.element);
+            if (viewer.save !== undefined) {
+                registration = EditorBuffers.register(buffer);
+                controlsIsland = mountIsland(
+                    controls,
+                    createElement(EditorBufferControls, { buffer, onSave: save }),
+                );
+            }
             fillExports();
             refreshState();
             viewer.activated?.();
@@ -169,9 +208,8 @@ export function createDocumentView(node: DocumentFileNode, document: IDocument):
             svg({ className: style.headerIcon, icon: node.icon }),
             title,
             info,
-            dirtyMark,
             div({ className: style.spacer }),
-            saveButton,
+            controls,
             exportMenu,
         ),
         body,
@@ -183,8 +221,11 @@ export function createDocumentView(node: DocumentFileNode, document: IDocument):
     return {
         element,
         activated: () => viewer?.activated?.(),
+        deactivated: () => viewer?.deactivated?.(),
         dispose: () => {
             disposed = true;
+            registration?.dispose();
+            controlsIsland?.dispose();
             node.removePropertyChanged(onNodeChanged);
             viewer?.dispose();
         },

@@ -7,7 +7,7 @@ import { FolderNode, type FolderNodeOptions } from "./folderNode";
 
 export interface GroupNodeOptions extends FolderNodeOptions {}
 
-@serializable()
+@serializable({ id: "GroupNode" })
 export class GroupNode extends FolderNode {
     constructor(options: GroupNodeOptions) {
         super(options);

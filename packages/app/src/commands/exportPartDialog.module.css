@@ -1,0 +1,55 @@
+/* Onshape's Export dialog for parts: a column of labelled fields. */
+.dialog {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: min(420px, 80vw);
+    font-size: 12px;
+}
+.field {
+    display: grid;
+    grid-template-columns: 96px minmax(0, 1fr);
+    gap: 4px 10px;
+    align-items: center;
+}
+.field > span:first-child {
+    color: var(--foreground-muted-color);
+}
+.row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+.row input {
+    flex: 1;
+    min-width: 0;
+}
+.dialog input[type="text"],
+.dialog select {
+    font: inherit;
+    color: inherit;
+    background: var(--input-background-color);
+    border: 1px solid var(--border-color);
+    padding: 5px 6px;
+}
+.check {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    grid-column: 2;
+}
+.link {
+    border: 0;
+    background: transparent;
+    color: var(--link-color, #2f6fd6);
+    font: inherit;
+    cursor: pointer;
+    padding: 0;
+    text-decoration: underline;
+}
+.muted {
+    grid-column: 1 / -1;
+    color: var(--foreground-muted-color);
+    font-size: 11px;
+    line-height: 1.4;
+}

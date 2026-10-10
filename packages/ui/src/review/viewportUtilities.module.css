@@ -84,9 +84,27 @@
     color: var(--foreground-secondary-color);
 }
 .measureCard dd {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 5px;
     margin: 0;
     text-align: right;
     font-variant-numeric: tabular-nums;
+}
+/* Onshape's (x): one click turns the row into a measured variable. */
+.rowVariable {
+    border: 0;
+    background: transparent;
+    color: var(--foreground-color);
+    font:
+        italic 600 10px Georgia,
+        serif;
+    padding: 0 2px;
+    cursor: pointer;
+}
+.rowVariable:hover {
+    color: #2f6fd6;
 }
 .measureCard dt[data-axis="x"],
 .axisX {

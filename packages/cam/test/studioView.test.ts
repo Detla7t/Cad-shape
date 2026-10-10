@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { DocumentElements, type EdgeMeshData, Result, type ShapeMeshData } from "@chili3d/core";
+import { DocumentElements, type EdgeMeshData, I18n, Result, type ShapeMeshData } from "@chili3d/core";
 import { createMockApplication, createMockVisualWithDocument, TestDocument } from "@chili3d/core/test-utils";
 import { rs } from "@rstest/core";
 import {
@@ -292,4 +292,31 @@ test("the tool library adds a setup tool and overrides a machine tool for the se
     click(view.element, '[data-action="add-tool"]');
     expect(studio.setups[0].tools?.map((tool) => tool.id)).toEqual(["t1", "t7"]);
     expect(view.element.querySelectorAll("tbody tr")).toHaveLength(7);
+});
+
+test("the post action shows what blocks posting with the shared indicator, and clears once generated", async () => {
+    const { studio, view } = setup();
+    click(view.element, '[data-action="add-setup"]');
+    change(must<HTMLSelectElement>(view.element, 'select[data-action="add-operation"]'), "test.square");
+    const operationId = studio.setups[0].operations[0].id;
+    // The operation row carries the shared indicator, not a colour-only dot.
+    const row = must(view.element, `[data-operation="${operationId}"]`);
+    expect(must(row, '[data-evaluation="changed"]').textContent).toBe(I18n.translate("evaluation.changed"));
+
+    click(view.element, '[data-action="tab-post"]');
+    const readiness = must<HTMLElement>(view.element, "[data-post-readiness]");
+    expect(readiness.dataset["blocked"]).toBe("true");
+    const blocker = must(readiness, '[data-blocker="missing"]');
+    expect(blocker.textContent).toContain('"Square (test) 1" has no toolpath');
+    expect(must(blocker, '[data-evaluation="changed"]').getAttribute("title")).toBe("Not generated yet");
+    expect(readiness.textContent).toContain(I18n.translate("cam.postRegenerates"));
+
+    await view.generator.generateOperation(studio.setups[0].id, operationId);
+    // The generator's report re-renders the reasons in place.
+    const cleared = must<HTMLElement>(view.element, "[data-post-readiness]");
+    expect(cleared.dataset["blocked"]).toBe("false");
+    expect(cleared.querySelector("[data-blocker]")).toBeNull();
+    expect(
+        must(view.element, `[data-operation="${operationId}"] [data-evaluation="ready"]`).textContent,
+    ).toBe(I18n.translate("evaluation.ready"));
 });

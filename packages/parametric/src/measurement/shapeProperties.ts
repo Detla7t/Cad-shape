@@ -2,8 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import { Result, registerShapeProperties } from "@chili3d/core";
-import { FsContext } from "../featurescript/context/fsContext";
-import { inertiaTensor, massData } from "../featurescript/context/massProperties";
+import { FsContext, inertiaTensor, massData } from "@chili3d/featurescript";
 
 registerShapeProperties((shapes) => {
     const context = new FsContext();

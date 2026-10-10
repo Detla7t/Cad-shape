@@ -123,6 +123,16 @@ export const shapeCapabilities: ShapeCapability[] = [
         ],
     },
     {
+        method: "normalProjection",
+        returnKind: "shape",
+        params: [
+            { name: "curves", kind: "refArray" },
+            { name: "target", kind: "ref" },
+        ],
+    },
+    { method: "splineThroughEdges", returnKind: "edge", params: [{ name: "edges", kind: "refArray" }] },
+    { method: "coonsSurface", returnKind: "face", params: [{ name: "edges", kind: "refArray" }] },
+    {
         method: "helix",
         returnKind: "wire",
         params: [
@@ -1994,6 +2004,9 @@ export const capabilitiesSource = `Available modeling capabilities (from IShapeF
   shell(faces: refArray) -> shell
   solid(shells: refArray) -> solid
   bezier(points: xyzArray, weights: numberArray?) -> edge
+  normalProjection(curves: refArray, target: ref) -> shape
+  splineThroughEdges(edges: refArray) -> edge
+  coonsSurface(edges: refArray) -> face
   helix(origin: xyz, normal: xyz, xDir: xyz, radius: number, pitch: number, angle: number) -> wire
   point(point: xyz) -> vertex
   line(start: xyz, end: xyz) -> edge

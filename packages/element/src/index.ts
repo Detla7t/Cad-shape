@@ -3,6 +3,7 @@
 
 export * from "./cadIcon";
 export * from "./collection";
+export * from "./constraintIcon";
 export * from "./converters";
 export * from "./editableTitle";
 export * from "./elements";

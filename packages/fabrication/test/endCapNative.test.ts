@@ -9,8 +9,7 @@ import {
     type Scope,
     type VariableData,
 } from "@chili3d/core";
-import type { SketchData } from "@chili3d/parametric";
-import { SketchSolver } from "../../parametric/src/sketch/solver";
+import { type SketchData, SketchSolver } from "@chili3d/parametric";
 import "../../parametric/test/sketch/setup";
 import { endCapConfigurationInputs, END_CAP_INPUT_NAMES as N } from "../src/app/endCapConfiguration";
 import { END_CAP_VARIABLES, plainEndCapSketch, reducingEndCapSketch } from "../src/app/endCapNative";

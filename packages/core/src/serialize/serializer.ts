@@ -5,7 +5,10 @@ import type { IDocument } from "../document";
 import { Observable } from "../foundation/observer";
 
 const propertiesMap = new Map<new (...args: any[]) => any, Array<PropertyInfo>>();
+/** Every identifier a class is read by (its written id and its aliases) → the class. */
 const reflectMap = new Map<string, RefelectData>();
+/** Class → the identifier written for it in `__cla$$__`. */
+const typeIds = new Map<new (...args: any[]) => any, string>();
 
 export type PropertyInfo = {
     name: string;
@@ -24,6 +27,10 @@ export interface RefelectData {
     deserialize?: (...args: any[]) => any;
 }
 
+/**
+ * Registers a serializable class under `name` (by default its runtime class name), the
+ * identifier written in `__cla$$__`, plus `aliases` it is also read by.
+ */
 export function registerReflect(
     data: RefelectData,
     name?: string,
@@ -31,13 +38,25 @@ export function registerReflect(
         type: any;
         props: PropertyInfo[];
     },
+    aliases: readonly string[] = [],
 ) {
     const actualName = name ?? data.ctor.name;
     if (reflectMap.has(actualName)) {
         console.warn(`Class ${actualName} already registered, skip.`);
+        // The class still serializes under the name (a module evaluated twice, e.g. by hot reload).
+        if (!typeIds.has(data.ctor)) typeIds.set(data.ctor, actualName);
         return;
     }
     reflectMap.set(actualName, data);
+    typeIds.set(data.ctor, actualName);
+    for (const alias of aliases) {
+        if (alias === actualName) continue;
+        if (reflectMap.has(alias)) {
+            console.warn(`Serialized type alias ${alias} of ${actualName} is already registered, skip.`);
+            continue;
+        }
+        reflectMap.set(alias, data);
+    }
     if (props !== undefined) {
         const ps = propertiesMap.get(props.type);
         if (ps === undefined) {
@@ -82,16 +101,50 @@ if (typeof Float16Array !== "undefined") {
 registerTypeArray(Float32Array);
 registerTypeArray(Uint32Array);
 
-export function serializable<T>(options?: {
+export interface SerializableOptions<T> {
+    /**
+     * The stable identifier written in `__cla$$__` (default: the runtime class name). Declare it
+     * as a string literal so saved documents do not depend on class names surviving minification
+     * or a rename. An existing class keeps its current class name as its id: older versions of
+     * Chili3D read documents by that name. Changing what an existing class writes is a document
+     * schema change (see `documentSchema.ts`); keep the old identifier in `aliases`.
+     */
+    id?: string;
+    /** Other identifiers this class is read by (former class names or ids). Never written. */
+    aliases?: readonly string[];
     deserialize?: (...args: any[]) => T;
     serialize?: (target: T) => SerializedData;
-}) {
+}
+
+export function serializable<T>(options?: SerializableOptions<T>) {
     return (target: new (options: any) => T) => {
-        registerReflect({
-            ctor: target,
-            ...options,
-        });
+        registerReflect(
+            {
+                ctor: target,
+                ...(options?.serialize === undefined ? {} : { serialize: options.serialize }),
+                ...(options?.deserialize === undefined ? {} : { deserialize: options.deserialize }),
+            },
+            options?.id,
+            undefined,
+            options?.aliases,
+        );
     };
+}
+
+/**
+ * The identifier an instance (or class) is written with in `__cla$$__`, or undefined when its
+ * class is not serializable. Use it instead of `constructor.name` to key anything by the
+ * serialized type: class names do not survive minification.
+ */
+export function serializedTypeId(target: object | (new (...args: any[]) => any)): string | undefined {
+    const ctor = typeof target === "function" ? target : target.constructor;
+    return typeIds.get(ctor as new (...args: any[]) => any);
+}
+
+/** The identifier `name` (an id or an alias) is written as today, or undefined when unknown. */
+export function canonicalSerializedTypeId(name: string): string | undefined {
+    const data = reflectMap.get(name);
+    return data === undefined ? undefined : typeIds.get(data.ctor);
 }
 
 export function serialize() {
@@ -182,12 +235,10 @@ export class Serializer {
     }
 
     static serializeObject(target: object): Serialized {
-        const className = target.constructor.name;
-        if (!reflectMap.has(className)) {
-            console.log(target);
-
+        const className = typeIds.get(target.constructor as new (...args: any[]) => any);
+        if (className === undefined) {
             throw new Error(
-                `Type ${target.constructor.name} is not registered, please add the @Serializer.register decorator.`,
+                `Type ${target.constructor.name} is not registered, please add the @serializable() decorator.`,
             );
         }
         const data = reflectMap.get(className)!;

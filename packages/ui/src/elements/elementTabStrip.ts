@@ -1,11 +1,12 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { I18n, type I18nKeys, Localize, PubSub } from "@chili3d/core";
+import { type ElementKind, I18n, type I18nKeys, Localize, PubSub } from "@chili3d/core";
 import { button, createCadIcon, div, input, span, svg } from "@chili3d/element";
 import { type ElementMenuItem, showElementMenu } from "./elementMenu";
 import style from "./elements.module.css";
 import type { ElementTab, ElementWorkspace } from "./elementWorkspace";
+import { unsavedMark } from "./unsavedMark";
 import { setShown } from "./visibility";
 
 /**
@@ -49,6 +50,9 @@ export class ElementTabStrip extends HTMLElement {
         this.render();
     }
 
+    /** The active element as of the last render, to animate only a real switch. */
+    private lastActive: string | undefined;
+
     render(): void {
         this.browse.setAttribute("aria-expanded", String(!this.workspace.tabsSidebar.hidden));
         const tabs = this.workspace.tabs();
@@ -61,11 +65,16 @@ export class ElementTabStrip extends HTMLElement {
         const shown = JSON.stringify([
             this.workspace.activeId,
             this.renaming,
-            tabs.map((tab) => [tab.id, tab.name, tab.icon]),
+            tabs.map((tab) => [tab.id, tab.name, tab.icon, tab.dirty === true]),
         ]);
         if (shown === this.rendered) return;
         this.rendered = shown;
         this.tabsPanel.replaceChildren(...tabs.map((tab) => this.tab(tab)));
+        // The tab that just became active grows its bar in (see elements.module.css).
+        if (this.workspace.activeId !== this.lastActive) {
+            this.lastActive = this.workspace.activeId;
+            this.tabsPanel.querySelector<HTMLElement>(`.${style.active}`)?.setAttribute("data-switched", "");
+        }
         const editor = this.tabsPanel.querySelector("input");
         if (editor !== null && window.document.activeElement !== editor) {
             editor.focus();
@@ -103,6 +112,7 @@ export class ElementTabStrip extends HTMLElement {
             createCadIcon(tab.kind, tab.icon),
             this.renaming === tab.id ? this.nameEditor(tab) : this.label(tab),
         );
+        if (tab.dirty) element.append(unsavedMark());
         element.dataset["elementId"] = tab.id;
         element.dataset["kind"] = tab.kind;
         return element;
@@ -167,26 +177,57 @@ export class ElementTabStrip extends HTMLElement {
         );
     }
 
+    /**
+     * Onshape's "+" menu: the applications first (Feature Studio, CAM Studio, …), then the
+     * core elements — Part Studio (one per document, so disabled), Assembly, Variable Studio,
+     * Drawing, a folder, Import.
+     */
     private openNewMenu(anchor: HTMLElement): void {
         const rect = anchor.getBoundingClientRect();
+        const core = new Set(["assembly", "variableStudio", "drawingDocument"]);
+        const create = (kind: ElementKind, ellipsis = false): ElementMenuItem => ({
+            label: `command.${kind.newCommand}` as I18nKeys,
+            text: `${I18n.translate("elements.create{0}", I18n.translate(kind.display))}${ellipsis ? "…" : ""}`,
+            icon: kind.icon,
+            cadIcon: kind.kind,
+            onSelect: () => {
+                if (kind.newCommand !== undefined) PubSub.default.pub("executeCommand", kind.newCommand);
+            },
+        });
+        const kinds = this.workspace.creatableKinds();
+        const applications = kinds.filter((kind) => !core.has(kind.kind)).map((kind) => create(kind));
+        const coreKinds = [...core]
+            .map((id) => kinds.find((kind) => kind.kind === id))
+            .filter((kind): kind is ElementKind => kind !== undefined)
+            .map((kind) => create(kind, kind.kind === "drawingDocument"));
         showElementMenu(
             [
-                ...this.workspace.creatableKinds().map((kind) => ({
-                    label: `command.${kind.newCommand}` as I18nKeys,
-                    icon: kind.icon,
-                    cadIcon: kind.kind,
-                    onSelect: () => {
-                        if (kind.newCommand !== undefined)
-                            PubSub.default.pub("executeCommand", kind.newCommand);
-                    },
-                })),
+                ...applications,
+                {
+                    label: "elements.partStudio{0}",
+                    text: I18n.translate(
+                        "elements.create{0}",
+                        I18n.translate("elements.partStudio{0}", ""),
+                    ).trim(),
+                    cadIcon: "partStudio",
+                    disabled: true,
+                    tooltip: "elements.partStudio.one",
+                    separator: applications.length > 0,
+                    onSelect: () => {},
+                },
+                ...coreKinds,
                 {
                     label: "command.create.folder",
+                    text: I18n.translate(
+                        "elements.create{0}",
+                        I18n.translate("command.create.folder").toLowerCase(),
+                    ),
                     cadIcon: "folder",
                     onSelect: () => PubSub.default.pub("executeCommand", "create.folder"),
                 },
                 {
                     label: "command.file.import",
+                    text: `${I18n.translate("command.file.import")}…`,
                     cadIcon: "file.import",
                     onSelect: () => PubSub.default.pub("executeCommand", "file.import"),
                 },

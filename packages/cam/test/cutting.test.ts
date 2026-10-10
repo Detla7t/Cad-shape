@@ -2,9 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import { Plane } from "@chili3d/core";
-import { flatPatternOf } from "@chili3d/parametric/src/sheetMetal/flatPattern";
-import type { Segment2, SheetMetalModel } from "@chili3d/parametric/src/sheetMetal/model";
-import { treatmentElements } from "@chili3d/parametric/src/sheetMetal/treatments";
+import { flatPatternOf, type Segment2, type SheetMetalModel, treatmentElements } from "@chili3d/parametric";
 import {
     type CamLoop,
     markOperation,

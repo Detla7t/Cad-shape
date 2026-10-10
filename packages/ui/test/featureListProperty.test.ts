@@ -58,12 +58,15 @@ rs.mock("../src/dialog", () => ({
     showDialog: showDialogMock,
 }));
 
+import { PubSub } from "@chili3d/core";
 import { FeatureListProperty } from "../src/property/featureListProperty";
 import { mustQuery } from "./_helpers/domHelpers";
 
 function featureNode(parameters: FeatureItem["parameters"], item?: Partial<FeatureItem>) {
     return {
         featureItems: () => [{ id: "b1", display: "command.feature.fuse", parameters, ...item }],
+        onPropertyChanged: rs.fn(),
+        removePropertyChanged: rs.fn(),
         setFeatureParameter: rs.fn((_id: string, _key: string, _value: number | string | boolean) => {}),
         setFeatureSuppressed: rs.fn(),
         moveFeature: rs.fn(),
@@ -252,6 +255,87 @@ describe("FeatureListProperty", () => {
         expect(mustQuery(prop, ".fl-error-text").textContent).toBe("Edge not found after rebuild");
     });
 
+    describe("evaluation state", () => {
+        function listNode(items: FeatureItem[]) {
+            return {
+                featureItems: () => items,
+                onPropertyChanged: rs.fn(),
+                removePropertyChanged: rs.fn(),
+                setFeatureParameter: rs.fn(),
+                setFeatureSuppressed: rs.fn(),
+                moveFeature: rs.fn(),
+                removeFeature: rs.fn(),
+            } as unknown as INode & IFeatureListNode;
+        }
+        const items = (): FeatureItem[] => [
+            { id: "f1", display: "command.feature.fuse", name: "Base", parameters: [] },
+            {
+                id: "f2",
+                display: "command.feature.fuse",
+                name: "Fillet",
+                error: "Edge not found",
+                parameters: [],
+            },
+            { id: "f3", display: "command.feature.fuse", name: "Shell", parameters: [] },
+        ];
+
+        afterEach(() => {
+            rs.restoreAllMocks();
+        });
+
+        test("a failed row shows the shared indicator, and clicking it opens the feature", () => {
+            const pub = rs.spyOn(PubSub.default, "pub");
+            const node = listNode(items());
+            const prop = new FeatureListProperty(createMockDocument(), node);
+            const rows = prop.querySelectorAll<HTMLElement>(".fl-item");
+            // Healthy rows stay unmarked; the failing one says so in words and its tooltip.
+            expect(rows[0].querySelector("[data-evaluation]")).toBeNull();
+            const badge = mustQuery<HTMLButtonElement>(
+                rows[1],
+                '.fl-header button[data-evaluation="failed"]',
+            );
+            expect(badge.textContent).toBe("evaluation.failed");
+            expect(badge.title).toContain("Edge not found");
+            badge.click();
+            expect(pub).toHaveBeenCalledWith("editFeature", node, "f2");
+        });
+
+        test("features after the failing one are marked out of date, naming it", () => {
+            const prop = new FeatureListProperty(createMockDocument(), listNode(items()));
+            const rows = prop.querySelectorAll<HTMLElement>(".fl-item");
+            const changed = mustQuery<HTMLElement>(rows[2], '[data-evaluation="changed"]');
+            expect(changed.textContent).toBe("evaluation.changed");
+            expect(changed.title).toBe("evaluation.notRebuiltFillet");
+        });
+
+        test("the list opens with a banner naming the failing feature and offering to edit it", () => {
+            const pub = rs.spyOn(PubSub.default, "pub");
+            const node = listNode(items());
+            const prop = new FeatureListProperty(createMockDocument(), node);
+            const banner = mustQuery<HTMLElement>(prop.firstElementChild!, '[data-evaluation="failed"]');
+            expect(banner.textContent).toContain("evaluation.rebuildFailedAtFillet: Edge not found");
+            // The banner is not a feature row (drag, history bar and row queries skip it).
+            expect(prop.firstElementChild!.classList.contains("fl-item")).toBe(false);
+            const edit = mustQuery<HTMLButtonElement>(banner, "button");
+            expect(edit.textContent).toBe("evaluation.editFeature");
+            edit.click();
+            expect(pub).toHaveBeenCalledWith("editFeature", node, "f2");
+        });
+
+        test("a healthy list has no banner and no indicators", () => {
+            const node = listNode([{ id: "f1", display: "command.feature.fuse", parameters: [] }]);
+            const prop = new FeatureListProperty(createMockDocument(), node);
+            expect(prop.querySelector("[data-evaluation]")).toBeNull();
+            expect(prop.querySelectorAll(".fl-item")).toHaveLength(1);
+        });
+
+        test("inside the feature's own dialog the failure shows without the edit action or banner", () => {
+            const prop = new FeatureListProperty(createMockDocument(), listNode(items()), "f2");
+            expect(prop.querySelectorAll('[data-evaluation="failed"]')).toHaveLength(1);
+            expect(mustQuery(prop, '[data-evaluation="failed"]').tagName).toBe("SPAN");
+        });
+    });
+
     test("warning rows render tinted without forcing expansion", () => {
         const doc = createMockDocument();
         const node = featureNode([], { warning: "Sketch has unresolved external references" });
@@ -371,6 +455,8 @@ describe("FeatureListProperty", () => {
         ];
         const node = {
             featureItems: () => items,
+            onPropertyChanged: rs.fn(),
+            removePropertyChanged: rs.fn(),
             setFeatureParameter: rs.fn(),
             setFeatureSuppressed: rs.fn(),
             moveFeature: rs.fn(),

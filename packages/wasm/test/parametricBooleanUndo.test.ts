@@ -7,10 +7,9 @@
 
 import { Plane, Transaction } from "@chili3d/core";
 import { createMockApplication, TestDocument } from "@chili3d/core/test-utils";
+// The package entry registers all feature handlers.
+import { ParametricBodyNode, type SketchData, SketchNode } from "@chili3d/parametric";
 import { ShapeFactory } from "@chili3d/wasm";
-import "../../parametric/src/features"; // registers all feature handlers
-import { ParametricBodyNode } from "../../parametric/src/parametricBodyNode";
-import { type SketchData, SketchNode } from "../../parametric/src/sketch";
 import "./setup";
 
 // The global `shapeFactory` resolves through the current application — stub it.

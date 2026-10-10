@@ -21,7 +21,7 @@ export interface PyramidNodeOptions {
     dz: number;
 }
 
-@serializable()
+@serializable({ id: "PyramidNode" })
 export class PyramidNode extends ParameterShapeNode {
     override display(): I18nKeys {
         return "body.pyramid";

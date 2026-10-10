@@ -20,6 +20,8 @@ import style from "./editor.module.css";
 import { ElementWorkspace } from "./elements";
 import { FloatPanel } from "./floatPanel";
 import { ModelSidebar } from "./project/modelSidebar";
+import { mountPartStudioTimeline } from "./project/timeline/partStudioTimelineBar";
+import timelineStyle from "./project/timeline/partStudioTimelineBar.module.css";
 import { showConfigurationPanel } from "./property/configuration";
 import { showFeatureEditPanel } from "./property/featureEditPanel";
 import { FeatureListProperty } from "./property/featureListProperty";
@@ -71,8 +73,14 @@ export class Editor extends HTMLElement {
             },
         );
         const viewport = new LayoutViewport(app);
-        viewport.classList.add(style.viewport);
-        this._viewportContainer = div({ className: style.viewportContainer }, viewport);
+        viewport.classList.add(style.viewport, timelineStyle.viewport);
+        // The Part Studio timeline runs along the bottom of the viewport (Fusion's history bar).
+        const timeline = div({ className: timelineStyle.host });
+        mountPartStudioTimeline(timeline, app);
+        this._viewportContainer = div(
+            { className: style.viewportContainer },
+            div({ className: timelineStyle.frame }, viewport, timeline),
+        );
         this.render();
     }
 

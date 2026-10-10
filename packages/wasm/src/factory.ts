@@ -231,6 +231,30 @@ export class ShapeFactory implements IShapeFactory {
         );
     }
 
+    normalProjection(curves: (IEdge | IWire)[], target: IShape): Result<IShape> {
+        return convertShapeResult(
+            wasm.ShapeFactory.normalProjection,
+            [ensureOccShape(curves), ensureOccShape(target)[0]],
+            "Normal projection failed",
+        );
+    }
+
+    splineThroughEdges(edges: IEdge[]): Result<IEdge> {
+        return convertShapeResult(
+            wasm.ShapeFactory.splineThroughEdges,
+            [ensureOccShape(edges)],
+            "Joining the edges failed",
+        ) as Result<IEdge>;
+    }
+
+    coonsSurface(edges: IEdge[]): Result<IFace> {
+        return convertShapeResult(
+            wasm.ShapeFactory.coonsSurface,
+            [ensureOccShape(edges)],
+            "Coons patch failed",
+        ) as Result<IFace>;
+    }
+
     edge(curve: ICurve): IEdge {
         if (!(curve instanceof OccCurve)) {
             throw new Error("Invalid curve");

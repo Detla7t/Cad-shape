@@ -3,9 +3,11 @@
 
 import {
     DocumentElements,
+    EditorBuffers,
     type ElementKind,
     I18n,
     type IApplication,
+    type IDisposable,
     type IDocument,
     type IElementHost,
     type IElementView,
@@ -14,9 +16,11 @@ import {
     Logger,
     PART_STUDIO_KIND,
     PubSub,
+    type RibbonTabKeys,
     Transaction,
 } from "@chili3d/core";
 import { div } from "@chili3d/element";
+import { editorBufferDialogs } from "./editorBufferDialogs";
 import style from "./elements.module.css";
 import { ElementTabStrip } from "./elementTabStrip";
 import { ElementTabsSidebar } from "./elementTabsSidebar";
@@ -35,6 +39,8 @@ export interface ElementTab {
     readonly name: string;
     /** The element's node; undefined for the Part Studio. */
     readonly node?: INode;
+    /** An editor of the element holds unsaved edits (`EditorBuffers`). */
+    readonly dirty?: boolean;
 }
 
 interface MountedView {
@@ -79,6 +85,12 @@ export class ElementWorkspace implements IElementHost {
     /** The view last brought forward, so `activated` runs on a switch, not on every re-layout. */
     private shownView: IElementView | undefined;
 
+    /** The contextual ribbon tab the active element opened, if any. */
+    private ribbonTab: RibbonTabKeys | undefined;
+    private buffers: IDisposable | undefined;
+    /** The dirty elements the tabs last showed, to redraw only when one flips. */
+    private shownDirty = "";
+
     constructor(
         readonly app: IApplication,
         readonly partStudio: HTMLElement,
@@ -99,6 +111,8 @@ export class ElementWorkspace implements IElementHost {
         PubSub.default.sub("documentSaved", this.handleDocumentSaved);
         DocumentElements.onChanged(this.handleRegistryChanged);
         DocumentElements.setHost(this);
+        this.buffers = EditorBuffers.onChanged(this.handleBuffersChanged);
+        EditorBuffers.setPrompt(editorBufferDialogs);
         this.setDocument(this.app.activeView?.document);
     }
 
@@ -111,6 +125,9 @@ export class ElementWorkspace implements IElementHost {
         this.closeTabs();
         DocumentElements.removeChanged(this.handleRegistryChanged);
         if (DocumentElements.host === this) DocumentElements.setHost(undefined);
+        this.buffers?.dispose();
+        this.buffers = undefined;
+        EditorBuffers.setPrompt(undefined);
         this.setDocument(undefined);
     }
 
@@ -159,6 +176,7 @@ export class ElementWorkspace implements IElementHost {
                 icon: kind.icon,
                 name: node.name,
                 node,
+                dirty: EditorBuffers.isDirty(node),
             })),
         ];
     }
@@ -236,11 +254,18 @@ export class ElementWorkspace implements IElementHost {
         return copy;
     }
 
-    /** Asks before deleting an element node; the Part Studio has no node and cannot go. */
+    /**
+     * Asks before deleting an element node; the Part Studio has no node and cannot go. An
+     * element whose editor holds unsaved edits says so: deleting discards them.
+     */
     confirmDelete(node: INode): void {
+        const unsaved = EditorBuffers.isDirty(node);
         const message = div({
             className: style.confirm,
-            textContent: I18n.translate("elements.delete.confirm{0}", node.name),
+            textContent: I18n.translate(
+                unsaved ? "elements.delete.unsaved{0}" : "elements.delete.confirm{0}",
+                node.name,
+            ),
         });
         PubSub.default.pub("showDialog", "elements.delete.title", message, [
             { content: "common.confirm", onclick: () => this.delete(node) },
@@ -248,10 +273,14 @@ export class ElementWorkspace implements IElementHost {
         ]);
     }
 
-    /** Removes an element node from the document — one undo step, which brings it back. */
+    /**
+     * Removes an element node from the document — one undo step, which brings it back. Its
+     * editors' unsaved drafts are discarded first, so nothing stale is kept for recovery.
+     */
     delete(node: INode): void {
         const document = this._document;
         if (document === undefined || DocumentElements.kindOf(node) === undefined) return;
+        EditorBuffers.revertAll(EditorBuffers.dirtyBuffers(document, node));
         document.selection.clearSelection();
         Transaction.execute(document, "delete element", () => {
             node.parent?.remove(node);
@@ -336,6 +365,21 @@ export class ElementWorkspace implements IElementHost {
             this.shownView = active?.view;
             this.shownView?.activated?.();
         }
+        this.syncRibbonTab(
+            active === undefined ? undefined : DocumentElements.kindOf(active.node)?.ribbonTab,
+        );
+    }
+
+    /**
+     * The element in front owns the toolbar: its kind's contextual tab opens (a Drawing's
+     * tools replace the Part Studio's), and closes again when another element takes over.
+     */
+    private syncRibbonTab(tab: RibbonTabKeys | undefined): void {
+        if (tab === this.ribbonTab) return;
+        const ribbon = this.app.mainWindow?.ribbon;
+        if (this.ribbonTab !== undefined) ribbon?.closeTab(this.ribbonTab);
+        this.ribbonTab = tab;
+        if (tab !== undefined) ribbon?.openTab(tab);
     }
 
     /**
@@ -399,6 +443,19 @@ export class ElementWorkspace implements IElementHost {
 
     private readonly handleRegistryChanged = () => {
         this.reconcile();
+    };
+
+    /** An editor's draft changed: redraw the tabs when an element's unsaved mark flips. */
+    private readonly handleBuffersChanged = (document: IDocument) => {
+        if (document !== this._document) return;
+        const dirty = EditorBuffers.dirtyBuffers(document)
+            .map((buffer) => buffer.node.id)
+            .sort()
+            .join();
+        if (dirty === this.shownDirty) return;
+        this.shownDirty = dirty;
+        this.strip.render();
+        this.tabsSidebar.render();
     };
 
     private readonly handleNodeChanged = (property: string) => {

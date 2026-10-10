@@ -75,6 +75,13 @@ export const FILE_FORMATS: readonly FileFormat[] = [
     f("glb", "mesh", "glTF binary", [".glb"], "model/gltf-binary"),
     f("3mf", "mesh", "3D Manufacturing Format", [".3mf"], "model/3mf"),
     f("ply", "mesh", "PLY", [".ply"], "application/octet-stream"),
+    f(
+        "sqlite",
+        "document",
+        "SQLite database",
+        [".sqlite", ".sqlite3", ".db", ".db3"],
+        "application/vnd.sqlite3",
+    ),
     f("dxf", "drawing", "AutoCAD DXF", [".dxf"], "image/vnd.dxf"),
     f("dwg", "drawing", "AutoCAD DWG", [".dwg"], "image/vnd.dwg"),
     f("markdown", "document", "Markdown", [".md", ".markdown", ".mdown"], "text/markdown"),
@@ -428,6 +435,7 @@ export function sniffFileContent(bytes: Uint8Array): Sniffed | undefined {
     if (startsWith(bytes, ZIP)) return { id: sniffZip(bytes) };
     if (startsWith(bytes, OLE)) return { id: sniffOle(bytes) };
     if (startsWith(bytes, [0x25, 0x50, 0x44, 0x46, 0x2d])) return { id: "pdf" };
+    if (ascii(bytes, 0, 15) === "SQLite format 3") return { id: "sqlite" };
     if (startsWith(bytes, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) return { id: "png" };
     if (startsWith(bytes, [0xff, 0xd8, 0xff])) return { id: "jpeg" };
     if (ascii(bytes, 0, 4) === "GIF8") return { id: "gif" };

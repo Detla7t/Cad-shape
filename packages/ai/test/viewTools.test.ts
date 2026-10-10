@@ -205,7 +205,21 @@ describe("rotate_view tool", () => {
         expect(target).toEqual({ x: 0, y: 0, z: 0 });
         expect(up).toEqual({ x: 0, y: 1, z: 0 });
         expect(update).toHaveBeenCalledTimes(1);
-        expect(JSON.parse(result.content)).toEqual({ ok: true, eye: { x: 0, y: 0, z: 50 } });
+        expect(JSON.parse(result.content)).toEqual({ ok: true, eye: { x: 0, y: 0, z: 50 }, view: "Top" });
+    });
+
+    test("view cube edges and corners in any word order", async () => {
+        const { lookAt } = stubView({ x: 0, y: 0, z: 30 });
+
+        const result = (await getTool().handler({ view: "right top front" })) as { content: string };
+
+        const [eye, , up] = lookAt.mock.calls[0];
+        const s = 30 / Math.sqrt(3);
+        expect(eye.x).toBeCloseTo(s, 6);
+        expect(eye.y).toBeCloseTo(-s, 6);
+        expect(eye.z).toBeCloseTo(s, 6);
+        expect(up).toEqual({ x: 0, y: 0, z: 1 });
+        expect(JSON.parse(result.content).view).toBe("Top Front Right");
     });
 
     test("relative azimuth orbits the camera around the Z axis", async () => {
@@ -237,8 +251,11 @@ describe("rotate_view tool", () => {
         const missing = (await getTool().handler({})) as { content: string };
         expect(JSON.parse(missing.content)).toEqual({ error: "provide view or azimuth/elevation" });
 
-        const unknown = (await getTool().handler({ view: "isometric" })) as { content: string };
+        const unknown = (await getTool().handler({ view: "sideways" })) as { content: string };
         expect(JSON.parse(unknown.content).error).toContain("unknown view");
+
+        const opposite = (await getTool().handler({ view: "left right" })) as { content: string };
+        expect(JSON.parse(opposite.content).error).toContain("two sides along one axis");
     });
 
     test("reports an error when there is no active view", async () => {

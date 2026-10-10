@@ -4,14 +4,13 @@
 import { AsyncController, CancelableCommand, command, PubSub } from "@chili3d/core";
 import { SketchEditor } from "../editor/sketchEditor";
 import {
-    ConstraintKind,
-    entityPointCount,
-    pointRefKey,
-    type SketchConstraintRole,
-    type SketchData,
-    type SketchPointRef,
-} from "../sketchModel";
-import type { SketchSolver } from "../solver";
+    type NewSketchConstraint,
+    pointOnCurve,
+    type SelectionConstraintTool,
+    type SketchSelectionTarget,
+    selectionConstraints,
+} from "../selectionConstraints";
+import { ConstraintKind, pointRefKey, type SketchData, type SketchPointRef } from "../sketchModel";
 import {
     allowsConstraintOnEntity,
     arcStartRef,
@@ -38,6 +37,14 @@ export abstract class SketchConstraintCommand extends CancelableCommand {
         return false;
     }
 
+    /**
+     * The tool's selection-wide form (`selectionConstraints`): with a selection that is a
+     * complete batch for it, the constraint applies to all of it in one undo step.
+     */
+    protected get selectionTool(): SelectionConstraintTool | undefined {
+        return undefined;
+    }
+
     async executeAsync(): Promise<void> {
         const editor = editorOrError();
         if (editor === undefined) return;
@@ -46,6 +53,10 @@ export abstract class SketchConstraintCommand extends CancelableCommand {
         // a pre-selected target applies the constraint at once and ends the tool
         const preselected = editor.selectedEntityIds.length > 0;
         try {
+            if (preselected && this.selectionTool !== undefined) {
+                const applied = applySelectionConstraints(editor, this.selectionTool, editor.preselection);
+                if (applied !== undefined) return;
+            }
             let again = true;
             while (again) {
                 const picksBefore = editor.pickSequence;
@@ -91,19 +102,48 @@ abstract class RepeatingConstraintCommand extends SketchConstraintCommand {
     }
 }
 
-/** Same-kind (and role) constraint with the same ref set already exists — adding it would be redundant. */
-function hasDuplicate(
-    solver: SketchSolver,
-    kind: ConstraintKind,
-    refs: SketchPointRef[],
-    role?: SketchConstraintRole,
+/**
+ * The one commit path of the constraint tools: adds every constraint of `constraints`
+ * that is not already there as one undoable change, and restores the drawing when the
+ * sketch no longer solves. Returns whether anything was committed.
+ */
+export function applySketchConstraints(
+    editor: SketchEditor,
+    constraints: readonly NewSketchConstraint[],
 ): boolean {
-    const key = refs.map(pointRefKey).sort().join("|");
-    return solver
-        .toData()
-        .constraints.some(
-            (c) => c.kind === kind && c.role === role && c.refs.map(pointRefKey).sort().join("|") === key,
-        );
+    const seen = new Set<string>();
+    const fresh = constraints.filter((constraint) => {
+        const key = `${constraint.kind}/${constraint.role ?? ""}/${constraint.refs.map(pointRefKey).sort().join("|")}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return !editor.solver.hasConstraint(constraint.kind, constraint.refs, constraint.role);
+    });
+    if (fresh.length === 0) {
+        PubSub.default.pub("statusBarTip", "sketch.constraintExists");
+        return false;
+    }
+    const before = editor.solver.toData();
+    for (const constraint of fresh) editor.solver.addConstraint(constraint);
+    return solveAndCommit(editor, before);
+}
+
+/**
+ * Applies `tool` to `targets` as a whole (`selectionConstraints`). `undefined` when the
+ * targets are no complete batch for the tool, so the caller picks the rest; otherwise
+ * whether it committed (a refused selection shows why).
+ */
+export function applySelectionConstraints(
+    editor: SketchEditor,
+    tool: SelectionConstraintTool,
+    targets: readonly SketchSelectionTarget[],
+): boolean | undefined {
+    const plan = selectionConstraints(editor.solver, tool, targets);
+    if (plan === undefined) return undefined;
+    if (!plan.isOk) {
+        PubSub.default.pub("displayError", plan.error);
+        return false;
+    }
+    return applySketchConstraints(editor, plan.value);
 }
 
 /** Adds the constraint unless redundant, then solves and commits. */
@@ -111,18 +151,12 @@ function addAndCommit(
     editor: SketchEditor,
     kind: ConstraintKind,
     refs: SketchPointRef[],
-    extra?: { datum?: number; datums?: number[]; role?: SketchConstraintRole },
+    extra?: Pick<NewSketchConstraint, "datum" | "datums" | "role">,
 ): void {
-    if (hasDuplicate(editor.solver, kind, refs, extra?.role)) {
-        PubSub.default.pub("statusBarTip", "sketch.constraintExists");
-        return;
-    }
-    const before = editor.solver.toData();
-    editor.solver.addConstraint({ kind, refs, ...extra });
-    solveAndCommit(editor, before);
+    applySketchConstraints(editor, [{ kind, refs, ...extra }]);
 }
 
-function solveAndCommit(editor: SketchEditor, before: SketchData): void {
+function solveAndCommit(editor: SketchEditor, before: SketchData): boolean {
     const outcome = editor.solve(true);
     if (outcome && !outcome.result.startsWith("Ok")) {
         editor.solver.reset(before);
@@ -131,13 +165,18 @@ function solveAndCommit(editor: SketchEditor, before: SketchData): void {
             "displayError",
             "This constraint conflicts with the sketch. The drawing was restored.",
         );
-        return;
+        return false;
     }
     editor.commit();
+    return true;
 }
 
 @command({ key: "constraint.coincident", icon: "icon-cCoincident" })
 export class CoincidentConstraintCommand extends RepeatingConstraintCommand {
+    protected override get selectionTool(): SelectionConstraintTool {
+        return "coincident";
+    }
+
     protected async executeWithEditor(editor: SketchEditor): Promise<void> {
         this.controller = new AsyncController();
         const first = await editor.pickPointOrEntity("prompt.pickSketchPointOrEntity", this.controller);
@@ -184,20 +223,11 @@ abstract class AxisConstraintCommand extends RepeatingConstraintCommand {
     protected abstract readonly kind: ConstraintKind.Horizontal | ConstraintKind.Vertical;
     protected abstract readonly alignKind: ConstraintKind.HorizontalAlign | ConstraintKind.VerticalAlign;
 
+    protected override get selectionTool(): SelectionConstraintTool {
+        return this.kind === ConstraintKind.Horizontal ? "horizontal" : "vertical";
+    }
+
     protected async executeWithEditor(editor: SketchEditor): Promise<void> {
-        const selected = editor.selectedWholeEntityIds;
-        if (selected.length > 0 && selected.every((id) => editor.solver.entity(id)?.type === "line")) {
-            const lines = selected.filter(
-                (id) =>
-                    allowsConstraintOnEntity(this.kind, id) &&
-                    !hasDuplicate(editor.solver, this.kind, lineRefs(id)),
-            );
-            if (lines.length === 0) return;
-            const before = editor.solver.toData();
-            for (const id of lines) editor.solver.addConstraint({ kind: this.kind, refs: lineRefs(id) });
-            solveAndCommit(editor, before);
-            return;
-        }
         this.controller = new AsyncController();
         const first = await editor.pickPointOrEntity("prompt.pickSketchPointOrEntity", this.controller);
         if (first === undefined) return;
@@ -267,6 +297,10 @@ abstract class TwoLineConstraintCommand extends RepeatingConstraintCommand {
 @command({ key: "constraint.parallel", icon: "icon-cParallel" })
 export class ParallelConstraintCommand extends TwoLineConstraintCommand {
     protected readonly kind = ConstraintKind.Parallel;
+
+    protected override get selectionTool(): SelectionConstraintTool {
+        return "parallel";
+    }
 }
 
 @command({ key: "constraint.perpendicular", icon: "icon-cPerpendicular" })
@@ -274,70 +308,40 @@ export class PerpendicularConstraintCommand extends TwoLineConstraintCommand {
     protected readonly kind = ConstraintKind.Perpendicular;
 }
 
-/** Round entities: an equal constraint between any two of them equates their radii. */
-const isRound = (type: string | undefined) => type === "circle" || type === "arc";
+/** Two picked entities as selection targets, in pick order. */
+const entityPair = (pair: readonly [number, number]): SketchSelectionTarget[] =>
+    pair.map((entityId) => ({ kind: "entity", entityId }));
 
 /**
- * Picks two lines (equal length) or two round entities — circles and arcs in any mix, so a
- * trimmed circle can still be made equal to a whole one — (equal radius).
+ * Equal: two or more lines (equal length) or round entities — circles and arcs in any mix,
+ * so a trimmed circle can still be made equal to a whole one — (equal radius).
  */
 @command({ key: "constraint.equal", icon: "icon-cEqual" })
 export class EqualConstraintCommand extends RepeatingConstraintCommand {
+    protected override get selectionTool(): SelectionConstraintTool {
+        return "equal";
+    }
+
     protected async executeWithEditor(editor: SketchEditor): Promise<void> {
-        this.controller = new AsyncController();
-        const e1 = await editor.pickEntity("prompt.pickSketchEntity", undefined, undefined, this.controller);
-        if (e1 === undefined) return;
-        this.controller = new AsyncController();
-        const e2 = await editor.pickEntity("prompt.pickSketchEntity", undefined, undefined, this.controller);
-        if (e2 === undefined) return;
-        if (e1 === e2) {
-            PubSub.default.pub("displayError", "Pick two different entities");
-            return;
-        }
-        const t1 = editor.solver.entity(e1)?.type;
-        const t2 = editor.solver.entity(e2)?.type;
-        if (t1 === "line" && t2 === "line") {
-            addAndCommit(editor, ConstraintKind.EqualLength, [...lineRefs(e1), ...lineRefs(e2)]);
-        } else if (t1 === "arc" && t2 === "arc") {
-            addAndCommit(editor, ConstraintKind.EqualArcRadius, [
-                centerRef(e1),
-                arcStartRef(e1),
-                centerRef(e2),
-                arcStartRef(e2),
-            ]);
-        } else if (isRound(t1) && isRound(t2)) {
-            // Two circles, or a circle and an arc: the solver equates the arc's radius to the
-            // circle's radius parameter.
-            addAndCommit(editor, ConstraintKind.EqualRadius, [centerRef(e1), centerRef(e2)]);
-        } else {
-            PubSub.default.pub("displayError", "Equal requires two lines, or two circles or arcs");
-        }
+        const pair = await this.pickTwoEntities(editor);
+        if (pair !== undefined) applySelectionConstraints(editor, "equal", entityPair(pair));
     }
 }
 
-/** Concentric: two circles, arcs or points share a center (Onshape's Concentric). */
+/** Concentric: two or more circles, arcs or points share a center (Onshape's Concentric). */
 @command({ key: "constraint.concentric", icon: "icon-a-tongxinyueshu2424" })
 export class ConcentricConstraintCommand extends RepeatingConstraintCommand {
+    protected override get selectionTool(): SelectionConstraintTool {
+        return "concentric";
+    }
+
     protected async executeWithEditor(editor: SketchEditor): Promise<void> {
         const pair = await this.pickTwoEntities(editor);
-        if (pair === undefined) return;
-        const centered = (id: number) => {
-            const type = editor.solver.entity(id)?.type;
-            return isRound(type) || type === "point";
-        };
-        if (!pair.every(centered)) {
-            PubSub.default.pub("displayError", "Concentric applies to circles, arcs and points");
-            return;
-        }
-        if (!pair.some((id) => isRound(editor.solver.entity(id)?.type))) {
-            PubSub.default.pub("displayError", "Concentric needs a circle or an arc");
-            return;
-        }
-        addAndCommit(editor, ConstraintKind.P2PCoincident, [centerRef(pair[0]), centerRef(pair[1])], {
-            role: "concentric",
-        });
+        if (pair !== undefined) applySelectionConstraints(editor, "concentric", entityPair(pair));
     }
 }
+
+const isRound = (type: string | undefined) => type === "circle" || type === "arc";
 
 /** Normal: a line meets a circle or arc at right angles — it runs through the center. */
 @command({ key: "constraint.normal", icon: "icon-cPerpendicular" })
@@ -444,12 +448,8 @@ function addPointOn(editor: SketchEditor, point: SketchPointRef, entityId: numbe
         PubSub.default.pub("displayError", "Pick a point from another entity");
         return;
     }
-    const type = editor.solver.entity(entityId)?.type;
-    if (type === "line") addAndCommit(editor, ConstraintKind.PointOnLine, [point, ...lineRefs(entityId)]);
-    else if (type === "circle")
-        addAndCommit(editor, ConstraintKind.PointOnCircle, [point, centerRef(entityId)]);
-    else if (type === "arc")
-        addAndCommit(editor, ConstraintKind.PointOnArc, [point, centerRef(entityId), arcStartRef(entityId)]);
+    const constraint = pointOnCurve(editor.solver, point, entityId);
+    if (constraint !== undefined) applySketchConstraints(editor, [constraint]);
 }
 
 @command({ key: "constraint.midpoint", icon: "icon-cMid" })
@@ -494,47 +494,16 @@ export class SymmetricConstraintCommand extends RepeatingConstraintCommand {
  */
 @command({ key: "constraint.fix", icon: "icon-cFix" })
 export class FixConstraintCommand extends RepeatingConstraintCommand {
+    protected override get selectionTool(): SelectionConstraintTool {
+        return "fix";
+    }
+
     protected async executeWithEditor(editor: SketchEditor): Promise<void> {
-        const selected = editor.selectedWholeEntityIds;
-        if (selected.length) {
-            fixEntities(editor, selected);
-            return;
-        }
         this.controller = new AsyncController();
         const picked = await editor.pickPointOrEntity("prompt.pickSketchPointOrEntity", this.controller);
         if (picked === undefined) return;
-        if (picked.kind === "entity") {
-            if (allowsConstraintOnEntity(ConstraintKind.Fix, picked.entityId))
-                fixEntities(editor, [picked.entityId]);
-            return;
-        }
-        const p = picked.ref;
-        if (!allowsConstraintOnEntity(ConstraintKind.Fix, p.entityId)) return;
-        addAndCommit(editor, ConstraintKind.Fix, [p], { datums: [...editor.solver.pointOf(p)] });
+        const id = picked.kind === "entity" ? picked.entityId : picked.ref.entityId;
+        if (allowsConstraintOnEntity(ConstraintKind.Fix, id))
+            applySelectionConstraints(editor, "fix", [picked]);
     }
-}
-
-/** Fixes every point of the entities (and a circle's radius) as one commit. */
-function fixEntities(editor: SketchEditor, ids: readonly number[]): void {
-    const before = editor.solver.toData();
-    for (const id of ids) {
-        const entity = editor.solver.entity(id);
-        if (!entity || !allowsConstraintOnEntity(ConstraintKind.Fix, id)) continue;
-        for (let pointIndex = 0; pointIndex < entityPointCount(entity.type, entity.params); pointIndex++) {
-            const ref = { entityId: id, pointIndex };
-            if (!hasDuplicate(editor.solver, ConstraintKind.Fix, [ref]))
-                editor.solver.addConstraint({
-                    kind: ConstraintKind.Fix,
-                    refs: [ref],
-                    datums: [...editor.solver.pointOf(ref)],
-                });
-        }
-        if (entity.type === "circle" && !hasDuplicate(editor.solver, ConstraintKind.Radius, [centerRef(id)]))
-            editor.solver.addConstraint({
-                kind: ConstraintKind.Radius,
-                refs: [centerRef(id)],
-                datum: entity.params[2],
-            });
-    }
-    solveAndCommit(editor, before);
 }

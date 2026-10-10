@@ -10,7 +10,23 @@ export interface Tool {
     parameters: JsonSchema;
     /** `signal` aborts when the user cancels the chat; long-running handlers should respect it. */
     handler: (args: Record<string, unknown>, signal?: AbortSignal) => Promise<string | ToolResult>;
+    /**
+     * Who may call it: `everywhere` (default) — the in-app assistant and the automation bridge;
+     * `external` — only the automation bridge (`scripts/automation-bridge.mjs`), which the user
+     * enabled for this tab (script evaluation, for one).
+     */
+    availability?: ToolAvailability;
+    /**
+     * Tools of one family share one line of the system prompt's tool index (`- a, b, c: …`),
+     * which keeps the resident prompt small; the schemas still carry each full description.
+     */
+    indexGroup?: string;
 }
+
+export type ToolAvailability = "everywhere" | "external";
+
+/** Who builds the tool list: the in-app assistant, or the automation bridge for a remote client. */
+export type ToolAudience = "assistant" | "automation";
 
 export interface ToolCall {
     id: string;

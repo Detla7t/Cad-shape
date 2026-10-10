@@ -1,8 +1,8 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { formulaCompletion, insertFunctionCall } from "../../sheet/formulaSuggestions";
-import { functionDoc } from "../../sheet/functionInfo";
+import { formulaCompletion, insertFunctionCall } from "@chili3d/sheet/formulaSuggestions";
+import { functionDoc } from "@chili3d/sheet/functionInfo";
 import style from "../spreadsheet.module.css";
 import { createFunctionBrowser } from "./functionBrowser";
 import { sheetButton } from "./sheetControls";

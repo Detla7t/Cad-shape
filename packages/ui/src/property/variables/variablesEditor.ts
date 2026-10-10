@@ -16,6 +16,7 @@ import {
     type VariableType,
 } from "@chili3d/core";
 import { button, div, input, option, select, span, svg } from "@chili3d/element";
+import { hasFeatureRows } from "./partStudioVariables";
 import type { VariablesDataContent } from "./variablesDataContent";
 import style from "./variablesEditor.module.css";
 
@@ -190,6 +191,12 @@ export class VariablesEditor extends HTMLElement {
         return div({ className: style.newRow }, div({ className: style.nameCell }, box));
     }
 
+    /** The feature a row belongs to (an assigned or measured variable of the model tree). */
+    private featureOf(id: string) {
+        const source = this.content.source;
+        return hasFeatureRows(source) ? source.featureRow(id) : undefined;
+    }
+
     private row(item: VariableData) {
         // Kept by id rather than looked up by position: refreshValues runs while editing and
         // must not depend on the row order.
@@ -201,6 +208,7 @@ export class VariablesEditor extends HTMLElement {
             value,
             this.actions(item),
         );
+        if (this.featureOf(item.id) !== undefined) row.dataset["feature"] = "true";
         this.valueCells.set(item.id, value);
         this.rows.set(item.id, row);
         return row;
@@ -213,6 +221,20 @@ export class VariablesEditor extends HTMLElement {
      */
     private valueCell(item: VariableData) {
         let editingText = item.expression;
+        const owner = this.featureOf(item.id);
+        if (
+            item.measured ||
+            item.type === "function" ||
+            (owner !== undefined && owner.updateVariable === undefined)
+        ) {
+            // A measurement is what the geometry says: the cell reads, it does not take input.
+            return input({
+                className: `${style.cell} ${style.field} ${style.value}`,
+                value: item.type === "function" ? "ƒ(…)" : item.expression,
+                readOnly: true,
+                tabIndex: -1,
+            });
+        }
         return input({
             className: `${style.cell} ${style.field} ${style.value}`,
             value: item.expression,
@@ -326,6 +348,19 @@ export class VariablesEditor extends HTMLElement {
     }
 
     private typeCell(item: VariableData) {
+        if (this.featureOf(item.id) !== undefined) {
+            // A feature's type is the feature's: Measured, Unspecified (a function), or the length it assigns.
+            return span({
+                className: `${style.cell} ${style.field} ${style.staticType}`,
+                textContent: new Localize(
+                    item.measured
+                        ? "variable.type.measured"
+                        : item.type === "function"
+                          ? "variable.type.unspecified"
+                          : (TYPES.find((type) => type.value === item.type)?.label ?? "variable.type.length"),
+                ),
+            });
+        }
         const types = select({
             className: `${style.cell} ${style.field}`,
             onchange: (e: Event) => {
@@ -347,12 +382,22 @@ export class VariablesEditor extends HTMLElement {
 
     private actions(item: VariableData) {
         const index = this.content.items.findIndex((x) => x.id === item.id);
+        const feature = this.featureOf(item.id) !== undefined;
         return div(
             { className: style.actions },
-            this.iconButton("icon-up", "variable.moveUp", index === 0, () => this.move(item.id, -1, 0)),
-            this.iconButton("icon-down", "variable.moveDown", index === this.content.items.length - 1, () =>
-                this.move(item.id, 1, 1),
-            ),
+            ...(feature
+                ? []
+                : [
+                      this.iconButton("icon-up", "variable.moveUp", index === 0, () =>
+                          this.move(item.id, -1, 0),
+                      ),
+                      this.iconButton(
+                          "icon-down",
+                          "variable.moveDown",
+                          index === this.content.items.length - 1,
+                          () => this.move(item.id, 1, 1),
+                      ),
+                  ]),
             this.iconButton(
                 "icon-trash",
                 "variable.delete",
@@ -402,10 +447,18 @@ export class VariablesEditor extends HTMLElement {
      * lower layer resolves normally and carries the warning as a marker and a tooltip.
      */
     private refreshValues(evaluated: EvaluatedVariables = this.content.evaluate()): void {
+        const configured = this.content.document.variables.configurationDependentNames();
         for (const item of this.content.items) {
             const cell = this.valueCells.get(item.id);
             const row = this.rows.get(item.id);
             if (cell === undefined || row === undefined) continue;
+            // A function has no value to show: the cell reads as a function, the name is what counts.
+            if (item.type === "function") {
+                cell.title = I18n.translate("variable.type.unspecified");
+                continue;
+            }
+            // Onshape's dotted outline: the value follows the configuration.
+            cell.classList.toggle(style.configured, configured.has(item.name));
             // The focused box belongs to whoever is typing in it — until they leave, it shows
             // the expression rather than the value.
             if (window.document.activeElement === cell) continue;
@@ -419,13 +472,15 @@ export class VariablesEditor extends HTMLElement {
                     : item.type === "unitless"
                       ? String(Math.round(value * 1e8) / 1e8)
                       : formatDocumentValue(value, this.content.document, unitSpecOfType(item.type)));
-            cell.className =
-                error === undefined
-                    ? `${style.cell} ${style.field} ${style.value}`
-                    : `${style.cell} ${style.field} ${style.value} ${style.error}`;
+            cell.classList.toggle(style.error, error !== undefined);
             // The cell shows what the expression came to; hovering reveals the expression.
-            cell.title =
-                error ?? (warning === undefined ? item.expression : `${warning}\n${item.expression}`);
+            const note = configured.has(item.name) ? I18n.translate("variable.configured") : undefined;
+            cell.title = [
+                error ?? (warning === undefined ? item.expression : `${warning}\n${item.expression}`),
+                note,
+            ]
+                .filter((part) => part !== undefined)
+                .join("\n");
             if (error !== undefined) row.className = `${style.row} ${style.errorRow}`;
             else if (warning !== undefined) row.className = `${style.row} ${style.warningRow}`;
             else row.className = style.row;

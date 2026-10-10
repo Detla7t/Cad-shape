@@ -1,9 +1,10 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
+import { diagnosticsFor, offsetOf } from "@chili3d/featurescript/ide";
 import { compileStudioSource } from "../../../src/featurescript/studioCompiler";
-import { diagnosticsFor, offsetOf } from "../../../src/featurescript/ui/ide/diagnostics";
-import { HEADER } from "./_helpers";
+
+const HEADER = 'FeatureScript 3083;\nimport(path : "onshape/std/geometry.fs", version : "3083.0");\n';
 
 /** Compiles a studio source the way the editor does (no other studios). */
 function compile(name: string, source: string) {

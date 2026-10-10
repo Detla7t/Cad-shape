@@ -23,7 +23,7 @@ export interface HelixOptions {
     angle: number;
 }
 
-@serializable()
+@serializable({ id: "HelixNode" })
 export class HelixNode extends ParameterShapeNode {
     override display(): I18nKeys {
         return "body.helix";

@@ -2,12 +2,11 @@
 // See LICENSE file in the project root for full license information.
 
 import { type IDocument, Result } from "@chili3d/core";
+import { type OnshapeStdSource, providedOnshapeStd } from "@chili3d/featurescript";
 import type { FeatureScriptFeatureData } from "../features/feature";
 import { ParametricBodyNode } from "../parametricBodyNode";
 import { FeatureStudioNode } from "./featureStudioNode";
 import { newFeatureScriptFeature } from "./insertFeature";
-import type { OnshapeStdSource } from "./onshape/onshapeStd";
-import { providedOnshapeStd } from "./runtime";
 import { registerStudioProvider } from "./studioCompiler";
 
 /**

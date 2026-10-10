@@ -18,7 +18,7 @@ export interface PolygonOptions {
     points: XYZ[];
 }
 
-@serializable()
+@serializable({ id: "PolygonNode" })
 export class PolygonNode extends FacebaseNode {
     override display(): I18nKeys {
         return "body.polygon";

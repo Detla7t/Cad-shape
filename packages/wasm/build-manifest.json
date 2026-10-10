@@ -5,13 +5,13 @@
     "sources": {
         "cpp/CMakeLists.txt": "bd94ca9c294d47eac6955aa72ef8f6eddbab8c861f47d5faf58dc64cd2066ef4",
         "cpp/src/converter.cpp": "602c9e5e8f77c91da086d5de2ed9a3041d8bd0c4a3841dd7c78569236665401e",
-        "cpp/src/factory.cpp": "ff49607b21a262ce5d5fbbb7f741632cbf74581acb276cc87b6a0d3a086e9f77",
+        "cpp/src/factory.cpp": "39e8dfa0f2f4c0b98104a46c608cf68d6b9b836a69d173ddd2dd90cc27fd35a8",
         "cpp/src/geometry.cpp": "7d4a31e206ecbf73f5f18e77bd3480869746e2addc77bbf9fde922d0553932af",
         "cpp/src/helps.cpp": "a2c4cde76a84349a1b54574505d859ffbfeb46a7c7285a5b97c27f90b3e40e42",
         "cpp/src/measurement.hpp": "5a46820ecb2216119d0b6a250f17f9fb108cf8efc243da5a489c9aaf64e1d86e",
         "cpp/src/mesher.cpp": "3b07f0fdaa39a3392a24d0d30b03706f42a2d1d8305e7f7ffea20f09253e4a15",
         "cpp/src/opencascade.cpp": "eb759c9bf04298ac7cb326b67cd2da3979a8e3edc1258e2abf61d7d4b69c5051",
-        "cpp/src/shape.cpp": "1def31ad0d132d1ddff2a82a8692408344d59d83cbbb71eaf46a79bc138a1dc6",
+        "cpp/src/shape.cpp": "446d74d3fa57fcb0b3c3b005eaa7497943c58999a4e9fc0cdd93a34100990f36",
         "cpp/src/shared.cpp": "748d34706d9e6cea237b989818ff7a363d6c3aaa392b21e9f46b55e9e8d72d70",
         "cpp/src/shared.hpp": "085d79af683e9ef3cef528fa524aae66de729a4607e264f42005feff98277e39",
         "cpp/src/transient.cpp": "bd22c5299352d1df2f7933a07f3dae10c181bd0abaa00485f9a90b914ad0ea76",
@@ -20,7 +20,7 @@
     },
     "artifacts": {
         "packages/wasm/lib/chili-wasm.js": "28fb75306ff62c75695e2cd2af67b476935a9dd814d50ebdf8c69bd6e25105f8",
-        "packages/wasm/lib/chili-wasm.wasm": "6d7e228eff4ae340fceb7b3f4c0cb1497e29c4604d8a21e032ba8f7ab5dacaf2",
-        "packages/wasm/lib/chili-wasm.d.ts": "a0180c18007fe526fd3c56addeb1ffa4bfbc810607acafae7d779f028474e249"
+        "packages/wasm/lib/chili-wasm.wasm": "719effecbf35ce14868eb0ee482980f8ee6289ca7dcb47e8b3e8b29d62bcd445",
+        "packages/wasm/lib/chili-wasm.d.ts": "a9f4b1511169598f077deb1a8868fa2997be7c322f08c63acc60b6054a04b72a"
     }
 }

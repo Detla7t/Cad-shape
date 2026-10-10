@@ -11,17 +11,15 @@ import {
     Result,
     ShapeNode,
 } from "@chili3d/core";
+import { bodyKindOf, type FeatureSpec, type TableExport } from "@chili3d/featurescript";
 import type { FeatureScriptParameterValue } from "../features/feature";
-import { bodyKindOf } from "./context/fsContext";
 import {
     configurationVariableNames,
     documentVariables,
     plainDefinition,
     plainParameterRows,
 } from "./featureScriptFeature";
-import type { FeatureSpec } from "./featureSpec";
 import type { FeatureStudioNode } from "./featureStudioNode";
-import type { TableExport } from "./lang/interpreter";
 import { type CompiledStudio, compileDocumentStudio, documentStudios, findStudio } from "./studioCompiler";
 import { runTable, type TableFormatOptions, type TableHostBody, type TableRunResult } from "./tableRuntime";
 

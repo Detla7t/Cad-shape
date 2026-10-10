@@ -8,6 +8,7 @@ import { Logger } from "../foundation/logger";
 import { PubSub } from "../foundation/pubsub";
 import type { I18nKeys } from "../i18n";
 import type { INode } from "../model/node";
+import type { RibbonTabKeys } from "./ribbon";
 
 /**
  * Document ELEMENTS — Onshape's tabs along the bottom of a document. One document is one
@@ -54,6 +55,12 @@ export interface ElementKind {
     readonly display: I18nKeys;
     /** Which document nodes are elements of this kind. */
     readonly isElement: (node: INode) => boolean;
+    /**
+     * False keeps the kind's nodes out of the Part Studio's Features tree: a drawing or an
+     * attached file is a tab of the document, not a feature of the model (Onshape lists
+     * neither), until the user imports it into the Part Studio themselves.
+     */
+    readonly inModelTree?: boolean;
     /** What the "+" menu runs to create one; the command opens the new element itself. */
     readonly newCommand?: CommandKeys;
     /** A detached copy for the tab's Duplicate; `node.clone()` when absent. */
@@ -64,6 +71,11 @@ export interface ElementKind {
      * toolpaths, picking geometry). The Part Studio's own sidebar is hidden meanwhile.
      */
     readonly besideViewport?: boolean;
+    /**
+     * A contextual ribbon tab opened while an element of this kind is the active tab (a
+     * Drawing's tools replace the Part Studio's), and closed when another element takes over.
+     */
+    readonly ribbonTab?: RibbonTabKeys;
     /** Optional tab-browser thumbnail, generated without opening or changing the element's view. */
     readonly thumbnail?: (
         node: INode,
@@ -143,6 +155,10 @@ export class DocumentElementRegistry {
 
     kindOf(node: INode): ElementKind | undefined {
         return this._kinds.find((kind) => kind.isElement(node));
+    }
+    /** True for a node of a kind that lives in the tab strip only (`inModelTree: false`). */
+    hiddenInTree(node: INode): boolean {
+        return this.kindOf(node)?.inModelTree === false;
     }
 
     /** The node-backed elements of `document`, in model-tree order — the tab order. */

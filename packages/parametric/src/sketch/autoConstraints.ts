@@ -894,7 +894,8 @@ function snapToTangency(
     const nearest = nearestTangency(solver, entity, tolerance);
     if (nearest === undefined) return;
     const constraint = tangentConstraintFor(entity.type, entity.id, nearest.target.type, nearest.target.id);
-    if (constraint === undefined) return;
+    // a tool may have made the tangency itself (the tangent arc)
+    if (constraint === undefined || solver.hasConstraint(constraint.kind, constraint.refs)) return;
 
     solver.addConstraint(constraint);
     added.push(constraint);

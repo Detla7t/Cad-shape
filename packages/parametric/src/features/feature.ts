@@ -4,6 +4,7 @@
 import {
     type Continuity,
     type FeatureParameter,
+    type FunctionVariable,
     type I18nKeys,
     type IDocument,
     type IEdge,
@@ -17,6 +18,7 @@ import {
     ShapeTypes,
     selectConfiguredBoolean,
     type TrackedShape,
+    type VariableData,
     type XYZLike,
 } from "@chili3d/core";
 import type { EdgeRef } from "./edgeRef";
@@ -340,6 +342,18 @@ export interface FeatureContext {
      * path fills the output arrays — left empty when tracking is unavailable.
      */
     readonly tracking?: ShapeTracking;
+    /**
+     * Set by the body: a handler whose run stored variables (FeatureScript's `setVariable`)
+     * reports them here — numbers as rows, functions beside them — and the body publishes
+     * them to the document's variable scope for the features and tables after it.
+     */
+    readonly setVariables?: (variables: FeatureVariables) => void;
+}
+
+/** The variables a feature run stored: rows for the variable table, function values beside them. */
+export interface FeatureVariables {
+    readonly items: readonly VariableData[];
+    readonly functions: ReadonlyMap<string, FunctionVariable>;
 }
 
 export interface ShapeTracking {

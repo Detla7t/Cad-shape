@@ -1,6 +1,6 @@
 {
     "schemaVersion": 1,
-    "auditedAt": "2026-10-08",
+    "auditedAt": "2026-10-09",
     "stdVersion": 3083,
     "parityCertified": false,
     "requirement": "Equivalent user tools and FeatureScript operations must produce equivalent geometry, units, constraints, references, and rebuild behavior to Onshape. Similar menus or successful execution alone do not establish compatibility.",
@@ -29,6 +29,17 @@
             "scope": "Native browser interactions",
             "cases": "Trim previews only the removed semicircle; split waits for a second circle point; offset accepts exact model values despite rounded inch display; sketch copy/paste and finish; stable Features position on selection and double-click; adjustable Properties accordion; history bar rollback and keyboard control.",
             "documents": ["Trim and sketch parity · verification", "Spline and split · verification"]
+        },
+        {
+            "scope": "Sketch constraint feedback, tangent arc and selection constraints (local UI behavior)",
+            "cases": "Per-point determined status and per-curve strokes: origin-attached vertical line with a free end, fixed endpoint with free direction and length, ends on the X axis with a free length, both ends fixed, circle center versus radius, arc on a solved circle with free ends, redundant pins, coincident chains; solved/free colors from Graphics preferences, theme edge color and layer colors; a solved point is selected rather than dragged. Tangent arc from line and arc ends (coincident start, tangency kept under Shift, refused straight continuation, start limited to curve ends). Selection-wide Horizontal/Vertical, Coincident, Parallel, Equal, Concentric and Fix in one commit, with refusals, duplicate skipping and single-item fallback.",
+            "evidence": [
+                "packages/parametric/test/sketch/sketchConstraintStatus.test.ts",
+                "packages/parametric/test/sketch/sketchTangentArc.test.ts",
+                "packages/parametric/test/sketch/sketchConstraintCommands.test.ts",
+                "packages/parametric/test/sketch/constraintInteraction.test.ts"
+            ],
+            "limit": "Automated local tests only. The colors and tools were not captured beside Onshape in a browser trial, and Onshape's rules for mixed batch selections (points with lines) were not trialed."
         }
     ],
     "knownLimits": [
@@ -40,7 +51,10 @@
         "Polygon, slot and pattern geometry is available, but complete Onshape construction constraints and associative pattern editing are not implemented.",
         "Raster images can be inserted and persisted; interactive image handles are not implemented.",
         "The FeatureScript sketch constraint bridge supports common geometric and dimensional constraints. Unsupported constraints or unsatisfied solves report an error; not all Onshape constraint types, external references or out-of-line initial guesses are supported.",
-        "Part body history uses feature replay. The document-level history bar previews node visibility rather than rebuilding a unified cross-node timeline.",
-        "Full Onshape std and UI compatibility remains unverified. Broader differential fixtures are tracked separately in docs/onshape-compatibility.json."
+        "Part body history uses feature replay. One Part Studio timeline orders sketches, reference geometry and every body's features by dependency and rolls them back together (bodies replay to the marker, later nodes are hidden); a node created while rolled back is placed at the marker for the session only, without reordering the document.",
+        "Full Onshape std and UI compatibility remains unverified. Broader differential fixtures are tracked separately in docs/onshape-compatibility.json.",
+        "Ellipse, elliptical arc and conic sketch tools are not offered: the garlic solver has no ellipse entity or constraints.",
+        "Tangent arc starts only on a snapped line or arc end (snapping on, no Shift on the first pick); Onshape's arc-from-line-end gesture inside the Line tool is not implemented.",
+        "garlic's `dofs()` over-counts when a constraint is redundant. Fine solves and the constraint coloring use garlic's rank diagnosis, so the panel's settled DOF count is right; the count shown during a drag (coarse solves) can still read high until the drag ends."
     ]
 }

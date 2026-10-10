@@ -8,11 +8,13 @@
  */
 
 import { type IFace, Plane, PubSub, ShapeTypes, Transaction } from "@chili3d/core";
-import type { FeatureData } from "../../parametric/src/features/feature";
-import { captureProfileRef } from "../../parametric/src/features/profileRef";
-import { ParametricBodyNode } from "../../parametric/src/parametricBodyNode";
-import type { SketchData } from "../../parametric/src/sketch/sketchModel";
-import { SketchNode } from "../../parametric/src/sketch/sketchNode";
+import {
+    captureProfileRef,
+    type FeatureData,
+    ParametricBodyNode,
+    type SketchData,
+    SketchNode,
+} from "@chili3d/parametric";
 import "../../parametric/test/sketch/setup";
 import { setLinkService } from "../src/link/linkRegistry";
 import type { PartLinkService } from "../src/link/partLinkService";

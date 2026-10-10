@@ -5,6 +5,7 @@ import { DocumentElements, I18n, type IDocument, type INode } from "@chili3d/cor
 import { createCadIcon } from "@chili3d/element";
 import style from "./elementTabsSidebar.module.css";
 import type { ElementTab, ElementWorkspace } from "./elementWorkspace";
+import { unsavedMark } from "./unsavedMark";
 
 function element<K extends keyof HTMLElementTagNameMap>(tag: K, className: string, text?: string) {
     const result = document.createElement(tag);
@@ -284,6 +285,7 @@ export class ElementTabsSidebar extends HTMLElement {
         const content = element("div", style.rowText);
         const title = element("div", style.rowTitle);
         title.append(createCadIcon(tab.kind, tab.icon), element("span", style.name, tabName(tab)));
+        if (tab.dirty) title.append(unsavedMark());
         content.append(title, element("span", style.kind, kindName(tab)));
         if (!this.compact) row.append(this.thumbnail(tab, style.thumbnail));
         row.append(content);

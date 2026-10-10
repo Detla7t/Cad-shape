@@ -5,7 +5,13 @@ import type { IViewGizmo, Plane } from "@chili3d/core";
 import { Matrix4, Quaternion, Vector3 } from "three";
 import type { CameraController } from "./cameraController";
 import type { ThreeView } from "./threeView";
-import { createCubeRegions, roundedCubePatch, visibleCubeAxis } from "./viewCubeGeometry";
+import {
+    cornerDisc,
+    createCubeRegions,
+    discEllipse,
+    roundedCubePatch,
+    visibleCubeAxis,
+} from "./viewCubeGeometry";
 import style from "./viewGizmo.module.css";
 import { ViewMenu } from "./viewMenu";
 
@@ -23,13 +29,38 @@ export class ViewGizmo extends HTMLElement implements IViewGizmo {
     private readonly regions = createCubeRegions().map((region) => {
         const group = svg("g", { class: style.region, "data-kind": region.kind });
         const polygon = svg("polygon", { class: style.hitTarget });
-        const surface = svg("path", { class: style.surface });
+        // a corner is a flat round facet: a disc that tilts with the cube, never a ball
+        const surface = svg(region.kind === "corner" ? "ellipse" : "path", { class: style.surface });
         const label = svg("text", { "text-anchor": "middle", "dominant-baseline": "central" });
         label.textContent = region.kind === "face" ? region.name : "";
         group.append(polygon, surface, label);
         this.button(group, `${region.name} view`, () => this.orient(region.normal));
         return { ...region, group, polygon, surface, label };
     });
+    /**
+     * The cube is translucent, so the names of the faces on its far side show through it;
+     * each is a target of its own, drawn over the cube, so any face can be turned to at any
+     * moment without orbiting first (Onshape's cube). Hovering one lights its face.
+     */
+    private readonly through = svg("g", { "data-role": "through-labels" });
+    private readonly throughLabels = this.regions
+        .filter((region) => region.kind === "face")
+        .map((region) => {
+            const group = svg("g", { class: style.through });
+            const hit = svg("rect", { x: "-19", y: "-7", width: "38", height: "14", rx: "3" });
+            const text = svg("text", { "text-anchor": "middle", "dominant-baseline": "central" });
+            text.textContent = region.name;
+            group.append(hit, text);
+            this.button(group, `${region.name} view`, () => this.orient(region.normal));
+            group.addEventListener("pointerenter", () => {
+                region.group.dataset["hover"] = "true";
+            });
+            group.addEventListener("pointerleave", () => {
+                delete region.group.dataset["hover"];
+            });
+            this.through.append(group);
+            return { region, group };
+        });
     private readonly axisLines = ["#e85b57", "#55ba65", "#608be9"].map((color, i) => {
         const line = svg("path", { stroke: color, fill: "none", "data-axis": "XYZ"[i] });
         const label = svg("text", { fill: color });
@@ -48,7 +79,7 @@ export class ViewGizmo extends HTMLElement implements IViewGizmo {
         this.menu = new ViewMenu(view, (direction) => this.orient(direction));
         this.className = style.root;
         const orientation = svg("g", { "data-role": "orientation-object" });
-        orientation.append(this.cube, this.axes);
+        orientation.append(this.cube, this.axes, this.through);
         this.drawing.append(orientation);
         this.append(this.drawing);
         this.addControls();
@@ -178,12 +209,19 @@ export class ViewGizmo extends HTMLElement implements IViewGizmo {
         );
     }
 
+    /** Turns the camera to `rotation` about its target — over a short tween, like Onshape's cube. */
     private setRotation(rotation: Quaternion) {
         const { camera, target } = this.cameraController;
         const distance = camera.position.distanceTo(target);
         const eye = new Vector3(0, 0, distance).applyQuaternion(rotation).add(target);
         const up = new Vector3(0, 1, 0).applyQuaternion(rotation);
-        this.cameraController.lookAt(eye, target, up);
+        const controller = this.cameraController;
+        if (typeof controller.animateLookAt === "function") {
+            void controller.animateLookAt(eye, target, up).then(() => {
+                this.view.update();
+                this.update();
+            });
+        } else controller.lookAt(eye, target, up);
         this.view.update();
         this.update();
     }
@@ -249,39 +287,63 @@ export class ViewGizmo extends HTMLElement implements IViewGizmo {
         const regions = this.regions
             .map((region) => ({ region, normal: region.normal.clone().applyQuaternion(inverse) }))
             .sort((a, b) => a.normal.z - b.normal.z);
+        // Every region is drawn, far side first: the cube is translucent, so the back shows
+        // through. Only the near side takes the pointer; the far faces are reached by name.
+        const labelTransform = (region: (typeof this.regions)[number], mirrored: boolean) => {
+            const right = region.up!.clone().cross(region.normal).applyQuaternion(inverse);
+            if (mirrored) right.negate();
+            const up = region.up!.clone().applyQuaternion(inverse);
+            const center = project(region.normal);
+            return `matrix(${right.x} ${-right.y} ${-up.x} ${up.y} ${center.x} ${center.y})`;
+        };
         for (const { region, normal } of regions) {
             const visible = normal.z > 0.001;
-            region.group.style.display = visible ? "" : "none";
+            region.group.dataset["back"] = String(!visible);
             region.group.setAttribute("tabindex", visible ? "0" : "-1");
             region.group.setAttribute("aria-hidden", String(!visible));
-            if (visible) {
-                const points = region.vertices.map(project);
-                region.polygon.setAttribute("points", points.map((p) => `${p.x},${p.y}`).join(" "));
-                region.surface.setAttribute("d", roundedCubePatch(points, region.kind === "face" ? 5 : 1.5));
-                if (region.up) {
-                    const right = region.up.clone().cross(region.normal).applyQuaternion(inverse);
-                    const up = region.up.clone().applyQuaternion(inverse);
-                    const center = project(region.normal);
-                    region.label.setAttribute(
-                        "transform",
-                        `matrix(${right.x} ${-right.y} ${-up.x} ${up.y} ${center.x} ${center.y})`,
-                    );
-                }
+            const points = region.vertices.map(project);
+            region.polygon.setAttribute("points", points.map((p) => `${p.x},${p.y}`).join(" "));
+            if (region.kind === "corner") {
+                const disc = cornerDisc(region.normal);
+                const center = project(disc.center);
+                const { rx, ry, angle } = discEllipse(normal, disc.radius * 28);
+                region.surface.setAttribute("cx", String(center.x));
+                region.surface.setAttribute("cy", String(center.y));
+                region.surface.setAttribute("rx", String(rx));
+                region.surface.setAttribute("ry", String(ry));
+                region.surface.setAttribute("transform", `rotate(${angle} ${center.x} ${center.y})`);
+            } else {
+                region.surface.setAttribute("d", roundedCubePatch(points, region.kind === "face" ? 6 : 2));
+            }
+            if (region.up) {
+                region.label.style.display = visible ? "" : "none";
+                if (visible) region.label.setAttribute("transform", labelTransform(region, false));
             }
             this.cube.append(region.group);
         }
-        // The triad starts at the cube's negative XYZ corner, just outside its rounded shell.
-        // Both endpoints use the cube's projection, so the corner and axes orbit as one object.
-        const corner = new Vector3(-1.12, -1.12, -1.12);
+        for (const { region, group } of this.throughLabels) {
+            const back = region.normal.clone().applyQuaternion(inverse).z <= 0.001;
+            group.style.display = back ? "" : "none";
+            group.setAttribute("tabindex", back ? "0" : "-1");
+            group.setAttribute("aria-hidden", String(!back));
+            // seen from behind, the name would read mirrored: flip it back
+            if (back) group.setAttribute("transform", labelTransform(region, true));
+        }
+        // The triad starts off the cube's negative XYZ corner, clear of its shell, and runs past
+        // the cube so each axis shows as a free line with its name beyond the cube (Onshape's
+        // triad). Both endpoints use the cube's projection, so the cube and axes orbit as one.
+        const corner = new Vector3(-1.22, -1.22, -1.22);
         const start = corner.clone().applyQuaternion(inverse);
         const faces = regions
             .filter(({ normal }) => normal.z > 0.001)
             .map(({ region }) => region.vertices.map((v) => v.clone().applyQuaternion(inverse)));
         for (let i = 0; i < 3; i++) {
             const axis = new Vector3().setComponent(i, 1).applyQuaternion(inverse);
-            const end = corner.clone().setComponent(i, 1.12).applyQuaternion(inverse);
+            const end = corner.clone().setComponent(i, 1.42).applyQuaternion(inverse);
             const { x, y } = screen(end);
-            const segments = visibleCubeAxis(start, end, faces);
+            // an axis seen end-on is a dot at the origin, not a line: leave it out
+            const endOn = Math.hypot(axis.x, axis.y) < 0.15;
+            const segments = endOn ? [] : visibleCubeAxis(start, end, faces);
             const { line, label } = this.axisLines[i];
             // Draw only unoccluded segments above the cube; a foreground axis must never be
             // hidden merely because an SVG face was appended later in DOM order.
@@ -298,7 +360,7 @@ export class ViewGizmo extends HTMLElement implements IViewGizmo {
             label.setAttribute("x", String(x + axis.x * 7 - 3));
             label.setAttribute("y", String(y - axis.y * 7 + 3));
             const endVisible = segments.some(([, b]) => b.distanceToSquared(end) < 1e-10);
-            label.style.display = Math.hypot(axis.x, axis.y) < 0.15 || !endVisible ? "none" : "";
+            label.style.display = endOn || !endVisible ? "none" : "";
         }
     }
 }

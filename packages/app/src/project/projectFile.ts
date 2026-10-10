@@ -18,6 +18,7 @@ import {
     type ProjectGeometryInput,
     packProject,
     pngDataUrlBytes,
+    prepareDocumentForLoad,
     projectElementKind,
     projectEntryProviders,
     projectFileState,
@@ -26,6 +27,7 @@ import {
     Result,
     type Serialized,
     ShapeNode,
+    serializedTypeId,
     setProjectFileState,
     type UnpackedProject,
     unpackProject,
@@ -68,8 +70,9 @@ export function isDocumentFileName(fileName: string): boolean {
 function scenelessElements(document: IDocument): ProjectElement[] {
     return document.modelManager
         .findNodes((node) => isNodeSceneless(node))
-        .filter((node) => projectSourceElementSpec(node.constructor.name) === undefined)
-        .map((node) => ({ id: node.id, kind: projectElementKind(node.constructor.name), name: node.name }));
+        .map((node) => ({ node, type: serializedTypeId(node) ?? node.constructor.name }))
+        .filter(({ type }) => projectSourceElementSpec(type) === undefined)
+        .map(({ node, type }) => ({ id: node.id, kind: projectElementKind(type), name: node.name }));
 }
 
 function documentThumbnail(document: IDocument): Uint8Array | undefined {
@@ -286,7 +289,9 @@ export async function openProjectFile(
     const project = await readProjectFile(bytes);
     if (!project.isOk) return Result.err(project.error);
     for (const warning of project.value.warnings) Logger.warn(`project: ${warning}`);
-    const data = options.asCopy ? { ...project.value.document, id: Id.generate() } : project.value.document;
+    const prepared = prepareDocumentForLoad(project.value.document);
+    if (!prepared.isOk) return Result.err(prepared.error.message);
+    const data = options.asCopy ? { ...prepared.value.document, id: Id.generate() } : prepared.value.document;
     const document = await app.loadDocument(data);
     if (document === undefined) return Result.err("The document could not be loaded");
     await restoreProjectState(document, project.value);
@@ -310,7 +315,10 @@ export async function openDocumentFile(
     } catch {
         return Result.err(`${file.name ?? "The file"} is not a Chili3D document`);
     }
-    const document = await app.loadDocument(options.asCopy ? { ...data, id: Id.generate() } : data);
+    const prepared = prepareDocumentForLoad(data);
+    if (!prepared.isOk) return Result.err(prepared.error.message);
+    const current = prepared.value.document;
+    const document = await app.loadDocument(options.asCopy ? { ...current, id: Id.generate() } : current);
     if (document === undefined) return Result.err("The document could not be loaded");
     return Result.ok(document);
 }

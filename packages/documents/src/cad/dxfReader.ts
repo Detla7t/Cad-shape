@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import { Result } from "@chili3d/core";
+import { decodeText } from "@chili3d/office-io";
 
 /**
  * The structure of a DXF file — header variables, layers, blocks and model-space
@@ -60,15 +61,6 @@ export function isNumericCode(code: number): boolean {
 }
 
 // ------------------------------------------------------------------ Groups
-
-function decodeText(bytes: Uint8Array): string {
-    try {
-        return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-    } catch {
-        // Pre-2007 DXF is written in the drawing's code page; Windows-1252 is by far the most common.
-        return new TextDecoder("windows-1252").decode(bytes);
-    }
-}
 
 function asciiGroups(text: string): Result<DxfGroup[]> {
     const lines = text.split(/\r?\n/);

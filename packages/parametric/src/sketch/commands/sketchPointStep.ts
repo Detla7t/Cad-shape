@@ -2,7 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import { type AsyncController, type IDocument, type PointSnapData, PointStep } from "@chili3d/core";
-import type { TentativeEntity } from "../autoConstraints";
+import type { DragSnap, TentativeEntity } from "../autoConstraints";
 import { SketchPointSnapEventHandler } from "./sketchPointSnapEventHandler";
 
 /**
@@ -13,6 +13,12 @@ import { SketchPointSnapEventHandler } from "./sketchPointSnapEventHandler";
  */
 export interface SketchPointSnapData extends PointSnapData {
     tentative?: (probe: [number, number]) => TentativeEntity | undefined;
+    /**
+     * Where the pick may land, judged by its sketch snap (undefined when nothing
+     * snapped): a tangent arc starts only on the end of a line or arc. A refused
+     * position is no valid point, like one the step's `validator` refuses.
+     */
+    acceptSnap?: (snap: DragSnap | undefined) => boolean;
 }
 
 /**

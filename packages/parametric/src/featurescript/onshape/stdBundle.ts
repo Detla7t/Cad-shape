@@ -1,19 +1,8 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import type { OnshapeStdSource } from "./onshapeStd";
+// Compatibility path: this module moved to `@chili3d/featurescript` (`src/onshape/stdBundle.ts`).
+// Loading the engine through parametric installs parametric's modeling host.
+import "../modelingHost";
 
-/** Onshape's std library packed by `scripts/bundle-onshape-std.mjs` (once decompressed). */
-export interface OnshapeStdBundle {
-    readonly version: number;
-    /** The std's MIT license text. */
-    readonly license: string;
-    readonly files: Readonly<Record<string, string>>;
-}
-
-export function onshapeStdFromBundle(bundle: OnshapeStdBundle): OnshapeStdSource {
-    return {
-        version: bundle.version,
-        read: (file) => (Object.hasOwn(bundle.files, file) ? bundle.files[file] : undefined),
-    };
-}
+export * from "@chili3d/featurescript/onshape/stdBundle";

@@ -25,6 +25,11 @@ export function getPubSubPubs() {
 rs.mock("@chili3d/core", () => {
     const actual = rs.hoisted(() => require("@chili3d/core"));
     const { setHistoryHidden } = rs.hoisted(() => require("../../../core/src/model/historyPreview"));
+    // The shared evaluation vocabulary, its Part Studio adapter and the ShapeNode class the
+    // tree's indicator checks: the partial `actual` snapshot can miss them.
+    const evaluationState = rs.hoisted(() => require("../../../core/src/model/evaluationState"));
+    const featureEvaluation = rs.hoisted(() => require("../../../core/src/model/featureEvaluation"));
+    const { ShapeNode } = rs.hoisted(() => require("../../../core/src/model/shapeNode"));
     const {
         BindingMock,
         TransactionMock,
@@ -52,6 +57,9 @@ rs.mock("@chili3d/core", () => {
         ...actual,
         Binding: BindingMock,
         Transaction: TransactionMock,
+        ...evaluationState,
+        ...featureEvaluation,
+        ShapeNode,
         // The hoisted `actual` snapshots core mid-initialization, so PubSub must be stubbed.
         PubSub: pubSubRecorder.stub,
         I18n: I18nMock,
@@ -66,6 +74,11 @@ rs.mock("@chili3d/core", () => {
         NodeSelectionHandler,
         ShapeSelectionHandler,
         setHistoryHidden,
+        // a node flagged `hiddenInTree` stands for a file element (a drawing, an attached document)
+        DocumentElements: {
+            hiddenInTree: (node: { hiddenInTree?: boolean }) => node?.hiddenInTree === true,
+            kindOf: () => undefined,
+        },
         NodeUtils: {
             isLinkedListNode: (node: { isGroup?: boolean }) => node.isGroup === true,
             getNodesBetween: () => [],

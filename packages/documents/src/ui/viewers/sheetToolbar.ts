@@ -1,8 +1,8 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { styleColor } from "../../sheet/cellStyle";
-import type { CellStyle } from "../../sheet/model";
+import { styleColor } from "@chili3d/sheet/cellStyle";
+import type { CellStyle } from "@chili3d/sheet/model";
 import style from "../spreadsheet.module.css";
 import { sheetButton } from "./sheetControls";
 

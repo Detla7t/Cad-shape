@@ -6,10 +6,8 @@ import path from "node:path";
 import { FolderNode, findDocumentTemplate, type INode, Plane, Serializer } from "@chili3d/core";
 import { createMockApplication, createMockVisualWithDocument, TestDocument } from "@chili3d/core/test-utils";
 import { readDxf } from "@chili3d/drawing";
-import type { SketchNode } from "@chili3d/parametric";
+import { type SketchNode, SketchSolver, sketchProfiles } from "@chili3d/parametric";
 import { initWasm, ShapeFactory } from "@chili3d/wasm";
-import { sketchProfiles } from "../../parametric/src/features/profileBuilder";
-import { SketchSolver } from "../../parametric/src/sketch/solver";
 import "../../parametric/test/sketch/setup";
 import {
     addConfiguredEndCap,
@@ -248,9 +246,12 @@ describe("the native End Cap Configurator", () => {
         ) as SketchNode;
         expect(restored.data).toEqual(cap.reducing.data);
         expect(restored.suppression).toBe(cap.reducing.suppression);
-        expect(restored.data.constraints.filter((c) => typeof c.datum === "string").length).toBeGreaterThan(
-            20,
-        );
+        // Every expression-driven dimension survives the round trip (the sketch keeps few:
+        // the mirrored half is symmetric and equal constraints, not dimensions again).
+        const expressions = (node: SketchNode) =>
+            node.data.constraints.filter((c) => typeof c.datum === "string").length;
+        expect(expressions(restored)).toBe(expressions(cap.reducing));
+        expect(expressions(restored)).toBeGreaterThanOrEqual(12);
     });
 });
 

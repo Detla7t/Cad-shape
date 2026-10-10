@@ -2,7 +2,12 @@
 // See LICENSE file in the project root for full license information.
 
 /** Application display preferences; never alter modeling tolerances or geometry. */
+/** How the viewport trades picture for frame rate while the camera moves (see `renderQuality.ts`). */
+export type RenderQualityProfile = "automatic" | "performance" | "balanced" | "quality";
+
 export interface GraphicsPreferences {
+    /** Automatic (60 fps), Performance (120 fps), Balanced (60 fps) or Quality (30 fps). */
+    quality: RenderQualityProfile;
     ambientOcclusion: number;
     fieldOfView: number;
     bodyLineWidth: number;
@@ -28,6 +33,7 @@ export interface GraphicsPreferences {
 }
 
 export const DEFAULT_GRAPHICS: Readonly<GraphicsPreferences> = Object.freeze({
+    quality: "automatic",
     ambientOcclusion: 37.5,
     fieldOfView: 45,
     bodyLineWidth: 1,
@@ -44,8 +50,8 @@ export const DEFAULT_GRAPHICS: Readonly<GraphicsPreferences> = Object.freeze({
     inactiveColor: "#999999",
     inactiveRegionOpacity: 12,
     inactivePointSize: 4,
-    firstDash: 4,
-    firstGap: 6,
-    secondDash: 30,
-    secondGap: 6,
+    firstDash: 12,
+    firstGap: 18,
+    secondDash: 90,
+    secondGap: 18,
 });

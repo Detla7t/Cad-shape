@@ -10,6 +10,7 @@ export * from "./endCapDrawingNode";
 export * from "./endCapNative";
 export * from "./endCapSketch";
 export * from "./endCapSketchNode";
+export * from "./endCapStandardSizes";
 export * from "./endCapTemplate";
 
 // Loading the module publishes its templates, as loading it registers its commands and nodes.

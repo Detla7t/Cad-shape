@@ -11,7 +11,7 @@ export interface TextureOptions {
     document: IDocument;
 }
 
-@serializable()
+@serializable({ id: "Texture" })
 export class Texture extends HistoryObservable {
     constructor(options: TextureOptions) {
         super(options.document);
@@ -84,7 +84,7 @@ export interface MaterialOptions {
     id?: string;
 }
 
-@serializable()
+@serializable({ id: "Material" })
 export class Material extends HistoryObservable {
     @serialize()
     vertexColors = false;
@@ -152,7 +152,7 @@ export class Material extends HistoryObservable {
 
 export interface PhongMaterialOptions extends MaterialOptions {}
 
-@serializable()
+@serializable({ id: "PhongMaterial" })
 export class PhongMaterial extends Material {
     constructor(options: PhongMaterialOptions) {
         super(options);
@@ -224,7 +224,7 @@ export class PhongMaterial extends Material {
 
 export interface PhysicalMaterialOptions extends MaterialOptions {}
 
-@serializable()
+@serializable({ id: "PhysicalMaterial" })
 export class PhysicalMaterial extends Material {
     constructor(options: PhysicalMaterialOptions) {
         super(options);

@@ -21,6 +21,7 @@ function harness(solver: SketchSolver, picks: SketchPickTarget[] = []) {
         beginConstraintSelection: rs.fn(),
         registerTool: () => ({ dispose() {} }),
         selectedEntityIds: [] as number[],
+        preselection: [] as SketchPickTarget[],
         pickSequence: 0,
         lastPickCancelled: false,
         endConstraintSelection: rs.fn(),
@@ -44,6 +45,13 @@ async function run(command: ICommand, editor: ReturnType<typeof harness>) {
 }
 
 const point = (entityId: number, pointIndex: number): SketchPointRef => ({ entityId, pointIndex });
+
+/** Whole entities selected when the tool starts, as the editor reports them. */
+function selectWhole(editor: ReturnType<typeof harness>, ids: number[]): void {
+    editor.selectedWholeEntityIds = ids;
+    editor.selectedEntityIds = ids;
+    editor.preselection = ids.map((entityId) => ({ kind: "entity", entityId }));
+}
 
 test("resizing a circle preserves a driving radius dimension", () => {
     const solver = new SketchSolver(Plane.XY);
@@ -97,7 +105,7 @@ test("Fix applies to selected whole geometry and reaches zero degrees of freedom
         const line = solver.addLine(0, 0, 40, 12);
         const circle = solver.addCircle(50, 10, 8);
         const editor = harness(solver);
-        editor.selectedWholeEntityIds = [line, circle];
+        selectWhole(editor, [line, circle]);
         await run(new FixConstraintCommand(), editor);
         expect(solver.dofs()).toBe(0);
         expect(solver.entity(line)!.params).toEqual([0, 0, 40, 12]);
@@ -134,7 +142,7 @@ test("Vertical Align applies to a selected whole line, then an endpoint attaches
     try {
         const id = solver.addLine(20, 10, 40, 80);
         const editor = harness(solver);
-        editor.selectedWholeEntityIds = [id];
+        selectWhole(editor, [id]);
         await run(new VerticalConstraintCommand(), editor);
         expect(solver.entity(id)!.params[0]).toBeCloseTo(solver.entity(id)!.params[2], 7);
         const attach = harness(solver, [

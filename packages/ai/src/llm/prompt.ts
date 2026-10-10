@@ -32,7 +32,19 @@ Shape transform op (run_program creation op, not an IShapeFactory method): { "me
  * section only keeps the prompt aware of what exists, so it can never drift from the registry.
  */
 function toolIndexSection(): string {
-    const lines = buildTools().map((t) => `- ${t.name}: ${firstSentence(t.description)}`);
+    const lines: string[] = [];
+    // A family shares one line, at its first member's place: `- a, b, c: <what the family does>`.
+    const groups = new Map<string, { line: number; names: string[] }>();
+    for (const tool of buildTools("assistant")) {
+        if (tool.indexGroup === undefined) {
+            lines.push(`- ${tool.name}: ${firstSentence(tool.description)}`);
+            continue;
+        }
+        const group = groups.get(tool.indexGroup);
+        if (group) group.names.push(tool.name);
+        else groups.set(tool.indexGroup, { line: lines.push("") - 1, names: [tool.name] });
+    }
+    for (const [sentence, { line, names }] of groups) lines[line] = `- ${names.join(", ")}: ${sentence}`;
     return `Available tools (full parameter schemas are provided via function calling):
 ${lines.join("\n")}`;
 }

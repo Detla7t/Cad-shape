@@ -61,6 +61,7 @@ export const SketchRibbonProfiles: RibbonProfileExtra[] = [
                     "sketch.circle",
                     "sketch.circle3Point",
                     "sketch.arc",
+                    "sketch.tangentArc",
                     "sketch.rectangle",
                 ],
             },

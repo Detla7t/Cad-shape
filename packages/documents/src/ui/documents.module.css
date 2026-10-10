@@ -502,3 +502,71 @@
     font-size: 12px;
     line-height: 1.6;
 }
+
+/* ------------------------------------------------------------ Export as DXF/DWG */
+
+.exportDialog {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 520px;
+    max-width: 80vw;
+    font-size: 13px;
+}
+.exportField {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+.exportLabel {
+    font-weight: 600;
+}
+.exportRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.exportName {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 6px 8px;
+    font: inherit;
+    color: var(--input-text-color);
+    background: var(--input-background-color);
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+}
+.exportName:focus {
+    border-color: var(--primary-color);
+    outline: none;
+}
+.exportCheck {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+}
+.exportProperties {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 6px 8px;
+    font: inherit;
+    color: var(--input-text-color);
+    background: var(--input-background-color);
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    resize: vertical;
+}
+.link {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--primary-color);
+    font: inherit;
+    cursor: pointer;
+    text-decoration: underline;
+}
+.muted {
+    color: var(--foreground-secondary-color);
+    font-size: 12px;
+}

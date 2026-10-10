@@ -2,8 +2,12 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    EVALUATION_COMPUTING,
+    EVALUATION_READY,
+    type EvaluationState,
     type IDisposable,
     type IDocument,
+    type IEvaluationStateSource,
     type INode,
     Logger,
     Result,
@@ -19,7 +23,7 @@ import type { CamOperationData, SetupData } from "../model/setup";
 import type { ToolData } from "../model/tool";
 import type { ToolpathData } from "../model/toolpath";
 import { createOperationContext, selectionNodeIds } from "./operationContext";
-import { SetupGeometry } from "./setupGeometry";
+import { SetupGeometry, setupPartNodes } from "./setupGeometry";
 import { type ToolpathStats, toolpathStats } from "./stats";
 import { defaultTool, operationTool, setupTools } from "./tools";
 
@@ -44,17 +48,95 @@ export interface OperationStatus {
     readonly stats?: ToolpathStats;
     /** The inputs changed since this result was made. */
     readonly stale?: boolean;
+    /** What changed, when `stale` ("The tool changed", `"Body" was rebuilt or moved`…). */
+    readonly staleReason?: string;
 }
+
+/**
+ * What a result was made from, part by part, so a stale result can say what moved: the
+ * operation's data, the setup frame (WCS, stock, parts), the machine, the tool, and the shape
+ * token of every node it reads.
+ */
+interface OperationInputs {
+    readonly key: string;
+    readonly parts: readonly [operation: string, setup: string, machine: string, tool: string];
+    readonly nodes: ReadonlyMap<string, string>;
+}
+
+const INPUT_PART_REASONS = [
+    "The operation was edited",
+    "The setup changed (WCS, stock or parts)",
+    "The machine profile changed",
+    "The tool changed",
+] as const;
 
 interface StoredResult {
     readonly key: string;
+    readonly inputs: OperationInputs;
     readonly status: OperationStatus;
 }
 
 interface GenerationJob {
     readonly operation: CamOperationData;
+    readonly inputs: OperationInputs;
     readonly key: string;
     readonly controller: AbortController;
+}
+
+/**
+ * Why a setup cannot be posted right now. `postBlockers` lists them; `program` (and so
+ * `post`) refuses with the first, so the post action can show exactly what blocks it.
+ */
+export interface PostBlocker {
+    readonly kind: "setup" | "machine" | "part" | "missing" | "running" | "failed" | "stale" | "empty";
+    readonly message: string;
+    readonly operationId?: string;
+    /** The blocker in the shared evaluation vocabulary (what its indicator shows). */
+    readonly state: EvaluationState;
+}
+
+const NOT_GENERATED = "Not generated yet";
+const INPUTS_CHANGED = "Its inputs changed since it was generated";
+
+/**
+ * The CAM adapter of the shared evaluation vocabulary: running → computing, an up-to-date
+ * toolpath → ready, never generated or inputs changed (also after a failure) → changed with
+ * the reason, a failure → failed (CAM never shows a failed operation's previous toolpath as
+ * its result). Suppressed operations are not evaluated by design: no state.
+ */
+export function operationEvaluationState(status: OperationStatus): EvaluationState | undefined {
+    switch (status.state) {
+        case "suppressed":
+            return undefined;
+        case "running":
+            return EVALUATION_COMPUTING;
+        case "pending":
+            return { kind: "changed", reason: status.staleReason ?? NOT_GENERATED };
+        case "error":
+            return status.stale
+                ? { kind: "changed", reason: status.staleReason ?? INPUTS_CHANGED }
+                : { kind: "failed", message: status.error ?? "", lastGoodShown: false };
+        case "ok":
+            return status.stale
+                ? { kind: "changed", reason: status.staleReason ?? INPUTS_CHANGED }
+                : EVALUATION_READY;
+    }
+}
+
+/** Why one operation blocks posting, or undefined when its toolpath is up to date. */
+function operationPostBlocker(operation: CamOperationData, status: OperationStatus): PostBlocker | undefined {
+    const state = operationEvaluationState(status);
+    if (state === undefined || state.kind === "ready") return undefined;
+    const name = `"${operation.name}"`;
+    const operationId = operation.id;
+    if (state.kind === "computing")
+        return { kind: "running", message: `${name} is still generating`, operationId, state };
+    if (state.kind === "failed")
+        return { kind: "failed", message: `${name} has no toolpath: ${state.message}`, operationId, state };
+    if (status.state === "pending" && status.staleReason === undefined)
+        return { kind: "missing", message: `${name} has no toolpath`, operationId, state };
+    const reason = status.staleReason === undefined ? "" : `: ${status.staleReason}`;
+    return { kind: "stale", message: `${name} changed since it was generated${reason}`, operationId, state };
 }
 
 export interface CamGeneratorOptions {
@@ -154,8 +236,20 @@ export class CamGenerator implements IDisposable {
             return { ...this.results.get(operationId)?.status, state: "running" };
         const stored = this.results.get(operationId);
         if (stored === undefined) return { state: "pending" };
-        const key = this.inputsKey(found.setup, found.operation);
-        return key === stored.key ? stored.status : { ...stored.status, stale: true };
+        const inputs = this.inputs(found.setup, found.operation);
+        if (inputs.key === stored.key) return stored.status;
+        return { ...stored.status, stale: true, staleReason: this.staleReason(stored.inputs, inputs) };
+    }
+
+    /** The operation's live evaluation state (`operationEvaluationState` of its status). */
+    evaluationSource(operationId: string): IEvaluationStateSource {
+        return {
+            state: () => operationEvaluationState(this.status(operationId)),
+            subscribe: (listener) =>
+                this.onChanged((changed) => {
+                    if (changed === undefined || changed === operationId) listener();
+                }),
+        };
     }
 
     /** The operation's toolpath when it has an up-to-date result. */
@@ -211,11 +305,10 @@ export class CamGenerator implements IDisposable {
         if (this.disposed || operations.length === 0) return;
         const jobs: GenerationJob[] = operations
             .filter((operation) => !operation.suppressed)
-            .map((operation) => ({
-                operation,
-                key: this.inputsKey(setup, operation),
-                controller: new AbortController(),
-            }));
+            .map((operation) => {
+                const inputs = this.inputs(setup, operation);
+                return { operation, inputs, key: inputs.key, controller: new AbortController() };
+            });
         for (const job of jobs) {
             this.running.get(job.operation.id)?.controller.abort();
             this.running.set(job.operation.id, job);
@@ -234,12 +327,16 @@ export class CamGenerator implements IDisposable {
                 // Keep an existing preview, but never publish newly computed output
                 // against inputs it did not use. A first run still needs a retry marker.
                 if (!this.results.has(id))
-                    this.results.set(id, { key: job.key, status: { state: "pending", stale: true } });
+                    this.results.set(id, {
+                        key: job.key,
+                        inputs: job.inputs,
+                        status: { state: "pending", stale: true },
+                    });
                 this.emit(id);
                 this.schedule();
                 return;
             }
-            this.results.set(id, { key: job.key, status });
+            this.results.set(id, { key: job.key, inputs: job.inputs, status });
             this.emit(id);
         };
         let geometry: SetupGeometry | undefined;
@@ -340,25 +437,50 @@ export class CamGenerator implements IDisposable {
 
     // ------------------------------------------------------------------ Programs
 
+    /**
+     * Everything that keeps the setup from posting now, in order: the setup or machine, a part
+     * that failed to rebuild, then each operation that is missing, running, failed or stale,
+     * or no operations at all. Empty when `program` will succeed. Post generates missing and
+     * stale operations first (`ensureSetup`), so those clear by themselves.
+     */
+    postBlockers(setupId: string): PostBlocker[] {
+        const fail = (kind: PostBlocker["kind"], message: string): PostBlocker => ({
+            kind,
+            message,
+            state: { kind: "failed", message, lastGoodShown: false },
+        });
+        if (this.disposed) return [fail("setup", "The CAM generator is disposed")];
+        const setup = this.setup(setupId);
+        if (setup === undefined) return [fail("setup", "No such setup")];
+        if (this.machineOf(setup) === undefined)
+            return [fail("machine", `Unknown machine "${setup.machineId}"`)];
+        const blockers: PostBlocker[] = [];
+        const parts = setupPartNodes(this.document, setup);
+        if (!parts.isOk) blockers.push(fail("part", parts.error));
+        const active = setup.operations.filter((operation) => !operation.suppressed);
+        for (const operation of active) {
+            const blocker = operationPostBlocker(operation, this.status(operation.id));
+            if (blocker !== undefined) blockers.push(blocker);
+        }
+        if (active.length === 0) blockers.push(fail("empty", "The setup has no operations to post"));
+        return blockers;
+    }
+
     /** The setup's program from its up-to-date results, in operation order. */
     program(setupId: string): Result<CamProgram> {
-        if (this.disposed) return Result.err("The CAM generator is disposed");
+        const [blocker] = this.postBlockers(setupId);
         const setup = this.setup(setupId);
-        if (setup === undefined) return Result.err("No such setup");
-        const machine = this.machineOf(setup);
-        if (machine === undefined) return Result.err(`Unknown machine "${setup.machineId}"`);
+        const machine = setup === undefined ? undefined : this.machineOf(setup);
+        if (blocker !== undefined || setup === undefined || machine === undefined)
+            return Result.err(blocker?.message ?? "No such setup");
         const library = setupTools(setup, machine);
         const tools = new Map<string, ToolData>();
         const toolpaths: ToolpathData[] = [];
         for (const operation of setup.operations) {
             if (operation.suppressed) continue;
             const status = this.status(operation.id);
-            if (status.state !== "ok" || status.toolpath === undefined) {
-                return Result.err(
-                    `"${operation.name}" has no toolpath${status.error ? `: ${status.error}` : ""}`,
-                );
-            }
-            if (status.stale) return Result.err(`"${operation.name}" changed since it was generated`);
+            // `postBlockers` guarantees an up-to-date toolpath.
+            if (status.toolpath === undefined) return Result.err(`"${operation.name}" has no toolpath`);
             const tool =
                 library.find((x) => x.id === status.toolpath!.toolId) ??
                 (status.toolpath.toolId === "default"
@@ -370,7 +492,6 @@ export class CamGenerator implements IDisposable {
             );
             toolpaths.push({ ...status.toolpath, label: operation.name });
         }
-        if (toolpaths.length === 0) return Result.err("The setup has no operations to post");
         return Result.ok({ name: setup.programName ?? setup.name, machine, setup, tools, toolpaths });
     }
 
@@ -412,6 +533,10 @@ export class CamGenerator implements IDisposable {
     }
 
     private inputsKey(setup: SetupData, operation: CamOperationData): string {
+        return this.inputs(setup, operation).key;
+    }
+
+    private inputs(setup: SetupData, operation: CamOperationData): OperationInputs {
         const machine = this.machineOf(setup);
         const {
             operations: _operations,
@@ -424,9 +549,30 @@ export class CamGenerator implements IDisposable {
         const { name: _name, ...data } = operation;
         const nodes = [...setup.partIds, ...selectionNodeIds(operation.selection)];
         if (setup.stock.kind === "body") nodes.push(setup.stock.nodeId);
-        const tokens = nodes.map((id) => [id, shapeToken(this.findNode(id))]);
+        const tokens = new Map(nodes.map((id) => [id, JSON.stringify(shapeToken(this.findNode(id)))]));
         const tool = machine === undefined ? undefined : operationTool(setup, machine, operation);
-        return JSON.stringify([data, frame, machine, tool, tokens]);
+        const parts = [
+            JSON.stringify(data),
+            JSON.stringify(frame),
+            JSON.stringify(machine) ?? "",
+            JSON.stringify(tool) ?? "",
+        ] as const;
+        return { key: JSON.stringify([...parts, [...tokens]]), parts, nodes: tokens };
+    }
+
+    /** What differs between the inputs a result was made from and the current ones. */
+    private staleReason(before: OperationInputs, now: OperationInputs): string {
+        const part = before.parts.findIndex((value, index) => value !== now.parts[index]);
+        if (part >= 0) return INPUT_PART_REASONS[part];
+        for (const [id, token] of now.nodes) {
+            if (before.nodes.get(id) === token) continue;
+            const node = this.findNode(id);
+            if (node === undefined) return `${id} is no longer in the document`;
+            if (node instanceof ShapeNode && node.evaluationError !== undefined)
+                return `"${node.name}" failed to rebuild`;
+            return `"${node.name}" was rebuilt or moved`;
+        }
+        return INPUTS_CHANGED;
     }
 
     private findNode(id: string): INode | undefined {

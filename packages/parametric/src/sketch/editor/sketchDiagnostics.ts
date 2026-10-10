@@ -2,11 +2,82 @@
 // See LICENSE file in the project root for full license information.
 
 import { sketchProfiles } from "../../features/profileBuilder";
-import { ConstraintKind, dimensionDisplaySource, resolveDatumSource, type SketchData } from "../sketchModel";
+import {
+    ConstraintKind,
+    dimensionDisplaySource,
+    resolveDatumSource,
+    type SketchConstraintRole,
+    type SketchData,
+} from "../sketchModel";
 import { SketchSolver } from "../solver";
 import { formatDatum } from "./dimensionLayout";
+import { badgeSymbol, constraintBadgeIcon } from "./sketchAnnotations";
 import type { SketchEditor } from "./sketchEditor";
 import style from "./sketchPanel.module.css";
+
+/** Constraint names as the toolbar calls them (the solver's kinds are its own). */
+const CONSTRAINT_NAMES: Partial<Record<ConstraintKind, string>> = {
+    [ConstraintKind.P2PCoincident]: "Coincident",
+    [ConstraintKind.PointOnLine]: "Coincident",
+    [ConstraintKind.PointOnCircle]: "Coincident",
+    [ConstraintKind.PointOnArc]: "Coincident",
+    [ConstraintKind.Horizontal]: "Horizontal",
+    [ConstraintKind.HorizontalAlign]: "Horizontal",
+    [ConstraintKind.Vertical]: "Vertical",
+    [ConstraintKind.VerticalAlign]: "Vertical",
+    [ConstraintKind.Parallel]: "Parallel",
+    [ConstraintKind.Perpendicular]: "Perpendicular",
+    [ConstraintKind.Equal]: "Equal",
+    [ConstraintKind.EqualLength]: "Equal",
+    [ConstraintKind.EqualRadius]: "Equal",
+    [ConstraintKind.EqualArcRadius]: "Equal",
+    [ConstraintKind.TangentLineCircle]: "Tangent",
+    [ConstraintKind.TangentCircleCircle]: "Tangent",
+    [ConstraintKind.TangentLineArc]: "Tangent",
+    [ConstraintKind.TangentArcArc]: "Tangent",
+    [ConstraintKind.TangentCircleArc]: "Tangent",
+    [ConstraintKind.Midpoint]: "Midpoint",
+    [ConstraintKind.Symmetric]: "Symmetric",
+    [ConstraintKind.Fix]: "Fix",
+    [ConstraintKind.P2PDistance]: "Distance",
+    [ConstraintKind.P2LDistance]: "Distance",
+    [ConstraintKind.HorizontalDistance]: "Horizontal distance",
+    [ConstraintKind.VerticalDistance]: "Vertical distance",
+    [ConstraintKind.Radius]: "Radius",
+    [ConstraintKind.Angle]: "Angle",
+};
+const ROLE_NAMES: Record<SketchConstraintRole, string> = {
+    concentric: "Concentric",
+    normal: "Normal",
+    curvature: "Curvature",
+};
+/** Text glyphs for the dimension kinds, which have no toolbar constraint icon. */
+const DIMENSION_GLYPHS: Partial<Record<ConstraintKind, string>> = {
+    [ConstraintKind.P2PDistance]: "↔",
+    [ConstraintKind.P2LDistance]: "↔",
+    [ConstraintKind.HorizontalDistance]: "↔",
+    [ConstraintKind.VerticalDistance]: "↕",
+    [ConstraintKind.Radius]: "R",
+    [ConstraintKind.Angle]: "∠",
+};
+
+export function constraintDisplayName(kind: ConstraintKind, role?: SketchConstraintRole): string {
+    return role === undefined
+        ? (CONSTRAINT_NAMES[kind] ?? ConstraintKind[kind] ?? String(kind))
+        : ROLE_NAMES[role];
+}
+
+/** The row's glyph: the badge artwork of a symbol constraint, a text mark of a dimension. */
+function constraintGlyph(kind: ConstraintKind, role?: SketchConstraintRole): HTMLElement {
+    const glyph = document.createElement("span");
+    glyph.className = style.constraintGlyph;
+    glyph.setAttribute("aria-hidden", "true");
+    const symbol = badgeSymbol(kind, role);
+    const graphic = symbol === undefined ? undefined : constraintBadgeIcon(symbol);
+    if (graphic !== undefined) glyph.append(graphic);
+    else glyph.textContent = DIMENSION_GLYPHS[kind] ?? symbol?.label ?? "•";
+    return glyph;
+}
 
 export function openEndpoints(data: SketchData): { id: number; point: [number, number] }[] {
     const ends = data.entities
@@ -42,6 +113,7 @@ export function showSketchDiagnostics(editor: SketchEditor, mode: "profiles" | "
     close.ariaLabel = "Close diagnostics";
     close.onclick = () => {
         editor.highlightEntities([]);
+        editor.annotations.setHoveredConstraint(undefined);
         panel.remove();
     };
     header.append(title, close);
@@ -86,8 +158,7 @@ export function showSketchDiagnostics(editor: SketchEditor, mode: "profiles" | "
         const filter = document.createElement("input");
         filter.placeholder = "Filter by type or entity";
         filter.ariaLabel = "Filter constraints";
-        const selected = new Set<number>(),
-            selectedEntities = new Set(editor.selectedEntityIds);
+        const selected = new Set<number>();
         const only = document.createElement("label"),
             check = document.createElement("input");
         check.type = "checkbox";
@@ -111,21 +182,59 @@ export function showSketchDiagnostics(editor: SketchEditor, mode: "profiles" | "
                 }
             }
         }
+        // Where the sketch is still free: Onshape's blue geometry, listed so each can be found.
+        const freedom = document.createElement("div");
+        freedom.className = style.freedom;
+        const renderFreedom = () => {
+            freedom.replaceChildren();
+            const { dofs, result } = editor.lastSolveOutcome;
+            const status = document.createElement("p");
+            status.textContent = !result.startsWith("Ok")
+                ? `Not solved · ${result}`
+                : dofs === 0
+                  ? "Fully constrained"
+                  : `${dofs} degree${dofs === 1 ? "" : "s"} of freedom`;
+            freedom.append(status);
+            if (dofs === 0 || !result.startsWith("Ok")) return;
+            const free = editor.solver
+                .toData()
+                .entities.filter((entity) => !editor.fullyConstrainedEntities.has(entity.id));
+            for (const entity of free) {
+                const button = document.createElement("button");
+                button.className = style.freeEntity;
+                button.textContent = `Under-constrained · ${entity.type} ${entity.id}`;
+                button.title = "Select it, then apply a constraint or dimension from the toolbar";
+                button.onpointerenter = () => editor.highlightEntities([entity.id]);
+                button.onpointerleave = () => editor.highlightEntities([]);
+                // Selecting it is the quick way to constrain it: the constraint tools act on the selection.
+                button.onclick = () => editor.selectEntities([entity.id]);
+                freedom.append(button);
+            }
+        };
+        const hover = (ids: number[], id: number | undefined) => {
+            editor.highlightEntities(ids);
+            editor.annotations.setHoveredConstraint(id);
+        };
         const render = () => {
             list.replaceChildren();
+            const selectedEntities = new Set(editor.selectedEntityIds);
             for (const c of editor.solver.toData().constraints) {
-                const name = ConstraintKind[c.kind] ?? String(c.kind),
+                const kindName = ConstraintKind[c.kind] ?? String(c.kind),
+                    name = constraintDisplayName(c.kind, c.role),
                     ids = [...new Set(c.refs.map((r) => r.entityId))],
                     error = errors.get(c.id);
                 if (check.checked && !ids.some((id) => selectedEntities.has(id))) continue;
                 if (
-                    !`${name} ${ids.join(" ")} ${error ?? ""}`
+                    !`${name} ${kindName} ${ids.join(" ")} ${error ?? ""}`
                         .toLowerCase()
                         .includes(filter.value.toLowerCase())
                 )
                     continue;
                 const line = document.createElement("label"),
                     toggle = document.createElement("input");
+                line.className = style.constraintRow;
+                line.dataset["constraintId"] = String(c.id);
+                line.dataset["constraintKind"] = kindName;
                 toggle.type = "checkbox";
                 toggle.checked = selected.has(c.id);
                 toggle.onchange = () => {
@@ -133,13 +242,15 @@ export function showSketchDiagnostics(editor: SketchEditor, mode: "profiles" | "
                 };
                 const text = document.createElement("span");
                 text.textContent = `${name} · ${ids.join(", ")}${c.datum === undefined ? "" : ` = ${formatDatum(c.kind, c.datum, editor.document)}`}${error ? ` · ${error}` : ""}`;
+                text.title = `${kindName} ${c.id}`;
                 if (error) text.style.color = "#d43e3e";
-                line.append(toggle, text);
-                line.onpointerenter = () => editor.highlightEntities(ids);
-                line.onpointerleave = () => editor.highlightEntities([]);
+                line.append(toggle, constraintGlyph(c.kind, c.role), text);
+                line.onpointerenter = () => hover(ids, c.id);
+                line.onpointerleave = () => hover([], undefined);
                 line.ondblclick = () => editor.editDatum(c.id);
                 list.append(line);
             }
+            renderFreedom();
         };
         const remove = () => {
             editor.deleteConstraints(selected);
@@ -158,7 +269,7 @@ export function showSketchDiagnostics(editor: SketchEditor, mode: "profiles" | "
         });
         filter.oninput = render;
         check.onchange = render;
-        panel.append(filter, only, button);
+        panel.append(filter, only, button, freedom);
         render();
     }
     panel.append(list);

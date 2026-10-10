@@ -10,27 +10,31 @@ import {
     type QuantityKind,
     unitSuffix,
 } from "@chili3d/core";
-import { FsContext, type FsDataTableSource } from "./context/fsContext";
-import { FsThrow } from "./lang/errors";
-import type { Interpreter, TableExport } from "./lang/interpreter";
 import {
     ANGLE,
     AREA,
+    describeError,
+    expandTemplate,
     FsArray,
+    FsContext,
+    type FsDataTableSource,
     FsEnumValue,
     FsMap,
     FsQuantity,
+    FsThrow,
     type FsValue,
+    type Interpreter,
     LENGTH,
+    type TableExport,
     toDisplayString,
     typeName,
     type Units,
     unitsEqual,
     unitsLabel,
     VOLUME,
-} from "./lang/values";
-import { describeError } from "./runtime";
-import { expandTemplate } from "./std/table";
+} from "@chili3d/featurescript";
+// The engine runs here with parametric's history completion, sketch solver and loop rules.
+import "./modelingHost";
 
 /**
  * Runs a custom table (Onshape's `defineTable`) against the Part Studio — the

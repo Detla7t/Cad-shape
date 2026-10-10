@@ -38,6 +38,8 @@
         flex: 1 1 auto;
         width: 0;
         min-width: 0;
+        /* Restarts when the Part Studio tab comes back (display none → flex). */
+        animation: part-studio-in 160ms ease-out;
     }
 
     /* Where the other elements' views mount, one shown at a time (see ElementWorkspace). */
@@ -219,4 +221,18 @@
 }
 .utilityRail button:hover {
     background: var(--hover-background-color);
+}
+
+@keyframes part-studio-in {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .root .partStudio {
+        animation: none;
+    }
 }

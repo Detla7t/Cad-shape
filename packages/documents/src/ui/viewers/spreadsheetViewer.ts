@@ -3,9 +3,20 @@
 
 import { I18n, Localize, Transaction } from "@chili3d/core";
 import { div, input, option, select, span } from "@chili3d/element";
-import { setDocumentWorkbook } from "../../api";
-import { applyCellStyle } from "../../sheet/cellStyle";
-import { FORMULA_FUNCTIONS, isFormulaError, WorkbookEvaluator } from "../../sheet/formula";
+import { applyCellStyle } from "@chili3d/sheet/cellStyle";
+import { FORMULA_FUNCTIONS, isFormulaError, WorkbookEvaluator } from "@chili3d/sheet/formula";
+import {
+    closeParentheses,
+    cycleAbsolute,
+    formulaReferences,
+    insertReference,
+    REFERENCE_COLORS,
+    referenceAt,
+    referenceInsertion,
+    referenceRange,
+    referenceText,
+    type TextSpan,
+} from "@chili3d/sheet/formulaPointing";
 import {
     addressOf,
     type CellAddress,
@@ -21,11 +32,17 @@ import {
     rangeText,
     usedSize,
     type WorkbookData,
-} from "../../sheet/model";
-import { adjustDecimalPlaces, COMMON_NUMBER_FORMATS, formatCellValue } from "../../sheet/numberFormat";
-import { dropdownValues, translateFormula, validationAt } from "../../sheet/operations";
-import { resolveRanges, validRangeName } from "../../sheet/ranges";
-import { isWorkbookFormat, readWorkbook, type WorkbookFormat, writeWorkbook } from "../../sheet/workbookIo";
+} from "@chili3d/sheet/model";
+import { adjustDecimalPlaces, COMMON_NUMBER_FORMATS, formatCellValue } from "@chili3d/sheet/numberFormat";
+import { dropdownValues, translateFormula, validationAt } from "@chili3d/sheet/operations";
+import { resolveRanges, validRangeName } from "@chili3d/sheet/ranges";
+import {
+    isWorkbookFormat,
+    readWorkbook,
+    type WorkbookFormat,
+    writeWorkbook,
+} from "@chili3d/sheet/workbookIo";
+import { setDocumentWorkbook } from "../../api";
 import style from "../documents.module.css";
 import chrome from "../spreadsheet.module.css";
 import type { DocumentExport, IDocumentViewer, ViewerContext } from "../viewer";
@@ -49,6 +66,12 @@ const DEFAULT_WIDTH = 88;
 const HEADER_WIDTH = 48;
 const OVERSCAN = 10;
 const CELLS_MIME = "application/x-chili3d-cells";
+const ARROWS: Record<string, [number, number]> = {
+    ArrowUp: [-1, 0],
+    ArrowDown: [1, 0],
+    ArrowLeft: [0, -1],
+    ArrowRight: [0, 1],
+};
 let copiedRange: { token: string; at: CellAddress; cells: (CellData | undefined)[][] } | undefined;
 let copyId = 0;
 
@@ -63,6 +86,21 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
     let loaded = false;
     let editor: HTMLInputElement | undefined;
     let disposeEditorAssist: (() => void) | undefined;
+    /** Point mode (formulaPointing.ts): the reference just put in by pointing, replaced by the next click until something is typed. */
+    let hot:
+        | {
+              input: HTMLInputElement;
+              span: TextSpan;
+              anchor: CellAddress;
+              end: CellAddress;
+              sheet: number;
+              text: string;
+          }
+        | undefined;
+    let pointDrag = false;
+    /** The cell a formula in the bar belongs to; it stays while pointing takes the view to another sheet. */
+    let formulaHome: { sheet: number; address: string } | undefined;
+    let committingFormula = false;
     const assist = createFormulaAssist(() => (workbook.names ?? []).map((n) => n.name));
     type Revision = { book: WorkbookData; index: number };
     const undoStack: Revision[] = [];
@@ -106,8 +144,16 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
     const followLink = (link: { target?: string; location?: string }) =>
         followHyperlink(link, workbook, sheetIndex, (index, range) => switchSheet(index, range));
     const images = createImageLayer(followLink);
-    const scroller = div({ className: style.gridScroller, tabIndex: 0 }, table, images.element);
+    // The range finder: the cells of the formula being edited, framed in their colours.
+    const references = div({ className: chrome.referenceLayer });
+    const scroller = div({ className: style.gridScroller, tabIndex: 0 }, table, images.element, references);
     const tabs = div({ className: `${style.sheetTabs} ${chrome.tabs}` });
+    // Pointing goes on across sheets: a click on a tab keeps the formula (moved into the bar) alive.
+    tabs.addEventListener("mousedown", (e) => {
+        if (!pointable()) return;
+        e.preventDefault();
+        if (editor !== undefined) editInBar();
+    });
 
     const sheet = () => workbook.sheets[sheetIndex];
     const size = () => {
@@ -396,8 +442,8 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
         const next = sheet().cells[addressOf(row, col + 1)];
         return next === undefined || (next.v === undefined && next.f === undefined);
     };
-    /** Pictures at their anchors: column edges from the widths, row edges from the row layout. */
-    const renderImages = () => {
+    /** Column edges from the widths, row edges from the row layout (the scroller's content box). */
+    const gridGeometry = () => {
         const lefts = [HEADER_WIDTH];
         const left = (col: number) => {
             while (lefts.length <= col) lefts.push(lefts[lefts.length - 1] + widthOf(lefts.length - 1));
@@ -406,12 +452,47 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
         const last = rowTops.length - 1;
         const top = (row: number) =>
             ROW_HEIGHT + (row <= last ? rowTops[row] : rowTops[last] + (row - last) * ROW_HEIGHT);
-        images.render(sheet(), { left, top });
-        // Full content size, clipped to the area below/right of the sticky headers it is drawn above.
-        const layer = images.element.style;
+        return { left, top, last };
+    };
+    /** A layer over the cells: full content size, clipped below/right of the sticky headers it is drawn above. */
+    const sizeLayer = (layer: CSSStyleDeclaration, height: number) => {
         layer.width = table.style.width;
-        layer.height = `${top(last)}px`;
+        layer.height = `${height}px`;
         layer.clipPath = `inset(${scroller.scrollTop + ROW_HEIGHT}px 0 0 ${scroller.scrollLeft + HEADER_WIDTH}px)`;
+    };
+    /** Pictures at their anchors. */
+    const renderImages = () => {
+        const { left, top, last } = gridGeometry();
+        images.render(sheet(), { left, top });
+        sizeLayer(images.element.style, top(last));
+        renderReferences();
+    };
+    /** The range finder: each reference of the formula being edited frames its cells in its colour. */
+    const renderReferences = () => {
+        const input = activeFormulaInput();
+        if (input === undefined || !loaded || !input.value.startsWith("=")) {
+            references.replaceChildren();
+            return;
+        }
+        const { left, top, last } = gridGeometry();
+        const home = workbook.sheets[formulaHome?.sheet ?? sheetIndex]?.name ?? "";
+        const boxes = formulaReferences(input.value).flatMap((ref, index) => {
+            const onSheet = (ref.sheet ?? home).toLowerCase() === sheet().name.toLowerCase();
+            const range = onSheet ? referenceRange(ref.cells) : undefined;
+            if (range === undefined) return [];
+            const box = div({});
+            box.dataset["ref"] = ref.text;
+            box.style.borderColor = REFERENCE_COLORS[index % REFERENCE_COLORS.length];
+            box.style.left = `${left(range.start.col)}px`;
+            box.style.top = `${top(range.start.row)}px`;
+            box.style.width = `${left(range.end.col + 1) - left(range.start.col)}px`;
+            box.style.height = `${top(range.end.row + 1) - top(range.start.row)}px`;
+            if (hot?.input === input && hot.text === input.value && hot.span.start === ref.start)
+                box.dataset["hot"] = "true";
+            return [box];
+        });
+        references.replaceChildren(...boxes);
+        sizeLayer(references.style, top(last));
     };
 
     const renderTabs = () => {
@@ -432,8 +513,13 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
         }
     };
     function switchSheet(index: number, range?: { start: CellAddress; end: CellAddress }): void {
-        commitEditor();
-        commitFormula();
+        // pointing goes on across sheets: the formula, in the bar by now, keeps its home cell
+        if (pointable()) {
+            if (editor !== undefined) editInBar();
+        } else {
+            commitEditor();
+            commitFormula();
+        }
         sheetIndex = index;
         layoutDirty = true;
         anchor = range?.start ?? { row: 0, col: 0 };
@@ -451,7 +537,7 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
                 ? address
                 : `${addressOf(range.start.row, range.start.col)}:${addressOf(range.end.row, range.end.col)}`;
         const cell = sheet().cells[address];
-        formulaInput.value = cellInputText(cell);
+        if (formulaHome === undefined) formulaInput.value = cellInputText(cell);
         toolbar.update(cell?.s);
         formatMenu.value = cell?.z ?? "General";
         if (formatMenu.value !== (cell?.z ?? "General")) {
@@ -498,6 +584,88 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
         }
     };
 
+    // ---------------------------------------------------------- point mode (formulaPointing.ts)
+
+    const activeFormulaInput = (): HTMLInputElement | undefined =>
+        editor ?? (window.document.activeElement === formulaInput ? formulaInput : undefined);
+    const homeSheet = () => formulaHome?.sheet ?? sheetIndex;
+    /** The span the next pointed reference goes into: the hot one, else where the caret allows one. */
+    const pointSlot = (input: HTMLInputElement): TextSpan | undefined => {
+        const caret = input.selectionStart ?? input.value.length;
+        const end = input.selectionEnd ?? caret;
+        if (hot?.input === input && hot.text === input.value && caret === hot.span.end) return hot.span;
+        return referenceInsertion(input.value, caret, end);
+    };
+    const pointable = () => {
+        const input = activeFormulaInput();
+        return input !== undefined && pointSlot(input) !== undefined;
+    };
+    /** Something typed: the pointed reference is no longer replaceable. */
+    const onTyped = () => {
+        hot = undefined;
+        renderReferences();
+    };
+    const endPointing = () => {
+        hot = undefined;
+        pointDrag = false;
+        renderReferences();
+    };
+    /** Puts the reference to `from`..`to` into the formula over `slot`; it is then the hot one. */
+    const pointTo = (input: HTMLInputElement, slot: TextSpan, from: CellAddress, to: CellAddress) => {
+        const reference = referenceText(from, to, sheetIndex === homeSheet() ? undefined : sheet().name);
+        const { text, span } = insertReference(input.value, slot, reference);
+        input.value = text;
+        input.setSelectionRange(span.end, span.end);
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        hot = { input, span, anchor: from, end: to, sheet: sheetIndex, text };
+        renderReferences();
+    };
+    /** Moves the cell editor's text into the formula bar, so pointing can go on across sheets. */
+    const editInBar = () => {
+        if (editor === undefined) return;
+        const box = editor;
+        const cursor = box.selectionStart ?? box.value.length;
+        const address = box.dataset["address"] ?? addressOf(focus.row, focus.col);
+        disposeEditorAssist?.();
+        disposeEditorAssist = undefined;
+        editor = undefined;
+        box.remove();
+        formulaHome = { sheet: sheetIndex, address };
+        formulaInput.value = box.value;
+        formulaInput.focus();
+        formulaInput.setSelectionRange(cursor, cursor);
+        if (hot?.input === box) hot = { ...hot, input: formulaInput };
+        renderReferences();
+    };
+    /** F4: the reference at the caret cycles through its anchoring. */
+    const cycleReferenceAt = (input: HTMLInputElement): boolean => {
+        const ref = referenceAt(input.value, input.selectionStart ?? input.value.length);
+        if (ref === undefined) return false;
+        const prefix = ref.text.includes("!") ? ref.text.slice(0, ref.text.lastIndexOf("!") + 1) : "";
+        const { text, span } = insertReference(input.value, ref, prefix + cycleAbsolute(ref.cells));
+        const previous = hot;
+        input.value = text;
+        input.setSelectionRange(span.end, span.end);
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        if (previous?.input === input && previous.span.start === ref.start) hot = { ...previous, span, text };
+        renderReferences();
+        return true;
+    };
+    /** Point mode on an arrow key: the pointed cell walks, Shift stretches it to a range. */
+    const pointByArrow = (input: HTMLInputElement, e: KeyboardEvent): boolean => {
+        const arrow = ARROWS[e.key];
+        if (arrow === undefined || e.ctrlKey || e.metaKey || e.altKey) return false;
+        const slot = pointSlot(input);
+        if (slot === undefined) return false;
+        e.preventDefault();
+        const current = hot?.input === input && hot.sheet === sheetIndex ? hot : undefined;
+        const end = current?.end ?? focus;
+        const next = { row: Math.max(0, end.row + arrow[0]), col: Math.max(0, end.col + arrow[1]) };
+        pointTo(input, slot, e.shiftKey && current ? current.anchor : next, next);
+        scrollIntoView(next);
+        return true;
+    };
+
     function selectRange(from: CellAddress, to: CellAddress = from): void {
         commitEditor();
         if (window.document.activeElement === formulaInput) commitFormula();
@@ -527,11 +695,12 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
         renderFormulaBar();
     }
 
-    const setCell = (address: string, text: string) => {
+    const setCell = (address: string, text: string, index = sheetIndex) => {
         const at = parseAddress(address);
+        const target = workbook.sheets[index];
         if (at && text !== "" && !text.startsWith("=")) {
-            const rule = validationAt(sheet(), at.row, at.col);
-            const values = dropdownValues(workbook, sheetIndex, at.row, at.col);
+            const rule = validationAt(target, at.row, at.col);
+            const values = dropdownValues(workbook, index, at.row, at.col);
             if (
                 values &&
                 rule?.showErrorMessage &&
@@ -543,7 +712,7 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
                 return;
             }
         }
-        const cells = sheet().cells;
+        const cells = target.cells;
         const next = cellFromInput(text, cells[address]?.z);
         const formatting = cells[address]?.s;
         if (next === undefined && formatting === undefined) delete cells[address];
@@ -556,8 +725,9 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
         disposeEditorAssist?.();
         disposeEditorAssist = undefined;
         editor = undefined;
+        endPointing();
         const address = box.dataset["address"] ?? "";
-        const value = box.value;
+        const value = closeParentheses(box.value);
         box.remove();
         if (value !== box.dataset["original"]) {
             setCell(address, value);
@@ -573,6 +743,7 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
         disposeEditorAssist = undefined;
         editor?.remove();
         editor = undefined;
+        endPointing();
         scroller.focus();
     };
 
@@ -587,6 +758,7 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
         const box = input({ className: style.cellEditor, spellcheck: false });
         box.setAttribute("aria-label", `Edit ${address}`);
         box.addEventListener("input", changed);
+        box.addEventListener("input", onTyped);
         disposeEditorAssist = assist.bind(box);
         box.dataset["address"] = address;
         box.dataset["original"] = original;
@@ -599,6 +771,12 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
             if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") return;
             e.stopPropagation();
             if (fx.handleKey(e)) return;
+            if (e.key === "F4") {
+                e.preventDefault();
+                cycleReferenceAt(box);
+                return;
+            }
+            if (pointByArrow(box, e)) return;
             if (e.key === "Enter" || e.key === "Tab") {
                 e.preventDefault();
                 commitEditor();
@@ -725,13 +903,20 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
     let selecting = false;
     const endSelection = () => {
         selecting = false;
+        pointDrag = false;
     };
     window.addEventListener("mouseup", endSelection);
     scroller.addEventListener("mouseover", (e) => {
-        if (!selecting || editor) return;
         const td = (e.target as HTMLElement).closest<HTMLTableCellElement>("td[data-row]");
         if (!td) return;
         const to = { row: Number(td.dataset["row"]), col: Number(td.dataset["col"]) };
+        if (pointDrag && hot !== undefined) {
+            // dragging in point mode stretches the pointed reference to a range
+            if (to.row !== hot.end.row || to.col !== hot.end.col)
+                pointTo(hot.input, hot.span, hot.anchor, to);
+            return;
+        }
+        if (!selecting || editor) return;
         if (to.row !== focus.row || to.col !== focus.col) selectRange(anchor, to);
     });
     scroller.addEventListener("mousedown", (e) => {
@@ -746,9 +931,19 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
                 return;
             }
         }
+        const at = { row: Number(td.dataset["row"]), col: Number(td.dataset["col"]) };
+        const input = activeFormulaInput();
+        const slot = input === undefined ? undefined : pointSlot(input);
+        if (input !== undefined && slot !== undefined) {
+            // point mode: the click puts the cell's reference into the formula; the edit goes on
+            e.preventDefault();
+            pointDrag = true;
+            const from = e.shiftKey && hot?.input === input && hot.sheet === sheetIndex ? hot.anchor : at;
+            pointTo(input, slot, from, at);
+            return;
+        }
         selecting = true;
         e.preventDefault();
-        const at = { row: Number(td.dataset["row"]), col: Number(td.dataset["col"]) };
         if (e.shiftKey) selectRange(anchor, at);
         else selectRange(at);
         scroller.focus();
@@ -841,15 +1036,38 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
         } else paste(text);
     });
 
+    /** Writes the bar's formula to its home cell (back on the home sheet when pointing left it). */
     const commitFormula = () => {
-        if (!loaded) return;
-        const address = addressOf(focus.row, focus.col);
-        if (formulaInput.value !== cellInputText(sheet().cells[address])) {
-            setCell(address, formulaInput.value);
-            markDirty();
-            renderRows();
+        if (!loaded || committingFormula) return;
+        committingFormula = true;
+        try {
+            const home = formulaHome ?? { sheet: sheetIndex, address: addressOf(focus.row, focus.col) };
+            formulaHome = undefined;
+            const text = closeParentheses(formulaInput.value);
+            const cells = workbook.sheets[home.sheet]?.cells;
+            if (cells !== undefined && text !== cellInputText(cells[home.address])) {
+                setCell(home.address, text, home.sheet);
+                markDirty();
+                renderRows();
+            }
+            assist.hide();
+            endPointing();
+            if (home.sheet !== sheetIndex) {
+                const at = parseAddress(home.address);
+                switchSheet(home.sheet, at && { start: at, end: at });
+            }
+        } finally {
+            committingFormula = false;
         }
-        assist.hide();
+    };
+    /** Escape in the bar: the formula is dropped and the view returns to its cell. */
+    const revertFormula = () => {
+        const home = formulaHome;
+        formulaHome = undefined;
+        endPointing();
+        const at = home && parseAddress(home.address);
+        if (home && home.sheet !== sheetIndex) switchSheet(home.sheet, at && { start: at, end: at });
+        else renderFormulaBar();
     };
     // The fx button and its function browser (focus moves into the browser while it is open).
     const formulaToValue = () => {
@@ -886,7 +1104,8 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
         },
         toValue: formulaToValue,
         revert: (focusGrid) => {
-            renderFormulaBar();
+            // Like Escape: forget the formula's home cell too, or the bar keeps the dropped edit.
+            revertFormula();
             if (focusGrid) scroller.focus();
         },
         commit: commitFormula,
@@ -894,6 +1113,11 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
         showHint: () => assist.refresh(formulaInput),
         hideHint: () => assist.hide(),
     });
+    formulaInput.addEventListener("focus", () => {
+        formulaHome ??= { sheet: sheetIndex, address: addressOf(focus.row, focus.col) };
+        renderReferences();
+    });
+    formulaInput.addEventListener("input", onTyped);
     formulaInput.addEventListener("blur", () => {
         if (!fx.browsing()) commitFormula();
     });
@@ -901,18 +1125,16 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") return;
         e.stopPropagation();
         if (fx.handleKey(e)) return;
-        if (e.key === "Enter") {
+        if (e.key === "F4") {
             e.preventDefault();
-            const address = addressOf(focus.row, focus.col);
-            if (formulaInput.value !== cellInputText(sheet().cells[address])) {
-                setCell(address, formulaInput.value);
-                markDirty();
-                renderRows();
-            }
+            cycleReferenceAt(formulaInput);
+        } else if (e.key === "Enter") {
+            e.preventDefault();
+            commitFormula();
             move(1, 0, false);
             scroller.focus();
         } else if (e.key === "Escape") {
-            renderFormulaBar();
+            revertFormula();
             scroller.focus();
         }
     });
@@ -1114,7 +1336,7 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
         renderAll();
         changed();
     };
-    void load();
+    let loading = load();
 
     const exportAs = (target: "xlsx" | "ods" | "csv"): DocumentExport => ({
         label: `documents.export.${target}`,
@@ -1162,7 +1384,27 @@ export function createSpreadsheetViewer({ node, document, changed }: ViewerConte
                 ((editor !== undefined && editor.value !== editor.dataset["original"]) ||
                     formulaInput.value !== cellInputText(sheet().cells[addressOf(focus.row, focus.col)]))),
         save: saveWorkbook,
-        reload: () => void load(),
+        reload: () => {
+            loading = load();
+        },
+        snapshot: () => {
+            if (!loaded) return undefined;
+            const text = JSON.stringify(workbook);
+            return text === savedText ? undefined : { data: JSON.stringify({ sheet: sheetIndex, workbook }) };
+        },
+        restore: async (draft) => {
+            await loading;
+            if (!loaded) return;
+            const recovered = JSON.parse(draft.data) as { sheet?: number; workbook?: WorkbookData };
+            if (!Array.isArray(recovered.workbook?.sheets) || recovered.workbook.sheets.length === 0) return;
+            cancelEditor();
+            workbook = cloneWorkbook(recovered.workbook);
+            sheetIndex = Math.max(0, Math.min(recovered.sheet ?? 0, workbook.sheets.length - 1));
+            actions.resetFilters();
+            // One revision back is the file as loaded, so the sheet's own undo can go back to it.
+            markDirty();
+            renderAll();
+        },
         exports: () => (["xlsx", "ods", "csv"] as const).filter((target) => target !== format).map(exportAs),
         activated: () => {
             scroller.focus();

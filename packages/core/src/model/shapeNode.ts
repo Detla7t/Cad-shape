@@ -33,6 +33,15 @@ export abstract class ShapeNode extends GeometryNode {
         return this._evaluationError ?? (this._shape.isOk ? undefined : this._shape.error);
     }
 
+    /**
+     * True while the latest rebuild failed but `shape` still holds the last good geometry —
+     * what the model shows is the last successful result, not the current inputs. Reads no
+     * derived state (unlike `shape`, which may re-evaluate).
+     */
+    get showsLastGoodShape(): boolean {
+        return this._evaluationError !== undefined && this._shape?.isOk === true;
+    }
+
     protected setEvaluationError(error: string | undefined): void {
         const previous = this.evaluationError;
         this._evaluationError = error;
@@ -163,7 +172,7 @@ export interface MultiShapeNodeOptions {
     id?: string;
 }
 
-@serializable()
+@serializable({ id: "MultiShapeNode" })
 export class MultiShapeNode extends GeometryNode {
     private readonly _shapes: IShape[];
     @serialize()
@@ -249,7 +258,7 @@ export interface EditableShapeNodeOptions {
     id?: string;
 }
 
-@serializable()
+@serializable({ id: "EditableShapeNode" })
 export class EditableShapeNode extends ShapeNode {
     override display(): I18nKeys {
         return "body.editableShape";

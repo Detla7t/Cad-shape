@@ -3,6 +3,7 @@
 
 import { download, type I18nKeys, type IDocument, type IElementView, Logger, PubSub } from "@chili3d/core";
 import { div, input, label, option, select, span, svg } from "@chili3d/element";
+import { EvaluationIndicators } from "@chili3d/react";
 import type { CamStudioNode } from "../camStudioNode";
 import { type CamGenerator, generatorOf, type OperationStatus } from "../context/generator";
 import { formatLength } from "../context/stats";
@@ -14,8 +15,8 @@ import type { ToolpathData } from "../model/toolpath";
 import style from "./camStudio.module.css";
 import { iconButton, keepFocus, t, textButton } from "./dom";
 import { renderMachinePanel } from "./machinePanel";
-import { renderOperationPanel, renderOperationStatus, statusDetail, statusText } from "./operationPanel";
-import { postSetup, renderPostPanel } from "./postPanel";
+import { renderOperationPanel, renderOperationStatus, statusDetail } from "./operationPanel";
+import { postSetup, renderPostPanel, renderPostReadiness } from "./postPanel";
 import { renderSetupPanel } from "./setupPanel";
 import { SimulationPanel } from "./simulationPanel";
 import {
@@ -81,6 +82,9 @@ export class CamStudioView implements IElementView, StudioHost {
     /** The stock simulation of a setup (its Simulate action). */
     readonly simulation: SimulationPanel;
     readonly state: StudioViewState = { detail: "setup", hidden: new Set(), collapsed: new Set() };
+    /** The operation tree's evaluation indicators (one React island per operation, kept across renders). */
+    private readonly treeIndicators = new EvaluationIndicators(style.statusHost);
+    readonly detailIndicators = new EvaluationIndicators();
     private readonly title = span({ className: style.title });
     private readonly tree = div({ className: style.tree });
     private readonly detail = div({ className: style.detail });
@@ -170,6 +174,8 @@ export class CamStudioView implements IElementView, StudioHost {
         this.unsubscribe();
         this.simulation.dispose();
         this.preview.dispose();
+        this.treeIndicators.dispose();
+        this.detailIndicators.dispose();
     }
 
     // ------------------------------------------------------------------ StudioHost
@@ -331,27 +337,34 @@ export class CamStudioView implements IElementView, StudioHost {
             children.push(this.addOperationRow(setup));
         });
         this.tree.replaceChildren(...children);
+        this.treeIndicators.sweep();
     }
 
     private operationItem(setup: SetupData, operation: CamOperationData, selected: boolean): HTMLElement {
         const status = this.generator.status(operation.id);
         const hidden = this.state.hidden.has(operation.id);
-        const dot = span({ className: style.status, title: statusText(status) });
-        dot.dataset["state"] = status.state;
-        if (status.stale) dot.dataset["stale"] = "";
+        // The shared evaluation indicator (icon + label, reason in its tooltip); the host keeps
+        // the generator's raw state as data for tests and styling.
+        const indicator = this.treeIndicators.element(
+            operation.id,
+            this.generator.evaluationSource(operation.id),
+        );
+        indicator.dataset["state"] = status.state;
+        if (status.stale) indicator.dataset["stale"] = "";
+        else delete indicator.dataset["stale"];
         const meta =
-            status.state === "error"
+            status.state === "error" && !status.stale
                 ? (status.error ?? "")
                 : status.state === "ok" && status.stats
                   ? formatLength(status.stats.cutting)
-                  : statusText(status);
+                  : "";
         const write = (name: string, next: SetupData) => this.commitSetup(name, next);
         const item = div(
             {
                 className: `${style.item} ${style.operationItem}${selected ? ` ${style.selected}` : ""}${operation.suppressed ? ` ${style.suppressed}` : ""}`,
                 title: statusDetail(status) ?? status.error ?? "",
             },
-            dot,
+            indicator,
             iconButton(
                 hidden ? "icon-eye-slash" : "icon-eye",
                 t("cam.visibility"),
@@ -526,6 +539,7 @@ export class CamStudioView implements IElementView, StudioHost {
             body = div({ className: style.error, textContent: String(error) });
         }
         this.detail.replaceChildren(tabBar, heading, body);
+        this.detailIndicators.sweep();
     }
 
     private addSetup(): void {
@@ -570,6 +584,11 @@ export class CamStudioView implements IElementView, StudioHost {
         ) {
             const block = this.detail.querySelector<HTMLElement>(`[data-op-status="${operation.id}"]`);
             block?.replaceWith(renderOperationStatus(this, setup, operation));
+        }
+        // The post action's reasons follow every result (and part rebuild) too.
+        if (setup !== undefined) {
+            const readiness = this.detail.querySelector<HTMLElement>("[data-post-readiness]");
+            readiness?.replaceWith(renderPostReadiness(this, setup.id));
         }
         this.updatePreview();
     };

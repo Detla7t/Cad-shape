@@ -27,8 +27,25 @@ import "./_helpers/mockCoreBinding";
 // Mock element helpers
 import "./_helpers/mockElement";
 
-import { FolderNode, I18n } from "@chili3d/core";
+import { FolderNode, I18n, type IShapeMeshData, ShapeNode } from "@chili3d/core";
+import { MockShape } from "@chili3d/core/test-utils";
+import { act } from "react";
+// The mocked core is a partial snapshot without `Result`; the module itself is the same one.
+import { Result } from "../../core/src/foundation/result";
 import { TreeModel } from "../src/project/tree/treeModel";
+
+/** A shape node whose rebuild the test fails and repairs (a sketch with an open profile). */
+class RebuildingShape extends ShapeNode {
+    display(): any {
+        return "body.multiShape";
+    }
+    protected override createMesh(): IShapeMeshData {
+        return { edges: undefined, faces: undefined, vertexs: undefined };
+    }
+    rebuild(result: Result<any>) {
+        this.setShape(result);
+    }
+}
 
 type PropertyHandler = (property: string, model: unknown) => void;
 
@@ -277,6 +294,51 @@ describe("TreeModel (TreeItem)", () => {
             node.warningCount = 0;
             node.emit("warningCount");
             expect(item.warningBadge.classList.contains("ti-hidden")).toBe(true);
+        });
+    });
+
+    describe("evaluation indicator", () => {
+        test("a shape node that fails to rebuild shows the shared indicator in its row", () => {
+            (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+            const doc = makeDoc();
+            const shape = new RebuildingShape({ document: doc, name: "Sketch 1" });
+            shape.rebuild(Result.ok(new MockShape()));
+            const item = new TreeModel(doc, shape);
+            document.body.append(item);
+            expect(item.querySelector("[data-evaluation]")).toBeNull();
+
+            act(() => shape.rebuild(Result.err("Open profile")));
+            const badge = item.querySelector<HTMLElement>('[data-evaluation="failed"]');
+            expect(badge).not.toBeNull();
+            expect(badge!.textContent).toBe("evaluation.failed");
+            expect(badge!.title).toBe("Open profile\nevaluation.lastGoodShown");
+
+            act(() => shape.rebuild(Result.ok(new MockShape())));
+            expect(item.querySelector("[data-evaluation]")).toBeNull();
+            act(() => item.remove());
+        });
+
+        test("a node already failing when its row connects shows the indicator once connected", async () => {
+            (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+            const doc = makeDoc();
+            const shape = new RebuildingShape({ document: doc, name: "Sketch 2" });
+            shape.rebuild(Result.err("Open profile"));
+            const item = new TreeModel(doc, shape);
+            document.body.append(item);
+            await act(async () => {
+                await Promise.resolve();
+            });
+            const badge = item.querySelector<HTMLElement>('[data-evaluation="failed"]');
+            expect(badge).not.toBeNull();
+            expect(badge!.title).toBe("Open profile");
+            act(() => item.remove());
+        });
+
+        test("rows of other nodes hold no indicator and no extra listener", () => {
+            const item = createItem();
+            document.body.append(item);
+            expect(node.handlerCount()).toBe(1);
+            expect(item.children).toHaveLength(3);
         });
     });
 });

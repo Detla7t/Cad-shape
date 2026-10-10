@@ -4,8 +4,14 @@
 import {
     type Act,
     Constants,
+    DOCUMENT_SCHEMA_VERSION,
+    type DocumentMigrationRegistry,
     DocumentVersionControl,
     documentConfiguration,
+    documentMigrations,
+    documentSchemaHeader,
+    EDITOR_DRAFTS_KEY,
+    EditorBuffers,
     History,
     I18n,
     type IApplication,
@@ -28,6 +34,7 @@ import {
     Serializer,
     StorageHistoryPersistence,
     type StorageOperation,
+    storedEditorDrafts,
     VariableTable,
     writeStorageBatch,
 } from "@chili3d/core";
@@ -47,7 +54,8 @@ export class Document extends Observable implements IDocument {
     private saveQueue: Promise<void> = Promise.resolve();
     private versioningError: unknown;
 
-    static readonly version = __DOCUMENT_VERSION__;
+    /** The document schema this build writes (see `DOCUMENT_SCHEMA_VERSION`). */
+    static readonly version = DOCUMENT_SCHEMA_VERSION;
 
     get name(): string {
         return this.getPrivateValue("name");
@@ -78,7 +86,7 @@ export class Document extends Observable implements IDocument {
     serialize(): Serialized {
         const serialized: Serialized = {
             [InternalClassName]: "Document",
-            version: __DOCUMENT_VERSION__,
+            ...documentSchemaHeader(__APP_VERSION__),
             id: this.id,
             name: this.name,
             models: this.modelManager.serialize(),
@@ -125,6 +133,10 @@ export class Document extends Observable implements IDocument {
                 cause: this.versioningError,
             });
         const data = structuredClone(this.serialize());
+        // Unsaved editor drafts ride along in the stored record (outside `serialize()`, so they
+        // never enter the version history or a project file); reopening offers them back.
+        const drafts = EditorBuffers.snapshots(this);
+        if (drafts.length > 0) data[EDITOR_DRAFTS_KEY] = drafts;
         const view =
             this.application.activeView?.document === this
                 ? this.application.activeView
@@ -163,13 +175,30 @@ export class Document extends Observable implements IDocument {
         if (!this._isDisposed) PubSub.default.pub(auto ? "documentAutosaved" : "documentSaved", this);
     }
 
+    /**
+     * Closes the document. Editors holding unsaved edits ask first — Save commits them (one undo
+     * step each) and saves the document, Discard drops them and closes without saving, Cancel
+     * keeps the document open. Otherwise the save question is asked as before. A close that does
+     * not save also drops the drafts stored for recovery, so they are not offered again.
+     */
     async close() {
         const running = this.application.executingCommand;
         if (this.application.activeView?.document === this && running && isCancelableCommand(running))
             await running.cancel();
-        if (window.confirm(I18n.translate("prompt.saveDocument{0}", this.name))) {
-            await this.save();
+        const dirty = EditorBuffers.dirtyBuffers(this);
+        let save: boolean;
+        if (dirty.length > 0) {
+            const decision = await EditorBuffers.ask(dirty);
+            if (decision === "cancel") return;
+            if (decision === "save" && !(await EditorBuffers.commitAll(dirty))) return;
+            if (decision === "discard") EditorBuffers.revertAll(dirty);
+            save = decision === "save";
+        } else {
+            save = window.confirm(I18n.translate("prompt.saveDocument{0}", this.name));
         }
+        if (save) await this.save();
+        else await this.dropStoredDrafts();
+        EditorBuffers.forget(this);
 
         const views = this.application.views.filter((x) => x.document === this);
         this.application.views.remove(...views);
@@ -183,6 +212,25 @@ export class Document extends Observable implements IDocument {
         this.dispose();
     }
 
+    /** Removes the recovery drafts from the stored record (after the queued saves). */
+    private dropStoredDrafts(): Promise<void> {
+        const drop = this.saveQueue.then(async () => {
+            const storage = this.application.storage;
+            const stored = (await storage.get(Constants.DBName, Constants.DocumentTable, this.id)) as
+                | Serialized
+                | undefined;
+            if (stored === undefined || !(EDITOR_DRAFTS_KEY in stored)) return;
+            const { [EDITOR_DRAFTS_KEY]: _drafts, ...rest } = stored;
+            await storage.put(Constants.DBName, Constants.DocumentTable, this.id, rest);
+        });
+        this.saveQueue = drop.catch(() => {});
+        return drop.catch((error) => Logger.warn(`document: drafts of ${this.name} not dropped`, error));
+    }
+
+    /**
+     * Opens a stored document. Unsaved editor drafts stored with it are handed to
+     * `EditorBuffers`; the application offers them back once the document is shown.
+     */
     static async open(application: IApplication, id: string) {
         const data = (await application.storage.get(
             Constants.DBName,
@@ -195,18 +243,35 @@ export class Document extends Observable implements IDocument {
         }
         const document = await Document.load(application, data);
         if (document !== undefined) {
+            EditorBuffers.setRecovered(document, storedEditorDrafts(data));
             Logger.info(`document: ${document.name} opened`);
         }
         return document;
     }
 
-    static async load(app: IApplication, data: Serialized): Promise<IDocument | undefined> {
-        if ((data as any).version !== __DOCUMENT_VERSION__) {
-            alert(
-                "The file version has been upgraded, no compatibility treatment was done in the development phase",
-            );
+    /**
+     * Loads a serialized document, migrated to the current schema first. A document this build
+     * cannot read — above all one saved with a newer schema — is refused with a message and
+     * nothing loads, so it can never be saved back over in an older format. `migrations` is the
+     * application's registry unless a test supplies its own.
+     */
+    static async load(
+        app: IApplication,
+        serialized: Serialized,
+        migrations: DocumentMigrationRegistry = documentMigrations,
+    ): Promise<IDocument | undefined> {
+        const prepared = migrations.prepare(serialized);
+        if (!prepared.isOk) {
+            Logger.warn(`document: ${prepared.error.message}`);
+            alert(prepared.error.message);
             return undefined;
         }
+        const data = prepared.value.document;
+        if (prepared.value.applied.length > 0)
+            Logger.info(
+                `document: upgraded from schema ${prepared.value.fromVersion}`,
+                prepared.value.applied,
+            );
         const document = new Document(app, data["name"], data["id"]);
         document.history.disabled = true;
         // Before the models: a body's feature chain resolves its parameters against

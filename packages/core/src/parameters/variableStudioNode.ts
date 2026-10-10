@@ -29,7 +29,7 @@ export interface VariableStudioNodeOptions {
  * `variablesJson` is a recorded property — an edit is one undo step — and a change of it
  * re-scopes the document, which re-derives every body and sketch the same way a table edit does.
  */
-@serializable()
+@serializable({ id: "VariableStudioNode" })
 export class VariableStudioNode extends Node implements INodeIcon, INodeSceneless, IVariableSource {
     get icon(): string {
         return "icon-tag";

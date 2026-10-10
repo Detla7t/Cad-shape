@@ -18,7 +18,7 @@ export interface PointOptions {
     position: XYZ;
 }
 
-@serializable()
+@serializable({ id: "PointNode" })
 export class PointNode extends ParameterShapeNode {
     override display(): I18nKeys {
         return "body.point";

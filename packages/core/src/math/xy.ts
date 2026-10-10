@@ -12,7 +12,7 @@ export interface XYOptions {
     y: number;
 }
 
-@serializable()
+@serializable({ id: "XY" })
 export class XY {
     static readonly zero = Object.freeze(new XY({ x: 0, y: 0 }));
     static readonly unitX = Object.freeze(new XY({ x: 1, y: 0 }));

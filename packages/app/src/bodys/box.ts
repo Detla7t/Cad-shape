@@ -22,7 +22,7 @@ export interface BoxNodeOptions {
     dz: number;
 }
 
-@serializable()
+@serializable({ id: "BoxNode" })
 export class BoxNode extends ParameterShapeNode {
     override display(): I18nKeys {
         return "body.box";

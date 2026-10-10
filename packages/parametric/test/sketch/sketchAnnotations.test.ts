@@ -231,8 +231,13 @@ describe("SketchAnnotations visibility", () => {
             editor.solve(true);
 
             (doc.visual.eventHandler as SketchEventHandler).pointerMove(view, pointerEvent(405, 300));
-            const iconHrefs = elements.map((el) => el.querySelector("use")?.getAttribute("href"));
-            expect(iconHrefs).toContain("#icon-cHorizontal");
+            // The badge shows Onshape's horizontal glyph (or the iconfont's where the artwork is missing).
+            const icons = elements.map(
+                (el) =>
+                    el.querySelector<SVGSVGElement>("svg")?.dataset["constraintIcon"] ??
+                    el.querySelector("use")?.getAttribute("href"),
+            );
+            expect(icons.some((icon) => icon === "horizontal" || icon === "#icon-cHorizontal")).toBe(true);
             editor.exit();
         } finally {
             restoreFactory();

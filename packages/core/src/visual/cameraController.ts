@@ -14,6 +14,12 @@ export interface ICameraController extends IPropertyChanged, IDisposable {
     cameraType: CameraType;
     fitContent(): void;
     lookAt(eye: XYZLike, target: XYZLike, up: XYZLike): void;
+    /**
+     * `lookAt` reached over a short tween (view cube orientations, entering a sketch). Resolves
+     * when the camera is there; an interaction or another animation cuts it short at its
+     * current frame. Falls back to the instant `lookAt` where motion is reduced.
+     */
+    animateLookAt(eye: XYZLike, target: XYZLike, up: XYZLike, duration?: number): Promise<void>;
     pan(dx: number, dy: number): void;
     startRotate(x: number, y: number): void;
     rotate(dx: number, dy: number, mode?: "trackball" | "turntable"): void;

@@ -9,6 +9,7 @@
  * an assembly.
  */
 
+import { BoxNode, CylinderNode } from "@chili3d/app";
 import {
     type FolderNode,
     type IFace,
@@ -21,8 +22,6 @@ import {
     Transaction,
     XYZ,
 } from "@chili3d/core";
-import { BoxNode } from "../../app/src/bodys/box";
-import { CylinderNode } from "../../app/src/bodys/cylinder";
 import { arrayToRigid, axisAngle, rigidToArray, type Vec3 } from "../src/math/rigid";
 import { AssemblyNode } from "../src/model/assemblyNode";
 import type { MateConnectorData, MateData } from "../src/model/assemblyTypes";

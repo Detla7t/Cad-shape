@@ -46,7 +46,7 @@ export interface PrinterPostOptions {
     /** Plain-text start/end G-code overriding the preset's. */
     readonly startGcode?: string;
     readonly endGcode?: string;
-    /** URL of the local PrusaSlicer bridge (`scripts/prusa-slicer-bridge.mjs`). */
+    /** URL of the local desktop bridge (`scripts/desktop-bridge.mjs`), which slices with PrusaSlicer. */
     readonly prusaSlicerBridgeUrl?: string;
     // Post-processor options (machine options, overridable per post call):
     /** mm/min for travels that carry no feed (default: the machine's rapid feed). */

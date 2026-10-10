@@ -152,7 +152,7 @@ test("configuration columns use typed editors for operations, text, and unsuppre
         await Promise.resolve();
         expect(field(panel.element, "Small: Unsuppressed / Depth").checked).toBe(true);
         const remove = panel.element.querySelector<HTMLButtonElement>(
-            '[aria-label="Stop configuring Extrude / Depth"]',
+            '[aria-label="configuration.stopConfiguringExtrude / Depth"]',
         );
         expect(remove).not.toBeNull();
         remove!.click();
@@ -166,17 +166,38 @@ test("configuration columns use typed editors for operations, text, and unsuppre
         doc.dispose();
     }
 });
-test("inspection tolerance edits update limits and undo restores both data and displayed values", async () => {
+function addCharacteristic(panel: InspectionPanel, label: string) {
+    const picker = panel.element.querySelector<HTMLSelectElement>(
+        "select[aria-label='inspection.addCharacteristic']",
+    );
+    expect(picker).not.toBeNull();
+    const choice = Array.from(picker!.options).find((option) => option.textContent === label);
+    expect(choice).not.toBeUndefined();
+    picker!.value = choice!.value;
+    picker!.dispatchEvent(new Event("change", { bubbles: true }));
+}
+test("inspection lists nothing until a characteristic is added, then tolerance edits update limits and undo restores both data and displayed values", async () => {
     const { doc, node } = fixture();
     const panel = new InspectionPanel(doc);
     try {
+        expect(panel.element.querySelector("table")).toBeNull();
+        expect(panel.element.textContent).toContain("inspection.empty");
+        addCharacteristic(panel, "Extrude / Depth");
+        expect(JSON.parse(node.inspectionJson)[`${node.id}:depth`]).toEqual({ minus: 0, plus: 0 });
         change(field(panel.element, "Depth: minus tolerance"), "0.2");
         expect(JSON.parse(node.inspectionJson)[`${node.id}:depth`]).toEqual({ minus: 0.2, plus: 0 });
-        expect(panel.element.textContent).toContain("19.8 mm");
+        expect(panel.element.textContent).toContain("19.80 mm");
         doc.history.undo();
         await Promise.resolve();
         expect(field(panel.element, "Depth: minus tolerance").value).toBe("0");
-        expect(panel.element.textContent).not.toContain("19.8 mm");
+        expect(panel.element.textContent).not.toContain("19.80 mm");
+        const remove = panel.element.querySelector<HTMLButtonElement>(
+            "button[aria-label='inspection.removeCharacteristic: Extrude / Depth']",
+        );
+        expect(remove).not.toBeNull();
+        remove!.click();
+        expect(panel.element.querySelector("table")).toBeNull();
+        expect(JSON.parse(node.inspectionJson)[`${node.id}:depth`]).toBeUndefined();
     } finally {
         panel.dispose();
         doc.dispose();
@@ -187,6 +208,7 @@ test("inspection displays a unitless parameter without millimeter units", () => 
     node.unit = UNITLESS;
     const panel = new InspectionPanel(doc);
     try {
+        addCharacteristic(panel, "Extrude / Depth");
         expect(panel.element.querySelectorAll("tr")).toHaveLength(2);
         expect(panel.element.querySelectorAll("tr")[1].cells[1].textContent).toBe("20");
     } finally {
@@ -208,9 +230,9 @@ test("the add-input menu creates independent lists, checkboxes and variables wit
             add!.click();
             const choices = panel.element.querySelectorAll<HTMLButtonElement>("[role=menuitem]");
             expect(Array.from(choices).map((b) => b.textContent)).toEqual([
-                "List",
-                "Checkbox",
-                "Configuration variable",
+                "configuration.kind.list",
+                "configuration.kind.checkbox",
+                "configuration.kind.variable",
             ]);
             panel.element.querySelector<HTMLButtonElement>(`[data-input-kind='${kind}']`)!.click();
             expect(doc.variables.configurationInputs.at(-1)!.kind).toBe(kind);

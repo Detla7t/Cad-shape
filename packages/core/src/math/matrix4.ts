@@ -14,7 +14,7 @@ export interface Matrix4Options {
 /**
  * Matrix in column-major order
  */
-@serializable()
+@serializable({ id: "Matrix4" })
 export class Matrix4 {
     private readonly _array: number[];
 

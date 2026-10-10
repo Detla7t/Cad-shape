@@ -19,8 +19,10 @@ const types = {
     ".png": "image/png",
 };
 const policy =
-    "default-src 'self' data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' blob:; worker-src 'self' blob:; frame-src 'none'; object-src 'none'";
-// CSP blocks external asset/API requests in the browser before they reach the network.
+    "default-src 'self' data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' blob: http://127.0.0.1:7782 http://localhost:7782; worker-src 'self' blob:; frame-src 'none'; object-src 'none'";
+// CSP blocks external asset/API requests in the browser before they reach the network. The one
+// exception is the local automation bridge on 127.0.0.1:7782 (scripts/automation-bridge.mjs),
+// which a tab connects to only when the user enabled automation.
 // No service worker or warm browser cache is needed: every shipped asset is served locally.
 createServer(async (request, response) => {
     response.setHeader("Content-Security-Policy", policy);

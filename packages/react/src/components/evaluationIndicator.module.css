@@ -1,0 +1,113 @@
+.host {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    min-width: 0;
+}
+
+.badge,
+.banner {
+    --evaluation-color: var(--foreground-secondary-color, #666666);
+    color: var(--evaluation-color);
+    font: inherit;
+    font-size: 11px;
+    line-height: 16px;
+}
+
+.badge {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 3px;
+    padding: 0 4px;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    white-space: nowrap;
+}
+
+.badgeButton {
+    margin: 0;
+    background: none;
+    border-color: currentColor;
+    cursor: pointer;
+}
+
+.badgeButton:hover,
+.badgeButton:focus-visible {
+    background-color: var(--hover-background-color, rgba(0, 0, 0, 0.06));
+}
+
+.banner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 6px;
+    margin: 4px 6px;
+    padding: 4px 8px;
+    border: 1px solid currentColor;
+    border-radius: 4px;
+    background-color: var(--panel-background-color, #ffffff);
+}
+
+.label {
+    font-weight: 600;
+}
+
+.message {
+    flex: 1 1 160px;
+    min-width: 0;
+    color: var(--foreground-color, #333333);
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+}
+
+.action {
+    margin-left: auto;
+    padding: 1px 8px;
+    border: 1px solid currentColor;
+    border-radius: 3px;
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+.icon {
+    flex: none;
+}
+
+.spin {
+    animation: evaluation-spin 0.9s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .spin {
+        animation: none;
+    }
+}
+
+@keyframes evaluation-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.badge[data-evaluation="ready"],
+.banner[data-evaluation="ready"] {
+    --evaluation-color: var(--success-color, #2b8a3e);
+}
+
+.badge[data-evaluation="computing"],
+.banner[data-evaluation="computing"] {
+    --evaluation-color: var(--primary-color, #1971c2);
+}
+
+.badge[data-evaluation="changed"],
+.banner[data-evaluation="changed"] {
+    --evaluation-color: var(--warning-color, #b35c00);
+}
+
+.badge[data-evaluation="failed"],
+.banner[data-evaluation="failed"] {
+    --evaluation-color: var(--error-color, #c92a2a);
+}

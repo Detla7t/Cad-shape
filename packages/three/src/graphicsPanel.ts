@@ -4,6 +4,7 @@
 import { Config, DEFAULT_GRAPHICS, type GraphicsPreferences, VisualConfig } from "@chili3d/core";
 import { createCadIcon } from "@chili3d/element";
 import style from "./graphicsPanel.module.css";
+import { describeProfile, QUALITY_PROFILES, type QualityProfile } from "./renderQuality";
 import type { ThreeView } from "./threeView";
 
 export class GraphicsPanel {
@@ -158,6 +159,23 @@ export class GraphicsPanel {
         };
         if (this.tab === "General") {
             const viewport = group("Viewport");
+            // The frame-rate profile: what moving frames aim at and how a settled frame draws.
+            const qualityRow = document.createElement("label"),
+                qualityText = document.createElement("span"),
+                qualitySelect = document.createElement("select");
+            qualityRow.className = style.row;
+            qualityText.textContent = "Rendering quality";
+            qualitySelect.setAttribute("aria-label", "Viewport Rendering quality");
+            for (const profile of QUALITY_PROFILES) {
+                const option = document.createElement("option");
+                option.value = profile;
+                option.textContent = describeProfile(profile);
+                option.selected = profile === Config.instance.graphics.quality;
+                qualitySelect.append(option);
+            }
+            qualitySelect.onchange = () => set("quality", qualitySelect.value as QualityProfile);
+            qualityRow.append(qualityText, qualitySelect);
+            viewport.append(qualityRow);
             number(viewport, "Ambient occlusion", "ambientOcclusion", "%", 0, 100, 0.5);
             number(viewport, "Field of view", "fieldOfView", "deg", 10, 120, 1);
             const bodies = group("Shaded bodies");

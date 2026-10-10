@@ -260,7 +260,7 @@ export class ContextToolbar extends HTMLElement {
                     "Rectangle tools",
                 ),
                 this.family(["sketch.circle", "sketch.circle3Point"], "Circle tools"),
-                this.family(["sketch.arc3Point", "sketch.arc"], "Arc tools"),
+                this.family(["sketch.arc3Point", "sketch.tangentArc", "sketch.arc"], "Arc tools"),
                 this.family(["sketch.polygon", "sketch.circumscribedPolygon"], "Polygon tools"),
                 this.family(["sketch.spline", "sketch.bezier", "sketch.splinePoint"], "Spline tools"),
                 this.tool("sketch.point"),
@@ -339,14 +339,16 @@ export class ContextToolbar extends HTMLElement {
                     for (const item of group.items) {
                         if (typeof item === "string") available.add(item);
                     }
+                // Onshape's Part Studio order: solid features, edge treatments, patterns, then the
+                // part operations (Boolean, Transform), then FeatureScript.
                 for (const [name, tools] of [
                     ["Solid features", ["feature.extrude", "feature.revolve", "feature.loft"]],
                     ["Edge treatments", ["partStudio.fillet", "partStudio.chamfer", "partStudio.shell"]],
-                    ["Part operations", ["partStudio.boolean", "partStudio.transform"]],
                     [
                         "Patterns",
                         ["partStudio.linearPattern", "partStudio.circularPattern", "partStudio.mirror"],
                     ],
+                    ["Part operations", ["partStudio.boolean", "partStudio.transform"]],
                     [
                         "FeatureScript",
                         ["featurescript.insert", "featurescript.newStudio", "featurescript.editStudio"],

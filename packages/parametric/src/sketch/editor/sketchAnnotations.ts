@@ -5,13 +5,19 @@ import {
     type CommandKeys,
     CommandStore,
     debounce,
+    dependsOnConfiguration,
     type EdgeMeshData,
+    expressionIdentifiers,
+    I18n,
     type IDisposable,
     type IDocument,
     type IView,
+    isConfiguredValue,
     PubSub,
+    unitSuffix,
     VisualConfig,
 } from "@chili3d/core";
+import { createConstraintIcon } from "@chili3d/element";
 import {
     arcAngles,
     ConstraintKind,
@@ -84,14 +90,31 @@ const ROLE_BADGES: Record<SketchConstraintRole, { label: string; command: Comman
     curvature: { label: "κ", command: "constraint.curvature" },
 };
 
-export type BadgeSymbol = { label: string; icon?: string };
+export type BadgeSymbol = { label: string; icon?: string; command?: CommandKeys };
 
 /** Badge content for a constraint kind (or its role); the icon comes from the command's `@command` decorator. */
 export function badgeSymbol(kind: ConstraintKind, role?: SketchConstraintRole): BadgeSymbol | undefined {
     const entry = role === undefined ? CONSTRAINT_BADGES[kind] : ROLE_BADGES[role];
     if (entry === undefined) return undefined;
     const icon = CommandStore.getComandData(entry.command)?.icon;
-    return { label: entry.label, icon: typeof icon === "string" ? icon : undefined };
+    return { label: entry.label, icon: typeof icon === "string" ? icon : undefined, command: entry.command };
+}
+
+/**
+ * What marks a dimension label beyond its value — Onshape's "fx" for an expression (a
+ * variable, a function, a configured value) and the dotted outline of one that follows the
+ * configuration. A plain quantity ("9.625 in") is neither.
+ */
+export interface DatumMarks {
+    readonly expression: string;
+    readonly configured: boolean;
+}
+
+export function datumMarks(datum: unknown, dependentNames: ReadonlySet<string>): DatumMarks | undefined {
+    if (typeof datum !== "string") return undefined;
+    const names = [...expressionIdentifiers(datum)].filter((name) => unitSuffix(name, true) === undefined);
+    if (!isConfiguredValue(datum) && names.length === 0) return undefined;
+    return { expression: datum, configured: dependsOnConfiguration(datum, dependentNames) };
 }
 
 /** Badge center offset from its geometry, in screen pixels. */
@@ -187,6 +210,8 @@ export class SketchAnnotationManager implements IDisposable {
     private disposed = false;
     private highlightedEntities = new Set<number>();
     private hoveredConstraint?: number;
+    /** A constraint pointed at from outside the viewport (the constraint manager's row). */
+    private externalHover?: number;
     private readonly selectedConstraints = new Set<number>();
     private rebuilding = false;
     private suppressSymbols = false;
@@ -257,6 +282,16 @@ export class SketchAnnotationManager implements IDisposable {
     }
 
     /** Shows constraint symbols for these entities; refresh is skipped when unchanged. */
+    /**
+     * Shows and lights the badges of one constraint while something else points at it — the
+     * constraint manager's row under the cursor — like hovering the badge itself.
+     */
+    setHoveredConstraint(id: number | undefined): void {
+        if (this.disposed || this.externalHover === id) return;
+        this.externalHover = id;
+        this.refresh();
+    }
+
     setHighlightedEntities(entityIds: Iterable<number>): void {
         if (this.disposed) return;
         const next = new Set(entityIds);
@@ -357,7 +392,7 @@ export class SketchAnnotationManager implements IDisposable {
         // offset along the segment normal so the badge does not cover the line
         const [u, v] = offsetFromSegment(p1, p2, BADGE_OFFSET_PX * px);
         const symbol = badgeSymbol(constraint.kind);
-        this.addBadge(symbol?.label ?? "", u, v, constraint, constraint.refs, false, symbol?.icon);
+        this.addBadge(symbol?.label ?? "", u, v, constraint, constraint.refs, false, symbol);
     }
 
     /**
@@ -384,7 +419,7 @@ export class SketchAnnotationManager implements IDisposable {
                 all.findIndex((b) => Math.hypot(anchor[0] - b[0], anchor[1] - b[1]) < 1e-9) === i,
         );
         for (const [u, v] of anchors) {
-            this.addBadge(symbol.label, u, v, constraint, constraint.refs, false, symbol.icon);
+            this.addBadge(symbol.label, u, v, constraint, constraint.refs, false, symbol);
         }
     }
 
@@ -487,7 +522,7 @@ export class SketchAnnotationManager implements IDisposable {
         // diagonal offset so the badge does not cover the shared point
         const off = BADGE_OFFSET_PX * px * Math.SQRT1_2;
         const symbol = badgeSymbol(ConstraintKind.P2PCoincident);
-        this.addBadge(symbol?.label ?? "", u + off, v + off, constraint, group, false, symbol?.icon);
+        this.addBadge(symbol?.label ?? "", u + off, v + off, constraint, group, false, symbol);
     }
 
     private addDatumDimension(
@@ -518,6 +553,8 @@ export class SketchAnnotationManager implements IDisposable {
             constraint,
             constraint.refs,
             true,
+            undefined,
+            datumMarks(constraint.datum, this.view.document.variables.configurationDependentNames()),
         );
     }
 
@@ -741,6 +778,7 @@ export class SketchAnnotationManager implements IDisposable {
         return (
             this.allConstraints ||
             this.hoveredConstraint === constraint.id ||
+            this.externalHover === constraint.id ||
             this.selectedConstraints.has(constraint.id) ||
             refs.some((ref) => this.highlightedEntities.has(ref.entityId))
         );
@@ -794,7 +832,8 @@ export class SketchAnnotationManager implements IDisposable {
         constraint: SketchConstraintData,
         refs: readonly SketchPointRef[] = constraint.refs,
         draggable = false,
-        icon?: string,
+        symbol?: BadgeSymbol,
+        marks?: DatumMarks,
     ): void {
         const id = constraint.id;
         const entityIds = [...new Set(refs.map((r) => r.entityId))];
@@ -809,6 +848,20 @@ export class SketchAnnotationManager implements IDisposable {
                     list.push(element);
                     this.badgeElements.set(id, list);
                     element.classList.toggle(style.selected, this.selectedConstraints.has(id));
+                    element.classList.toggle(style.hover, this.externalHover === id);
+                    if (marks !== undefined) {
+                        // Onshape's "fx": the label is an expression; hovering reads it.
+                        element.classList.add(style.expression);
+                        const fx = document.createElement("i");
+                        fx.className = style.fx;
+                        fx.textContent = "fx";
+                        fx.setAttribute("aria-hidden", "true");
+                        element.prepend(fx);
+                        element.title = marks.configured
+                            ? `${marks.expression}\n${I18n.translate("sketch.configuredDimension")}`
+                            : marks.expression;
+                        element.classList.toggle(style.configured, marks.configured);
+                    }
                     // A datum whose expression stopped resolving keeps its last geometry
                     // (`SketchSolver.datumOf`) — this badge is the only place that says so,
                     // so it carries the reason as its tooltip and reads as broken.
@@ -817,9 +870,12 @@ export class SketchAnnotationManager implements IDisposable {
                         element.classList.add(style.error);
                         element.title = datumError;
                     }
-                    if (icon !== undefined) {
-                        element.classList.add(style.symbol);
-                        element.replaceChildren(badgeIcon(icon));
+                    if (symbol !== undefined && (symbol.command !== undefined || symbol.icon !== undefined)) {
+                        const graphic = constraintBadgeIcon(symbol);
+                        if (graphic !== undefined) {
+                            element.classList.add(style.symbol);
+                            element.replaceChildren(graphic);
+                        }
                     }
                     if (draggable) {
                         element.classList.add(style.draggable);
@@ -1070,11 +1126,24 @@ export function badgeIcon(name: string): SVGSVGElement {
     return icon;
 }
 
+/**
+ * The badge's artwork: Onshape's constraint glyph for the constraint's command when the
+ * artwork is available, else the toolbar iconfont symbol, else nothing (the label shows).
+ */
+export function constraintBadgeIcon(symbol: BadgeSymbol): SVGSVGElement | undefined {
+    if (symbol.command !== undefined) {
+        const artwork = createConstraintIcon(symbol.command);
+        if (artwork !== undefined) return artwork;
+    }
+    return symbol.icon === undefined ? undefined : badgeIcon(symbol.icon);
+}
+
 /** Applies the constraint icon of `symbol` to a badge element, falling back to its label. */
 export function applyConstraintIcon(element: HTMLElement, symbol: BadgeSymbol): void {
-    if (symbol.icon !== undefined) {
+    const graphic = constraintBadgeIcon(symbol);
+    if (graphic !== undefined) {
         element.classList.add(style.symbol);
-        element.replaceChildren(badgeIcon(symbol.icon));
+        element.replaceChildren(graphic);
     } else {
         element.textContent = symbol.label;
     }

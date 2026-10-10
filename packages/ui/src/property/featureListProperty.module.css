@@ -114,6 +114,14 @@
 
 /* The "⋯" menu button stays out of the way until the row is hovered; an errored
    row keeps it visible so the repair actions (e.g. re-pick) remain discoverable. */
+.status {
+    flex: 0 0 auto;
+}
+
+.statusBanner {
+    display: block;
+}
+
 .more {
     width: 14px;
     height: 14px;

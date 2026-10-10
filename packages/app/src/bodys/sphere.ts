@@ -19,7 +19,7 @@ export interface SphereNodeOptions {
     radius: number;
 }
 
-@serializable()
+@serializable({ id: "SphereNode" })
 export class SphereNode extends ParameterShapeNode {
     override display(): I18nKeys {
         return "body.sphere";

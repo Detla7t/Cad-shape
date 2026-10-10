@@ -1,14 +1,14 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { Transaction } from "@chili3d/core";
+import { createCodeEditor } from "@chili3d/code-editor";
 import { div } from "@chili3d/element";
+import { sanitizeHtml } from "@chili3d/richtext/sanitize";
 import { htmlPage, markdownToHtmlPage, renderMarkdown } from "../../text/markdown";
-import { sanitizeHtml } from "../../text/sanitize";
 import { labelButton } from "../controls";
 import style from "../documents.module.css";
 import type { DocumentExport, IDocumentViewer, ViewerContext } from "../viewer";
-import { createCodeEditor } from "./codeEditor";
+import { textDocumentBuffer } from "./textViewer";
 
 /**
  * Markdown (and HTML) documents: the source in CodeMirror beside a live, sanitized
@@ -20,17 +20,24 @@ export function createMarkdownViewer({ node, document, changed }: ViewerContext)
     const render = (source: string) => (isHtml ? sanitizeHtml(source) : renderMarkdown(source));
     const source = div({ className: style.source });
     const preview = div({ className: style.preview });
-    let saved = node.text;
     let timer: ReturnType<typeof setTimeout> | undefined;
 
-    const editor = createCodeEditor(source, saved, () => {
-        clearTimeout(timer);
-        timer = setTimeout(() => {
-            preview.innerHTML = render(editor.text());
-        }, 150);
-        changed();
+    const editor = createCodeEditor(source, {
+        text: node.text,
+        lineWrapping: true,
+        onChange: () => {
+            clearTimeout(timer);
+            timer = setTimeout(() => {
+                preview.innerHTML = render(editor.text());
+            }, 150);
+            changed();
+        },
     });
-    preview.innerHTML = render(saved);
+    preview.innerHTML = render(node.text);
+    const buffer = textDocumentBuffer({ node, document, changed }, editor, (text) => {
+        clearTimeout(timer);
+        preview.innerHTML = render(text);
+    });
 
     const mode = (show: "source" | "split" | "preview") => {
         source.style.display = show === "preview" ? "none" : "";
@@ -62,19 +69,7 @@ export function createMarkdownViewer({ node, document, changed }: ViewerContext)
 
     return {
         element,
-        isDirty: () => editor.text() !== saved,
-        save: async () => {
-            const text = editor.text();
-            Transaction.execute(document, "edit document", () => node.setText(text));
-            saved = text;
-            changed();
-        },
-        reload: () => {
-            saved = node.text;
-            editor.setText(saved);
-            preview.innerHTML = render(saved);
-            changed();
-        },
+        ...buffer,
         exports,
         activated: () => editor.focus(),
         dispose: () => {

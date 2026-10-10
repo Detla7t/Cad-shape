@@ -4,6 +4,7 @@
 import {
     type IDocument,
     type IShape,
+    type MeasurementFrame,
     type MeasurementMode,
     Result,
     registerSelectionMeasurementProvider,
@@ -46,9 +47,32 @@ export function selectedMeasurementReferences(document: IDocument): Result<Measu
     );
 }
 
+const POSITION_MODES: readonly MeasurementMode[] = ["positionX", "positionY", "positionZ"];
+
+/** The modes the shapes support — the main values first (what the readout offers), then the rest of the panel's rows. */
+function availableModes(shapes: readonly IShape[], hasDistance: boolean): MeasurementMode[] {
+    const modes: MeasurementMode[] = [];
+    const ok = (mode: MeasurementMode) => measureShapes(mode, shapes).isOk;
+    if (shapes.length === 2 && hasDistance) {
+        modes.push("distance", "maxDistance");
+        if (shapes.every((shape) => centerOf(shape) !== undefined)) modes.push("centerDistance");
+    }
+    if (shapes.length === 1 && ok("diameter")) modes.push("diameter", "radius");
+    if (ok("length")) modes.push("length");
+    if (ok("area")) modes.push("area");
+    if (shapes.length === 2) {
+        if (hasDistance) modes.push("deltaX", "deltaY", "deltaZ");
+        if (ok("angle")) modes.push("angle");
+        if (ok("tangentAngle")) modes.push("tangentAngle");
+    }
+    if (shapes.length === 1 && centerOf(shapes[0]) !== undefined) modes.push(...POSITION_MODES);
+    return modes;
+}
+
 export function measureSelection(
     document: IDocument,
     requested?: MeasurementMode,
+    frame?: MeasurementFrame,
 ): Result<SelectionMeasurement> {
     const shapes: IShape[] = [];
     try {
@@ -60,35 +84,39 @@ export function measureSelection(
             if (!resolved.isOk) return Result.err(resolved.error);
             shapes.push(resolved.value);
         }
-        const modes: MeasurementMode[] = [];
-        if (shapes.length === 2) {
-            modes.push("distance", "maxDistance");
-            if (shapes.every((shape) => centerOf(shape) !== undefined)) modes.push("centerDistance");
-        }
-        const diameter = shapes.length === 1 ? measureShapes("diameter", shapes) : undefined;
-        if (diameter?.isOk) modes.push("diameter", "radius");
-        const length = measureShapes("length", shapes);
-        if (length.isOk) modes.push("length");
         const refs = selected.value;
-        const key = JSON.stringify(refs);
+        const key = JSON.stringify([refs, frame ?? null]);
+        const entities = refs.map((ref) => ({ label: ref.label, nodeId: ref.nodeId }));
         const createVariable = (mode: MeasurementMode) =>
-            VariableCommand.createMeasured(document, { mode, entities: refs });
-        if (!modes.length) {
-            // a lone point: Onshape shows its coordinates
-            const details = measurementDetails(shapes);
-            if (details.length) return Result.ok({ key, modes, details, createVariable });
-            return Result.err("Select an edge, round face, boundary, point, or two entities.");
+            VariableCommand.createMeasured(document, { mode, entities: refs, ...(frame ? { frame } : {}) });
+        const distance = shapes.length === 2 ? measureShapes("distance", shapes, frame) : undefined;
+        const witness = distance?.isOk ? distance.value : undefined;
+        const modes = availableModes(shapes, witness !== undefined);
+        if (!modes.length) return Result.err("Select an edge, round face, boundary, point, or two entities.");
+        const main = modes.filter((mode) => !POSITION_MODES.includes(mode));
+        const mode = requested && modes.includes(requested) ? requested : main[0];
+        if (mode === undefined) {
+            // a lone point: Onshape shows its coordinates, not one value
+            return Result.ok({
+                key,
+                modes,
+                details: measurementDetails(shapes, undefined, frame),
+                entities,
+                createVariable,
+            });
         }
-        const mode = requested && modes.includes(requested) ? requested : modes[0];
         const result =
-            mode === "length" ? length : mode === "diameter" ? diameter! : measureShapes(mode, shapes);
+            mode === "distance" && witness !== undefined
+                ? Result.ok(witness)
+                : measureShapes(mode, shapes, frame);
         if (!result.isOk) return Result.err(result.error);
         const isDistance = mode === "distance" || mode === "maxDistance" || mode === "centerDistance";
         return Result.ok({
             key,
             modes,
             measurement: result.value,
-            details: measurementDetails(shapes, isDistance ? result.value : undefined),
+            details: measurementDetails(shapes, isDistance ? result.value : witness, frame),
+            entities,
             createVariable,
         });
     } catch (error) {

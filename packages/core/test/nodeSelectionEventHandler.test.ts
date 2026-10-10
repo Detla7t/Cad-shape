@@ -3,7 +3,7 @@
 
 import { rs } from "@rstest/core";
 import type { INode, INodeFilter, ISelection, IVisualObject } from "../src";
-import { AsyncController, Matrix4, NodeSelectionHandler, VisualStates } from "../src";
+import { AsyncController, Matrix4, NodeSelectionHandler, ShapeTypes, VisualStates } from "../src";
 import {
     createMockHighlighter,
     createMockSelection,
@@ -712,5 +712,99 @@ describe("NodeSelectionHandler", () => {
 
             expect(togglePassed).toBe(true);
         });
+    });
+});
+
+describe("a node that selects its parts (a sketch's curves)", () => {
+    test("hover highlights the curve under the cursor and a click selects that curve, not the node", () => {
+        const { handler, view, addCalls, removeCalls, selection, nodesByVisual } =
+            setupNodeSelectionHandler();
+        const visual = createMockVisualObject();
+        const sketch = { ...createMockNode("Sketch 1"), selectsSubShapes: 0b1000000 } as INode;
+        nodesByVisual.set(visual, sketch);
+        const pick = {
+            shape: { shapeType: 0b1000000 },
+            owner: { node: sketch },
+            indexes: [2],
+            transform: Matrix4.identity(),
+        };
+        view.detectVisual = () => [visual];
+        view.detectShapes = rs.fn(() => [pick]);
+        const setSelectedShapes = rs.spyOn(selection, "setSelectedShapes");
+        const setSelectedNodes = rs.spyOn(selection, "setSelectedNodes");
+        handler.pointerMove(view, createPointerEvent({ buttons: 0, offsetX: 10, offsetY: 10 }));
+        expect(view.detectShapes).toHaveBeenCalledWith(0b1000000, 10, 10, undefined, undefined);
+        expect(addCalls.at(-1)).toEqual({
+            shape: visual,
+            state: VisualStates.edgeHighlight,
+            type: 0b1000000,
+            indexes: [2],
+        });
+        handler.pointerDown(view, createPointerEvent({ button: 0, offsetX: 10, offsetY: 10 }));
+        handler.pointerUp(view, createPointerEvent({ button: 0, offsetX: 10, offsetY: 10 }));
+        expect(setSelectedShapes).toHaveBeenCalledWith([pick], VisualStates.edgeSelected, false);
+        expect(setSelectedNodes).not.toHaveBeenCalled();
+        expect(removeCalls.at(-1)).toEqual({
+            shape: visual,
+            state: VisualStates.edgeHighlight,
+            type: 0b1000000,
+            indexes: [2],
+        });
+    });
+
+    test("a point under the cursor wins over the curve it ends", () => {
+        const { handler, view, addCalls, selection, nodesByVisual } = setupNodeSelectionHandler();
+        const visual = createMockVisualObject();
+        const sketch = {
+            ...createMockNode("Sketch 1"),
+            selectsSubShapes: ShapeTypes.edge | ShapeTypes.vertex,
+        } as INode;
+        nodesByVisual.set(visual, sketch);
+        const edge = {
+            shape: { shapeType: ShapeTypes.edge },
+            owner: { node: sketch },
+            indexes: [2],
+            transform: Matrix4.identity(),
+        };
+        const vertex = {
+            shape: { shapeType: ShapeTypes.vertex },
+            owner: { node: sketch },
+            indexes: [5],
+            transform: Matrix4.identity(),
+        };
+        view.detectVisual = () => [visual];
+        view.detectShapes = rs.fn(() => [edge, vertex]);
+        const setSelectedShapes = rs.spyOn(selection, "setSelectedShapes");
+        handler.pointerMove(view, createPointerEvent({ buttons: 0, offsetX: 10, offsetY: 10 }));
+        expect(view.detectShapes).toHaveBeenCalledWith(
+            ShapeTypes.edge | ShapeTypes.vertex,
+            10,
+            10,
+            undefined,
+            undefined,
+        );
+        expect(addCalls.at(-1)).toEqual({
+            shape: visual,
+            state: VisualStates.edgeHighlight,
+            type: ShapeTypes.vertex,
+            indexes: [5],
+        });
+        handler.pointerDown(view, createPointerEvent({ button: 0, offsetX: 10, offsetY: 10 }));
+        handler.pointerUp(view, createPointerEvent({ button: 0, offsetX: 10, offsetY: 10 }));
+        expect(setSelectedShapes).toHaveBeenCalledWith([vertex], VisualStates.edgeSelected, false);
+    });
+
+    test("a node without the marker still selects as a whole", () => {
+        const { handler, view, selection, nodesByVisual } = setupNodeSelectionHandler();
+        const visual = createMockVisualObject();
+        nodesByVisual.set(visual, createMockNode("Box"));
+        view.detectVisual = () => [visual];
+        view.detectShapes = rs.fn(() => []);
+        const setSelectedNodes = rs.spyOn(selection, "setSelectedNodes");
+        handler.pointerMove(view, createPointerEvent({ buttons: 0 }));
+        expect(view.detectShapes).not.toHaveBeenCalled();
+        handler.pointerDown(view, createPointerEvent({ button: 0 }));
+        handler.pointerUp(view, createPointerEvent({ button: 0 }));
+        expect(setSelectedNodes).toHaveBeenCalled();
     });
 });

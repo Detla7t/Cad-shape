@@ -14,9 +14,31 @@
     cursor: pointer;
 }
 
-.badge:hover {
+.badge:hover,
+.hover {
     background-color: color-mix(in srgb, var(--badge-accent) 16%, var(--panel-background-color));
     border-color: var(--badge-accent);
+}
+
+/* Onshape's "fx" mark: the dimension is an expression (hover reads it). */
+.expression {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 3px;
+}
+.fx {
+    font-size: 9px;
+    font-style: italic;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    color: var(--primary-color, #1651b0);
+}
+
+/* Onshape's dotted amber box: the dimension follows the configuration. */
+.configured {
+    outline: 1px dotted #e0a400;
+    outline-offset: 2px;
 }
 
 .selected,

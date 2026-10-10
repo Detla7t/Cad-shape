@@ -7,8 +7,6 @@ import {
     CurveUtils,
     documentQuantityUnit,
     documentUnit,
-    documentUnits,
-    evaluateSelectionMeasurement,
     evaluateShapeProperties,
     formatDocumentQuantity,
     type IEdge,
@@ -24,22 +22,18 @@ import {
     type ShapeType,
     ShapeTypes,
     ShapeTypeUtils,
-    unitSuffix,
     VisualStates,
 } from "@chili3d/core";
 import { action, labeled, panelBody, table, textElement } from "./helpers";
 import style from "./review.module.css";
 
-export type GeometryPanelKind = "measure" | "analysis" | "mass";
+export type GeometryPanelKind = "analysis" | "mass";
 export class GeometryPanel {
     readonly element: HTMLElement;
     private readonly output = document.createElement("div");
     private readonly density = document.createElement("input");
     private readonly densityLabel = document.createElement("label");
     private densityFactor = 1000;
-    private readonly measureType = document.createElement("select");
-    private readonly lengthUnit = document.createElement("select");
-    private readonly angleUnit = document.createElement("select");
     private massMode: "part" | "face" = "part";
     private picker?: AsyncController;
     private disposed = false;
@@ -50,21 +44,14 @@ export class GeometryPanel {
         private readonly analysisTool: "geometry" | "interference" = "geometry",
     ) {
         const { root, body } = panelBody(
-            kind === "measure"
-                ? "Measure details"
-                : kind === "analysis"
-                  ? "Analysis tools"
-                  : "Mass and section properties",
+            kind === "analysis" ? "Analysis tools" : "Mass and section properties",
         );
         this.element = root;
         root.classList.add(style.geometryPanel);
         const controls = document.createElement("div");
         controls.className = style.toolbar;
         controls.append(
-            action(
-                kind === "measure" ? "Select entities to measure" : "Select entities…",
-                () => void this.pick(),
-            ),
+            action("Select entities…", () => void this.pick()),
             action("Refresh", this.render),
         );
         if (kind === "analysis") controls.append(action("Section view…", () => view.showSectionView?.()));
@@ -76,46 +63,10 @@ export class GeometryPanel {
                     ? analysisTool === "interference"
                         ? "Select two solid parts to calculate their common volume. Touching faces or edges have zero interference volume."
                         : "Numerical geometry inspection. Curvature combs and surface analysis overlays are not yet supported."
-                    : kind === "mass"
-                      ? "Select solids for volume and center of mass, or planar faces for section area and moments. Density is optional and applies uniformly to the selection."
-                      : "Select edges, faces, vertices or model items. Two entities also show their minimum distance.",
+                    : "Select solids for volume and center of mass, or planar faces for section area and moments. Density is optional and applies uniformly to the selection.",
                 style.muted,
             ),
         );
-        if (kind === "measure") {
-            this.addSelect(body, "Measure type", this.measureType, [
-                ["all", "Show all"],
-                ["position", "Position"],
-                ["length", "Length"],
-                ["radius", "Radius"],
-                ["diameter", "Diameter"],
-                ["angle", "Angle"],
-                ["distance", "Minimum distance"],
-                ["maxDistance", "Maximum distance"],
-                ["area", "Area"],
-                ["volume", "Volume"],
-            ]);
-            this.addSelect(body, "Length unit", this.lengthUnit, [
-                ["mm", "Millimeter"],
-                ["cm", "Centimeter"],
-                ["m", "Meter"],
-                ["in", "Inch"],
-                ["ft", "Foot"],
-            ]);
-            this.addSelect(body, "Angle unit", this.angleUnit, [
-                ["deg", "Degree"],
-                ["rad", "Radian"],
-            ]);
-            const units = documentUnits(view.document);
-            this.lengthUnit.value = units.length;
-            this.angleUnit.value = units.angle;
-            body.append(
-                this.unavailable(
-                    "Reference coordinate system",
-                    "Mate connector reference frames are not yet supported by this inspector.",
-                ),
-            );
-        }
         if (kind === "mass") {
             const tabs = document.createElement("div");
             tabs.className = style.toolbar;
@@ -161,17 +112,6 @@ export class GeometryPanel {
         this.render();
         root.addEventListener("keydown", (event) => event.stopPropagation());
     }
-    private addSelect(body: HTMLElement, label: string, select: HTMLSelectElement, options: string[][]) {
-        for (const [value, text] of options) {
-            const option = textElement("option", text);
-            option.value = value;
-            select.add(option);
-        }
-        select.value = options[0][0];
-        select.setAttribute("aria-label", label);
-        select.onchange = this.render;
-        body.append(labeled(label, select));
-    }
     private unavailable(label: string, reason: string) {
         const input = document.createElement("input");
         input.type = "checkbox";
@@ -189,13 +129,13 @@ export class GeometryPanel {
         try {
             const picks = await this.view.document.picker.pickShape("prompt.select.shape", controller, {
                 shapeType:
-                    this.kind === "analysis" && this.analysisTool === "interference"
-                        ? ShapeTypes.solid
-                        : this.kind === "mass"
-                          ? this.massMode === "part"
-                              ? ShapeTypes.solid
-                              : ShapeTypes.face
-                          : ((ShapeTypes.edge | ShapeTypes.face | ShapeTypes.vertex) as ShapeType),
+                    this.kind === "analysis"
+                        ? this.analysisTool === "interference"
+                            ? ShapeTypes.solid
+                            : ((ShapeTypes.edge | ShapeTypes.face | ShapeTypes.vertex) as ShapeType)
+                        : this.massMode === "part"
+                          ? ShapeTypes.solid
+                          : ShapeTypes.face,
                 multi: true,
             });
             if (!this.disposed && picks.length) {
@@ -271,10 +211,6 @@ export class GeometryPanel {
             }
             const doc = this.view.document,
                 unit = documentUnit(doc, LENGTH_UNITS);
-            if (this.kind === "measure") {
-                unit.suffix = this.lengthUnit.value;
-                unit.factor = unitSuffix(unit.suffix)?.factor ?? 1;
-            }
             const length = (v: number) => `${(v / unit.factor).toFixed(unit.precision)} ${unit.suffix}`;
             const power = (v: number, n: number) =>
                 `${(v / unit.factor ** n).toFixed(unit.precision)} ${unit.suffix}${n === 2 ? "²" : n === 3 ? "³" : n === 4 ? "⁴" : n === 5 ? "⁵" : ""}`;
@@ -488,20 +424,6 @@ export class GeometryPanel {
             if (volumeSum) rows.push(["Volume", power(volumeSum, 3)]);
             if (shapes.length === 2)
                 rows.push(["Minimum distance", length(shapes[0].extremaDistance(shapes[1]))]);
-            if (
-                this.kind === "measure" &&
-                shapes.length === 2 &&
-                ["all", "maxDistance"].includes(this.measureType.value)
-            ) {
-                const maximum = shapes[0].distanceMeasure?.(shapes[1], true);
-                if (maximum?.isOk) rows.push(["Maximum distance", length(maximum.value.value)]);
-            }
-            if (this.kind === "measure" && shapes.length === 1 && shapes[0].shapeType === ShapeTypes.face) {
-                const radial = evaluateSelectionMeasurement(doc, "diameter");
-                const measured = radial.isOk ? radial.value.measurement : undefined;
-                if (measured?.mode === "diameter")
-                    rows.push(["Radius", length(measured.value / 2)], ["Diameter", length(measured.value)]);
-            }
             if (shapes.length === 2 && shapes.every((shape) => shape.shapeType === ShapeTypes.edge)) {
                 const curves = shapes.map((shape) => (shape as IEdge).curve);
                 if (curves.every((curve) => CurveUtils.isLine(curve.basisCurve))) {
@@ -510,36 +432,10 @@ export class GeometryPanel {
                     const radians = Math.acos(
                         Math.max(-1, Math.min(1, a.dot(b) / (a.length() * b.length()))),
                     );
-                    rows.push([
-                        "Angle",
-                        this.angleUnit.value === "rad"
-                            ? `${radians.toFixed(6)} rad`
-                            : `${((radians * 180) / Math.PI).toFixed(3)}°`,
-                    ]);
+                    rows.push(["Angle", `${((radians * 180) / Math.PI).toFixed(3)}°`]);
                 }
             }
-            const filters: Record<string, RegExp> = {
-                position: /^Point /,
-                length: /length/i,
-                radius: /^Radius$/,
-                diameter: /^Diameter$/,
-                angle: /^Angle$/,
-                distance: /^Minimum distance$/,
-                maxDistance: /^Maximum distance$/,
-                area: /area/i,
-                volume: /^Volume$/,
-            };
-            const filter = this.kind === "measure" ? filters[this.measureType.value] : undefined;
-            const visible = filter ? [rows[0], ...rows.slice(1).filter(([name]) => filter.test(name))] : rows;
-            this.output.replaceChildren(
-                visible.length > 1
-                    ? table(visible)
-                    : textElement(
-                          "p",
-                          "This measurement does not apply to the selected entities.",
-                          style.muted,
-                      ),
-            );
+            this.output.replaceChildren(table(rows));
         } catch (error) {
             this.output.replaceChildren(
                 textElement("p", error instanceof Error ? error.message : String(error), style.error),

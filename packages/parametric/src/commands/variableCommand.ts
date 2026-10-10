@@ -16,7 +16,7 @@ import { editMeasuredVariable } from "../measurement/variableEditor";
 export class VariableCommand extends CancelableCommand {
     constructor(
         private readonly node?: MeasuredVariableNode,
-        private readonly initial?: Pick<MeasuredVariableData, "mode" | "entities">,
+        private readonly initial?: Pick<MeasuredVariableData, "mode" | "entities" | "frame">,
     ) {
         super();
     }
@@ -26,7 +26,7 @@ export class VariableCommand extends CancelableCommand {
     }
     static async createMeasured(
         document: IDocument,
-        initial: Pick<MeasuredVariableData, "mode" | "entities">,
+        initial: Pick<MeasuredVariableData, "mode" | "entities" | "frame">,
     ): Promise<void> {
         const app = document.application;
         if (app.activeView?.document !== document) return;

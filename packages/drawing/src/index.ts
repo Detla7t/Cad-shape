@@ -3,4 +3,5 @@
 
 export * from "./drawing";
 export * from "./dxf";
+export * from "./pdf";
 export * from "./svg";

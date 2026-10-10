@@ -37,6 +37,18 @@ const CAMERA_NEAR = 0.1;
 const CAMERA_FAR = 1e6;
 const MIN_CARME_TO_TARGET = 50;
 const SHAPE_EMPTY_SIZE = 800;
+/** View cube orientations and sketch entry tween over this long (Onshape's view transitions). */
+export const CAMERA_TWEEN_MS = 320;
+
+/** Whether the user asked the platform for less motion; a tween then lands at once. */
+export function reducedMotion(): boolean {
+    return (
+        typeof globalThis.matchMedia === "function" &&
+        globalThis.matchMedia("(prefers-reduced-motion: reduce)").matches
+    );
+}
+
+const easeInOutCubic = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 
 Camera.DEFAULT_UP = new Vector3(0, 0, 1);
 
@@ -48,6 +60,8 @@ export class CameraController extends Observable implements ICameraController {
     private _rotateCenter: Vector3 | undefined;
     private _camera: PerspectiveCamera | OrthographicCamera;
     private previous?: { eye: Vector3; target: Vector3; up: Vector3; type: CameraType };
+    /** The tween in flight, if any — `cancelAnimation` ends it where it stands. */
+    private animation?: { frame: number; finish: () => void };
 
     rememberView() {
         this.previous = {
@@ -90,6 +104,8 @@ export class CameraController extends Observable implements ICameraController {
             if (this.camera instanceof OrthographicCamera) {
                 this.updateOrthographicCamera(this.camera);
             }
+            // each projection has its own clipping rule
+            this.updateCameraNearFar();
             this.updateCameraPosionTarget();
         }
     }
@@ -158,7 +174,75 @@ export class CameraController extends Observable implements ICameraController {
         }
     }
 
+    /**
+     * `lookAt` reached over `duration` ms: the eye swings around the target (direction
+     * slerped, distance eased) while the target and up vector ease along, so an orientation
+     * from the view cube reads as a turn rather than a cut. A pan, rotate or zoom from the
+     * user — or another tween — ends it at its current frame. With reduced motion, or no
+     * animation frames (tests), the camera lands at once.
+     */
+    animateLookAt(eye: XYZLike, target: XYZLike, up: XYZLike, duration = CAMERA_TWEEN_MS): Promise<void> {
+        this.cancelAnimation();
+        const raf = globalThis.requestAnimationFrame;
+        if (duration <= 0 || reducedMotion() || typeof raf !== "function") {
+            this.lookAt(eye, target, up);
+            return Promise.resolve();
+        }
+        const fromTarget = this._target.clone();
+        const toTarget = new Vector3(target.x, target.y, target.z);
+        const fromOffset = this._position.clone().sub(fromTarget);
+        const toOffset = new Vector3(eye.x, eye.y, eye.z).sub(toTarget);
+        const fromDistance = fromOffset.length();
+        const toDistance = toOffset.length();
+        const fromDirection =
+            fromDistance > 0 ? fromOffset.clone().divideScalar(fromDistance) : new Vector3(0, 0, 1);
+        const toDirection =
+            toDistance > 0 ? toOffset.clone().divideScalar(toDistance) : fromDirection.clone();
+        const fromUp = this.camera.up.clone().normalize();
+        const toUp = new Vector3(up.x, up.y, up.z).normalize();
+        const turn = new Quaternion().setFromUnitVectors(fromDirection, toDirection);
+        const upTurn = new Quaternion().setFromUnitVectors(fromUp, toUp);
+        const start = performance.now();
+        return new Promise<void>((resolve) => {
+            const finish = () => {
+                this.animation = undefined;
+                resolve();
+            };
+            const step = (now: number) => {
+                const t = Math.min(1, (now - start) / duration);
+                const k = easeInOutCubic(t);
+                if (t >= 1) {
+                    this.animation = undefined;
+                    this.lookAt(eye, target, up);
+                    resolve();
+                    return;
+                }
+                const direction = fromDirection
+                    .clone()
+                    .applyQuaternion(new Quaternion().slerpQuaternions(new Quaternion(), turn, k));
+                const distance = fromDistance + (toDistance - fromDistance) * k;
+                const centre = fromTarget.clone().lerp(toTarget, k);
+                const frameUp = fromUp
+                    .clone()
+                    .applyQuaternion(new Quaternion().slerpQuaternions(new Quaternion(), upTurn, k));
+                this.lookAt(centre.clone().add(direction.multiplyScalar(distance)), centre, frameUp);
+                this.animation = { frame: raf(step), finish };
+            };
+            this.animation = { frame: raf(step), finish };
+        });
+    }
+
+    /** Ends a tween where it stands (the user took the camera). */
+    private cancelAnimation(): void {
+        const animation = this.animation;
+        if (animation === undefined) return;
+        this.animation = undefined;
+        globalThis.cancelAnimationFrame?.(animation.frame);
+        animation.finish();
+    }
+
     pan(dx: number, dy: number): void {
+        this.cancelAnimation();
         const ratio = PAN_SPEED_FACTOR * this._target.distanceTo(this._position);
         const direction = this._target.clone().sub(this._position).normalize();
         const hor = direction.clone().cross(this.camera.up).normalize();
@@ -202,6 +286,7 @@ export class CameraController extends Observable implements ICameraController {
     }
 
     startRotate(x: number, y: number): void {
+        this.cancelAnimation();
         this.rememberView();
         this._rotateCenter = this.selectedNodesCenter();
         if (this._rotateCenter) {
@@ -334,6 +419,7 @@ export class CameraController extends Observable implements ICameraController {
     }
 
     zoom(x: number, y: number, delta: number): void {
+        this.cancelAnimation();
         const vector = this._target.clone().sub(this._position);
 
         const zoomFactor = this.caclueZoomFactor(x, y, vector);
@@ -369,12 +455,21 @@ export class CameraController extends Observable implements ICameraController {
         return zoomFactor;
     }
 
+    /**
+     * The clipping planes for the camera's distance. A perspective view clips at a thousandth
+     * of the distance: anything nearer is on the lens. An orthographic view has no lens, and
+     * its camera plane routinely sits inside the model — a wide field of view fits the model
+     * close to it, a zoom moves it into the geometry — so its near plane is pushed as far
+     * behind the camera as the far plane is in front: nothing in front of the far plane is
+     * cut (the picking ray starts at that near plane too, see `ThreeView`).
+     */
     private updateCameraNearFar() {
         const distance = this._position.distanceTo(this._target);
-
-        const nearPlane = Math.max(0.01, Math.min(distance / 1000, distance / 10));
         const farPlane = Math.max(1000, distance * 100);
-
+        const nearPlane =
+            this.camera instanceof OrthographicCamera
+                ? -farPlane
+                : Math.max(0.01, Math.min(distance / 1000, distance / 10));
         this.camera.near = nearPlane;
         this.camera.far = farPlane;
     }

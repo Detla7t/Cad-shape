@@ -2,9 +2,9 @@
 // See LICENSE file in the project root for full license information.
 
 import { TestDocument } from "@chili3d/core/test-utils";
+import type { CellRange, HyperlinkData, SheetImage, WorkbookData } from "@chili3d/sheet/model";
+import { writeXlsx } from "@chili3d/sheet/xlsx";
 import { DocumentFileNode } from "../src/documentFileNode";
-import type { CellRange, HyperlinkData, SheetImage, WorkbookData } from "../src/sheet/model";
-import { writeXlsx } from "../src/sheet/xlsx";
 import {
     createImageLayer,
     externalTarget,

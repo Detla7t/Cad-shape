@@ -3,6 +3,7 @@
 
 import { rs } from "@rstest/core";
 import {
+    canonicalSerializedTypeId,
     FolderNode,
     type IDocument,
     InternalClassName,
@@ -11,6 +12,8 @@ import {
     Serializer,
     serializable,
     serialize,
+    serializedTypeId,
+    XYZ,
 } from "../src";
 import { TestDocument } from "../test-utils";
 
@@ -131,14 +134,9 @@ describe("serializeObject", () => {
 
     test("should throw for an unregistered class", () => {
         class UnregisteredValue {}
-        const spy = rs.spyOn(console, "log").mockImplementation(() => {});
-        try {
-            expect(() => Serializer.serializeObject(new UnregisteredValue())).toThrow(
-                "Type UnregisteredValue is not registered, please add the @Serializer.register decorator.",
-            );
-        } finally {
-            spy.mockRestore();
-        }
+        expect(() => Serializer.serializeObject(new UnregisteredValue())).toThrow(
+            "Type UnregisteredValue is not registered, please add the @serializable() decorator.",
+        );
     });
 
     test("should serialize Float32Array via the registered custom serializer", () => {
@@ -290,5 +288,80 @@ describe("edge cases", () => {
         }
 
         expect(() => Serializer.serializeObject(new NullValue({ data: null }))).toThrow(TypeError);
+    });
+});
+
+describe("stable serialized type ids", () => {
+    @serializable({ id: "test.Widget", aliases: ["OldWidget", "LegacyWidget"] })
+    class RenamedWidget_x1 {
+        @serialize()
+        public size: number;
+
+        constructor(options: { size: number }) {
+            this.size = options.size;
+        }
+    }
+
+    test("writes the declared id, not the runtime class name", () => {
+        const s = Serializer.serializeObject(new RenamedWidget_x1({ size: 3 }));
+        expect(s[InternalClassName]).toBe("test.Widget");
+        expect(serializedTypeId(new RenamedWidget_x1({ size: 1 }))).toBe("test.Widget");
+        expect(serializedTypeId(RenamedWidget_x1)).toBe("test.Widget");
+    });
+
+    test.each(["test.Widget", "OldWidget", "LegacyWidget"])("reads %s as the class", (name) => {
+        const widget = Serializer.deserializeObject({} as IDocument, { [InternalClassName]: name, size: 7 });
+        expect(widget).toBeInstanceOf(RenamedWidget_x1);
+        expect(widget.size).toBe(7);
+        expect(canonicalSerializedTypeId(name)).toBe("test.Widget");
+    });
+
+    test("the runtime class name is not an identifier when an id is declared", () => {
+        expect(canonicalSerializedTypeId("RenamedWidget_x1")).toBeUndefined();
+        expect(() =>
+            Serializer.deserializeObject({} as IDocument, {
+                [InternalClassName]: "RenamedWidget_x1",
+                size: 1,
+            }),
+        ).toThrow(/cannot be deserialize/);
+    });
+
+    test("survives minification: the written id does not depend on the class name", () => {
+        // What a mangling build does to a class name after its decorator ran.
+        @serializable({ id: "test.Mangled" })
+        class Readable {
+            @serialize()
+            public value = 1;
+        }
+        Object.defineProperty(Readable, "name", { value: "a" });
+        expect(Serializer.serializeObject(new Readable())[InternalClassName]).toBe("test.Mangled");
+    });
+
+    test("core classes keep their class names as ids (what saved documents hold)", () => {
+        expect(serializedTypeId(XYZ)).toBe("XYZ");
+        expect(serializedTypeId(FolderNode)).toBe("FolderNode");
+        expect(serializedTypeId(Float32Array)).toBe("Float32Array");
+    });
+
+    test("an undecorated class has no id and does not serialize", () => {
+        class Plain {}
+        expect(serializedTypeId(new Plain())).toBeUndefined();
+        expect(() => Serializer.serializeObject(new Plain())).toThrow(/not registered/);
+    });
+
+    test("an alias already taken by another class is skipped with a warning", () => {
+        const warn = rs.spyOn(console, "warn").mockImplementation(() => {});
+        try {
+            @serializable({ id: "test.Other", aliases: ["OldWidget"] })
+            class Other {
+                @serialize()
+                public size = 0;
+            }
+            expect(warn).toHaveBeenCalledWith(expect.stringContaining("OldWidget"));
+            expect(serializedTypeId(Other)).toBe("test.Other");
+            expect(canonicalSerializedTypeId("OldWidget")).toBe("test.Widget");
+        } finally {
+            warn.mockRestore();
+        }
     });
 });

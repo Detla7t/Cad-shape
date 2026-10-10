@@ -18,6 +18,9 @@ rs.mock("@chili3d/core", () => {
     const configuredValue = rs.hoisted(() => require("../../../core/src/parameters/configuredValue"));
     const configuration = rs.hoisted(() => require("../../../core/src/parameters/configuration"));
     const documentUnits = rs.hoisted(() => require("../../../core/src/parameters/documentUnits"));
+    // The shared evaluation vocabulary and its Part Studio adapter (feature-list indicators).
+    const evaluationState = rs.hoisted(() => require("../../../core/src/model/evaluationState"));
+    const featureEvaluation = rs.hoisted(() => require("../../../core/src/model/featureEvaluation"));
     const {
         LocalizeMock,
         BindingMock,
@@ -32,6 +35,8 @@ rs.mock("@chili3d/core", () => {
         ...configuredValue,
         ...configuration,
         ...documentUnits,
+        ...evaluationState,
+        ...featureEvaluation,
         Localize: LocalizeMock,
         Binding: BindingMock,
         PathBinding: PathBindingMock,

@@ -20,7 +20,7 @@ export interface CircleOptions {
     radius: number;
 }
 
-@serializable()
+@serializable({ id: "CircleNode" })
 export class CircleNode extends FacebaseNode {
     override display(): I18nKeys {
         return "body.circle";

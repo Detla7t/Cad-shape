@@ -77,7 +77,16 @@ export interface ProjectManifest {
     /** ISO 8601 timestamps. */
     readonly createdAt: string;
     readonly modifiedAt: string;
-    readonly document: { readonly id: string; readonly name: string; readonly version: string };
+    /**
+     * `schemaVersion`: the document schema (`DOCUMENT_SCHEMA_VERSION`), absent before it existed;
+     * `version`: the legacy compatibility marker (`LEGACY_DOCUMENT_VERSION`).
+     */
+    readonly document: {
+        readonly id: string;
+        readonly name: string;
+        readonly version: string;
+        readonly schemaVersion?: number;
+    };
     readonly featureScript?: { readonly std: string; readonly version: number };
     readonly elements: readonly ProjectElement[];
     readonly files: readonly ProjectFileEntry[];

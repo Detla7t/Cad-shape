@@ -4,8 +4,11 @@
 import { Document } from "@chili3d/app";
 import {
     Constants,
+    DOCUMENT_SCHEMA_VERSION,
     DocumentVersionControl,
+    documentSchemaHeader,
     type IDocument,
+    LEGACY_DOCUMENT_VERSION,
     Logger,
     PubSub,
     StorageHistoryPersistence,
@@ -250,4 +253,47 @@ test("aborted history compaction preserves the earlier packs and can be retried"
     const loaded = await reopen(document);
     expect(loaded.name).toBe("Compacted revision");
     expect(DocumentVersionControl.of(loaded)?.log()).toHaveLength(26);
+});
+
+describe("document schema in the document store", () => {
+    test("a stored document with a newer schema does not open and is left exactly as stored", async () => {
+        const document = await newDocument();
+        await document.save();
+        const stored = await storage.get(Constants.DBName, Constants.DocumentTable, document.id);
+        const newer = { ...stored, ...documentSchemaHeader("99.0.0", DOCUMENT_SCHEMA_VERSION + 1) };
+        await storage.put(Constants.DBName, Constants.DocumentTable, document.id, newer);
+        const alert = rs.fn((_message?: string) => {});
+        rs.stubGlobal("alert", alert);
+
+        const app = Object.assign(createMockApplication(), { storage });
+        const opened = await Document.open(app, document.id);
+
+        expect(opened).toBeUndefined();
+        expect(app.documents.size).toBe(0);
+        expect(alert.mock.calls[0][0]).toContain("Chili3D 99.0.0");
+        expect(await storage.get(Constants.DBName, Constants.DocumentTable, document.id)).toEqual(newer);
+    });
+
+    test("a document stored before schemaVersion existed opens and is saved back with it", async () => {
+        const document = await newDocument();
+        await document.save();
+        const stored = await storage.get(Constants.DBName, Constants.DocumentTable, document.id);
+        expect(stored).toMatchObject({
+            schemaVersion: DOCUMENT_SCHEMA_VERSION,
+            version: LEGACY_DOCUMENT_VERSION,
+        });
+        const { schemaVersion: _schema, appVersion: _app, ...legacy } = stored;
+        await storage.put(Constants.DBName, Constants.DocumentTable, document.id, legacy);
+
+        const reopened = await reopen(document);
+        reopened.name = "Upgraded";
+        await reopened.save();
+
+        expect(await storage.get(Constants.DBName, Constants.DocumentTable, document.id)).toMatchObject({
+            name: "Upgraded",
+            version: LEGACY_DOCUMENT_VERSION,
+            schemaVersion: DOCUMENT_SCHEMA_VERSION,
+            appVersion: __APP_VERSION__,
+        });
+    });
 });

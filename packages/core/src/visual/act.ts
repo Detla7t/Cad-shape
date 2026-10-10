@@ -13,7 +13,7 @@ export interface ActOptions {
     cameraUp: XYZ;
 }
 
-@serializable()
+@serializable({ id: "Act" })
 export class Act extends Observable {
     @serialize()
     public get name() {

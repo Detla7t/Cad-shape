@@ -2,8 +2,10 @@
     opacity: 0.56;
 }
 
+/* Fills the rest of the row, shrinks with the sidebar, and wraps under the name below 9em. */
 .box {
-    flex: 1;
+    flex: 1 1 9em;
+    min-width: 0;
     font-size: 1rem;
     padding: 4px;
     outline: none;

@@ -69,3 +69,47 @@ test("preferences save document units as one undo step, keep defaults separate, 
         Config.instance.preferences = saved;
     }
 });
+
+test("desktop settings save the bridge URL and the auto-open choice; a bad URL is refused", () => {
+    const saved = Config.instance.preferences;
+    const storage = rs.spyOn(Config.instance, "saveToStorage").mockImplementation(() => {});
+    Config.instance.preferences = defaultUserPreferences();
+    const ribbon = new Ribbon([], [new RibbonTab("ribbon.tab.model")]);
+    const preferences = new PreferencesDialog(ribbon, () => {}).show();
+    try {
+        const section = preferences.dialog.querySelector<HTMLElement>('section[data-section="desktop"]');
+        expect(section).not.toBeNull();
+        const url = section!.querySelector<HTMLInputElement>('input[aria-label="Desktop bridge URL"]');
+        expect(url).not.toBeNull();
+        expect(url!.value).toBe("http://127.0.0.1:7781");
+        const statusText = () =>
+            [...section!.querySelectorAll('[role="status"]')].map((el) => el.textContent).join(" | ");
+
+        url!.value = "not a url";
+        url!.dispatchEvent(new Event("input", { bubbles: true }));
+        click(section!, "Save desktop settings");
+        expect(statusText()).toContain("Enter the bridge URL");
+        expect(Config.instance.preferences.desktop).toEqual({
+            bridgeUrl: "http://127.0.0.1:7781",
+            openExports: false,
+        });
+
+        url!.value = "http://localhost:9999/";
+        url!.dispatchEvent(new Event("input", { bubbles: true }));
+        const auto = section!.querySelector<HTMLInputElement>('input[type="checkbox"]');
+        expect(auto).not.toBeNull();
+        auto!.checked = true;
+        auto!.dispatchEvent(new Event("change", { bubbles: true }));
+        click(section!, "Save desktop settings");
+        expect(statusText()).toContain("Saved");
+        expect(Config.instance.preferences.desktop).toEqual({
+            bridgeUrl: "http://localhost:9999",
+            openExports: true,
+        });
+        expect(storage).toHaveBeenCalled();
+    } finally {
+        preferences.dispose();
+        storage.mockRestore();
+        Config.instance.preferences = saved;
+    }
+});

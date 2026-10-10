@@ -16,7 +16,7 @@ export interface BooleanOptions {
     booleanShape: IShape;
 }
 
-@serializable()
+@serializable({ id: "BooleanNode" })
 export class BooleanNode extends ParameterShapeNode {
     override display(): I18nKeys {
         return "body.bolean";

@@ -25,6 +25,7 @@ import {
     type Plane,
     PubSub,
     Ray,
+    type RenderQualityState,
     SelectionRectangle,
     type ShapeMeshRange,
     ShapeNode,
@@ -60,6 +61,7 @@ import { CSS2DObject, CSS2DRenderer } from "three/examples/jsm/renderers/CSS2DRe
 import { CameraController } from "./cameraController";
 import { Constants } from "./constants";
 import { renderModelThumbnail } from "./modelThumbnail";
+import { FULL_QUALITY, QualityController, type QualityLevel } from "./renderQuality";
 import { ThreeRefSegmentAnnotation } from "./threeAnnotation";
 import { ThreeGeometry } from "./threeGeometry";
 import { ThreeHelper } from "./threeHelper";
@@ -96,6 +98,8 @@ function wantedContainers(shapeType: ShapeType, subType: ShapeType): ShapeType[]
 
 /** How long after the last camera change frames keep drawing at interactive (draft) quality. */
 const CAMERA_SETTLE_MS = 150;
+/** The gap after which two moving frames are not consecutive (the user paused). */
+const MOTION_GAP_MS = 500;
 
 /** Whether the sub-shape itself is what a pick with no applicable container asked for. */
 function keepsSubShape(shapeType: ShapeType, subType: ShapeType): boolean {
@@ -119,6 +123,11 @@ export class ThreeView extends Observable implements IView {
     private renderHeight = 0;
     private renderedFrames = 0;
     private frameCpuMs = 0;
+    /** Walks the quality ladder with the measured cadence of the moving frames. */
+    private readonly quality = new QualityController(Config.instance.graphics.quality);
+    private lastMovingFrameAt: number | undefined;
+    /** The share of the display pixel ratio the drawing buffer uses now. */
+    private renderScale = 1;
     private readonly lightDirection = new Vector3();
     /** Frames requested within this window after a camera move draw at interactive quality. */
     private interactingUntil = 0;
@@ -139,18 +148,41 @@ export class ThreeView extends Observable implements IView {
     private readonly effects = new ViewEffects(this);
     private readonly graphicsChanged = (key: keyof Config) => {
         if (key === "preferences") {
-            const ratio = displayPixelRatio(
-                Config.instance.preferences.pixelDensity,
-                window.devicePixelRatio,
-            );
-            if (this._renderer.getPixelRatio() !== ratio) this._renderer.setPixelRatio(ratio);
+            this.applyPixelRatio();
             this.update();
         }
         if (key === "graphics") {
+            this.quality.setProfile(Config.instance.graphics.quality);
             this.cameraController.updateCameraPosionTarget();
             this.update();
         }
     };
+
+    /** The display pixel ratio the preferences ask for, before the render scale. */
+    private displayRatio(): number {
+        return displayPixelRatio(Config.instance.preferences.pixelDensity, window.devicePixelRatio);
+    }
+
+    /**
+     * Sets the drawing buffer to the display ratio times the render scale — only when it
+     * changes, as the browser reallocates the buffer on every change.
+     */
+    private applyPixelRatio(scale = this.renderScale): void {
+        this.renderScale = scale;
+        const ratio = this.displayRatio() * scale;
+        if (Math.abs(this._renderer.getPixelRatio() - ratio) > 1e-6) this._renderer.setPixelRatio(ratio);
+    }
+
+    /** The quality profile in force and what the moving frames measure, for readouts. */
+    qualityState(): RenderQualityState {
+        return {
+            profile: this.quality.currentProfile,
+            targetFps: this.quality.targetFps,
+            movingFps: this.quality.fps,
+            movingLevel: this.quality.movingLevel,
+            renderScale: this.renderScale,
+        };
+    }
     private readonly _cssRenderer: CSS2DRenderer;
     private readonly labelScene = new Scene();
     private readonly _gizmo: IViewGizmo;
@@ -372,8 +404,15 @@ export class ThreeView extends Observable implements IView {
         return element;
     }
 
-    protected renderEffects(quality: "interactive" | "final" = "final") {
-        this.effects.render(quality);
+    protected renderEffects(quality: "interactive" | "final" = "final", level: QualityLevel = FULL_QUALITY) {
+        this.effects.render(quality, level);
+    }
+
+    /** The quality level of the frame about to draw, applied to the drawing buffer. */
+    private frameLevel(quality: "interactive" | "final"): QualityLevel {
+        const level = quality === "interactive" ? this.quality.moving : this.quality.still;
+        if (level.scale !== this.renderScale) this.applyPixelRatio(level.scale);
+        return level;
     }
 
     private renderFrame(quality: "interactive" | "final" = "final") {
@@ -381,10 +420,11 @@ export class ThreeView extends Observable implements IView {
         const reset = this._renderer.info.autoReset;
         this._renderer.info.autoReset = false;
         this._renderer.info.reset();
+        const level = this.frameLevel(quality);
         try {
             this.display.render(() => {
                 this._renderer.render(this._scene, this.camera);
-                this.renderEffects(quality);
+                this.renderEffects(quality, level);
             });
         } finally {
             this._renderer.info.autoReset = reset;
@@ -419,6 +459,10 @@ export class ThreeView extends Observable implements IView {
             "Rendered frames": this.renderedFrames,
             "Frame CPU submission (ms)": Number(this.frameCpuMs.toFixed(2)),
             "Render pixel ratio": this.renderer.getPixelRatio(),
+            "Render scale": this.renderScale,
+            "Moving frame rate (fps)": Number((this.quality.fps ?? 0).toFixed(1)),
+            "Target frame rate (fps)": this.quality.targetFps,
+            "Quality level": this.quality.movingLevel,
         };
     }
 
@@ -467,7 +511,14 @@ export class ThreeView extends Observable implements IView {
 
         this.lightDirection.copy(this.camera.position).sub(this.cameraController.target);
         this.dynamicLight.position.copy(this.lightDirection);
-        const interactive = performance.now() < this.interactingUntil;
+        const now = performance.now();
+        const interactive = now < this.interactingUntil;
+        // The cadence of consecutive moving frames is what the quality profile steers by.
+        if (interactive) {
+            if (this.lastMovingFrameAt !== undefined && now - this.lastMovingFrameAt < MOTION_GAP_MS)
+                this.quality.observe(now - this.lastMovingFrameAt, now);
+            this.lastMovingFrameAt = now;
+        } else this.lastMovingFrameAt = undefined;
         this.renderFrame(interactive ? "interactive" : "final");
         this._cssRenderer.render(this.labelScene, this.camera);
         this._gizmo?.update();
@@ -523,8 +574,8 @@ export class ThreeView extends Observable implements IView {
             origin.setFromMatrixPosition(this.camera.matrixWorld);
             direction.unproject(this.camera).sub(origin).normalize();
         } else if (this.camera instanceof OrthographicCamera) {
-            const z = (this.camera.near + this.camera.far) / (this.camera.near - this.camera.far);
-            origin.set(x, y, z).unproject(this.camera);
+            // the ray starts on the near plane, which sits behind the camera (see `updateCameraNearFar`)
+            origin.set(x, y, -1).unproject(this.camera);
             direction.set(0, 0, -1).transformDirection(this.camera.matrixWorld);
         } else {
             console.error(`Unsupported camera type: ${this.camera}`);
@@ -1195,6 +1246,10 @@ export class ThreeView extends Observable implements IView {
             raycaster.layers.enableAll();
         }
         raycaster.setFromCamera(mousePos, this.camera);
+        // An orthographic near plane behind the camera (see `CameraController.updateCameraNearFar`)
+        // renders what lies behind the camera plane; the ray starts there, so it is picked too.
+        if (this.camera instanceof OrthographicCamera && this.camera.near < 0)
+            raycaster.ray.origin.addScaledVector(raycaster.ray.direction, this.camera.near);
         raycaster.params = {
             ...raycaster.params,
             Line2: { threshold },

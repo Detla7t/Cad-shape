@@ -22,6 +22,7 @@ import {
     type IWindow,
     type Locale,
     Logger,
+    PubSub,
     registerProjectEntryProvider,
     VERSION_HISTORY_ENTRY_PROVIDER,
 } from "@chili3d/core";
@@ -40,6 +41,16 @@ import {
 
 export class AppBuilder {
     protected readonly _inits: (() => Promise<void>)[] = [];
+    /** The module each init belongs to, for the failure report. */
+    private readonly _initNames = new WeakMap<() => Promise<void>, string>();
+    /** Modules that failed to load or initialize; the rest of the suite runs without them. */
+    readonly moduleFailures: ModuleFailure[] = [];
+
+    /** Registers a module's init under its name. */
+    protected init(name: string, run: () => Promise<void>): void {
+        this._inits.push(run);
+        this._initNames.set(run, name);
+    }
     protected readonly _ribbonExtras: RibbonProfileExtra[] = [];
     /** Run once the application exists (modules that need it — storage, documents — start here). */
     protected readonly _onBuilt: ((app: IApplication) => void | Promise<void>)[] = [];
@@ -55,7 +66,7 @@ export class AppBuilder {
     }
 
     protected ensureAPI() {
-        this._inits.push(async () => {
+        this.init("api", async () => {
             Logger.info("initializing api");
 
             (globalThis as any).Chili3dCore = await import("@chili3d/core");
@@ -69,7 +80,7 @@ export class AppBuilder {
     }
 
     protected initI18n() {
-        this._inits.push(async () => {
+        this.init("i18n", async () => {
             Logger.info("initializing i18n");
 
             const i18n = await import("@chili3d/i18n");
@@ -80,7 +91,7 @@ export class AppBuilder {
     }
 
     useIndexedDB() {
-        this._inits.push(async () => {
+        this.init("IndexedDBStorage", async () => {
             Logger.info("initializing IndexedDBStorage");
 
             const db = await import("@chili3d/storage");
@@ -103,7 +114,7 @@ export class AppBuilder {
             await wasm.initWasm();
             return wasm;
         });
-        this._inits.push(async () => {
+        this.init("wasm occ", async () => {
             Logger.info("initializing wasm occ");
 
             const wasm = await loading;
@@ -123,7 +134,7 @@ export class AppBuilder {
             await parametric.initGarlic();
             return parametric;
         });
-        this._inits.push(async () => {
+        this.init("parametric", async () => {
             Logger.info("initializing parametric");
 
             const parametric = await loading;
@@ -158,7 +169,7 @@ export class AppBuilder {
             // registers the CAM Studio element and commands, the machine library and the posts
             return import("@chili3d/cam");
         });
-        this._inits.push(async () => {
+        this.init("cam", async () => {
             Logger.info("initializing cam");
 
             // plugins reach the registries (operations, posts, machines) through the global
@@ -177,7 +188,7 @@ export class AppBuilder {
      */
     useData(): this {
         const loading = preload(() => import("@chili3d/data"));
-        this._inits.push(async () => {
+        this.init("data sources", async () => {
             Logger.info("initializing data sources");
 
             const data = await loading;
@@ -194,7 +205,7 @@ export class AppBuilder {
      */
     useAssembly(): this {
         const loading = preload(() => import("@chili3d/assembly"));
-        this._inits.push(async () => {
+        this.init("assembly", async () => {
             Logger.info("initializing assembly");
 
             const assembly = await loading;
@@ -216,7 +227,7 @@ export class AppBuilder {
      */
     useDocuments(): this {
         const loading = preload(() => import("@chili3d/documents"));
-        this._inits.push(async () => {
+        this.init("documents", async () => {
             Logger.info("initializing documents");
 
             const documents = await loading;
@@ -233,7 +244,7 @@ export class AppBuilder {
      */
     useFabrication(): this {
         const loading = preload(() => import("@chili3d/fabrication/app"));
-        this._inits.push(async () => {
+        this.init("fabrication", async () => {
             Logger.info("initializing fabrication");
 
             const fabrication = await loading;
@@ -245,7 +256,7 @@ export class AppBuilder {
 
     useThree(): this {
         const loading = preload(() => import("@chili3d/three"));
-        this._inits.push(async () => {
+        this.init("three", async () => {
             Logger.info("initializing three");
 
             const three = await loading;
@@ -260,7 +271,7 @@ export class AppBuilder {
      */
     useUI(container?: HTMLElement): this {
         const loading = preload(() => import("@chili3d/ui"));
-        this._inits.push(async () => {
+        this.init("MainWindow", async () => {
             Logger.info("initializing MainWindow");
 
             const ui = await loading;
@@ -277,8 +288,17 @@ export class AppBuilder {
     async build(): Promise<IApplication> {
         // A document's version history travels inside its .chili3d file, under history/.
         registerProjectEntryProvider(VERSION_HISTORY_ENTRY_PROVIDER);
+        // Each module loads and initializes on its own: one that is broken, or still being
+        // worked on, is reported and left out instead of taking the whole suite down with it.
         for (const init of this._inits) {
-            await init();
+            try {
+                await init();
+            } catch (error) {
+                const name = this._initNames.get(init) ?? "startup";
+                const message = error instanceof Error ? error.message : String(error);
+                Logger.error(`module "${name}" failed to load; continuing without it`, error);
+                this.moduleFailures.push({ module: name, message });
+            }
         }
         this.ensureNecessary();
 
@@ -289,6 +309,8 @@ export class AppBuilder {
         }
         await this._window?.init(app);
         await this.loadDefaultPlugins(app);
+        for (const failure of this.moduleFailures)
+            PubSub.default.pub("showToast", "error.default:{0}", `${failure.module}: ${failure.message}`);
 
         Logger.info("Application build completed");
 
@@ -359,6 +381,12 @@ export class AppBuilder {
  * evaluation and WebAssembly compile overlap; the init that awaits it still runs in order, so
  * ribbon contributions and registrations stay deterministic. A failure surfaces in that init.
  */
+/** A module the builder could not bring up. */
+export interface ModuleFailure {
+    readonly module: string;
+    readonly message: string;
+}
+
 function preload<T>(load: () => Promise<T>): Promise<T> {
     const loading = load();
     loading.catch(() => {});

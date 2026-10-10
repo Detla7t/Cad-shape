@@ -1,0 +1,19 @@
+{
+    "name": "@chili3d/richtext",
+    "version": "0.7.1",
+    "description": "Rich-text documents: the editable block model (from the editor's HTML), the HTML sanitizer, and DOCX (mammoth/docx) and ODT read/write; no CAD or UI",
+    "main": "src/index.ts",
+    "type": "module",
+    "exports": {
+        ".": "./src/index.ts",
+        "./*": "./src/*.ts"
+    },
+    "devDependencies": {
+        "@chili3d/core": "*",
+        "@chili3d/office-io": "*"
+    },
+    "dependencies": {
+        "docx": "^9.9.0",
+        "mammoth": "^1.13.0"
+    }
+}

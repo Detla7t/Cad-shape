@@ -15,7 +15,11 @@ import style from "./nodeContextMenu.module.css";
 
 let closeMenu: (() => void) | undefined;
 export function showNodeContextMenu(node: INode, x: number, y: number, context?: NodeMenuContext): void {
-    let actions = NodeActions.forNode(node, context);
+    // Providers registered later replace an earlier action of the same id (a module that
+    // loads after another refines its entry — the documents module's export dialog).
+    let actions = NodeActions.forNode(node, context).filter(
+        (action, index, all) => all.findLastIndex((other) => other.id === action.id) === index,
+    );
     const doc = node instanceof ModelNode ? node.document : context?.view.document;
     const isPlane = node instanceof ReferencePlaneNode;
     if (doc && !isPlane) {

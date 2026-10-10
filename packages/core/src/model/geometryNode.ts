@@ -17,7 +17,7 @@ export interface FaceMaterialPairOptions {
     materialIndex: number;
 }
 
-@serializable()
+@serializable({ id: "FaceMaterialPair" })
 export class FaceMaterialPair {
     @serialize()
     faceIndex: number;

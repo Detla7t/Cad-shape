@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 
 export const FIXTURES = resolve(
     dirname(fileURLToPath(import.meta.url)),
-    "../packages/parametric/test/featurescript/fixtures/conformance",
+    "../packages/featurescript/test/fixtures/conformance",
 );
 export const manifest = JSON.parse(readFileSync(join(FIXTURES, "cases.json"), "utf8"));
 

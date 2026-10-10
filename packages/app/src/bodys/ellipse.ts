@@ -23,7 +23,7 @@ export interface EllipseOptions {
     isFace?: boolean;
 }
 
-@serializable()
+@serializable({ id: "EllipseNode" })
 export class EllipseNode extends FacebaseNode {
     override display(): I18nKeys {
         return "body.ellipse";

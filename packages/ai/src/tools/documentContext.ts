@@ -1,7 +1,21 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { I18n, type IDocument, type INode } from "@chili3d/core";
+import { I18n, type IApplication, type IDocument, type INode, type IView } from "@chili3d/core";
+
+/** The application, or undefined before one exists (`globalThis.app` is a throwing getter then). */
+export function getApplication(): IApplication | undefined {
+    try {
+        return globalThis.app ?? undefined;
+    } catch {
+        return undefined;
+    }
+}
+
+/** The active view, or undefined when none is open. */
+export function getActiveView(): IView | undefined {
+    return getApplication()?.activeView;
+}
 
 /**
  * The active document, or undefined when none is open. `globalThis.app` is a core getter that

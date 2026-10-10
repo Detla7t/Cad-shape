@@ -1,0 +1,19 @@
+{
+    "name": "@chili3d/sheet",
+    "version": "0.7.1",
+    "description": "The spreadsheet engine: workbook model, formula engine (Excel functions, arrays, structured references), number formats, range operations and CSV/TSV/XLSX/ODS read/write; no CAD or UI",
+    "main": "src/index.ts",
+    "type": "module",
+    "exports": {
+        ".": "./src/index.ts",
+        "./*": "./src/*.ts"
+    },
+    "devDependencies": {
+        "@chili3d/core": "*",
+        "@chili3d/office-io": "*"
+    },
+    "dependencies": {
+        "exceljs": "^4.4.0",
+        "jszip": "^3.10.1"
+    }
+}

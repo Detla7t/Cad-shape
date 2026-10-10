@@ -251,7 +251,7 @@ and verify them, then use `npm run test:rust:offline`. Keep `.offline/rust-confi
 with that directory; Cargo verifies the vendored crates against their upstream checksums.
 
 Captured Onshape results and their source hashes are stored under
-`packages/parametric/test/featurescript/fixtures/conformance/`; replay needs no Onshape login.
+`packages/featurescript/test/fixtures/conformance/`; replay needs no Onshape login.
 Generating new Onshape reference results, following external video links, and refreshing
 user-configured remote data sources still require their services. Saved data snapshots remain
 available offline. The offline preview deliberately disables browser caching to test a cold load.
@@ -264,27 +264,50 @@ You can also deploy with Docker:
 docker compose up -d   # Builds and serves the app at http://localhost:8080
 ```
 
-### 3D Printing with PrusaSlicer (optional)
+### Desktop bridge (optional): open exports in your desktop apps, slice with PrusaSlicer
+
+A browser cannot start a desktop program, so Chili3d ships a small local helper. Start it on the computer
+you work at (Node.js 18+, no extra packages):
+
+```bash
+node scripts/desktop-bridge.mjs                              # http://127.0.0.1:7781, saves to ~/Downloads
+node scripts/desktop-bridge.mjs --exports ~/CAD/exports      # another folder
+node scripts/desktop-bridge.mjs --app "Blender[stl,obj]=/usr/bin/blender"   # offer a program the bridge does not know
+node scripts/desktop-bridge.mjs --origin https://your-chili3d-host          # allow a deployed app (dev origins are allowed)
+```
+
+With the bridge running, every export ends with a message offering **Open in default app**, **Open in FreeCAD**,
+**Open in PrusaSlicer**, … for the programs the bridge found on the machine (FreeCAD, PrusaSlicer, Bambu Studio,
+OrcaSlicer, UltiMaker Cura, LibreCAD, QCAD, Inkscape, MeshLab, LightBurn, CAMotics, Rhino, SOLIDWORKS; `--app`
+adds your own), and **Show in folder** once a file was opened. Preferences ▸ Desktop apps holds the bridge URL,
+a connection check, and the option to hand every export to the bridge directly: the file is then saved to the
+bridge's folder and opened in the system's default program instead of being downloaded. Where the browser can
+share files (Android, Windows, macOS), the message also offers **Share…** through the system share sheet, with
+or without the bridge.
+
+The bridge listens on 127.0.0.1 only and accepts requests from the app's origins. `POST /open` saves the file
+under the exports folder (never overwriting: `part (1).step`) and launches the program detached; it opens CAD,
+mesh, drawing, program and document file types only (`--allow ext,ext` adds more), never executables.
+`PRUSA_SLICER`, `CHILI3D_BRIDGE_PORT`, `CHILI3D_ORIGINS`, `CHILI3D_EXPORTS_DIR`, `CHILI3D_APPS` (`;`-separated
+`Name[ext,ext]=command` entries) and `CHILI3D_ALLOW` set the same options as the flags.
+
+#### 3D printing with PrusaSlicer
 
 A CAM Studio printer setup slices in the browser with the built-in slicer, or with your installed
-[PrusaSlicer](https://www.prusa3d.com/prusaslicer/) through a small local bridge (the "PrusaSlicer (local)"
+[PrusaSlicer](https://www.prusa3d.com/prusaslicer/) through the same bridge (the "PrusaSlicer (local)"
 operation). Both read the same PrusaSlicer print / filament / printer presets; "Open in PrusaSlicer" exports the
 job as a PrusaSlicer project (`.3mf`) instead.
 
-Start the bridge on the computer that has PrusaSlicer (Node.js 18+, no extra packages):
-
 ```bash
-node scripts/prusa-slicer-bridge.mjs                         # http://127.0.0.1:7781, runs `prusa-slicer`
-node scripts/prusa-slicer-bridge.mjs --slicer "/Applications/PrusaSlicer.app/Contents/MacOS/PrusaSlicer"
-node scripts/prusa-slicer-bridge.mjs --slicer "C:\Program Files\Prusa3D\PrusaSlicer\prusa-slicer-console.exe"
-node scripts/prusa-slicer-bridge.mjs --origin https://your-chili3d-host   # allow a deployed app (dev origins are allowed)
+node scripts/desktop-bridge.mjs --slicer "/Applications/PrusaSlicer.app/Contents/MacOS/PrusaSlicer"
+node scripts/desktop-bridge.mjs --slicer "C:\Program Files\Prusa3D\PrusaSlicer\prusa-slicer-console.exe"
 ```
 
-`PRUSA_SLICER`, `CHILI3D_BRIDGE_PORT` and `CHILI3D_ORIGINS` (comma-separated) set the same options. The bridge
-listens on 127.0.0.1 only, answers `GET /health` with the PrusaSlicer version, and for `POST /slice` runs
-`prusa-slicer --export-gcode --dont-arrange --load job.ini --output job.gcode job.3mf` in a temporary directory
-and returns the G-code. Set the operation's "Bridge URL" (or the machine's `prusaSlicerBridgeUrl` option) when it
-runs elsewhere.
+`GET /health` reports the PrusaSlicer version (or that none was found; the bridge still opens exports), and
+`POST /slice` runs `prusa-slicer --export-gcode --dont-arrange --load job.ini --output job.gcode job.3mf` in a
+temporary directory and returns the G-code. Set the operation's "Bridge URL" (or the machine's
+`prusaSlicerBridgeUrl` option) when it runs elsewhere. `node scripts/prusa-slicer-bridge.mjs`, the bridge's
+former name, still works.
 
 ## Code Style
 

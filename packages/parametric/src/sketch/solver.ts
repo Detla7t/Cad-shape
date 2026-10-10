@@ -37,6 +37,7 @@ import {
     syncExternalRoles,
     toDatumSource,
 } from "./sketchModel";
+import { lineRefs } from "./solverEntities";
 
 function findRoot(parent: Map<string, string>, key: string): string {
     let root = key;
@@ -62,6 +63,20 @@ function projectOntoCircle(
 export interface SolveOutcome {
     result: string;
     dofs: number;
+}
+
+/** What the constraints determine (Onshape's black geometry) — see `SketchSolver.constraintStatus`. */
+export interface SketchConstraintStatus {
+    /** `pointRefKey` of every point the constraints hold in place. */
+    readonly points: ReadonlySet<string>;
+    /**
+     * Entities whose curve is determined, the extent aside: a line's carrier line, a
+     * circle's or an arc's circle, every point of a point, Bézier or spline. Their
+     * stroke draws as solved while a free endpoint can still slide along it.
+     */
+    readonly curves: ReadonlySet<number>;
+    /** Entities with nothing left to move: every point, and a circle's radius. */
+    readonly entities: ReadonlySet<number>;
 }
 
 /** One datum as it goes into garlic: what to persist alongside the value it resolved to. */
@@ -470,10 +485,15 @@ export class SketchSolver implements ExternalEntityHost {
             report = this.system.solve(true);
             this.refreshCache();
         }
-        return {
-            result: typeof report === "string" ? report : String(report?.result),
-            dofs: this.system.dofs(),
-        };
+        const result = typeof report === "string" ? report : String(report?.result);
+        // garlic's dofs() over-counts once a constraint is redundant (an extra Fix on an
+        // origin-attached end reads 3 DOF instead of 1); a settled fine solve reports
+        // the rank diagnosis, so the panel's remaining DOF and "Solved" stay right
+        if (fine && result.startsWith("Ok")) {
+            const dofs = this.rankDofs();
+            return { result: dofs === 0 ? "Ok" : "OkUnderconstrained", dofs };
+        }
+        return { result, dofs: this.system.dofs() };
     }
 
     /**
@@ -575,56 +595,111 @@ export class SketchSolver implements ExternalEntityHost {
         return this.system.dofs();
     }
 
-    /**
-     * A fully constrained entity loses no degrees of freedom when pinned at its solved
-     * position. Probe on an isolated solver so diagnostics never alter the live sketch,
-     * its ids, drag state or undo history. Called after fine solves, never per drag frame.
-     */
+    /** Entities with nothing left to move — see `constraintStatus`. */
     fullyConstrainedEntities(): Set<number> {
+        return new Set(this.constraintStatus().entities);
+    }
+
+    /**
+     * What the constraints determine, point by point and curve by curve (Onshape's black
+     * geometry). Something is determined when pinning it at its solved position removes
+     * no degree of freedom. The pins go onto an isolated probe solver, so the analysis
+     * never alters the live sketch, its ids, drag state or undo history; the probe's
+     * DOF comes from garlic's rank diagnosis, which stays right where a pin is redundant
+     * (`dofs()` over-counts there). Coincident points share one probe. Called after fine
+     * solves, never per drag frame.
+     */
+    constraintStatus(): SketchConstraintStatus {
         const data = this.toData();
-        if (this.dofs() === 0) return new Set(data.entities.map((entity) => entity.id));
+        if (this.dofs() === 0) {
+            const points = data.entities.flatMap((entity) =>
+                Array.from({ length: entityPointCount(entity.type, entity.params) }, (_, pointIndex) =>
+                    pointRefKey({ entityId: entity.id, pointIndex }),
+                ),
+            );
+            const ids = new Set(data.entities.map((entity) => entity.id));
+            return { points: new Set(points), curves: ids, entities: ids };
+        }
         const referenced = new Set(
             data.constraints.flatMap((constraint) => constraint.refs.map((ref) => ref.entityId)),
         );
         const candidates = data.entities.filter((entity) => referenced.has(entity.id));
-        const fixed = new Set<number>();
-        if (!candidates.length) return fixed;
+        const status = { points: new Set<string>(), curves: new Set<number>(), entities: new Set<number>() };
+        if (!candidates.length) return status;
         const probe = new SketchSolver(this.plane, data, this._scope);
         try {
-            const baseline = probe.dofs();
+            // A fixed copy of each line: pinning the line's ends onto it pins the
+            // carrier line alone, leaving the ends free to slide along it.
+            const carriers = new Map<number, [SketchPointRef, SketchPointRef]>();
             for (const entity of candidates) {
-                const pins: number[] = [];
+                if (entity.type !== "line") continue;
+                const copy = probe.addLine(...(entity.params as [number, number, number, number]));
+                const ends = lineRefs(copy) as [SketchPointRef, SketchPointRef];
+                for (const ref of ends) probe.addConstraint({ kind: ConstraintKind.Fix, refs: [ref] });
+                carriers.set(entity.id, ends);
+            }
+            const baseline = probe.rankDofs();
+            const determined = (pins: Omit<SketchConstraintData, "id">[]): boolean => {
+                const ids = pins.map((pin) => probe.addConstraint(pin));
+                try {
+                    return probe.rankDofs() === baseline;
+                } finally {
+                    for (const id of ids) probe.removeConstraint(id);
+                }
+            };
+            const probed = new Set<string>();
+            for (const entity of candidates) {
                 for (
                     let pointIndex = 0;
                     pointIndex < entityPointCount(entity.type, entity.params);
                     pointIndex++
                 ) {
                     const ref = { entityId: entity.id, pointIndex };
-                    pins.push(
-                        probe.addConstraint({
-                            kind: ConstraintKind.Fix,
-                            refs: [ref],
-                            datums: probe.pointOf(ref),
-                        }),
+                    if (probed.has(pointRefKey(ref))) continue;
+                    const fixed = determined([{ kind: ConstraintKind.Fix, refs: [ref] }]);
+                    for (const member of this.coincidentGroup(ref)) {
+                        probed.add(pointRefKey(member));
+                        if (fixed) status.points.add(pointRefKey(member));
+                    }
+                }
+            }
+            for (const entity of candidates) {
+                const has = (pointIndex: number) =>
+                    status.points.has(pointRefKey({ entityId: entity.id, pointIndex }));
+                const allPoints = Array.from(
+                    { length: entityPointCount(entity.type, entity.params) },
+                    (_, pointIndex) => pointIndex,
+                ).every(has);
+                const radius = (): boolean =>
+                    has(0) &&
+                    determined([
+                        { kind: ConstraintKind.Radius, refs: [{ entityId: entity.id, pointIndex: 0 }] },
+                    ]);
+                let curve = allPoints;
+                let whole = allPoints;
+                if (entity.type === "circle") curve = whole = radius();
+                else if (entity.type === "arc") curve ||= radius();
+                else if (entity.type === "line" && !curve) {
+                    const carrier = carriers.get(entity.id)!;
+                    curve = determined(
+                        lineRefs(entity.id).map((ref) => ({
+                            kind: ConstraintKind.PointOnLine,
+                            refs: [ref, ...carrier],
+                        })),
                     );
                 }
-                if (entity.type === "circle")
-                    pins.push(
-                        probe.addConstraint({
-                            kind: ConstraintKind.Radius,
-                            refs: [{ entityId: entity.id, pointIndex: 0 }],
-                            datum: entity.params[2],
-                        }),
-                    );
-                const result = probe.solve(true);
-                if (result.result.startsWith("Ok") && result.dofs === baseline) fixed.add(entity.id);
-                for (const id of pins) probe.removeConstraint(id);
-                probe.solve(true);
+                if (curve) status.curves.add(entity.id);
+                if (whole) status.entities.add(entity.id);
             }
         } finally {
             probe.dispose();
         }
-        return fixed;
+        return status;
+    }
+
+    /** DOF from garlic's rank diagnosis: unlike `dofs()`, a redundant constraint does not inflate it. */
+    private rankDofs(): number {
+        return Number((this.system.diagnose() as { dofs: number }).dofs);
     }
 
     // ------------------------------------------------------------------ Queries

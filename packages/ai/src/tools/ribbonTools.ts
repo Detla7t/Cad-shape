@@ -96,6 +96,43 @@ function commandsOnRibbon(ribbon: Ribbon): Set<string> {
 }
 
 /**
+ * Where each command's buttons are: "Tab ▸ Group" (with " ▸ Dropdown" inside a pulldown, and
+ * "Quick access" for the title bar), in the user's language.
+ */
+export function ribbonLocations(ribbon: Ribbon): Map<string, string[]> {
+    const locations = new Map<string, string[]>();
+    const at = (command: string, place: string) => {
+        const list = locations.get(command);
+        if (!list) locations.set(command, [place]);
+        else if (!list.includes(place)) list.push(place);
+    };
+    const add = (item: RibbonCommand, place: string): void => {
+        if (typeof item === "string") at(item, place);
+        else if (item instanceof ObservableCollection) item.forEach((command) => add(command, place));
+        else if (item.type === "push") at(item.command, place);
+        else if (item.type === "pulldown")
+            item.items.forEach((entry) =>
+                add(entry as RibbonCommand, `${place} ▸ ${translate(item.display)}`),
+            );
+        else item.items.forEach((entry) => add(entry as RibbonCommand, place));
+    };
+    for (const tab of ribbon.tabs) {
+        for (const group of tab.groups) {
+            const place = `${translate(tab.tabName)} ▸ ${translate(group.groupName)}`;
+            group.items.forEach((item) => add(item, place));
+            for (const command of group.collapsedItems) at(command, `${place} (overflow)`);
+        }
+    }
+    for (const command of ribbon.quickCommands) at(command, "Quick access");
+    return locations;
+}
+
+/** The ribbon of the open window, if any. */
+export function currentRibbon(): Ribbon | undefined {
+    return getRibbon();
+}
+
+/**
  * Registered commands with no button anywhere on the ribbon: they are run from a dialog, the
  * model tree, or a hotkey only, so "click the ribbon" is the wrong answer for them. Read from
  * the command registry rather than from the labels — this way it names the commands this build

@@ -46,7 +46,7 @@ export function sketchFlatPattern(data: SketchData, name: string): FlatPattern {
  * configuration shows ("End Cap" or "Reducing End Cap"), redrawn after every configuration
  * switch once the sketches have re-solved. Named the way Onshape names its exports.
  */
-@serializable()
+@serializable({ id: "EndCapDrawingNode" })
 export class EndCapDrawingNode extends DocumentFileNode {
     /** `IVariableConsumer`: after the sketches (0), bodies (1) and variable features (2). */
     readonly variableSyncOrder = 3;

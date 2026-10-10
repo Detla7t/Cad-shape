@@ -1,8 +1,13 @@
+/* A property row: the name, then its control; the control wraps under the name when the
+   two do not fit side by side (a narrow sidebar). */
 .panel {
     display: flex;
     flex-direction: row;
+    flex-wrap: wrap;
     align-items: center;
+    gap: 4px 6px;
     position: relative;
+    min-width: 0;
 }
 
 .propertyName {

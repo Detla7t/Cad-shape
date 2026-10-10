@@ -15,6 +15,7 @@ function createMockCameraController(overrides?: Partial<ICameraController>): ICa
         cameraType: "perspective",
         fitContent: () => {},
         lookAt: () => {},
+        animateLookAt: () => Promise.resolve(),
         pan: () => {},
         startRotate: () => {},
         rotate: () => {},

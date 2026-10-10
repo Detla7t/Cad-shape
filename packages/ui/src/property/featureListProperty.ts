@@ -20,6 +20,8 @@ import {
     isConfiguredValue,
     isFeatureListNode,
     Localize,
+    NodeEvaluation,
+    PartStudioTimeline,
     PubSub,
     ShapeTypes,
     selectConfiguredArm,
@@ -27,11 +29,13 @@ import {
     type UnitSpec,
 } from "@chili3d/core";
 import { button, div, input, option, select, span, svg } from "@chili3d/element";
-import { showDialog } from "../dialog";
+import { type EvaluationAction, EvaluationIndicators } from "@chili3d/react";
 import { HistoryBar } from "../project/historyBar";
 import commonStyle from "./common.module.css";
 import { type ConfigureGridKind, showConfigureGrid } from "./configuration/configureGrid";
+import { closeFeatureContextMenu, showFeatureContextMenu } from "./featureContextMenu";
 import style from "./featureListProperty.module.css";
+import { featureDisplayName } from "./featureName";
 import inputStyle from "./input.module.css";
 
 interface DropTarget {
@@ -57,11 +61,19 @@ function unitSpecLabelKey(unit: UnitSpec | undefined): I18nKeys | undefined {
  */
 export class FeatureListProperty extends HTMLElement {
     private readonly expanded = new Set<string>();
-    private menu: HTMLElement | undefined;
     private draggingId: string | undefined;
     private dropTarget: DropTarget | undefined;
     private historyBar?: HistoryBar;
+    /** The Part Studio timeline the rollback bar reads and drives (set once the bar exists). */
+    private timelineModel?: PartStudioTimeline;
     private picking = false;
+    /** Live evaluation states of the node and its features (one listener for the whole list). */
+    private readonly evaluation: NodeEvaluation;
+    /** The shared evaluation indicator of each row, kept across re-renders. */
+    private readonly indicators = new EvaluationIndicators(style.status);
+    /** The banner over the list while the node's last rebuild failed. */
+    private readonly banner = new EvaluationIndicators(style.statusBanner);
+    private indicatorsDisposed = false;
 
     /**
      * `session` is the feature dialog's edit session: pick parameters become Onshape-style
@@ -77,11 +89,19 @@ export class FeatureListProperty extends HTMLElement {
     ) {
         super();
         if (featureId) this.expanded.add(featureId);
+        this.evaluation = new NodeEvaluation(node, (item) => this.featureName(item));
         this.renderItems();
     }
 
     connectedCallback(): void {
+        // Indicators unmount on disconnect (their subscriptions hold the node); a re-attached
+        // list renders them again.
+        if (this.indicatorsDisposed) {
+            this.indicatorsDisposed = false;
+            this.renderItems();
+        }
         this.node.onPropertyChanged(this.handleNodeChanged);
+        this.timelineModel?.onPropertyChanged(this.handleTimelineChanged);
         PubSub.default.sub("documentUnitsChanged", this.handleUnitsChanged);
         if (this.session) {
             this.session.onPickChanged = () => this.renderItems();
@@ -95,9 +115,13 @@ export class FeatureListProperty extends HTMLElement {
             this.document.selection.onShapeChanged.remove(this.handleSelectionChanged);
         }
         this.node.removePropertyChanged(this.handleNodeChanged);
+        this.timelineModel?.removePropertyChanged(this.handleTimelineChanged);
         PubSub.default.remove("documentUnitsChanged", this.handleUnitsChanged);
         this.closeMenu();
         this.historyBar?.dispose();
+        this.indicators.dispose();
+        this.banner.dispose();
+        this.indicatorsDisposed = true;
     }
 
     /** The active query box shows what is selected right now, as Onshape's does. */
@@ -111,37 +135,72 @@ export class FeatureListProperty extends HTMLElement {
     private readonly handleUnitsChanged = (model: IDocument) => {
         if (model === this.document) this.renderItems();
     };
+    /** The marker moved elsewhere (the timeline, the tree's bar): follow it. */
+    private readonly handleTimelineChanged = (property: string) => {
+        if (property === "position") this.historyBar?.refresh();
+    };
 
     private renderItems() {
         this.closeMenu();
         this.historyBar?.dispose();
-        this.replaceChildren(
-            ...this.node
-                .featureItems()
-                .filter((item) => !this.featureId || item.id === this.featureId)
-                .map((item) => this.featureRow(item)),
-        );
+        const rows = this.node
+            .featureItems()
+            .filter((item) => !this.featureId || item.id === this.featureId)
+            .map((item) => this.featureRow(item));
+        // The whole list (not a single feature's dialog) says when the model shows the last
+        // successful result, names the failing feature and opens it.
+        const banner = this.featureId
+            ? []
+            : [
+                  this.banner.element("node", this.evaluation.node, {
+                      variant: "banner",
+                      onlyFailed: true,
+                      action: this.editFailingFeature,
+                  }),
+              ];
+        this.replaceChildren(...banner, ...rows);
+        this.indicators.sweep();
+        this.banner.sweep();
         if (this.picking) this.setInputsDisabled(true);
         if (!this.featureId && this.node.setRollbackIndex) {
-            const rows = [...this.children] as HTMLElement[];
+            // The body's bar is a view of the Part Studio timeline: one marker for every view.
+            if (this.timelineModel === undefined) {
+                this.timelineModel = PartStudioTimeline.of(this.document);
+                if (this.isConnected) this.timelineModel.onPropertyChanged(this.handleTimelineChanged);
+            }
+            const timeline = this.timelineModel;
             const bar = new HistoryBar(
                 () => rows,
-                () => this.node.rollbackIndex ?? rows.length,
-                (position) => {
-                    const previous = this.node.rollbackIndex;
-                    if (!this.node.setRollbackIndex!(position === rows.length ? undefined : position)) {
-                        this.node.setRollbackIndex!(previous);
-                        PubSub.default.pub(
-                            "displayError",
-                            "This history position cannot be rebuilt. The previous position was restored.",
-                        );
-                    }
-                },
+                () => timeline.appliedFeatureCount(this.node),
+                (position) => timeline.rollToFeature(this.node, position),
             );
             this.historyBar = bar;
             this.append(bar.element);
             bar.refresh();
         }
+    }
+
+    /** "Edit feature" on the banner: opens whichever feature fails now. */
+    private readonly editFailingFeature: EvaluationAction = {
+        label: I18n.translate("evaluation.editFeature"),
+        run: () => {
+            const state = this.evaluation.node.state();
+            if (state?.kind === "failed" && state.at !== undefined)
+                PubSub.default.pub("editFeature", this.node, state.at);
+        },
+    };
+
+    /** The row's shared evaluation indicator; failed rows offer "Edit feature" outside its dialog. */
+    private featureIndicator(item: FeatureItem): HTMLElement {
+        return this.indicators.element(item.id, this.evaluation.feature(item.id), {
+            hideReady: true,
+            action: this.featureId
+                ? undefined
+                : {
+                      label: I18n.translate("evaluation.editFeature"),
+                      run: () => PubSub.default.pub("editFeature", this.node, item.id),
+                  },
+        });
     }
 
     private isExpanded(item: FeatureItem) {
@@ -221,6 +280,7 @@ export class FeatureListProperty extends HTMLElement {
                 className: style.name,
                 textContent: this.featureName(item),
             }),
+            this.featureIndicator(item),
             more,
             ...(!this.timeline
                 ? [
@@ -238,23 +298,7 @@ export class FeatureListProperty extends HTMLElement {
     }
 
     private featureName(item: FeatureItem): string {
-        if (item.name) return item.name;
-        const nodes = this.document.modelManager?.findNodes?.() ?? [this.node];
-        let count = 0;
-        for (const node of nodes) {
-            if (!isFeatureListNode(node)) continue;
-            for (const feature of node.featureItems()) {
-                if (feature.display === item.display) count++;
-                if (node === this.node && feature.id === item.id)
-                    return `${I18n.translate(item.display)} ${count}`;
-            }
-        }
-        return `${I18n.translate(item.display)} ${
-            this.node
-                .featureItems()
-                .filter((f) => f.display === item.display)
-                .findIndex((f) => f.id === item.id) + 1
-        }`;
+        return featureDisplayName(this.document, this.node, item);
     }
 
     private featureBody(item: FeatureItem) {
@@ -618,124 +662,11 @@ export class FeatureListProperty extends HTMLElement {
     // --- floating menu ---
 
     private openMenu(anchor: Element, item: FeatureItem) {
-        this.closeMenu();
-        const entries: [icon: string, display: I18nKeys, action: () => void][] = [
-            ["icon-edit", "common.rename", () => this.rename(item)],
-        ];
-        if (item.reselectable) {
-            entries.push(["icon-sync-alt", "features.reselect", () => this.node.reselectShapes?.(item.id)]);
-        }
-        entries.push(
-            [
-                item.suppressed ? "icon-eye" : "icon-eye-slash",
-                item.suppressed ? "features.unsuppress" : "features.suppress",
-                () => this.toggleSuppressed(item),
-            ],
-            ["icon-layer-group", "features.configureSuppression", () => this.configureSuppression(item)],
-            ["icon-delete", "common.delete", () => this.removeItem(item)],
-        );
-        const menu = div(
-            { className: style.menu },
-            ...entries.map(([icon, display, action]) =>
-                div(
-                    {
-                        className: style.menuItem,
-                        onclick: (e: MouseEvent) => {
-                            e.stopPropagation();
-                            this.closeMenu();
-                            action();
-                        },
-                    },
-                    svg({ className: style.menuIcon, icon }),
-                    span({ textContent: new Localize(display) }),
-                ),
-            ),
-        );
-        const target = {
-            documentId: this.document.id,
-            nodeId: this.node.id,
-            featureId: item.id,
-            name: `${this.node.name} / ${item.name ?? I18n.translate(item.display)}`,
-        };
-        menu.prepend(
-            div({
-                className: style.menuItem,
-                textContent: "Edit…",
-                onclick: (event: MouseEvent) => {
-                    event.stopPropagation();
-                    this.closeMenu();
-                    PubSub.default.pub("editFeature", this.node, item.id);
-                },
-            }),
-        );
-        for (const [label, topic] of [
-            ["Add comment", "openReviewComments"],
-            ["Where used…", "openWhereUsed"],
-        ] as const) {
-            const entry = div({
-                className: style.menuItem,
-                textContent: label,
-                onclick: (event: MouseEvent) => {
-                    event.stopPropagation();
-                    this.closeMenu();
-                    PubSub.default.pub(topic, target);
-                },
-            });
-            menu.append(entry);
-        }
-        document.body.appendChild(menu);
-        const { top, left } = this.menuPosition(anchor.getBoundingClientRect(), menu);
-        menu.style.top = `${top}px`;
-        menu.style.left = `${left}px`;
-        this.menu = menu;
-        document.addEventListener("click", this.handleOutsideClick, true);
-        document.addEventListener("keydown", this.handleMenuKeyDown);
-    }
-
-    /**
-     * Keeps the floating menu inside the viewport: flips above the anchor when it
-     * would overflow the bottom edge, and clamps horizontally.
-     */
-    private menuPosition(anchorRect: DOMRect, menu: HTMLElement) {
-        const margin = 4;
-        const height = menu.offsetHeight;
-        const width = menu.offsetWidth;
-        let top = anchorRect.bottom + 2;
-        if (top + height > window.innerHeight - margin) {
-            top = Math.max(margin, anchorRect.top - height - 2);
-        }
-        let left = Math.max(anchorRect.left, anchorRect.right - width);
-        left = Math.min(left, window.innerWidth - width - margin);
-        return { top, left: Math.max(margin, left) };
+        showFeatureContextMenu(this.document, this.node, item, anchor, this);
     }
 
     private closeMenu() {
-        if (this.menu === undefined) return;
-        this.menu.remove();
-        this.menu = undefined;
-        document.removeEventListener("click", this.handleOutsideClick, true);
-        document.removeEventListener("keydown", this.handleMenuKeyDown);
-    }
-
-    private readonly handleOutsideClick = (e: Event) => {
-        if (this.menu !== undefined && !this.menu.contains(e.target as Node)) this.closeMenu();
-    };
-
-    private readonly handleMenuKeyDown = (e: KeyboardEvent) => {
-        if (e.key === "Escape") this.closeMenu();
-    };
-
-    private rename(item: FeatureItem) {
-        const box = input({ className: inputStyle.box, value: item.name ?? I18n.translate(item.display) });
-        showDialog("common.rename", box, () => {
-            Transaction.execute(this.document, "rename feature", () => {
-                this.node.renameFeature?.(item.id, box.value.trim());
-            });
-        });
-        setTimeout(() => {
-            box.focus();
-            box.select();
-        });
+        closeFeatureContextMenu(this);
     }
 
     // --- drag reorder ---
@@ -868,47 +799,6 @@ export class FeatureListProperty extends HTMLElement {
             this.node.setFeatureParameter(item.id, key, value);
             this.document.visual.update();
         });
-    }
-
-    private removeItem(item: FeatureItem) {
-        Transaction.execute(this.document, "remove feature", () => {
-            this.node.removeFeature(item.id);
-            this.document.visual.update();
-        });
-    }
-
-    /**
-     * Suppress / unsuppress. A feature whose suppression is configured changes for the active
-     * configuration only — the other configurations keep theirs.
-     */
-    private toggleSuppressed(item: FeatureItem) {
-        let suppressed: boolean | string = !item.suppressed;
-        if (item.suppressionConfigured !== undefined) {
-            const scope = this.document.variables.evaluate().scope;
-            const assigned = assignActiveArm(
-                item.suppressionConfigured,
-                scope,
-                configuredArmSource(!item.suppressed),
-            );
-            if (assigned.isOk) suppressed = assigned.value;
-        }
-        this.setSuppressed(item, suppressed);
-    }
-
-    private setSuppressed(item: FeatureItem, suppressed: boolean | string) {
-        Transaction.execute(this.document, "toggle feature", () => {
-            this.node.setFeatureSuppressed(item.id, suppressed);
-            this.document.visual.update();
-        });
-    }
-
-    /** Suppression per configuration, edited in the same grid as a configured checkbox. */
-    private configureSuppression(item: FeatureItem) {
-        showConfigureGrid(
-            this.document,
-            { kind: "boolean", stored: item.suppressionConfigured ?? item.suppressed === true },
-            (value) => this.setSuppressed(item, value === true || value === false ? value : String(value)),
-        );
     }
 }
 

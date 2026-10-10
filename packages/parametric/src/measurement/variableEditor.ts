@@ -2,14 +2,18 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    ANGLE_UNITS,
     AsyncController,
     documentParameterInput,
+    documentUnit,
     formatDocumentValue,
+    formatPreferenceNumber,
     type IDocument,
     type INode,
     isConstantName,
     LENGTH_UNITS,
     MEASUREMENT_LABELS,
+    measurementQuantity,
     PubSub,
     Result,
     resolveUnitSpec,
@@ -21,18 +25,34 @@ import { SketchEditor } from "../sketch/editor/sketchEditor";
 import { MeasuredVariableNode } from "./measuredVariableNode";
 import {
     captureMeasurement,
+    MEASUREMENT_FAMILIES,
     type MeasuredVariableData,
+    type MeasurementFamily,
     type MeasurementMode,
     type MeasurementReference,
+    measuredVariableName,
+    measurementFamily,
     measureReferenceDetails,
 } from "./measurement";
+
+/** A measured value in the document's units: a length, an angle, or an area in the squared length unit. */
+function formatMeasured(value: number, mode: MeasurementMode, doc: IDocument): string {
+    const quantity = measurementQuantity(mode);
+    if (quantity === "angle") return formatDocumentValue(value, doc, ANGLE_UNITS);
+    if (quantity === "area") {
+        const unit = documentUnit(doc, LENGTH_UNITS);
+        return `${formatPreferenceNumber(value / unit.factor ** 2, unit.precision)} ${unit.suffix}²`;
+    }
+    return formatDocumentValue(value, doc, LENGTH_UNITS);
+}
+
 import style from "./variableEditor.module.css";
 
 export function editMeasuredVariable(
     model: IDocument,
     controller: AsyncController,
     existing?: MeasuredVariableNode,
-    initial?: Pick<MeasuredVariableData, "mode" | "entities">,
+    initial?: Pick<MeasuredVariableData, "mode" | "entities" | "frame">,
 ): Promise<void> {
     return new Promise((resolve) => {
         const editor = SketchEditor.getActive();
@@ -54,10 +74,11 @@ export function editMeasuredVariable(
         let draft: MeasuredVariableData = existing
             ? structuredClone(existing.definition)
             : {
-                  name: initial ? MEASUREMENT_LABELS[initial.mode].replace(/ /g, "_") : "Length",
+                  name: initial ? measuredVariableName(initial.mode) : "Length",
                   source: "measured",
                   mode: initial?.mode ?? "length",
                   entities: initial?.entities ?? initialPicks,
+                  ...(initial?.frame ? { frame: initial.frame } : {}),
               };
         if (!existing) {
             const taken = model.variables.scope;
@@ -117,12 +138,12 @@ export function editMeasuredVariable(
         }
         const modes = document.createElement("div");
         modes.className = style.tabs;
-        for (const mode of ["distance", "length", "diameter"] as const) {
-            const tab = makeButton(mode[0].toUpperCase() + mode.slice(1), () => {
-                draft = { ...draft, mode };
+        for (const family of Object.keys(MEASUREMENT_FAMILIES) as MeasurementFamily[]) {
+            const tab = makeButton(family[0].toUpperCase() + family.slice(1), () => {
+                draft = { ...draft, mode: MEASUREMENT_FAMILIES[family][0] };
                 render();
             });
-            tab.dataset["mode"] = mode;
+            tab.dataset["mode"] = family;
             modes.append(tab);
         }
         const method = document.createElement("select");
@@ -178,7 +199,8 @@ export function editMeasuredVariable(
             try {
                 let ref: MeasurementReference | undefined;
                 if (editor?.document === model && SketchEditor.getActive() === editor) {
-                    if (draft.mode === "distance" || draft.mode === "maxDistance") {
+                    const family = measurementFamily(draft.mode);
+                    if (family === "distance" || family === "position") {
                         const target = await editor.pickPointOrEntity("prompt.select.edges", currentPicker);
                         if (target)
                             ref = {
@@ -191,9 +213,7 @@ export function editMeasuredVariable(
                     } else {
                         const id = await editor.pickEntity(
                             "prompt.select.edges",
-                            draft.mode === "diameter" || draft.mode === "radius"
-                                ? ["circle", "arc"]
-                                : undefined,
+                            family === "diameter" ? ["circle", "arc"] : undefined,
                             undefined,
                             currentPicker,
                         );
@@ -252,7 +272,7 @@ export function editMeasuredVariable(
             const validName = /^[A-Za-z_]\w*$/.test(draft.name) && !isConstantName(draft.name);
             const duplicate =
                 draft.name !== existing?.definition.name && model.variables.scope.has(draft.name);
-            title.textContent = `#${draft.name || "Variable"}${result.isOk ? ` = ${formatDocumentValue(result.value, model, LENGTH_UNITS)}` : ""}`;
+            title.textContent = `#${draft.name || "Variable"}${result.isOk ? ` = ${formatMeasured(result.value, draft.source === "assigned" ? "length" : draft.mode, model)}` : ""}`;
             status.textContent = !validName
                 ? "Use a name beginning with a letter or underscore."
                 : duplicate
@@ -264,11 +284,8 @@ export function editMeasuredVariable(
         }
         function render() {
             modes.hidden = entities.hidden = pick.hidden = draft.source !== "measured";
-            method.hidden = draft.source !== "measured" || draft.mode === "length";
-            const options: MeasurementMode[] =
-                draft.mode === "distance" || draft.mode === "maxDistance"
-                    ? ["distance", "maxDistance"]
-                    : ["diameter", "radius"];
+            const options = MEASUREMENT_FAMILIES[measurementFamily(draft.mode)];
+            method.hidden = draft.source !== "measured" || options.length < 2;
             method.replaceChildren(
                 ...options.map((mode) => {
                     const option = document.createElement("option");
@@ -284,14 +301,7 @@ export function editMeasuredVariable(
             for (const tab of modes.querySelectorAll("button"))
                 tab.setAttribute(
                     "aria-pressed",
-                    String(
-                        tab.dataset["mode"] ===
-                            (draft.mode === "maxDistance"
-                                ? "distance"
-                                : draft.mode === "radius"
-                                  ? "diameter"
-                                  : draft.mode),
-                    ),
+                    String(tab.dataset["mode"] === measurementFamily(draft.mode)),
                 );
             entities.replaceChildren();
             for (const [index, ref] of draft.entities.entries()) {

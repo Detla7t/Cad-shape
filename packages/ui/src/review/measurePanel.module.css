@@ -1,0 +1,152 @@
+/* Onshape's Measure panel: a query box, three inline choices, a checkbox, then the values. */
+.panel {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 215px;
+    padding: 6px 8px 10px;
+    font-size: 12px;
+    color: var(--foreground-color);
+}
+.entities {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-height: 26px;
+    padding: 3px 6px;
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    background: var(--input-background-color);
+    cursor: pointer;
+}
+.entities:focus-visible,
+.entities[data-picking="true"],
+.entities:not([data-empty]) {
+    outline: none;
+    border-color: #7fb3e8;
+    background: color-mix(in srgb, #7fb3e8 14%, var(--input-background-color));
+}
+.caption {
+    font-size: 10px;
+    color: var(--foreground-muted-color);
+}
+.entities[data-empty] .caption {
+    font-size: 12px;
+    padding: 2px 0;
+}
+.entity {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    line-height: 20px;
+}
+.entity button {
+    border: 0;
+    background: transparent;
+    color: var(--foreground-muted-color);
+    font: inherit;
+    font-size: 14px;
+    line-height: 1;
+    padding: 0 2px;
+    cursor: pointer;
+}
+.entity button:hover {
+    color: var(--foreground-color);
+}
+.row {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 6px;
+}
+.row span {
+    font-size: 11px;
+    color: var(--foreground-muted-color);
+}
+.row select {
+    font: inherit;
+    font-weight: 500;
+    color: inherit;
+    background: transparent;
+    border: 0;
+    padding: 2px 0;
+    cursor: pointer;
+}
+.check {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.check input {
+    margin: 0;
+}
+.frame {
+    font: inherit;
+    color: inherit;
+    background: var(--input-background-color);
+    border: 1px solid var(--border-color);
+    padding: 3px;
+}
+.values {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding-top: 4px;
+}
+.value {
+    display: grid;
+    grid-template-columns: auto auto 1fr auto;
+    align-items: baseline;
+    gap: 4px;
+}
+.value[data-axis] {
+    padding-left: 18px;
+}
+.label {
+    white-space: nowrap;
+}
+.value[data-axis] .label {
+    font-weight: 600;
+}
+.value[data-axis="x"] .label {
+    color: #d0312d;
+}
+.value[data-axis="y"] .label {
+    color: #2e9d3a;
+}
+.value[data-axis="z"] .label {
+    color: #2f6fd6;
+}
+.number {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-weight: 600;
+    font-size: 11px;
+}
+.unit {
+    font-size: 11px;
+}
+.variable {
+    justify-self: end;
+    border: 0;
+    background: transparent;
+    color: var(--foreground-color);
+    font:
+        italic 600 10px Georgia,
+        serif;
+    cursor: pointer;
+    padding: 0 2px;
+}
+.variable:hover {
+    color: #2f6fd6;
+}
+.muted {
+    margin: 2px 0;
+    color: var(--foreground-muted-color);
+    font-size: 11px;
+}
+.error {
+    margin: 2px 0;
+    color: var(--danger-color);
+    font-size: 11px;
+}

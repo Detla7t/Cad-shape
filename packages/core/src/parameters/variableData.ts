@@ -5,6 +5,7 @@ import type { IDocument } from "../document";
 import { Logger } from "../foundation/logger";
 import type { IPropertyChanged } from "../foundation/observer";
 import type { INode } from "../model/node";
+import type { ExpressionFunction } from "./expression";
 import type { VariableType } from "./unitSpec";
 
 /** One document-level parameter: a named, typed value usable across the whole document. */
@@ -17,6 +18,19 @@ export interface VariableData {
     readonly description?: string;
     /** Derived variables may report a lost measurement without exposing a stale value. */
     readonly evaluationError?: string;
+    /** The value is measured from geometry: the expression is the measurement, not editable text. */
+    readonly measured?: boolean;
+}
+
+/**
+ * The value of a `function` row — set by a feature (`setVariable` in FeatureScript), called
+ * as `#name(args)` from expressions. Never stored: a feature rebuilds it, and hands it over
+ * beside its rows (`IVariableFeatureNode.functionValues`).
+ */
+export interface FunctionVariable {
+    readonly call: ExpressionFunction;
+    /** The runtime object behind `call` (the FeatureScript closure), for FeatureScript runs. */
+    readonly native?: unknown;
 }
 
 /** A modeling feature which contributes variables without becoming a Variable Studio tab. */
@@ -24,6 +38,14 @@ export interface IVariableFeatureNode extends INode {
     readonly variableSource: true;
     readonly items: readonly VariableData[];
     readonly variablesJson: string;
+    /**
+     * Edits one of the feature's variables in place — name, expression, description — the
+     * variable table's write path into a feature (one call, one undo step when wrapped in a
+     * transaction). A feature without it shows read-only rows.
+     */
+    updateVariable?(item: VariableData): void;
+    /** The values of the feature's `function` rows, by variable name. */
+    functionValues?(): ReadonlyMap<string, FunctionVariable>;
 }
 export function isVariableFeatureNode(node: INode): node is IVariableFeatureNode {
     return (node as Partial<IVariableFeatureNode>).variableSource === true;

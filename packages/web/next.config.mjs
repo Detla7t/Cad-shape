@@ -63,15 +63,21 @@ const nextConfig = {
     transpilePackages: workspacePackages,
     images: { unoptimized: true, disableStaticImages: true },
     experimental: { externalDir: true },
+    // The dev server only answers its own host (`localhost`); the app is also opened (and driven
+    // by browser tooling) at 127.0.0.1, whose HMR socket Next would otherwise block.
+    allowedDevOrigins: ["127.0.0.1"],
     // The workspace is type-checked as one project (the root tsconfig, the compiler `npm run
     // typecheck` picks): by `TypecheckPlugin` in webpack builds, by `scripts/dev.mjs` beside the
     // Turbopack dev server. Next's own check would cover only this app.
     typescript: { ignoreBuildErrors: true },
+    // Plain values: unlike webpack's DefinePlugin (code snippets), Next stringifies each value
+    // itself for both bundlers — a JSON.stringify here would embed quotes in the strings (the
+    // builds of 9 October 2026 wrote `'"0.7.1"'` into documents, the title and plugin checks).
     compiler: {
         define: {
-            __APP_VERSION__: JSON.stringify(rootPackage.version),
-            __DOCUMENT_VERSION__: JSON.stringify(rootPackage.documentVersion),
-            __IS_PRODUCTION__: JSON.stringify(process.env.NODE_ENV === "production"),
+            __APP_VERSION__: rootPackage.version,
+            __DOCUMENT_VERSION__: rootPackage.documentVersion,
+            __IS_PRODUCTION__: process.env.NODE_ENV === "production",
         },
     },
     // `npm run dev` runs Turbopack (seconds to a working app, cached between runs in .next/);
@@ -89,6 +95,12 @@ const nextConfig = {
             // Emscripten glue (LibreDWG in @chili3d/documents) imports Node's `module` only under Node.
             module: { browser: "./src/emptyModule.js" },
         },
+        ignoreIssue: [
+            // The OCCT glue computes its directory with `new URL(".", import.meta.url)` (in a
+            // try/catch, unused: the .wasm is found by its own `new URL`), which Turbopack tries
+            // to resolve as an asset. The glue is a hashed build artifact, so it is not patched.
+            { path: "**/packages/wasm/lib/chili-wasm.js", title: /Module not found/ },
+        ],
     },
     webpack(config, { isServer }) {
         allowGlobalSelectorsInModules(config.module.rules);

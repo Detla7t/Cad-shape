@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    expressionIdentifiers,
     type IDocument,
     Id,
     type INode,
@@ -9,6 +10,7 @@ import {
     type INodeSceneless,
     type IVariableFeatureNode,
     Node,
+    type NodeDependencies,
     Result,
     resolveUnitSpec,
     selectConfiguredBoolean,
@@ -19,9 +21,14 @@ import {
 } from "@chili3d/core";
 import { syncNodeWatches } from "../nodeWatch";
 import { ensureVariableSync } from "../variableSync";
-import { type MeasuredVariableData, measureReferences } from "./measurement";
+import {
+    type MeasuredVariableData,
+    measuredExpression,
+    measuredVariableType,
+    measureReferences,
+} from "./measurement";
 
-@serializable()
+@serializable({ id: "MeasuredVariableNode" })
 export class MeasuredVariableNode extends Node implements INodeIcon, INodeSceneless, IVariableFeatureNode {
     readonly sceneless = true as const;
     readonly variableSource = true as const;
@@ -80,21 +87,48 @@ export class MeasuredVariableNode extends Node implements INodeIcon, INodeScenel
             {
                 id: this.id,
                 name: data.name,
-                type: "length",
+                type: data.source === "assigned" ? "length" : measuredVariableType(data.mode),
                 description: data.description,
                 expression:
                     data.source === "assigned"
                         ? (data.expression ?? "0")
                         : this.measured.isOk
-                          ? `${this.measured.value} mm`
+                          ? measuredExpression(data.mode, this.measured.value)
                           : "0",
                 evaluationError:
                     data.source === "measured" && !this.measured.isOk ? this.measured.error : undefined,
+                ...(data.source === "measured" ? { measured: true } : {}),
             },
         ];
     }
     get variablesJson(): string {
         return JSON.stringify(this.items);
+    }
+    /** The geometry it measures, and the variables its expression and suppression read. */
+    dependencies(): NodeDependencies {
+        const data = this.definition;
+        const variables = new Set<string>();
+        if (typeof data.expression === "string")
+            for (const name of expressionIdentifiers(data.expression)) variables.add(name);
+        if (typeof data.suppression === "string")
+            for (const name of expressionIdentifiers(data.suppression)) variables.add(name);
+        return { nodeIds: [...new Set(data.entities.map((ref) => ref.nodeId))], variables: [...variables] };
+    }
+    /**
+     * The variable table's write path: the row's name, description and — for an assigned
+     * variable — its expression land in the definition (one recorded property, so one undo
+     * step inside the table's transaction). A measurement keeps its sources.
+     */
+    updateVariable(item: VariableData): void {
+        const data = this.definition;
+        const next: MeasuredVariableData = {
+            ...data,
+            name: item.name.trim().replace(/^#/, "") || data.name,
+            ...(data.source === "assigned" ? { expression: item.expression } : {}),
+        };
+        if (item.description === undefined || item.description === "") delete next.description;
+        else next.description = item.description;
+        if (JSON.stringify(next) !== JSON.stringify(data)) this.definition = next;
     }
     private readonly nodesChanged = () => this.refresh();
     private readonly sourceChanged = (property: string) => {
@@ -127,7 +161,7 @@ export class MeasuredVariableNode extends Node implements INodeIcon, INodeScenel
                 : this.hasDependencyCycle()
                   ? Result.err(`Circular dependency: source geometry depends on #${data.name}.`)
                   : data.source === "measured"
-                    ? measureReferences(this.document, data.mode, data.entities)
+                    ? measureReferences(this.document, data.mode, data.entities, data.frame)
                     : Result.ok(0);
             const oldName = this.name;
             const value = this.suppressed
@@ -135,7 +169,7 @@ export class MeasuredVariableNode extends Node implements INodeIcon, INodeScenel
                 : data.source === "assigned"
                   ? (data.expression ?? "0")
                   : this.measured.isOk
-                    ? `${Number(this.measured.value.toPrecision(8))} mm`
+                    ? measuredExpression(data.mode, Number(this.measured.value.toPrecision(8)))
                     : "unresolved";
             // A long expression (a configured list's every arm) is cut short in the label.
             const label = value.length > 48 ? `${value.slice(0, 47).trimEnd()}…` : value;

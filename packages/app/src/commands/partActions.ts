@@ -14,6 +14,7 @@ import {
     Transaction,
 } from "@chili3d/core";
 import "./viewportPartActions";
+import { showExportPartDialog } from "./exportPartDialog";
 
 let copiedPart: ShapeNode | undefined;
 NodeActions.register((node) => {
@@ -134,28 +135,7 @@ NodeActions.register((node) => {
         {
             id: "export",
             label: "Export…",
-            run: () => {
-                const picker = document.createElement("select");
-                picker.setAttribute("aria-label", "Export format");
-                for (const format of doc.application.dataExchange.exportFormats())
-                    picker.add(new Option(format, format));
-                PubSub.default.pub("showDialog", "file.format", picker, () => {
-                    void doc.application.dataExchange
-                        .export(picker.value, [node])
-                        .then((data) => {
-                            if (data)
-                                download(
-                                    data,
-                                    exportFileName(
-                                        node.name,
-                                        picker.value.split(" ")[0],
-                                        Config.instance.preferences.exportRules,
-                                    ),
-                                );
-                        })
-                        .catch((error) => PubSub.default.pub("displayError", String(error)));
-                });
-            },
+            run: () => showExportPartDialog(doc.application, [node]),
         },
         {
             id: "release",

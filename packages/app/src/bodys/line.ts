@@ -19,7 +19,7 @@ export interface LineOptions {
     end: XYZ;
 }
 
-@serializable()
+@serializable({ id: "LineNode" })
 export class LineNode extends ParameterShapeNode {
     override display(): I18nKeys {
         return "body.line";

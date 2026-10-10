@@ -5,6 +5,7 @@ import {
     Config,
     type EdgeMeshData,
     EMPTY_SCOPE,
+    expressionIdentifiers,
     type FaceMeshData,
     type I18nKeys,
     type IDocument,
@@ -15,11 +16,14 @@ import {
     isPropertyChanged,
     Matrix4,
     MultiShapeMesh,
+    type NodeDependencies,
     ParameterShapeNode,
     type Plane,
     Precision,
     PubSub,
     Result,
+    type ShapeType,
+    ShapeTypes,
     selectConfiguredBoolean,
     serializable,
     serialize,
@@ -85,6 +89,32 @@ export class SketchNode extends ParameterShapeNode {
 
     override display(): I18nKeys {
         return "body.sketch";
+    }
+
+    /** A plain click in the viewport selects one curve or point of the sketch, as Onshape does. */
+    readonly selectsSubShapes = (ShapeTypes.edge | ShapeTypes.vertex) as ShapeType;
+
+    /** The plane it sits on, the geometry it projects, and the variables its dimensions read. */
+    dependencies(): NodeDependencies {
+        const data = this.data;
+        const nodeIds = new Set<string>();
+        if (this.planeRef?.nodeId !== undefined) nodeIds.add(this.planeRef.nodeId);
+        for (const ref of data.externalRefs ?? []) nodeIds.add(ref.nodeId);
+        const variables = new Set<string>();
+        for (const constraint of data.constraints) {
+            for (const datum of [constraint.datum, ...(constraint.datums ?? [])]) {
+                if (typeof datum === "string")
+                    for (const name of expressionIdentifiers(datum)) variables.add(name);
+            }
+        }
+        if (typeof this.suppression === "string")
+            for (const name of expressionIdentifiers(this.suppression)) variables.add(name);
+        const anchors = data.refPositions;
+        return {
+            nodeIds: [...nodeIds],
+            variables: [...variables],
+            ...(anchors === undefined ? {} : { anchors: { ...anchors } }),
+        };
     }
 
     /** `INodeIcon`: a sketch reads as a sketch, not as the solid it feeds. */

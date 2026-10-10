@@ -3,6 +3,8 @@
 
 import {
     download,
+    type EditorBufferRegistration,
+    EditorBuffers,
     type I18nKeys,
     type IDocument,
     type IElementView,
@@ -10,9 +12,12 @@ import {
     Logger,
     openElement,
     PubSub,
+    TextEditorBuffer,
     Transaction,
 } from "@chili3d/core";
 import { div, input, label, option, select, span, svg } from "@chili3d/element";
+import { EditorBufferControls, mountIsland, type ReactIsland } from "@chili3d/react";
+import { createElement } from "react";
 import { type MachineProfileData, machineProfile, machineProfiles } from "../../model/machine";
 import { postProcessors } from "../../model/post";
 import { iconButton, t, textButton } from "../../studio/dom";
@@ -37,8 +42,10 @@ import style from "./ncProgram.module.css";
  * problems of the program.
  *
  * The text is edited as a draft, re-read (debounced) as it changes so the backplot follows,
- * and written to the node by Save (Ctrl+S) — one undo step. A line under the cursor
- * highlights its moves; a click on the backplot puts the cursor on the move's line.
+ * and written to the node by Save (Ctrl+S) — one undo step. The draft is the program's
+ * editor buffer (`TextEditorBuffer`, registered with `EditorBuffers` as `ncProgram`), so its
+ * tab is marked, closing asks about it and the recovery autosave keeps it. A line under the
+ * cursor highlights its moves; a click on the backplot puts the cursor on the move's line.
  */
 
 export interface NcProgramViewOptions {
@@ -82,7 +89,9 @@ export class NcProgramView implements IElementView {
     private editor: GcodeEditor | undefined;
     private editorReady: Promise<void>;
     private draft: string;
-    private saved: string;
+    /** The draft's editor buffer: baseline, commit, revert, snapshot, restore. */
+    readonly buffer: TextEditorBuffer;
+    private readonly registration: EditorBufferRegistration;
     private parseTimer: ReturnType<typeof setTimeout> | undefined;
     private playTimer: ReturnType<typeof setInterval> | undefined;
     private active = false;
@@ -93,8 +102,9 @@ export class NcProgramView implements IElementView {
     private readonly detach: (() => void)[] = [];
 
     private readonly title = span({ className: style.title });
-    private readonly dirtyMark = span({ className: style.dirty, textContent: "", title: t("nc.unsaved") });
-    private readonly saveButton: HTMLButtonElement;
+    /** The shared save bar (unsaved mark, Discard, Save). */
+    private readonly controls = span();
+    private readonly controlsIsland: ReactIsland;
     private readonly dialectSelect = select({ className: style.select });
     private readonly machineSelect = select({ className: style.select });
     private readonly postSelect = select({ className: style.select });
@@ -120,8 +130,24 @@ export class NcProgramView implements IElementView {
     ) {
         this.backplot = new NcBackplot(document);
         this.draft = node.source;
-        this.saved = node.source;
-        this.saveButton = textButton(t("nc.save"), () => this.save(), true, "save");
+        this.buffer = new TextEditorBuffer({
+            document,
+            node,
+            editor: "ncProgram",
+            transaction: "edit NC program",
+            read: () => this.node.source,
+            write: (text) => {
+                this.node.source = text;
+            },
+            text: () => this.draft,
+            show: (text, selection) => {
+                this.draft = text;
+                this.editor?.setText(text, selection);
+                this.reparse();
+            },
+            selection: () => this.editor?.selection(),
+            changed: () => this.updateHeader(),
+        });
         this.playButton = iconButton("icon-angle-right", t("cam.play"), () => this.togglePlayback(), "play");
         this.slider.dataset["field"] = "playback";
         this.slider.addEventListener("input", () =>
@@ -141,8 +167,7 @@ export class NcProgramView implements IElementView {
                 { className: style.header },
                 svg({ className: style.headerIcon, icon: NC_PROGRAM_ICON }),
                 this.title,
-                this.dirtyMark,
-                this.saveButton,
+                this.controls,
                 iconButton("icon-download", t("nc.download"), () => this.downloadProgram(), "download"),
             ),
             div(
@@ -185,6 +210,11 @@ export class NcProgramView implements IElementView {
         this.renderSettings();
         this.renderActions();
         this.reparse();
+        this.registration = EditorBuffers.register(this.buffer);
+        this.controlsIsland = mountIsland(
+            this.controls,
+            createElement(EditorBufferControls, { buffer: this.buffer }),
+        );
         this.updateHeader();
     }
 
@@ -207,6 +237,8 @@ export class NcProgramView implements IElementView {
     dispose(): void {
         if (this.disposed) return;
         this.disposed = true;
+        this.registration.dispose();
+        this.controlsIsland.dispose();
         this.stopPlayback();
         if (this.parseTimer !== undefined) clearTimeout(this.parseTimer);
         this.node.removePropertyChanged(this.onNodeChanged);
@@ -221,7 +253,7 @@ export class NcProgramView implements IElementView {
     }
 
     get dirty(): boolean {
-        return this.draft !== this.saved;
+        return this.buffer.isDirty();
     }
 
     get text(): string {
@@ -245,6 +277,8 @@ export class NcProgramView implements IElementView {
                 return;
             }
             this.editor = editor;
+            // A draft restored or reverted while the editor was loading.
+            if (editor.text() !== this.draft) editor.setText(this.draft);
             this.editorHost.replaceChildren(host);
             if (this.program !== undefined) editor.setDiagnostics(this.program.diagnostics);
         } catch (error) {
@@ -270,29 +304,19 @@ export class NcProgramView implements IElementView {
 
     /** Writes the draft into the node: one undo step. */
     save(): void {
-        if (!this.dirty) return;
-        const text = this.draft;
-        Transaction.execute(this.document, "edit NC program", () => {
-            this.node.source = text;
-        });
-        this.saved = text;
-        this.updateHeader();
+        void this.buffer.commit();
+    }
+
+    /** Drops the draft's edits: the node's program again. */
+    revert(): void {
+        this.buffer.revert();
     }
 
     private readonly onNodeChanged = (property: string) => {
         if (this.disposed) return;
         if (property === "source") {
-            const source = this.node.source;
-            if (source === this.saved) return;
             // Undo, redo, a restored version: show it — unless there are edits of our own.
-            const hadEdits = this.dirty;
-            this.saved = source;
-            if (!hadEdits) {
-                this.draft = source;
-                this.editor?.setText(source);
-                this.reparse();
-            }
-            this.updateHeader();
+            this.buffer.nodeChanged();
             return;
         }
         if (property === "dialect" || property === "machineId") {
@@ -305,8 +329,8 @@ export class NcProgramView implements IElementView {
 
     private updateHeader(): void {
         this.title.textContent = this.node.name;
-        this.dirtyMark.textContent = this.dirty ? "●" : "";
-        this.saveButton.disabled = !this.dirty;
+        // Undefined while the constructor is still running.
+        this.registration?.changed();
     }
 
     // ------------------------------------------------------------------ Reading

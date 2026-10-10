@@ -5,6 +5,7 @@ import { Config } from "@chili3d/core";
 import { Mesh, type Object3D, Vector2 } from "three";
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
 import { SSAOPass } from "three/examples/jsm/postprocessing/SSAOPass.js";
+import { FULL_QUALITY, type QualityLevel } from "./renderQuality";
 import type { ThreeView } from "./threeView";
 
 /** Occlusion samples per pixel: enough for a smooth, grain-free shade on the settled frame. */
@@ -20,13 +21,18 @@ const AO_KERNEL_SIZE = 32;
  * at full quality when the motion settles.
  */
 export class ViewEffects {
-    private ao?: SSAOPass;
+    /** One pass per target scale (1: full, 2: half), so motion never reallocates targets. */
+    private readonly passes = new Map<number, SSAOPass>();
     private readonly bufferSize = new Vector2();
     constructor(private readonly view: ThreeView) {}
-    render(quality: "interactive" | "final" = "final") {
+    render(quality: "interactive" | "final" = "final", level: QualityLevel = FULL_QUALITY) {
         const view = this.view,
             strength = Config.instance.graphics.ambientOcclusion / 100;
         if (strength <= 0 || view.mode === "wireframe" || view.displayOptions.translucent) return;
+        // The quality level decides whether occlusion is drawn at all and at which resolution;
+        // a moving frame of the full level still takes the half-resolution map.
+        if (level.ao === "off") return;
+        const scale = level.ao === "half" || quality === "interactive" ? 2 : 1;
         const scene = view.content.scene;
         const hidden: Object3D[] = [];
         let hasOccluder = false;
@@ -49,20 +55,21 @@ export class ViewEffects {
             }
         });
         if (!hasOccluder) return;
-        if (!this.ao) {
-            this.ao = new SSAOPass(scene, view.camera, 1, 1, AO_KERNEL_SIZE);
-            this.ao.renderToScreen = true;
-            this.ao.copyMaterial.fragmentShader = this.ao.copyMaterial.fragmentShader.replace(
+        let ao = this.passes.get(scale);
+        if (!ao) {
+            ao = new SSAOPass(scene, view.camera, 1, 1, AO_KERNEL_SIZE);
+            ao.renderToScreen = true;
+            ao.copyMaterial.fragmentShader = ao.copyMaterial.fragmentShader.replace(
                 "gl_FragColor = opacity * texel;",
                 "gl_FragColor = vec4(mix(vec3(1.0), texel.rgb, opacity), 1.0);",
             );
+            this.passes.set(scale, ao);
         }
-        const ao = this.ao;
+        ao.scene = scene;
         ao.camera = view.camera;
         const size = view.renderer.getDrawingBufferSize(this.bufferSize);
-        // While the camera moves, half-resolution targets cut the pixel work by 75%; the
-        // model's MSAA render and line/text detail keep the full display resolution either way.
-        const scale = quality === "interactive" ? 2 : 1;
+        // Half-resolution targets cut the pixel work by 75%; the model's MSAA render and
+        // line/text detail keep the full display resolution either way.
         const width = Math.max(1, Math.ceil(size.x / scale));
         const height = Math.max(1, Math.ceil(size.y / scale));
         if (ao.width !== width || ao.height !== height) ao.setSize(width, height);
@@ -91,9 +98,12 @@ export class ViewEffects {
         }
     }
     dispose() {
-        this.ao?.dispose();
-        // SSAOPass currently leaves these two owned resources out of its disposal routine.
-        this.ao?.ssaoMaterial.dispose();
-        this.ao?.noiseTexture?.dispose();
+        for (const ao of this.passes.values()) {
+            ao.dispose();
+            // SSAOPass currently leaves these two owned resources out of its disposal routine.
+            ao.ssaoMaterial.dispose();
+            ao.noiseTexture?.dispose();
+        }
+        this.passes.clear();
     }
 }

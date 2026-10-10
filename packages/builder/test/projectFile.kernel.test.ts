@@ -22,9 +22,11 @@ import {
     zipProjectFiles,
 } from "@chili3d/app";
 import {
+    DOCUMENT_SCHEMA_VERSION,
     DocumentVersionControl,
     type IApplication,
     type IDocument,
+    LEGACY_DOCUMENT_VERSION,
     Material,
     MemoryHistoryPersistence,
     Plane,
@@ -178,7 +180,12 @@ describe(".chili3d project file", () => {
         expect(manifest.app).toEqual({ name: "Chili3D", version: __APP_VERSION__ });
         expect(manifest.createdAt).toBe(NOW.toISOString());
         expect(manifest.modifiedAt).toBe(NOW.toISOString());
-        expect(manifest.document).toEqual({ id: doc.id, name: "Duct job", version: __DOCUMENT_VERSION__ });
+        expect(manifest.document).toEqual({
+            id: doc.id,
+            name: "Duct job",
+            version: LEGACY_DOCUMENT_VERSION,
+            schemaVersion: DOCUMENT_SCHEMA_VERSION,
+        });
         expect(manifest.featureScript).toBeUndefined();
         const studios = doc.modelManager.findNodes((node) => node instanceof FeatureStudioNode);
         expect(manifest.elements).toEqual([

@@ -174,3 +174,52 @@
     border-top: 1px solid var(--border-color);
     margin: 3px 0;
 }
+
+/* Constraint manager rows: a glyph (the badge's artwork) before the text, highlighted on hover. */
+.constraintRow {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 1px 2px;
+    cursor: default;
+}
+.constraintRow:hover {
+    background: var(--hover-background-color);
+}
+.constraintGlyph {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 18px;
+    width: 18px;
+    height: 18px;
+    border: 1px solid var(--border-color);
+    border-radius: 2px;
+    font-size: 11px;
+    line-height: 1;
+    background: var(--panel-background-color);
+}
+.constraintGlyph svg {
+    width: 14px;
+    height: 14px;
+}
+.freedom {
+    margin: 6px 0;
+}
+.freedom p {
+    margin: 0 0 4px;
+    font-weight: 600;
+}
+.freeEntity {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: 0;
+    padding: 2px 4px;
+    background: transparent;
+    color: #1400d6;
+    cursor: pointer;
+}
+.freeEntity:hover {
+    background: var(--hover-background-color);
+}

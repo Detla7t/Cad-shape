@@ -107,7 +107,7 @@ function parseSecrets(json: string): Record<string, string> {
  * offline. A new snapshot re-scopes the document, so everything that reads the data rebuilds —
  * undo and redo included. Secret header values are session-only (see `secrets.ts`).
  */
-@serializable()
+@serializable({ id: "DataSourceNode" })
 export class DataSourceNode extends Node implements INodeIcon, INodeSceneless {
     readonly sceneless = true as const;
 

@@ -32,6 +32,13 @@ export interface EvaluatedValue {
     readonly option?: string;
     /** Set on every entry of the configuration layer (lists, checkboxes and configuration variables). */
     readonly configuration?: boolean;
+    /**
+     * A function value (Onshape's "Unspecified" variable set by a feature's `setVariable`):
+     * `#name(args)` calls it. `value` is then NaN — a function is not a number.
+     */
+    readonly call?: ExpressionFunction;
+    /** The runtime object behind `call` (a FeatureScript closure), handed back to FeatureScript as is. */
+    readonly native?: unknown;
 }
 
 /** Named values an expression resolves against, each carrying its declared unit. */
@@ -124,7 +131,7 @@ const FUNCTIONS: Record<string, (...args: number[]) => number> = {
     atan2: (y, x) => (Math.atan2(y, x) * 180) / Math.PI,
 };
 
-const CONSTANTS: Record<string, number> = { pi: Math.PI, e: Math.E };
+const CONSTANTS: Record<string, number> = { pi: Math.PI, PI: Math.PI, e: Math.E };
 
 /**
  * How many arguments each function takes — `[min, max]`. The parser accepts any count, so
@@ -417,20 +424,47 @@ class Parser {
         }
     }
 
+    /**
+     * A product chain, with Onshape's reading of a unit written after an operand: `13/16 in`
+     * is thirteen sixteenths of an inch and `(9 + 5/8) in` is 9⅝ inches — the unit applies
+     * to the whole unitless chain before it — while `10 mm / 2 mm` is 5, the unit applying
+     * to its own operand once the chain already carries one.
+     */
     private parseTerm(): Result<EvaluatedValue> {
         let left = this.parseUnary();
         if (!left.isOk) return left;
+        left = this.applySuffix(left.value);
         for (;;) {
+            if (!left.isOk) return left;
             this.skipSpaces();
             const op = this.source[this.pos];
             if (op !== "*" && op !== "/" && op !== "%") return left;
             this.pos++;
             const right = this.parseUnary();
             if (!right.isOk) return right;
+            const suffix = this.parseUnitSuffix();
+            if (suffix === undefined) {
+                left = multiplicativeValue(op, left.value, right.value);
+                continue;
+            }
             const combined = multiplicativeValue(op, left.value, right.value);
             if (!combined.isOk) return combined;
-            left = combined;
+            const unit = { value: suffix.factor, unit: suffix.unit };
+            if (unitSpecEquals(combined.value.unit, UNITLESS)) {
+                left = multiplicativeValue("*", combined.value, unit);
+                continue;
+            }
+            const operand = multiplicativeValue("*", right.value, unit);
+            if (!operand.isOk) return operand;
+            left = multiplicativeValue(op, left.value, operand.value);
         }
+    }
+
+    /** The unit written after an operand (`16 in`, `(9 + 5/8) in`), applied to it. */
+    private applySuffix(operand: EvaluatedValue): Result<EvaluatedValue> {
+        const suffix = this.parseUnitSuffix();
+        if (suffix === undefined) return Result.ok(operand);
+        return multiplicativeValue("*", operand, { value: suffix.factor, unit: suffix.unit });
     }
 
     private parseUnary(): Result<EvaluatedValue> {
@@ -472,7 +506,44 @@ class Parser {
         const name = match[0];
         this.pos += name.length;
         const scoped = this.scope.get(name);
-        return scoped === undefined ? Result.err(`Unknown variable: ${name}`) : Result.ok(scoped);
+        if (scoped === undefined) return Result.err(`Unknown variable: ${name}`);
+        this.skipSpaces();
+        if (this.source[this.pos] === "(") return this.callVariable(name, scoped);
+        return Result.ok(scoped);
+    }
+
+    /** `#f(a, b)` — a variable holding a function (set by a feature) applied to its arguments. */
+    private callVariable(name: string, variable: EvaluatedValue): Result<EvaluatedValue> {
+        if (variable.call === undefined) return Result.err(`${name} is not a function`);
+        const args = this.parseArguments();
+        if (!args.isOk) return Result.err(args.error);
+        const context = { scope: this.scope, document: scopeContext(this.scope)?.document };
+        try {
+            return variable.call(args.value, context);
+        } catch (error) {
+            return Result.err(`${name}(): ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
+
+    /** The parenthesized argument list of a call, the cursor on its `(`. */
+    private parseArguments(): Result<ExpressionArgument[]> {
+        this.pos++;
+        const args: ExpressionArgument[] = [];
+        this.skipSpaces();
+        if (this.source[this.pos] !== ")") {
+            for (;;) {
+                const arg = this.parseArgument();
+                if (!arg.isOk) return Result.err(arg.error);
+                args.push(arg.value);
+                this.skipSpaces();
+                if (this.source[this.pos] !== ",") break;
+                this.pos++;
+                this.skipSpaces();
+            }
+        }
+        if (this.source[this.pos] !== ")") return Result.err("Missing closing parenthesis");
+        this.pos++;
+        return Result.ok(args);
     }
 
     private parseParenthesized(): Result<EvaluatedValue> {
@@ -489,10 +560,8 @@ class Parser {
         const match = /^\d*\.?\d+([eE][+-]?\d+)?/.exec(this.source.slice(this.pos));
         if (match === null) return Result.err(`Unexpected character: ${this.source[this.pos]}`);
         this.pos += match[0].length;
-        const value = Number(match[0]);
-        const suffix = this.parseUnitSuffix();
-        if (suffix === undefined) return Result.ok({ value, unit: UNITLESS });
-        return Result.ok({ value: value * suffix.factor, unit: suffix.unit });
+        // The unit written after the literal is the term's business (`parseTerm`).
+        return Result.ok({ value: Number(match[0]), unit: UNITLESS });
     }
 
     /**
@@ -516,8 +585,13 @@ class Parser {
         const name = match[0];
         this.pos += name.length;
         this.skipSpaces();
-        if (this.source[this.pos] === "(") return this.parseFunction(name);
         const scoped = this.scope.get(name);
+        if (this.source[this.pos] === "(") {
+            // A function variable takes its name before the built-ins (as a variable shadows nothing
+            // built in: the built-in set cannot be named by a variable).
+            if (scoped?.call !== undefined) return this.callVariable(name, scoped);
+            return this.parseFunction(name);
+        }
         if (scoped !== undefined) return Result.ok(scoped);
         if (Object.hasOwn(CONSTANTS, name)) return Result.ok({ value: CONSTANTS[name], unit: UNITLESS });
         const unit = unitSuffix(name, true);
@@ -526,22 +600,9 @@ class Parser {
     }
 
     private parseFunction(name: string): Result<EvaluatedValue> {
-        this.pos++;
-        const args: ExpressionArgument[] = [];
-        this.skipSpaces();
-        if (this.source[this.pos] !== ")") {
-            for (;;) {
-                const arg = this.parseArgument();
-                if (!arg.isOk) return Result.err(arg.error);
-                args.push(arg.value);
-                this.skipSpaces();
-                if (this.source[this.pos] !== ",") break;
-                this.pos++;
-                this.skipSpaces();
-            }
-        }
-        if (this.source[this.pos] !== ")") return Result.err("Missing closing parenthesis");
-        this.pos++;
+        const parsed = this.parseArguments();
+        if (!parsed.isOk) return Result.err(parsed.error);
+        const args = parsed.value;
         // `FUNCTIONS[name]` alone would find `Object.prototype.toString` and call it.
         const fn = Object.hasOwn(FUNCTIONS, name) ? FUNCTIONS[name] : undefined;
         if (fn === undefined) return this.callRegistered(name, args);

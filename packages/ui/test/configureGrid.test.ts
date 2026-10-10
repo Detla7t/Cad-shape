@@ -111,6 +111,8 @@ function configuredDocument(active = "S") {
 function featureNode(parameters: FeatureItem["parameters"], item?: Partial<FeatureItem>) {
     return {
         featureItems: () => [{ id: "f1", display: "command.feature.extrude", parameters, ...item }],
+        onPropertyChanged: rs.fn(),
+        removePropertyChanged: rs.fn(),
         setFeatureParameter: rs.fn((_id: string, _key: string, _value: number | string | boolean) => {}),
         setFeatureSuppressed: rs.fn((_id: string, _suppressed: boolean | string) => {}),
         moveFeature: rs.fn(),

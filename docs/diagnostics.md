@@ -13,7 +13,7 @@ exports it as NDJSON; `OperationLog.snapshot()` reads it in code.
 | `operationId`, `parentId` | Causal structure: the operation that was still open when this one began — a command is the parent of the transactions it runs, a transaction of the feature rebuilds it triggers. |
 | `operation` | `command.execute`, `model.transaction`, `feature.rebuild`, `sketch.session`, `sketch.commit`, `ui.error`, `app.unhandledError`, `app.unhandledRejection`. |
 | `outcome`, `durationMs`, `error` | Success / cancelled / error / rolled back; the error with its stack. |
-| `session` | Static per page load: `sessionId`, `appVersion`, `documentFormat`, `userAgent`, `platform`, `language`, `devicePixelRatio`, `screen`, `hardwareConcurrency`, `production`. |
+| `session` | Static per page load: `sessionId`, `appVersion`, `documentSchema`, `userAgent`, `platform`, `language`, `devicePixelRatio`, `screen`, `hardwareConcurrency`, `production`. |
 | `context` | What the operation itself knows: the command key (and the key that was requested before routing), its `param.*` values, selection counts at start, the transaction's action and record names, the feature id and type, the sketch's entity/constraint counts, DOFs and solve result. |
 | `state` | The application at finish, from registered providers: active document id/name/units, node count, selection counts, undo/redo depth, version-control branch and head and pending operations, the view's camera type, mode and size, the running command, snap/autosave/navigation preferences, the sketch being edited and its solve state. |
 | `steps` | Named points inside the operation with their offset: each pick a sketch tool made (`pick.point` with entity and point index, `pick.entity`, `pick.position` with uv). |

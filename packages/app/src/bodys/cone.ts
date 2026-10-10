@@ -21,7 +21,7 @@ export interface ConeNodeOptions {
     dz: number;
 }
 
-@serializable()
+@serializable({ id: "ConeNode" })
 export class ConeNode extends ParameterShapeNode {
     override display(): I18nKeys {
         return "body.cone";

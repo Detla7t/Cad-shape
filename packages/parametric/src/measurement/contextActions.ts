@@ -7,6 +7,7 @@ import {
     isSelectorInput,
     NodeActions,
     type NodeMenuAction,
+    PartStudioTimeline,
     PubSub,
     parseConfiguredValue,
     selectorOptions,
@@ -190,6 +191,8 @@ NodeActions.register((node) => {
             id: "roll",
             label: "Roll to end",
             run: () => {
+                // The Part Studio timeline owns the rollback: its end releases every body and node.
+                PartStudioTimeline.of(model).end();
                 for (const body of model.modelManager.findNodes())
                     if (body instanceof ParametricBodyNode) body.setRollbackIndex(undefined);
                 model.visual.update();

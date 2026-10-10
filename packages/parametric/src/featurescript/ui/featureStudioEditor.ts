@@ -44,13 +44,15 @@ export function showFeatureStudioEditor(studio: FeatureStudioNode, reveal?: Stud
 
 /**
  * Mounts an IDE for `studio` into `container` (the element view's root): the chunk loads
- * asynchronously, so a reveal asked for meanwhile is kept and applied once it is up.
+ * asynchronously, so a reveal asked for meanwhile is kept and applied once it is up, and
+ * `onReady` gets the IDE then (the element view registers its editor buffer).
  * Returns the view's dispose.
  */
 export function mountFeatureScriptIde(
     studio: FeatureStudioNode,
     container: HTMLElement,
     onError: (error: unknown) => void,
+    onReady?: (ide: FeatureScriptIde) => void,
 ): { focus(): void; dispose(): void } {
     const entry: { ide?: FeatureScriptIde; reveal?: StudioReveal } = {};
     let disposed = false;
@@ -65,6 +67,7 @@ export function mountFeatureScriptIde(
             }
             entry.ide = ide;
             container.append(ide.root);
+            onReady?.(ide);
             requestAnimationFrame(() => {
                 if (entry.reveal !== undefined) ide.reveal(entry.reveal.from, entry.reveal.to);
                 else ide.focus();

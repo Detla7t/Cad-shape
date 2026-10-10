@@ -215,6 +215,9 @@ export function packProject(input: ProjectPackInput): Result<ProjectFiles> {
             id: String(document["id"]),
             name: String(document["name"]),
             version: String(document["version"]),
+            ...(typeof document["schemaVersion"] === "number"
+                ? { schemaVersion: document["schemaVersion"] }
+                : {}),
         },
         ...contributions,
         elements,

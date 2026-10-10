@@ -22,7 +22,7 @@ export interface ReferencePlaneNodeOptions {
 }
 
 /** A reference surface, never a part: its frame is persisted, editable and undoable. */
-@serializable()
+@serializable({ id: "ReferencePlaneNode" })
 export class ReferencePlaneNode extends VisualNode {
     constructor(options: ReferencePlaneNodeOptions) {
         super(

@@ -50,6 +50,7 @@
     border-right: 1.5px solid currentColor;
     border-bottom: 1.5px solid currentColor;
     transform: rotate(-45deg);
+    transition: transform 150ms ease;
 }
 .toggle[aria-expanded="true"]::before {
     transform: rotate(45deg) translateY(-2px);
@@ -78,9 +79,29 @@
     flex: 1;
     min-height: 0;
     overflow: auto;
+    /* Restarts when a section unfolds (display none → block). */
+    animation: section-in 160ms ease-out;
 }
 .sectionContent[hidden] {
     display: none;
+}
+@keyframes section-in {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .toggle::before {
+        transition: none;
+    }
+    .sectionContent {
+        animation: none;
+    }
 }
 .sectionContent > chili-project-view {
     height: 100%;

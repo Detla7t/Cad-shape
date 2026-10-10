@@ -428,10 +428,10 @@ describe.each([
         expect(body.shape.isOk).toBe(false);
     });
 
-    // GAP: every featurescript feature runs in a fresh FsContext (`runtime.ts` runFeature),
-    // seeded only with the document table — what one feature `setVariable`s is gone before the
-    // next feature runs. Onshape keeps it on the Part Studio context for later features.
-    test("a variable set by one feature is NOT visible to the next feature (gap)", () => {
+    // Onshape keeps a feature's setVariable on the Part Studio for the features after it; the
+    // body publishes what its features stored as a variable source, so the next feature, every
+    // table and the variable table see it — the document's own table stays what the user wrote.
+    test("a variable set by one feature is visible to the next feature and to the variable table", () => {
         const doc = newDoc();
         setVariables(doc, [length("w", "40")]);
         const studio = addStudio(doc, VARIABLE_STUDIO_SOURCE);
@@ -441,11 +441,12 @@ describe.each([
         ]);
         const [plate, reader] = rowErrors(body);
         expect(plate).toBeUndefined();
-        expect(reader).toMatch(
-            onshape ? /^Variable "published" not found$/ : /^Variable "published" is not defined/,
-        );
-        // ...and it never reaches the document table either.
+        expect(reader).toBeUndefined();
         expect(doc.variables.items.map((x) => x.name)).toEqual(["w"]);
+        expect(body.items.map((x) => [x.name, x.type, x.expression])).toEqual([
+            ["published", "length", "40 mm"],
+        ]);
+        expect(doc.variables.evaluate().scope.get("published")?.value).toBeCloseTo(40, 9);
     });
 });
 

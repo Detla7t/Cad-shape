@@ -26,6 +26,7 @@ import {
 } from "@chili3d/core";
 import type { ParametricBodyNode } from "../../parametricBodyNode";
 import { type DragSnap, SKETCH_SNAP_PIXELS } from "../autoConstraints";
+import type { SketchSelectionTarget } from "../selectionConstraints";
 import {
     ConstraintKind,
     datumUnitSpec,
@@ -39,7 +40,7 @@ import {
 } from "../sketchModel";
 import type { SketchNode } from "../sketchNode";
 import { computeSketchRollback, rollbackRestoreOrder } from "../sketchRollback";
-import { SketchSolver, type SolveOutcome } from "../solver";
+import { type SketchConstraintStatus, SketchSolver, type SolveOutcome } from "../solver";
 import * as datumPrompt from "./datumPrompt";
 import { type DimensionAnchor, toDisplayDatum, toStorageDatum } from "./dimensionLayout";
 import { SketchAnnotationManager } from "./sketchAnnotations";
@@ -74,7 +75,15 @@ import { SketchPanel } from "./sketchPanel";
  */
 
 export type SketchPickKind = "point" | "entity" | "position" | "pointOrEntity" | "dimension";
-export type SketchPickTarget = { kind: "point"; ref: SketchPointRef } | { kind: "entity"; entityId: number };
+/** The status before any analysis, or of a sketch that does not solve: nothing is determined. */
+const NOTHING_DETERMINED: SketchConstraintStatus = {
+    points: new Set(),
+    curves: new Set(),
+    entities: new Set(),
+};
+
+/** A picked point or whole entity — the same shape the selection-wide constraints read. */
+export type SketchPickTarget = SketchSelectionTarget;
 
 /** Entity type filter for picks: a single type or a set of acceptable types. */
 export type SketchEntityTypeFilter = SketchEntityType | readonly SketchEntityType[];
@@ -120,7 +129,13 @@ export class SketchEditor implements IDisposable {
         this.eventHandler.highlightPicks([...this.pickedEntities]);
     }
     lastSolveOutcome: SolveOutcome = { result: "OkUnderconstrained", dofs: 0 };
-    fullyConstrainedEntities = new Set<number>();
+    /** Per point and per curve, what the last fine solve left determined — see `SketchSolver.constraintStatus`. */
+    constraintStatus: SketchConstraintStatus = NOTHING_DETERMINED;
+
+    /** Entities with nothing left to move: never dragged, listed as solved by the diagnostics. */
+    get fullyConstrainedEntities(): ReadonlySet<number> {
+        return this.constraintStatus.entities;
+    }
 
     get selectedEntityIds(): number[] {
         return [
@@ -142,6 +157,11 @@ export class SketchEditor implements IDisposable {
                 (entityId): SketchPickTarget => ({ kind: "entity", entityId }),
             ),
         ];
+    }
+
+    /** What the running constraint tool found selected (`beginConstraintSelection`), points first, each in selection order. */
+    get preselection(): readonly SketchPickTarget[] {
+        return [...this.preselected];
     }
 
     selectEntities(ids: number[]): void {
@@ -542,15 +562,29 @@ export class SketchEditor implements IDisposable {
         }
     };
 
-    /** Orthographic top-down view onto the sketch plane; the plane becomes the workplane. */
+    /**
+     * Orthographic top-down view onto the sketch plane; the plane becomes the workplane. The
+     * camera turns there over a short tween (Onshape's "N"): the view is set instantly to
+     * find where it lands, put back, and animated to that.
+     */
     private lockCameraOntoPlane(view: IView): void {
         const controller = view.cameraController;
         const plane = this.node.plane;
+        const from = this.captureCamera();
         const distance = controller.cameraPosition?.distanceTo(controller.cameraTarget) || 1000;
         controller.cameraType = "orthographic";
         controller.lookAt(plane.origin.add(plane.normal.multiply(distance)), plane.origin, plane.yvec);
         controller.fitContent();
         view.workplane = plane;
+        if (typeof controller.animateLookAt !== "function" || !from.position || !from.target || !from.up)
+            return;
+        const to = {
+            position: controller.cameraPosition,
+            target: controller.cameraTarget,
+            up: controller.cameraUp,
+        };
+        controller.lookAt(from.position, from.target, from.up);
+        void controller.animateLookAt(to.position, to.target, to.up);
     }
 
     readonly view: IView;
@@ -759,10 +793,10 @@ export class SketchEditor implements IDisposable {
         const outcome = this.solver.solve(fine);
         this.lastSolveOutcome = outcome;
         if (fine)
-            this.fullyConstrainedEntities =
+            this.constraintStatus =
                 outcome.result.startsWith("Ok") && this.solver.datumErrors.size === 0
-                    ? this.solver.fullyConstrainedEntities()
-                    : new Set();
+                    ? this.solver.constraintStatus()
+                    : NOTHING_DETERMINED;
         this.annotations.refresh();
         this.eventHandler.refreshGeometryOverlays();
         this.refreshPanel();
@@ -1126,10 +1160,17 @@ export class SketchEditor implements IDisposable {
         if (this.view.isClosed) return;
         this.view.workplane = this.savedWorkplane;
         const controller = this.view.cameraController;
-        if (this.savedCamera.position && this.savedCamera.target && this.savedCamera.up) {
-            controller.lookAt(this.savedCamera.position, this.savedCamera.target, this.savedCamera.up);
-        }
         controller.cameraType = this.savedCamera.type;
+        if (this.savedCamera.position && this.savedCamera.target && this.savedCamera.up) {
+            // Back to where the user was looking from, over the same tween as the way in.
+            if (typeof controller.animateLookAt === "function")
+                void controller.animateLookAt(
+                    this.savedCamera.position,
+                    this.savedCamera.target,
+                    this.savedCamera.up,
+                );
+            else controller.lookAt(this.savedCamera.position, this.savedCamera.target, this.savedCamera.up);
+        }
     }
 
     private startPick<T>(

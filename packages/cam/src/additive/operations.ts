@@ -288,7 +288,7 @@ export const prusaSlicerOperation: CamOperationHandler = {
             key: "bridgeUrl",
             label: "Bridge URL",
             kind: "string",
-            description: 'Where "node scripts/prusa-slicer-bridge.mjs" listens',
+            description: 'Where "node scripts/desktop-bridge.mjs" listens',
         },
         { key: "arrange", label: "Let PrusaSlicer arrange", kind: "boolean" },
     ],

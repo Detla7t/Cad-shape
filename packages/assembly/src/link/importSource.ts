@@ -10,6 +10,7 @@ import {
     Logger,
     PROJECT_HISTORY_FOLDER,
     type ProjectFiles,
+    prepareDocumentForLoad,
     Result,
     type Serialized,
     StorageHistoryPersistence,
@@ -33,10 +34,10 @@ export async function importSourceProject(
     if (!files.isOk) return Result.err(files.error);
     const project = unpackProject(files.value);
     if (!project.isOk) return Result.err(project.error);
-    const document = project.value.document;
-    if ((document as { version?: string }).version !== __DOCUMENT_VERSION__) {
-        return Result.err("The file was written by an incompatible version of Chili3D");
-    }
+    // Stored as the current schema: a newer one is refused before anything is written.
+    const prepared = prepareDocumentForLoad(project.value.document);
+    if (!prepared.isOk) return Result.err(prepared.error.message);
+    const document = prepared.value.document;
     const id = String(document["id"]);
     const name = String(document["name"] ?? "Untitled");
     const persistence = new StorageHistoryPersistence(storage);

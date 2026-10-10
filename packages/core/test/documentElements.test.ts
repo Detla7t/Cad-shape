@@ -50,6 +50,20 @@ describe("DocumentElementRegistry", () => {
         expect(registry.kindOf(folder)).toBeUndefined();
     });
 
+    test("a kind kept out of the model tree hides its nodes from the Features tree only", () => {
+        const registry = new DocumentElementRegistry();
+        registry.registerKind({ ...studioKind, kind: "attachedFile", inModelTree: false });
+        const doc = new TestDocument();
+        const file = addStudio(doc, "Drawing 1");
+        const folder = new FolderNode({ document: doc, name: "Folder" });
+        doc.modelManager.rootNode.add(folder);
+        expect(registry.hiddenInTree(file)).toBe(true);
+        expect(registry.hiddenInTree(folder)).toBe(false);
+        expect(registry.elementsOf(doc).map((item) => item.node)).toEqual([file]);
+        registry.registerKind({ ...studioKind, kind: "attachedFile" });
+        expect(registry.hiddenInTree(file)).toBe(false);
+    });
+
     test("re-registering a kind or a view replaces it, and disposing unregisters", () => {
         const registry = new DocumentElementRegistry();
         const changed = rs.fn();

@@ -7,6 +7,7 @@ import {
     type IDisposable,
     type IDocument,
     type INode,
+    type RibbonTabKeys,
     registerElementKind,
     registerElementView,
 } from "@chili3d/core";
@@ -25,6 +26,8 @@ interface DocumentKind {
     readonly view: DocumentViewKind;
     readonly display: I18nKeys;
     readonly newCommand?: CommandKeys;
+    /** The contextual ribbon tab shown while an element of the kind is in front. */
+    readonly ribbonTab?: RibbonTabKeys;
     /** A representative format, for the icon. */
     readonly format: string;
 }
@@ -60,7 +63,14 @@ export const DOCUMENT_KINDS: readonly DocumentKind[] = [
     },
     { kind: "pdfDocument", view: "pdf", display: "documents.kind.pdf", format: "pdf" },
     { kind: "imageDocument", view: "image", display: "documents.kind.image", format: "png" },
-    { kind: "drawingDocument", view: "drawing", display: "documents.kind.drawing", format: "dxf" },
+    {
+        kind: "drawingDocument",
+        view: "drawing",
+        display: "documents.kind.drawing",
+        newCommand: "documents.newDrawing",
+        ribbonTab: "ribbon.tab.drawing",
+        format: "dxf",
+    },
     { kind: "fileDocument", view: "file", display: "documents.kind.file", format: "unknown" },
 ];
 
@@ -77,6 +87,8 @@ export function registerDocumentElements(): IDisposable {
                 icon: documentIcon(kind.format),
                 display: kind.display,
                 isElement: isKind(kind.view),
+                // a file is a tab of the document, not a feature of the Part Studio
+                inModelTree: false,
                 ...(["drawing", "image"].includes(kind.view)
                     ? {
                           thumbnail: async (node: INode) =>
@@ -84,6 +96,7 @@ export function registerDocumentElements(): IDisposable {
                       }
                     : {}),
                 ...(kind.newCommand === undefined ? {} : { newCommand: kind.newCommand }),
+                ...(kind.ribbonTab === undefined ? {} : { ribbonTab: kind.ribbonTab }),
             }),
             registerElementView(kind.kind, (node: INode, document: IDocument) =>
                 createDocumentView(node as DocumentFileNode, document),

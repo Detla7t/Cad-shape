@@ -13,6 +13,7 @@ import {
     PubSub,
 } from "@chili3d/core";
 import { createCadIcon } from "@chili3d/element";
+import { leave, motionEnabled } from "../motion";
 import { AppearancePanel } from "./appearancePanel";
 import { ConfigurationTablePanel } from "./configurationTablePanel";
 import { InspectionPanel } from "./inspectionPanel";
@@ -66,6 +67,8 @@ export class StudioSidebar extends HTMLElement implements IDocumentPanelHost {
     private active?: DocumentPanelId;
     private width = 480;
     private stopResize?: () => void;
+    /** Ends the close in progress (see `close`). */
+    private closing?: () => void;
     private railRefreshQueued = false;
 
     constructor(private readonly app: IApplication) {
@@ -162,6 +165,7 @@ export class StudioSidebar extends HTMLElement implements IDocumentPanelHost {
         if (!definition || !this.currentDocument) return;
         if (this.active === id && this.mounted) return;
         this.unmount();
+        this.cancelClosing();
         this.active = id;
         this.heading.textContent = I18n.translate(definition.title);
         this.panel.setAttribute("aria-label", this.heading.textContent);
@@ -173,15 +177,43 @@ export class StudioSidebar extends HTMLElement implements IDocumentPanelHost {
         for (const [key, button] of this.buttons) button.setAttribute("aria-expanded", String(key === id));
     }
 
+    /**
+     * Closes the dock: the panel slides shut (its content stays up for the slide) and is
+     * disposed when the width transition ends — at once without motion.
+     */
     close(focusRail = false) {
         const active = this.active;
-        this.unmount();
         this.active = undefined;
         delete this.dataset["open"];
-        this.panel.hidden = true;
-        this.style.width = "0px";
         for (const button of this.buttons.values()) button.setAttribute("aria-expanded", "false");
         if (focusRail && active) this.buttons.get(active)?.focus();
+        const finish = () => {
+            this.closing = undefined;
+            this.unmount();
+            this.panel.hidden = true;
+        };
+        if (!this.mounted || !motionEnabled() || !this.isConnected) {
+            this.style.width = "0px";
+            finish();
+            return;
+        }
+        this.dataset["closing"] = "true";
+        this.style.width = "0px";
+        this.closing = finish;
+        leave(this, () => {
+            if (this.closing === finish) finish();
+            delete this.dataset["closing"];
+        });
+    }
+
+    /** A close still sliding when the dock reopens: finish it now, the new panel takes over. */
+    private cancelClosing() {
+        const closing = this.closing;
+        if (closing === undefined) return;
+        this.closing = undefined;
+        closing();
+        delete this.dataset["closing"];
+        delete this.dataset["leaving"];
     }
 
     private unmount() {

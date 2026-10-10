@@ -1,0 +1,16 @@
+{
+    "name": "@chili3d/code-editor",
+    "version": "0.7.1",
+    "description": "The app's plain CodeMirror 6 editor: theme, history, search/replace, Ctrl+S, quiet text replacement and selection snapshots, shared by the document and NC program editors",
+    "main": "src/index.ts",
+    "type": "module",
+    "devDependencies": {
+        "@chili3d/core": "*"
+    },
+    "dependencies": {
+        "@codemirror/commands": "^6.11.1",
+        "@codemirror/search": "^6.7.2",
+        "@codemirror/state": "^6.7.6",
+        "@codemirror/view": "^6.43.14"
+    }
+}

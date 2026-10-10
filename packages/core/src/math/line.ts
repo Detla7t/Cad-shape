@@ -10,7 +10,7 @@ export interface LineOptions {
     direction: XYZ;
 }
 
-@serializable()
+@serializable({ id: "Line" })
 export class Line {
     @serialize()
     readonly point: XYZ;

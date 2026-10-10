@@ -7,7 +7,7 @@ import type { AddressInfo } from "node:net";
 import os from "node:os";
 import path from "node:path";
 import JSZip from "jszip";
-import { createBridgeServer } from "../../../../scripts/prusa-slicer-bridge.mjs";
+import { createBridgeServer } from "../../../../scripts/desktop-bridge.mjs";
 import {
     camOperation,
     isCompletePrinterProgram,
@@ -113,6 +113,8 @@ describe("PrusaSlicer bridge", () => {
             slicer: { command: process.execPath, args: [fake] },
             origins: ["https://cad.example"],
             log: () => {},
+            detect: false,
+            exportsDir: path.join(dir, "exports"),
         });
         await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
         base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
@@ -302,7 +304,7 @@ describe("PrusaSlicer bridge", () => {
             });
             expect(result.isOk).toBe(false);
             expect(result.error).toContain("not reachable");
-            expect(result.error).toContain("prusa-slicer-bridge.mjs");
+            expect(result.error).toContain("desktop-bridge.mjs");
         } finally {
             rs.unstubAllGlobals();
         }

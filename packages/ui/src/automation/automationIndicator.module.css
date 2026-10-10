@@ -1,0 +1,69 @@
+.indicator {
+    position: fixed;
+    right: 12px;
+    bottom: 34px;
+    z-index: 900;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 4px 3px 8px;
+    border: 1px solid var(--border-color, #d0d0d0);
+    border-radius: 12px;
+    background: var(--panel-background-color, #ffffff);
+    color: var(--foreground-color, #333333);
+    font-size: 11px;
+    line-height: 16px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+    pointer-events: auto;
+}
+
+.dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #2e9d4f;
+}
+
+.busy {
+    background: #d98a00;
+    animation: pulse 0.9s ease-in-out infinite alternate;
+}
+
+@keyframes pulse {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0.35;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .busy {
+        animation: none;
+    }
+}
+
+.label {
+    white-space: nowrap;
+}
+
+.last {
+    color: var(--foreground-secondary-color, #666666);
+}
+
+.disconnect {
+    margin: 0;
+    padding: 0 6px;
+    border: 1px solid var(--border-color, #c8c8c8);
+    border-radius: 9px;
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+.disconnect:hover,
+.disconnect:focus-visible {
+    background-color: var(--hover-background-color, rgba(0, 0, 0, 0.06));
+}

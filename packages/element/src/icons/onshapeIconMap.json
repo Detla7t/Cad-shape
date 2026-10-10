@@ -138,6 +138,7 @@
     "sketch.circularPattern": "sketch-cpattern-button",
     "sketch.transform": "sketch-transform-button",
     "sketch.arc3Point": "sketch-arc-button",
+    "sketch.tangentArc": "sketch-arc-button",
     "sketch.importDrawing": "drawing-insert-dwg-dxf",
     "sketch.insertImage": "sketch-image-rectangle-button"
 }

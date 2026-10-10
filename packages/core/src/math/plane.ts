@@ -14,7 +14,7 @@ export interface PlaneOptions {
     xvec: XYZ;
 }
 
-@serializable()
+@serializable({ id: "Plane" })
 export class Plane {
     static readonly XY: Plane = new Plane({ origin: XYZ.zero, normal: XYZ.unitZ, xvec: XYZ.unitX });
     static readonly YZ: Plane = new Plane({ origin: XYZ.zero, normal: XYZ.unitX, xvec: XYZ.unitY });

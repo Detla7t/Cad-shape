@@ -39,6 +39,18 @@ export type HtmlTextOptions = {
     onCreated?: (element: HTMLElement) => void;
 };
 
+/** What the viewport's quality profile is doing (see the three package's `renderQuality`). */
+export interface RenderQualityState {
+    readonly profile: "automatic" | "performance" | "balanced" | "quality";
+    readonly targetFps: number;
+    /** The smoothed frame rate of the moving frames; undefined before any motion. */
+    readonly movingFps: number | undefined;
+    /** Index on the quality ladder the moving frames draw at (higher is better). */
+    readonly movingLevel: number;
+    /** The drawing buffer's share of the display pixel ratio. */
+    readonly renderScale: number;
+}
+
 export interface IView extends IPropertyChanged, IDisposable {
     readonly document: IDocument;
     readonly cameraController: ICameraController;
@@ -62,6 +74,8 @@ export interface IView extends IPropertyChanged, IDisposable {
     unisolate(): void;
     showSectionView?(plane?: Plane): void;
     renderStats?(): Record<string, number>;
+    /** The rendering quality profile in force and the moving frame rate it measures. */
+    qualityState?(): RenderQualityState;
     resize(width: number, heigth: number): void;
     setDom(element: HTMLElement): void;
     htmlText(text: string, point: XYZLike, options?: HtmlTextOptions): IDisposable;

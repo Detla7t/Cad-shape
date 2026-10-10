@@ -75,7 +75,7 @@ export interface ComponentOptions {
     id?: string;
 }
 
-@serializable()
+@serializable({ id: "Component" })
 export class Component {
     private readonly _nodes: ReadonlyArray<VisualNode>;
     @serialize()
@@ -273,7 +273,7 @@ export interface ComponentNodeOptions {
     id?: string;
 }
 
-@serializable()
+@serializable({ id: "ComponentNode" })
 export class ComponentNode extends VisualNode {
     override display(): I18nKeys {
         return "body.group";

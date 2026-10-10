@@ -4,6 +4,11 @@
     top: 30%;
     transform: translate(-50%, 0%);
     z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.6em;
+    max-width: min(90vw, 36em);
     border-radius: 0.8em;
     background-color: var(--background-color);
     backdrop-filter: blur(10px);
@@ -12,6 +17,40 @@
     opacity: 0.85;
     color: var(--foreground-color);
     border: 1px solid var(--border-color);
+}
+
+.toast:has(.actions) {
+    opacity: 0.95;
+}
+
+.message {
+    text-align: center;
+    overflow-wrap: anywhere;
+}
+
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.4em;
+    font-size: 0.85em;
+}
+
+.actions button {
+    padding: 0.3em 0.8em;
+    border-radius: 0.5em;
+    border: 1px solid var(--border-color);
+    background-color: var(--panel-background-color, transparent);
+    color: var(--foreground-color);
+    cursor: pointer;
+}
+
+.actions button:hover {
+    background-color: var(--hover-background-color, rgba(128, 128, 128, 0.2));
+}
+
+.close {
+    min-width: 2em;
 }
 
 .info {

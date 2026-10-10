@@ -11,9 +11,15 @@
     color: inherit;
     background: var(--panel-background-color);
     border: 1px solid var(--border-color);
-    border-radius: 0;
-    padding: 5px;
+    border-radius: 2px;
+    padding: 4px 6px;
     min-width: 0;
+}
+.root button {
+    cursor: pointer;
+}
+.root button:hover {
+    background: var(--hover-background-color);
 }
 .tabs,
 .toolbar {
@@ -41,24 +47,46 @@
 .table td {
     border: 1px solid var(--border-color);
     padding: 0;
-    height: 30px;
+    height: 26px;
     text-align: left;
     white-space: nowrap;
 }
 .table th {
-    padding: 6px 8px;
+    padding: 4px 8px;
     background: var(--title-background);
     font-weight: 600;
+    text-align: center;
 }
-.table input {
-    width: 120px;
-    padding: 6px 8px;
+.table th .remove {
+    margin-left: 6px;
+    padding: 0 4px;
+    border: 0;
+    background: transparent;
+    line-height: 1;
+}
+.table input,
+.table select {
+    width: 100%;
+    min-width: 90px;
+    padding: 4px 8px;
     box-sizing: border-box;
     border: 1px solid transparent;
+    border-radius: 0;
     background: transparent;
 }
+.table .optionName {
+    width: 100%;
+    text-align: left;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    padding: 4px 8px;
+}
+.table tr[data-active="true"] {
+    background: color-mix(in srgb, var(--primary-color) 12%, var(--panel-background-color));
+}
 .table tr[data-active="true"] > td:first-child {
-    border-left: 3px solid var(--primary-color);
+    box-shadow: inset 3px 0 var(--primary-color);
 }
 .error {
     color: var(--danger-color);
@@ -92,27 +120,74 @@
     min-height: 0;
     overflow: auto;
 }
+/* Onshape's input section: "⌄ OD   Default: 9 5/8"      [+ Configure features] ⋯" */
 .inputSection {
-    margin-bottom: 12px;
-    border: 1px solid var(--border-color);
+    margin-bottom: 10px;
+    border-bottom: 1px solid var(--border-color);
 }
 .inputSection summary {
-    padding: 5px 8px;
-    background: var(--title-background);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 4px 4px 2px;
     cursor: pointer;
+    min-height: 26px;
+    list-style: none;
+}
+.inputSection summary::-webkit-details-marker {
+    display: none;
+}
+.inputSection summary::before {
+    content: "";
+    flex: 0 0 5px;
+    width: 5px;
+    height: 5px;
+    margin: 0 2px;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    transform: rotate(-45deg);
+    transition: transform 150ms ease;
+}
+.inputSection[open] summary::before {
+    transform: rotate(45deg) translateY(-2px);
+}
+.inputSection summary strong {
     font-weight: 600;
-    min-height: 24px;
-    line-height: 24px;
+    white-space: nowrap;
+}
+.defaultValue {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--foreground-secondary-color);
 }
 .inputSection summary button {
-    float: right;
+    flex: 0 0 auto;
+    padding: 2px 7px;
+    min-height: 22px;
+    line-height: 16px;
+    font-size: 12px;
+}
+.inputSection summary .more {
     border: 0;
     padding: 0 6px;
-    font-size: 18px;
+    font-size: 16px;
+    line-height: 1;
+}
+.configureFeatures {
+    white-space: nowrap;
 }
 .inputSection .toolbar {
-    padding: 6px;
+    padding: 6px 2px;
     flex-wrap: wrap;
+}
+.inputSection .toolbar[hidden] {
+    display: none;
+}
+.inputSection .scroll {
+    padding: 0 0 8px;
 }
 .inputSection .toolbar select {
     flex: 1;
@@ -136,9 +211,9 @@
     flex-shrink: 0;
     padding: 6px;
     border-top: 1px solid var(--border-color);
-    background: var(--title-background);
+    background: var(--panel-background-color);
     display: flex;
-    justify-content: center;
+    justify-content: flex-end;
 }
 .inputFooter button {
     display: flex;
@@ -180,4 +255,38 @@
     border-color: var(--primary-color);
     outline: 1px solid var(--primary-color);
     outline-offset: -1px;
+}
+
+/* Model definitions: "Model  [No models.]", the tools row, then the characteristics. */
+.inspection {
+    height: 100%;
+    box-sizing: border-box;
+}
+.inspection .toolbar select {
+    flex: 1 1 auto;
+}
+.modelLabel {
+    flex: 0 0 auto;
+    font-weight: 600;
+}
+.emptyState {
+    margin: 40px 16px 0;
+    text-align: center;
+    line-height: 1.6;
+    color: var(--foreground-secondary-color);
+}
+.emptyState::before {
+    content: "";
+    display: block;
+    width: 72px;
+    height: 56px;
+    margin: 0 auto 14px;
+    border: 2px solid var(--border-color);
+    border-radius: 3px;
+    background:
+        linear-gradient(var(--border-color), var(--border-color)) 0 18px / 100% 2px no-repeat,
+        linear-gradient(var(--border-color), var(--border-color)) 0 36px / 100% 2px no-repeat,
+        linear-gradient(var(--border-color), var(--border-color)) 24px 0 / 2px 100% no-repeat,
+        linear-gradient(var(--border-color), var(--border-color)) 48px 0 / 2px 100% no-repeat;
+    opacity: 0.7;
 }

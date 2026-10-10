@@ -3,6 +3,10 @@
 
 import { dataTableProviderOf } from "@chili3d/core";
 import { TestDocument, TestNode } from "@chili3d/core/test-utils";
+import { htmlToBlocks } from "@chili3d/richtext/blocks";
+import { blocksToDocx } from "@chili3d/richtext/docx";
+import type { WorkbookData } from "@chili3d/sheet/model";
+import { writeWorkbook } from "@chili3d/sheet/workbookIo";
 import {
     canReadDocumentTable,
     DOCUMENT_NOT_LOADED,
@@ -16,10 +20,6 @@ import {
 } from "../src/api";
 import { DocumentFileNode } from "../src/documentFileNode";
 import { registerDocumentsModule } from "../src/index";
-import { htmlToBlocks } from "../src/richtext/blocks";
-import { blocksToDocx } from "../src/richtext/docx";
-import type { WorkbookData } from "../src/sheet/model";
-import { writeWorkbook } from "../src/sheet/workbookIo";
 
 const document = new TestDocument();
 

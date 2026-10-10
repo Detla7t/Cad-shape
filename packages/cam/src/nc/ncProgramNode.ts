@@ -36,7 +36,7 @@ export interface NcProgramNodeOptions {
  * deltas — and in a `.chili3d` project it is a plain file under `nc/` with its own
  * extension. The dialect and machine choices are recorded too.
  */
-@serializable()
+@serializable({ id: "NcProgramNode" })
 export class NcProgramNode extends Node implements INodeIcon, INodeSceneless {
     get icon(): string {
         return NC_PROGRAM_ICON;

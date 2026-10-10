@@ -1,0 +1,8 @@
+{
+    "mcpServers": {
+        "chili3d": {
+            "command": "node",
+            "args": ["scripts/automation-bridge.mjs"]
+        }
+    }
+}

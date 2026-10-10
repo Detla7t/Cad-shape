@@ -27,7 +27,7 @@ export interface PipeOptions {
     thickness?: number;
 }
 
-@serializable()
+@serializable({ id: "PipeNode" })
 export class PipeNode extends ParameterShapeNode {
     override display(): I18nKeys {
         return "body.pipe" as I18nKeys;

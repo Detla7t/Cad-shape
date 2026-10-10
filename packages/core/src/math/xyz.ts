@@ -33,7 +33,7 @@ export function getVectorComponent(point: XYZLike, index: number) {
     throw new Error("index out of range");
 }
 
-@serializable()
+@serializable({ id: "XYZ" })
 export class XYZ {
     static readonly zero = Object.freeze(new XYZ({ x: 0, y: 0, z: 0 }));
     static readonly unitX = Object.freeze(new XYZ({ x: 1, y: 0, z: 0 }));

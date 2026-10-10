@@ -11,6 +11,13 @@
  */
 
 import {
+    BoxNode,
+    buildProjectFiles,
+    readProjectFile,
+    restoreProjectState,
+    zipProjectFiles,
+} from "@chili3d/app";
+import {
     Constants,
     type IFace,
     Matrix4,
@@ -24,13 +31,6 @@ import {
     unregisterProjectEntryProvider,
     VERSION_HISTORY_ENTRY_PROVIDER,
 } from "@chili3d/core";
-import { BoxNode } from "../../app/src/bodys/box";
-import {
-    buildProjectFiles,
-    readProjectFile,
-    restoreProjectState,
-    zipProjectFiles,
-} from "../../app/src/project/projectFile";
 import { importSourceProject } from "../src/link/importSource";
 import { LinkedPartNode } from "../src/link/linkedPartNode";
 import { linkService, setLinkService } from "../src/link/linkRegistry";

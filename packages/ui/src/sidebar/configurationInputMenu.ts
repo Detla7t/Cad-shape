@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import type { ConfigurationInputKind } from "@chili3d/core";
+import { type ConfigurationInputKind, I18n } from "@chili3d/core";
 import { createCadIcon } from "@chili3d/element";
 import style from "./modelTable.module.css";
 
@@ -14,7 +14,10 @@ export class ConfigurationInputMenu {
 
     constructor(private readonly onChoose: (kind: ConfigurationInputKind) => void) {
         this.element.className = style.inputFooter;
-        this.add.append(createCadIcon("tables"), document.createTextNode("Add configuration input ▴"));
+        this.add.append(
+            createCadIcon("tables"),
+            document.createTextNode(`${I18n.translate("configuration.addInput")} ▴`),
+        );
         this.add.setAttribute("aria-label", "Add configuration input");
         this.add.setAttribute("aria-haspopup", "menu");
         this.add.setAttribute("aria-expanded", "false");
@@ -26,14 +29,14 @@ export class ConfigurationInputMenu {
         menu.className = style.inputMenu;
         menu.setAttribute("role", "menu");
         for (const [kind, label, icon] of [
-            ["list", "List", "tables"],
-            ["checkbox", "Checkbox", "check"],
-            ["variable", "Configuration variable", "variable"],
+            ["list", "configuration.kind.list", "tables"],
+            ["checkbox", "configuration.kind.checkbox", "check"],
+            ["variable", "configuration.kind.variable", "variable"],
         ] as const) {
             const choice = document.createElement("button");
             choice.setAttribute("role", "menuitem");
             choice.dataset["inputKind"] = kind;
-            choice.append(createCadIcon(icon), document.createTextNode(label));
+            choice.append(createCadIcon(icon), document.createTextNode(I18n.translate(label)));
             choice.onclick = () => {
                 this.close();
                 this.onChoose(kind);

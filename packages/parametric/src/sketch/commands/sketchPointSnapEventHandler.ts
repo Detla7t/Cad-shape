@@ -79,7 +79,10 @@ export class SketchPointSnapEventHandler extends PointSnapEventHandler {
         );
         const point = toWorld(editor.node.plane, position[0], position[1]);
         // honour the step's validator (e.g. a circle radius point must not land on its center)
-        if (this.data.validator !== undefined && !this.data.validator(point)) {
+        if (
+            (this.data.validator !== undefined && !this.data.validator(point)) ||
+            (this.sketchData.acceptSnap !== undefined && !this.sketchData.acceptSnap(snap))
+        ) {
             this.sketchTangentKind = undefined;
             this._snaped = undefined;
             return;

@@ -75,9 +75,12 @@ export async function importDwg(
 }
 
 /** A drawing (millimetres) as AutoCAD 2004 (AC1018) DWG bytes. */
-export async function writeDwg(drawing: Drawing): Promise<Result<Uint8Array>> {
+export async function writeDwg(
+    drawing: Drawing,
+    options: { properties?: Readonly<Record<string, string>> } = {},
+): Promise<Result<Uint8Array>> {
     try {
-        return Result.ok(await (await import("./acadTs")).drawingToDwg(drawing));
+        return Result.ok(await (await import("./acadTs")).drawingToDwg(drawing, options));
     } catch (error) {
         return Result.err(error instanceof Error ? error.message : String(error));
     }

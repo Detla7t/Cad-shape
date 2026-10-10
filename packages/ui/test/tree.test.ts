@@ -194,6 +194,28 @@ function createFixture(): Fixture {
     return { doc, root, groupA, model1, model2, tree };
 }
 
+test("a file element (a drawing, an attached document) has no row in the Features tree", () => {
+    const root = new MockNode("root");
+    root.isGroup = true;
+    root.isFolder = true;
+    const part = new MockNode("Part 1");
+    const drawing = new MockNode("Drawing 1");
+    (drawing as unknown as { hiddenInTree: boolean }).hiddenInTree = true;
+    part.parent = root;
+    drawing.parent = root;
+    part.nextSibling = drawing;
+    root.firstChild = part;
+    const tree = new Tree(makeDoc(root));
+    document.body.appendChild(tree);
+    try {
+        const rows = [...tree.querySelectorAll<TreeModel>("tree-model")];
+        expect(rows.map((row) => row.node.name)).toEqual(["Part 1", "Drawing 1"]);
+        expect(rows.map((row) => row.hidden)).toEqual([false, true]);
+    } finally {
+        tree.remove();
+    }
+});
+
 test("filter keeps a matching node's ancestors and restores hidden siblings when cleared", () => {
     const { tree, root, groupA, model1, model2 } = createFixture();
     try {

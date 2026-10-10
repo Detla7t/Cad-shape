@@ -118,6 +118,7 @@ test("the readout refines a measurement, creates that definition and clears its 
 test("the card stacks a distance's ΔX/ΔY/ΔZ in axis colours; a lone point shows its coordinates", async () => {
     let selected: INode[] = [];
     let point = false;
+    const create = rs.fn(async (_mode: MeasurementMode) => {});
     const doc = createMockDocument({
         application: createMockApplication(),
         selection: { getSelectedNodes: () => selected },
@@ -142,7 +143,7 @@ test("the card stacks a distance's ΔX/ΔY/ΔZ in axis colours; a lone point sho
                   : Result.ok({
                         key: "pair",
                         modes: ["distance", "maxDistance", "centerDistance"],
-                        createVariable: async () => {},
+                        createVariable: create,
                         measurement: {
                             mode,
                             label: "Minimum distance",
@@ -155,10 +156,10 @@ test("the card stacks a distance's ΔX/ΔY/ΔZ in axis colours; a lone point sho
                             ],
                         },
                         details: [
-                            { label: "ΔX", value: 3, quantity: "length", axis: "x" },
-                            { label: "ΔY", value: 4, quantity: "length", axis: "y" },
-                            { label: "ΔZ", value: 12, quantity: "length", axis: "z" },
-                            { label: "Angle", value: 90, quantity: "angle" },
+                            { label: "ΔX", value: 3, quantity: "length", axis: "x", mode: "deltaX" },
+                            { label: "ΔY", value: 4, quantity: "length", axis: "y", mode: "deltaY" },
+                            { label: "ΔZ", value: 12, quantity: "length", axis: "z", mode: "deltaZ" },
+                            { label: "Angle", value: 90, quantity: "angle", mode: "angle" },
                             { label: "Area", value: 645.16, quantity: "area" },
                         ],
                     }),
@@ -179,15 +180,20 @@ test("the card stacks a distance's ΔX/ΔY/ΔZ in axis colours; a lone point sho
         const rows = [...control.card.querySelectorAll("dt")].map((dt) => [
             dt.textContent,
             dt.dataset["axis"] ?? null,
-            dt.nextElementSibling?.textContent,
+            dt.nextElementSibling?.querySelector("span")?.textContent,
+            dt.nextElementSibling?.querySelector("button")?.getAttribute("aria-label") ?? null,
         ]);
         expect(rows).toEqual([
-            ["ΔX", "x", "3.00 mm"],
-            ["ΔY", "y", "4.00 mm"],
-            ["ΔZ", "z", "12.00 mm"],
-            ["Angle", null, "90.0°"],
-            ["Area", null, "645.16 mm²"],
+            ["ΔX", "x", "3.00 mm", "Create variable from ΔX"],
+            ["ΔY", "y", "4.00 mm", "Create variable from ΔY"],
+            ["ΔZ", "z", "12.00 mm", "Create variable from ΔZ"],
+            ["Angle", null, "90.0°", "Create variable from Angle"],
+            ["Area", null, "645.16 mm²", null],
         ]);
+        // the row's (x) makes a variable of that one value
+        control.card.querySelector<HTMLButtonElement>('[aria-label="Create variable from ΔZ"]')!.click();
+        await Promise.resolve();
+        expect(create).toHaveBeenCalledWith("deltaZ");
         const options = [...control.popup.querySelectorAll("option")].map((o) => o.textContent);
         expect(options).toEqual(["Minimum distance", "Maximum distance", "Center distance"]);
 

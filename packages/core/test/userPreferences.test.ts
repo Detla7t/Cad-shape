@@ -3,6 +3,7 @@
 
 import {
     Config,
+    DEFAULT_DESKTOP_PREFERENCES,
     defaultUserPreferences,
     displayPixelRatio,
     documentParameterInput,
@@ -14,6 +15,7 @@ import {
     formatDocumentValue,
     initializeDocumentPreferences,
     LENGTH_UNITS,
+    mergeUserPreferences,
     resolveUnitSpec,
     setDocumentQuantityUnits,
 } from "../src";
@@ -92,4 +94,22 @@ test.each([
     ["automatic", Number.NaN, 1],
 ] as const)("%s display density at %s gives %s", (mode, device, expected) => {
     expect(displayPixelRatio(mode, device)).toBe(expected);
+});
+
+test("desktop bridge preferences default to the local bridge and merge with what an older version saved", () => {
+    expect(defaultUserPreferences().desktop).toEqual({
+        bridgeUrl: "http://127.0.0.1:7781",
+        openExports: false,
+    });
+    expect(mergeUserPreferences({ decimalComma: true }).desktop).toEqual(DEFAULT_DESKTOP_PREFERENCES);
+    expect(
+        mergeUserPreferences({
+            desktop: { openExports: true } as Partial<typeof DEFAULT_DESKTOP_PREFERENCES> as never,
+        }).desktop,
+    ).toEqual({ bridgeUrl: "http://127.0.0.1:7781", openExports: true });
+    Config.instance.preferences = {
+        ...defaultUserPreferences(),
+        desktop: { bridgeUrl: "http://pc:1", openExports: true },
+    };
+    expect(Config.instance.preferences.desktop).toEqual({ bridgeUrl: "http://pc:1", openExports: true });
 });

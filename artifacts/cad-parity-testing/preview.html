@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset="utf-8"><style>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><style>
 *{box-sizing:border-box}body{margin:0;font:14px var(--font-sans,system-ui);color:var(--foreground,#d8dee9)}
 p{margin:8px 0 14px}.status{color:var(--destructive,#e77777);font-weight:650}.muted{color:var(--muted-foreground,#818a9b);font-size:12px}.controls{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:14px 0 8px}
 select,button{font:inherit;color:inherit;background:var(--secondary,#222a36);border:1px solid var(--border,#414855);border-radius:6px;padding:7px 10px}select{min-width:175px}button{cursor:pointer}
@@ -7,11 +7,11 @@ canvas{display:block;width:100%;height:310px;border-radius:8px;background:var(--
 </style></head><body>
 <p><b>Testing · 13 feature specimens, 19 solid parts</b></p>
 <p class="status">Raw byte equality: failed for both STEP and DXF.</p>
-<div class="controls"><label for="feature">View specimen</label><select id="feature"></select><button id="reset">Reset view</button><span class="muted">Drag to rotate</span></div>
+<div class="controls"><label for="feature">View specimen</label><select id="feature"></select><button id="reset" type="button">Reset view</button><span class="muted">Drag to rotate</span></div>
 <canvas id="model" aria-label="Interactive 3D preview of the generated Chili3D test specimen"></canvas>
 <div class="facts"><b id="name"></b><span id="volume"></span><span id="count"></span></div>
 <p class="muted">Preview from Chili3D’s generated mesh. Both engines executed the same FeatureScript source. Measurement agreement does not count as byte equality.</p>
-<div class="drawing"><svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="95mm" height="20mm" viewBox="0 0 95 20">
+<div class="drawing"><svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="95mm" height="20mm" viewBox="0 0 95 20" role="img" aria-label="Drawing export">
   <desc>Units: millimetres (1 user unit = 1 mm). Written by Chili3D.</desc>
   <g id="VISIBLE" inkscape:groupmode="layer" inkscape:label="VISIBLE" fill="none" stroke="#000000" stroke-width="0.25">
     <line x1="5" y1="15" x2="5" y2="5"/>

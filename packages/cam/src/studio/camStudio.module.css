@@ -149,28 +149,22 @@
     visibility: hidden;
 }
 
-.status {
+.statusHost {
     flex: 0 0 auto;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background-color: var(--foreground-muted-color);
 }
 
-.status[data-state="ok"] {
-    background-color: var(--success-color, #2e7d32);
+.postReadiness {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 6px 0;
 }
 
-.status[data-state="error"] {
-    background-color: var(--error-color, #c62828);
-}
-
-.status[data-state="running"] {
-    background-color: var(--primary-color);
-}
-
-.status[data-stale] {
-    background-color: var(--warning-color, #ef6c00);
+.blocker {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    font-size: 12px;
 }
 
 .addRow {

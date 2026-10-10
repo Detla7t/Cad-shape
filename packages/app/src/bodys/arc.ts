@@ -21,7 +21,7 @@ export interface ArcOptions {
     angle: number;
 }
 
-@serializable()
+@serializable({ id: "ArcNode" })
 export class ArcNode extends ParameterShapeNode {
     override display(): I18nKeys {
         return "body.arc";

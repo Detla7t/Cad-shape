@@ -2,10 +2,12 @@
 // See LICENSE file in the project root for full license information.
 
 export * from "./configuration";
+export * from "./configurationDependencies";
 export * from "./configurationVisibility";
 export * from "./configuredValue";
 export * from "./dataTable";
 export * from "./documentUnits";
+export * from "./exportNaming";
 export * from "./expression";
 export * from "./modelParameters";
 export * from "./unitSpec";

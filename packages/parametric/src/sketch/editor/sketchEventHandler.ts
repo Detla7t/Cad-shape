@@ -37,6 +37,7 @@ import {
     isDatumEntityId,
     isExternalEntityId,
     originRef,
+    pointRefKey,
     SKETCH_EDGE_LINE_WIDTH,
     SKETCH_X_AXIS_ID,
     SKETCH_Y_AXIS_ID,
@@ -540,7 +541,8 @@ export class SketchEventHandler implements IEventHandler {
         // the datum origin and external references are pickable for constraints but never draggable
         if (ref !== undefined && !isDatumEntityId(ref.entityId) && !isExternalEntityId(ref.entityId)) {
             if (this.editor.solver.entityLocked(this.editor.solver.entity(ref.entityId)!)) return;
-            if (this.editor.fullyConstrainedEntities.has(ref.entityId)) {
+            // a point the constraints hold in place is selected, not dragged
+            if (this.editor.constraintStatus.points.has(pointRefKey(ref))) {
                 this.selectPoint(view, ref);
                 return;
             }
@@ -1246,16 +1248,24 @@ export class SketchEventHandler implements IEventHandler {
     }
 }
 
-function entityColor(editor: SketchEditor, entity: SketchEntityData): number {
-    if (
+/** Shown for every entity while the sketch does not solve (and errors are shown). */
+const SKETCH_ERROR_COLOR = 0xee6262;
+
+function showsSolveError(editor: SketchEditor): boolean {
+    return (
         editor.showErrors &&
         (!editor.lastSolveOutcome.result.startsWith("Ok") || editor.solver.datumErrors.size > 0)
-    )
-        return 0xee6262;
-    if (editor.lastSolveOutcome.dofs === 0 || editor.fullyConstrainedEntities.has(entity.id))
-        return Config.instance.graphics.constrainedColor
-            ? Number.parseInt(Config.instance.graphics.constrainedColor.slice(1), 16)
-            : VisualConfig.defaultEdgeColor;
+    );
+}
+
+/** Graphics ▸ constrained color, or the theme's edge color (dark on light, white on dark) when unset. */
+function solvedColor(): number {
+    const configured = Config.instance.graphics.constrainedColor;
+    return configured ? Number.parseInt(configured.slice(1), 16) : VisualConfig.defaultEdgeColor;
+}
+
+/** Free geometry: the entity's own color, else its layer's, else Graphics ▸ underconstrained color. */
+function freeColor(editor: SketchEditor, entity: SketchEntityData): number {
     const layer = editor.solver.sketchLayers().find((layer) => layer.id === (entity.layer ?? "0"));
     const layerColor =
         layer?.id === "0" && layer.color === DEFAULT_SKETCH_LAYER.color ? undefined : layer?.color;
@@ -1263,6 +1273,32 @@ function entityColor(editor: SketchEditor, entity: SketchEntityData): number {
         (entity.color ?? layerColor ?? Config.instance.graphics.underconstrainedColor).slice(1),
         16,
     );
+}
+
+/** The curve is determined (`SketchConstraintStatus.curves`): a line's carrier, a circle's or arc's circle. */
+function curveSolved(editor: SketchEditor, entityId: number): boolean {
+    return editor.lastSolveOutcome.dofs === 0 || editor.constraintStatus.curves.has(entityId);
+}
+
+/**
+ * Stroke color, Onshape's way: solved once the curve itself is determined, so an
+ * origin-attached vertical line draws solved while its far end is still free.
+ */
+export function sketchEntityColor(editor: SketchEditor, entity: SketchEntityData): number {
+    if (showsSolveError(editor)) return SKETCH_ERROR_COLOR;
+    return curveSolved(editor, entity.id) ? solvedColor() : freeColor(editor, entity);
+}
+
+/** Point marker color: each point by its own remaining freedom, whatever its curve's. */
+export function sketchPointColor(
+    editor: SketchEditor,
+    entity: SketchEntityData,
+    ref: SketchPointRef,
+): number {
+    if (showsSolveError(editor)) return SKETCH_ERROR_COLOR;
+    return editor.lastSolveOutcome.dofs === 0 || editor.constraintStatus.points.has(pointRefKey(ref))
+        ? solvedColor()
+        : freeColor(editor, entity);
 }
 
 function styledEntityMeshes(editor: SketchEditor): ShapeMeshData[] {
@@ -1277,11 +1313,11 @@ function styledEntityMeshes(editor: SketchEditor): ShapeMeshData[] {
             const mesh = entityDisplayMesh(
                 editor.node.plane,
                 entity,
-                entityColor(editor, entity),
+                sketchEntityColor(editor, entity),
                 !!(entity.construction || entity.dashed || layer?.dashed),
                 pixel,
             );
-            if (editor.lastSolveOutcome.dofs > 0 && !editor.fullyConstrainedEntities.has(entity.id))
+            if (!curveSolved(editor, entity.id))
                 mesh.occludedColor = Number.parseInt(Config.instance.graphics.occludedColor.slice(1), 16);
             return mesh;
         });
@@ -1292,22 +1328,6 @@ export function sketchEntityMeshes(editor: SketchEditor): ShapeMeshData[] {
         .entities()
         .filter((entity) => editor.solver.entityVisible(entity))
         .map((entity) => sketchEntityMesh(editor, entity));
-}
-
-/** An origin-attached center stays fixed even when its circle still has a free radius. */
-function pointColor(editor: SketchEditor, entity: SketchEntityData, ref: SketchPointRef): number {
-    const color = entityColor(editor, entity);
-    if (!editor.lastSolveOutcome.result.startsWith("Ok") || editor.solver.datumErrors.size) return color;
-    const pinned = editor.solver
-        .coincidentGroup(ref)
-        .some(
-            (point) =>
-                editor.solver.isFixed(point.entityId) ||
-                editor.solver.constraintKindsOnPoint(point).includes(ConstraintKind.Fix),
-        );
-    return pinned
-        ? Number.parseInt((Config.instance.graphics.constrainedColor || "#000000").slice(1), 16)
-        : color;
 }
 
 /** Vertex meshes at every entity point of the constraint targets — see `showEntityPoints`. */
@@ -1323,7 +1343,7 @@ function entityPointMeshes(editor: SketchEditor): ShapeMeshData[] {
                 MeshDataUtils.createVertexMesh(
                     toWorld(plane, u, v),
                     VisualConfig.editVertexSize,
-                    pointColor(editor, entity, { entityId: entity.id, pointIndex }),
+                    sketchPointColor(editor, entity, { entityId: entity.id, pointIndex }),
                 ),
             );
         }

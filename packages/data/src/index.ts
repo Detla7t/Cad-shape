@@ -7,7 +7,11 @@ import { registerDataFunctions } from "./resolver";
 import "./commands";
 import "./project";
 import "./ui/dataSourceElement";
+import "./database/databaseElement";
 
+export * from "./database/databaseElement";
+export * from "./database/databaseNode";
+export * from "./database/sqlite";
 export * from "./dataSourceNode";
 export * from "./dependencies";
 export * from "./load";

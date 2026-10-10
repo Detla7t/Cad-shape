@@ -21,7 +21,7 @@ export interface CylinderNodeOptions {
     dz: number;
 }
 
-@serializable()
+@serializable({ id: "CylinderNode" })
 export class CylinderNode extends ParameterShapeNode {
     override display(): I18nKeys {
         return "body.cylinder";

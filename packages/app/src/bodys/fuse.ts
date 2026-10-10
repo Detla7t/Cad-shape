@@ -17,7 +17,7 @@ export interface FuseOptions {
     top: IShape;
 }
 
-@serializable()
+@serializable({ id: "FuseNode" })
 export class FuseNode extends ParameterShapeNode {
     override display(): I18nKeys {
         return "body.fuse";

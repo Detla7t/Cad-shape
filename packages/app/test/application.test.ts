@@ -2,7 +2,16 @@
 // See LICENSE file in the project root for full license information.
 
 import type { ICommand, IDocument, IView, IVisualFactory, Serialized } from "@chili3d/core";
-import { documentUnits, Logger, ObservableCollection, PubSub } from "@chili3d/core";
+import {
+    documentUnits,
+    EDITOR_DRAFTS_KEY,
+    EditorBuffers,
+    FolderNode,
+    Logger,
+    ObservableCollection,
+    PubSub,
+    Result,
+} from "@chili3d/core";
 import { createMockView, createMockVisualWithDocument } from "@chili3d/core/test-utils";
 import { afterEach, beforeEach, describe, expect, rs, test } from "@rstest/core";
 import { Application } from "../src/application";
@@ -339,6 +348,33 @@ describe("Application", () => {
             expect(sharedApp.activeView).not.toBeNull();
             expect(sharedApp.activeView?.document?.name).toBe("SavedDoc");
         });
+
+        test("offers back the editor drafts stored with the document once it is shown", async () => {
+            const draft = {
+                nodeId: "studio-1",
+                editor: "featureStudio",
+                name: "Studio",
+                data: "x",
+                savedAt: 1,
+            };
+            sharedApp.storage.get = async () => ({ ...validData, [EDITOR_DRAFTS_KEY]: [draft] });
+            const offered: { document: IDocument; drafts: unknown[]; shown: boolean }[] = [];
+            const offer = rs.spyOn(EditorBuffers, "offerRecovery").mockImplementation(async (document) => {
+                offered.push({
+                    document,
+                    drafts: [...EditorBuffers.recoveredOf(document)],
+                    shown: sharedApp.activeView?.document === document,
+                });
+                return undefined;
+            });
+            try {
+                const doc = await sharedApp.openDocument("doc-456");
+                expect(offered).toEqual([{ document: doc, drafts: [draft], shown: true }]);
+            } finally {
+                offer.mockRestore();
+                EditorBuffers.forget({ id: "doc-456" } as IDocument);
+            }
+        });
     });
 
     // ==========================================================================
@@ -364,17 +400,20 @@ describe("Application", () => {
             expect(sharedApp.activeView).not.toBeNull();
         });
 
-        test("should return undefined when version mismatches", async () => {
+        test("should return undefined when the document's schema is newer than this build reads", async () => {
             const originalAlert = globalThis.alert;
             globalThis.alert = (() => {}) as any;
 
             try {
-                const badVersionData = {
+                // A document without `schemaVersion` is schema 1 whatever its version marker says
+                // (see documentSchema.test.ts); only a newer schema is refused.
+                const newerSchemaData = {
                     ...validSerializedData,
-                    version: "0.0.1",
+                    version: "schema-99",
+                    schemaVersion: 99,
                 } as unknown as Serialized;
 
-                const doc = await sharedApp.loadDocument(badVersionData);
+                const doc = await sharedApp.loadDocument(newerSchemaData);
                 expect(doc).toBeUndefined();
             } finally {
                 globalThis.alert = originalAlert;
@@ -735,6 +774,30 @@ describe("Application", () => {
 
             (sharedApp as any).handleWindowUnload(event);
             expect(event.returnValue).toBe("");
+        });
+
+        test("should prevent close when an editor holds unsaved edits, even without a view", () => {
+            sharedApp.activeView = undefined;
+            const document = { id: "unsaved" } as IDocument;
+            const registration = EditorBuffers.register({
+                document,
+                node: new FolderNode({ document, name: "Notes" }),
+                editor: "test",
+                isDirty: () => true,
+                commit: async () => Result.ok(undefined),
+                revert: () => {},
+            });
+            const event = new Event("beforeunload") as BeforeUnloadEvent;
+            let prevented = false;
+            event.preventDefault = () => {
+                prevented = true;
+            };
+            try {
+                (sharedApp as any).handleWindowUnload(event);
+            } finally {
+                registration.dispose();
+            }
+            expect(prevented).toBe(true);
         });
 
         test("should not prevent close when activeView is undefined", () => {

@@ -29,8 +29,9 @@ describe("viewport ambient occlusion", () => {
         return object;
     }
 
-    function pass(): SSAOPass {
-        const ao = (effects as unknown as { ao?: SSAOPass }).ao;
+    /** The pass drawing at `scale` (1: full resolution, 2: half). */
+    function pass(scale = 1): SSAOPass {
+        const ao = (effects as unknown as { passes: Map<number, SSAOPass> }).passes.get(scale);
         expect(ao).not.toBeUndefined();
         return ao!;
     }
@@ -87,7 +88,7 @@ describe("viewport ambient occlusion", () => {
         scene.add(lines);
         effects.render();
         expect(SSAOPass.prototype.render).not.toHaveBeenCalled();
-        expect((effects as unknown as { ao?: SSAOPass }).ao).toBeUndefined();
+        expect((effects as unknown as { passes: Map<number, SSAOPass> }).passes.size).toBe(0);
         expect(scene.children.every((object) => object.visible)).toBe(true);
     });
 
@@ -127,16 +128,31 @@ describe("viewport ambient occlusion", () => {
         expect(SSAOPass.prototype.render).toHaveBeenCalledTimes(3);
     });
 
-    test("frames drawn while the camera moves shade at half resolution, then settle back", () => {
+    test("frames drawn while the camera moves shade at half resolution on their own targets", () => {
         mesh();
         effects.render("interactive");
-        const ao = pass();
-        expect([ao.ssaoRenderTarget.width, ao.ssaoRenderTarget.height]).toEqual([501, 361]);
-        const resize = rs.spyOn(ao, "setSize");
+        const half = pass(2);
+        expect([half.ssaoRenderTarget.width, half.ssaoRenderTarget.height]).toEqual([501, 361]);
+        const resize = rs.spyOn(half, "setSize");
         effects.render("interactive");
         expect(resize).not.toHaveBeenCalled();
+        // Settling draws on the full-resolution pass; the half one is kept, not reallocated.
         effects.render("final");
-        expect(resize).toHaveBeenCalledExactlyOnceWith(1001, 721);
+        expect(resize).not.toHaveBeenCalled();
+        expect([pass(1).ssaoRenderTarget.width, pass(1).ssaoRenderTarget.height]).toEqual([1001, 721]);
+        effects.render("interactive");
+        expect(resize).not.toHaveBeenCalled();
+        expect(SSAOPass.prototype.render).toHaveBeenCalledTimes(4);
+    });
+
+    test("the quality level decides whether and at which resolution a settled frame shades", () => {
+        mesh();
+        effects.render("final", { scale: 0.5, ao: "off" });
+        expect(SSAOPass.prototype.render).not.toHaveBeenCalled();
+        effects.render("final", { scale: 1, ao: "half" });
+        expect(SSAOPass.prototype.render).toHaveBeenCalledTimes(1);
+        expect([pass(2).ssaoRenderTarget.width, pass(2).ssaoRenderTarget.height]).toEqual([501, 361]);
+        expect((effects as unknown as { passes: Map<number, SSAOPass> }).passes.has(1)).toBe(false);
     });
 
     test("zoom and camera switches refresh projection uniforms at a constant size", () => {

@@ -3,7 +3,9 @@
 
 import {
     Combobox,
+    Config,
     command,
+    documentUnit,
     download,
     GetOrSelectNodeStep,
     I18n,
@@ -19,14 +21,21 @@ import {
     property,
     ShapeNode,
     Transaction,
+    unitSpecOfType,
 } from "@chili3d/core";
-import { writeDxf, writeSvg } from "@chili3d/parametric";
+import { convertDrawing } from "@chili3d/drawing";
+import { partStudioNodes, writeDxf, writeSvg } from "@chili3d/parametric";
+import { blocksToDocx } from "@chili3d/richtext/docx";
+import { emptyWorkbook } from "@chili3d/sheet/model";
+import { writeWorkbook } from "@chili3d/sheet/workbookIo";
+import { activeDrawing } from "./activeDrawing";
+import { ANNOTATION_LAYERS, withEntities } from "./cad/drawingAnnotations";
 import { writeDwg } from "./cad/dwg";
+import { importDxf } from "./cad/dxfToDrawing";
 import { type ProjectionAngle, projectionDrawing } from "./cad/projection";
+import { SHEET_SIZES, scaleLabel, sheetLayout, sheetSizeNamed } from "./cad/sheetDrawing";
 import { DocumentFileNode } from "./documentFileNode";
-import { blocksToDocx } from "./richtext/docx";
-import { emptyWorkbook } from "./sheet/model";
-import { writeWorkbook } from "./sheet/workbookIo";
+import { showExportDrawingDialog } from "./ui/exportDialog";
 
 /**
  * Commands of the documents module: new Markdown / Word / spreadsheet / text elements
@@ -52,6 +61,151 @@ async function addNewDocument(
     });
     Transaction.execute(document, "new document", () => document.modelManager.addNode(node));
     openElement(document, node);
+}
+
+/**
+ * Onshape's "Create Drawing…": a Drawing element of the Part Studio's visible parts — their
+ * front, top, right and isometric views on a sheet with a frame and title block (A4 for a
+ * millimetre document, ANSI A for an inch one) at the largest standard scale that fits, or an
+ * empty sheet when there is nothing to draw yet. Stored as DXF, so it opens in the drawing
+ * viewer and exports as DXF, DWG or SVG.
+ */
+@command({ key: "documents.newDrawing", icon: "icon-doc-drawing" })
+export class NewDrawingCommand implements ICommand {
+    async execute(application: IApplication): Promise<void> {
+        const document: IDocument =
+            application.activeView?.document ?? (await application.newDocument("Untitled"));
+        const inch = documentUnit(document, unitSpecOfType("length")).suffix === "in";
+        const nodes = partStudioNodes(document);
+        const shapes: IShape[] = nodes.map((node) => node.shape.value.transformedMul(node.worldTransform()));
+        let views;
+        try {
+            if (shapes.length > 0) views = projectionDrawing(shapes, { angle: "third", iso: true });
+        } finally {
+            for (const shape of shapes) shape.dispose();
+        }
+        const name = nextElementName(document, I18n.translate("documents.kind.drawing"));
+        // The first saved template is the default sheet; the document's units pick the size otherwise.
+        const template = Config.instance.preferences.drawingTemplates[0];
+        const date = new Date().toISOString().slice(0, 10);
+        const options = {
+            size: sheetSizeNamed(template?.sheet) ?? (inch ? SHEET_SIZES.ansiA : SHEET_SIZES.A4),
+            title: nodes[0]?.name ?? document.name,
+            drawnBy: template?.drawnBy,
+            number: template?.number,
+            revision: template?.revision,
+            date,
+            units: inch ? ("inch" as const) : ("mm" as const),
+        };
+        const layout = sheetLayout(views, options);
+        let sheet = layout.drawing;
+        if (template?.frameDxf) {
+            const art = importDxf(template.frameDxf);
+            if (art.isOk)
+                sheet = withEntities(
+                    sheet,
+                    art.value.drawing.entities.map((entity) => ({
+                        ...entity,
+                        layer: ANNOTATION_LAYERS.template.name,
+                    })),
+                    ANNOTATION_LAYERS.template,
+                );
+        }
+        const drawing = inch ? convertDrawing(sheet, "inch") : sheet;
+        const properties: Record<string, string> = {
+            sheet: options.size.name,
+            scale: scaleLabel(layout.scale),
+            title: options.title,
+            date,
+            units: options.units,
+            ...(options.drawnBy ? { drawnBy: options.drawnBy } : {}),
+            ...(options.number ? { number: options.number } : {}),
+            ...(options.revision ? { revision: options.revision } : {}),
+        };
+        const node = new DocumentFileNode({
+            document,
+            name,
+            fileName: `${name}.dxf`,
+            format: "dxf",
+            text: writeDxf(drawing, { properties }),
+        });
+        Transaction.execute(document, "new drawing", () => document.modelManager.addNode(node));
+        openElement(document, node);
+    }
+}
+
+/** The Drawing toolbar: each command acts on the drawing element in front. */
+@command({ key: "drawing.createSketch", icon: "icon-sketch" })
+export class DrawingCreateSketchCommand implements ICommand {
+    async execute(): Promise<void> {
+        activeDrawing()?.createSketch();
+    }
+}
+@command({ key: "drawing.fit", icon: "icon-fitcontent" })
+export class DrawingFitCommand implements ICommand {
+    async execute(): Promise<void> {
+        activeDrawing()?.fit();
+    }
+}
+@command({ key: "drawing.preferences", icon: "icon-cog" })
+export class DrawingPreferencesCommand implements ICommand {
+    async execute(): Promise<void> {
+        activeDrawing()?.preferences();
+    }
+}
+@command({ key: "drawing.note", icon: "icon-edit" })
+export class DrawingNoteCommand implements ICommand {
+    async execute(): Promise<void> {
+        activeDrawing()?.note();
+    }
+}
+@command({ key: "drawing.dimension", icon: "icon-dDimension" })
+export class DrawingDimensionCommand implements ICommand {
+    async execute(): Promise<void> {
+        activeDrawing()?.dimension();
+    }
+}
+@command({ key: "drawing.titleBlock", icon: "icon-group" })
+export class DrawingTitleBlockCommand implements ICommand {
+    async execute(): Promise<void> {
+        activeDrawing()?.titleBlock();
+    }
+}
+@command({ key: "drawing.insertViews", icon: "icon-curveProject" })
+export class DrawingInsertViewsCommand implements ICommand {
+    async execute(): Promise<void> {
+        activeDrawing()?.insertViews();
+    }
+}
+@command({ key: "drawing.saveTemplate", icon: "icon-download" })
+export class DrawingSaveTemplateCommand implements ICommand {
+    async execute(): Promise<void> {
+        activeDrawing()?.saveTemplate();
+    }
+}
+@command({ key: "drawing.importTemplate", icon: "icon-import" })
+export class DrawingImportTemplateCommand implements ICommand {
+    async execute(): Promise<void> {
+        activeDrawing()?.importTemplate();
+    }
+}
+@command({ key: "drawing.exportDxf", icon: "icon-export" })
+export class DrawingExportDxfCommand implements ICommand {
+    async execute(): Promise<void> {
+        await activeDrawing()?.export(".dxf");
+    }
+}
+@command({ key: "drawing.exportDwg", icon: "icon-export" })
+export class DrawingExportDwgCommand implements ICommand {
+    async execute(): Promise<void> {
+        await activeDrawing()?.export(".dwg");
+    }
+}
+@command({ key: "drawing.exportSvg", icon: "icon-export" })
+export class DrawingExportSvgCommand implements ICommand {
+    async execute(): Promise<void> {
+        await activeDrawing()?.export(".svg");
+    }
 }
 
 @command({ key: "documents.newMarkdown", icon: "icon-doc-markdown" })
@@ -167,25 +321,24 @@ export class ExportProjectionCommand extends MultistepCommand {
     private async exportViews(): Promise<void> {
         const nodes = (this.stepDatas[0]?.nodes ?? []).filter((node): node is ShapeNode => hasShape(node));
         if (nodes.length === 0) return;
-        const shapes: IShape[] = nodes.map((node) => node.shape.value.transformedMul(node.worldTransform()));
-        try {
-            const drawing = projectionDrawing(shapes, {
-                angle: this.angle as ProjectionAngle,
-                iso: this.iso,
-            });
-            const name = `${nodes[0].name} drawing${this.format}`;
-            if (this.format === ".svg") download([writeSvg(drawing, { title: nodes[0].name })], name);
-            else if (this.format === ".dwg") {
-                const bytes = await writeDwg(drawing);
-                if (!bytes.isOk) {
-                    PubSub.default.pub("showToast", "error.default:{0}", bytes.error);
-                    return;
+        const document = nodes[0].document;
+        const angle = this.angle as ProjectionAngle;
+        const iso = this.iso;
+        showExportDrawingDialog({
+            document,
+            name: `${nodes[0].name} drawing`,
+            format: this.format as ".dxf" | ".dwg" | ".svg",
+            drawing: () => {
+                const shapes: IShape[] = nodes.map((node) =>
+                    node.shape.value.transformedMul(node.worldTransform()),
+                );
+                try {
+                    return projectionDrawing(shapes, { angle, iso });
+                } finally {
+                    for (const shape of shapes) shape.dispose();
                 }
-                download([bytes.value as BlobPart], name);
-            } else download([writeDxf(drawing)], name);
-        } finally {
-            for (const shape of shapes) shape.dispose();
-        }
+            },
+        });
     }
 }
 

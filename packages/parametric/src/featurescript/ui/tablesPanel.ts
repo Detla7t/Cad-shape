@@ -104,7 +104,10 @@ export class TablesPanel {
 
     constructor(readonly document: IDocument) {
         const toolbar = element("div", style.toolbar);
-        toolbar.append(element("span", undefined, translate("featurescript.tables.table")), this.select);
+        const mark = element("span", undefined, "St");
+        mark.title = translate("featurescript.tables.table");
+        mark.setAttribute("aria-label", translate("featurescript.tables.table"));
+        toolbar.append(mark, this.select);
         this.root.append(toolbar, this.parameters, this.output);
         this.select.addEventListener("change", () => {
             this.selected = this.select.value;
@@ -269,9 +272,14 @@ export class TablesPanel {
     }
 
     private renderTable(table: TableData): HTMLElement[] {
-        const title = element("div", style.title, table.title);
+        // Onshape's table group: "⌄ Standard Sizes" over the grid, folding on a click.
+        const group = element("details", style.group);
+        group.open = true;
+        const title = element("summary", style.title, table.title);
+        group.append(title);
         if (table.rows.length === 0) {
-            return [title, element("div", style.message, translate("featurescript.tables.noRows"))];
+            group.append(element("div", style.message, translate("featurescript.tables.noRows")));
+            return [group];
         }
         const align = (alignment: string | undefined) =>
             alignment === "CENTER" ? style.alignCenter : alignment === "RIGHT" ? style.alignRight : undefined;
@@ -296,7 +304,8 @@ export class TablesPanel {
         const thead = element("thead");
         thead.append(head);
         grid.append(thead, body);
-        return [title, grid];
+        group.append(grid);
+        return [group];
     }
 
     // ------------------------------------------------------------------ Following the document

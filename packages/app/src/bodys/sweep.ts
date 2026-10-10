@@ -21,7 +21,7 @@ export interface SweepOptions {
     round: boolean;
 }
 
-@serializable()
+@serializable({ id: "SweepedNode" })
 export class SweepedNode extends ParameterShapeNode {
     override display(): I18nKeys {
         return "body.sweep";

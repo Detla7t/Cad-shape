@@ -161,3 +161,67 @@ test("a measured solid boundary uses the kernel and follows deletion and undo", 
     model.history.undo();
     expect(model.variables.scope.get("Boundary")?.value).toBeCloseTo(240);
 });
+
+test("an angle variable is an angle in degrees and an area variable a plain number of mm²", () => {
+    const { model, sketch } = setup();
+    Transaction.execute(model, "add a perpendicular", () => {
+        const data = sketch.data;
+        data.entities.push({ id: 3, type: "line", params: [0, 0, -40, 30] });
+        sketch.setDataEmitShapeChanged(data);
+    });
+    const refs: MeasurementReference[] = [
+        { kind: "entity", nodeId: sketch.id, entityId: 1, label: "Edge of Sketch" },
+        { kind: "entity", nodeId: sketch.id, entityId: 3, label: "Edge of Sketch" },
+    ];
+    const angle = new MeasuredVariableNode({
+        document: model,
+        definition: { name: "Corner", source: "measured", mode: "angle", entities: refs },
+    });
+    model.modelManager.addNode(angle);
+    expect(angle.items[0]).toMatchObject({ type: "angle", expression: "90 deg" });
+    expect(model.variables.scope.get("Corner")?.value).toBeCloseTo(90, 9);
+    expect(angle.name).toBe("#Corner = 90 deg");
+
+    const rect = factory.rect(Plane.XY, 20, 10);
+    expect(rect.isOk).toBe(true);
+    const face = new EditableShapeNode({ document: model, name: "Plate", shape: rect });
+    model.modelManager.addNode(face);
+    const area = new MeasuredVariableNode({
+        document: model,
+        definition: {
+            name: "Plate_Area",
+            source: "measured",
+            mode: "area",
+            entities: [{ kind: "node", nodeId: face.id, label: "Plate" }],
+        },
+    });
+    model.modelManager.addNode(area);
+    expect(area.items[0].type).toBe("unitless");
+    expect(Number(area.items[0].expression)).toBeCloseTo(200, 6);
+    expect(model.variables.scope.get("Plate_Area")?.value).toBeCloseTo(200, 9);
+
+    // a component read in a frame follows that frame
+    const point = new EditableShapeNode({
+        document: model,
+        name: "Pin",
+        shape: factory.point(new XYZ(3, 4, 5)),
+    });
+    model.modelManager.addNode(point);
+    const along = new MeasuredVariableNode({
+        document: model,
+        definition: {
+            name: "Pin_Up",
+            source: "measured",
+            mode: "positionX",
+            entities: [{ kind: "node", nodeId: point.id, label: "Pin" }],
+            frame: { origin: XYZ.zero, xvec: XYZ.unitZ, yvec: XYZ.unitX, zvec: XYZ.unitY },
+        },
+    });
+    model.modelManager.addNode(along);
+    expect(model.variables.scope.get("Pin_Up")?.value).toBeCloseTo(5, 9);
+    expect(
+        JSON.parse(Serializer.serializeObject(along)["definitionJson"] as string).frame.xvec,
+    ).toMatchObject({
+        z: 1,
+    });
+});

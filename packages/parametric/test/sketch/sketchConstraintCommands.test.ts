@@ -19,7 +19,11 @@ import {
     TangentConstraintCommand,
     VerticalConstraintCommand,
 } from "../../src/sketch/commands/sketchConstraints";
-import { SketchEditor, type SketchEntityTypeFilter } from "../../src/sketch/editor/sketchEditor";
+import {
+    SketchEditor,
+    type SketchEntityTypeFilter,
+    type SketchPickTarget,
+} from "../../src/sketch/editor/sketchEditor";
 import {
     axisLineRefs,
     ConstraintKind,
@@ -42,6 +46,7 @@ function fakeEditor() {
         beginConstraintSelection: rs.fn(),
         registerTool: () => ({ dispose() {} }),
         selectedEntityIds: [] as number[],
+        preselection: [] as SketchPickTarget[],
         pickSequence: 0,
         lastPickCancelled: false,
         endConstraintSelection: rs.fn(),
@@ -66,6 +71,25 @@ function fakeEditor() {
 }
 
 type FakeEditor = ReturnType<typeof fakeEditor>;
+
+const entity = (entityId: number): SketchPickTarget => ({ kind: "entity", entityId });
+const point = (entityId: number, pointIndex: number): SketchPickTarget => ({
+    kind: "point",
+    ref: { entityId, pointIndex },
+});
+
+/** What the editor reports while a constraint tool starts with `targets` selected. */
+function select(editor: FakeEditor, targets: SketchPickTarget[]): void {
+    editor.preselection = targets;
+    editor.selectedEntityIds = [
+        ...new Set(
+            targets.map((target) => (target.kind === "point" ? target.ref.entityId : target.entityId)),
+        ),
+    ];
+    editor.selectedWholeEntityIds = targets.flatMap((target) =>
+        target.kind === "entity" ? [target.entityId] : [],
+    );
+}
 
 async function runCommand(command: ICommand, editor: FakeEditor): Promise<void> {
     const getActive = rs.spyOn(SketchEditor, "getActive").mockReturnValue(editor as any);
@@ -468,7 +492,7 @@ describe("Horizontal/VerticalConstraintCommand (one tool for a line or two point
         try {
             const a = editor.solver.addLine(0, 0, 10, 3);
             const b = editor.solver.addLine(0, 5, 10, 9);
-            editor.selectedWholeEntityIds = [a, b];
+            select(editor, [entity(a), entity(b)]);
 
             await runCommand(new HorizontalConstraintCommand(), editor);
 
@@ -732,4 +756,197 @@ describe("datum picks (origin and axes)", () => {
             editor.solver.dispose();
         }
     });
+});
+
+describe("constraints applied to a whole selection", () => {
+    function withEditor(body: (editor: FakeEditor) => Promise<void>): () => Promise<void> {
+        return async () => {
+            const editor = fakeEditor();
+            try {
+                await body(editor);
+            } finally {
+                editor.solver.dispose();
+            }
+        };
+    }
+
+    test(
+        "Vertical aligns three selected points with the first in one commit",
+        withEditor(async (editor) => {
+            const a = editor.solver.addLine(0, 0, 10, 20);
+            const b = editor.solver.addLine(30, 5, 40, 0);
+            select(editor, [point(a, 0), point(a, 1), point(b, 0)]);
+
+            await runCommand(new VerticalConstraintCommand(), editor);
+
+            expect(constraintsOf(editor, ConstraintKind.VerticalAlign).map((c) => c.refs)).toEqual([
+                [ref(a, 0), ref(a, 1)],
+                [ref(a, 0), ref(b, 0)],
+            ]);
+            expect(editor.commit).toHaveBeenCalledTimes(1);
+            expect(editor.pickPointOrEntity).not.toHaveBeenCalled();
+            expect(editor.solver.solve(true).result).toMatch(/^Ok/);
+            const xs = [ref(a, 0), ref(a, 1), ref(b, 0)].map((r) => editor.solver.pointOf(r)[0]);
+            expect(xs[1]).toBeCloseTo(xs[0], 6);
+            expect(xs[2]).toBeCloseTo(xs[0], 6);
+        }),
+    );
+
+    test(
+        "Coincident joins several selected points, or puts them all on one selected curve",
+        withEditor(async (editor) => {
+            const a = editor.solver.addLine(0, 0, 10, 0);
+            const b = editor.solver.addLine(11, 1, 20, 5);
+            const c = editor.solver.addLine(9, -1, 0, -10);
+            select(editor, [point(a, 1), point(b, 0), point(c, 0)]);
+            await runCommand(new CoincidentConstraintCommand(), editor);
+            expect(constraintsOf(editor, ConstraintKind.P2PCoincident)).toHaveLength(2);
+
+            const circle = editor.solver.addCircle(0, 40, 10);
+            select(editor, [point(b, 1), point(c, 1), entity(circle)]);
+            await runCommand(new CoincidentConstraintCommand(), editor);
+            expect(constraintsOf(editor, ConstraintKind.PointOnCircle).map((k) => k.refs)).toEqual([
+                [ref(b, 1), ref(circle, 0)],
+                [ref(c, 1), ref(circle, 0)],
+            ]);
+            expect(editor.commit).toHaveBeenCalledTimes(2);
+        }),
+    );
+
+    test(
+        "Parallel and Equal relate every selected line to the first; the solve makes them so",
+        withEditor(async (editor) => {
+            const lines = [
+                editor.solver.addLine(0, 0, 10, 0),
+                editor.solver.addLine(0, 10, 20, 14),
+                editor.solver.addLine(0, 20, 5, 28),
+            ];
+            select(editor, lines.map(entity));
+            await runCommand(new ParallelConstraintCommand(), editor);
+            select(editor, lines.map(entity));
+            await runCommand(new EqualConstraintCommand(), editor);
+
+            expect(constraintsOf(editor, ConstraintKind.Parallel)).toHaveLength(2);
+            expect(constraintsOf(editor, ConstraintKind.EqualLength)).toHaveLength(2);
+            expect(editor.commit).toHaveBeenCalledTimes(2);
+            expect(editor.solver.solve(true).result).toMatch(/^Ok/);
+            const directions = lines.map((id) => {
+                const [x1, y1, x2, y2] = editor.solver.entity(id)!.params;
+                return [x2 - x1, y2 - y1];
+            });
+            for (const [dx, dy] of directions) {
+                expect(Math.abs(dx * directions[0][1] - dy * directions[0][0])).toBeLessThan(1e-6);
+                expect(Math.hypot(dx, dy)).toBeCloseTo(Math.hypot(...directions[0]), 6);
+            }
+        }),
+    );
+
+    test(
+        "Equal and Concentric take circles and arcs together",
+        withEditor(async (editor) => {
+            const c1 = editor.solver.addCircle(0, 0, 5);
+            const c2 = editor.solver.addCircle(20, 0, 8);
+            const arc = editor.solver.addArc(40, 0, 50, 0, 40, 10);
+            select(editor, [entity(c1), entity(c2), entity(arc)]);
+            await runCommand(new EqualConstraintCommand(), editor);
+            expect(constraintsOf(editor, ConstraintKind.EqualRadius)).toHaveLength(2);
+
+            select(editor, [entity(c1), entity(c2), entity(arc)]);
+            await runCommand(new ConcentricConstraintCommand(), editor);
+            const concentric = constraintsOf(editor, ConstraintKind.P2PCoincident);
+            expect(concentric.map((c) => [c.role, c.refs])).toEqual([
+                ["concentric", [ref(c1, 0), ref(c2, 0)]],
+                ["concentric", [ref(c1, 0), ref(arc, 0)]],
+            ]);
+            expect(editor.solver.solve(true).result).toMatch(/^Ok/);
+            expect(editor.solver.pointOf(ref(arc, 0))[0]).toBeCloseTo(
+                editor.solver.pointOf(ref(c1, 0))[0],
+                6,
+            );
+        }),
+    );
+
+    test(
+        "Fix pins selected points and every point of selected entities, plus a circle's radius",
+        withEditor(async (editor) => {
+            const line = editor.solver.addLine(0, 0, 10, 0);
+            const circle = editor.solver.addCircle(30, 0, 4);
+            const other = editor.solver.addLine(0, 10, 5, 15);
+            select(editor, [point(other, 1), entity(line), entity(circle)]);
+
+            await runCommand(new FixConstraintCommand(), editor);
+
+            expect(constraintsOf(editor, ConstraintKind.Fix).map((c) => c.refs[0])).toEqual([
+                ref(other, 1),
+                ref(line, 0),
+                ref(line, 1),
+                ref(circle, 0),
+            ]);
+            expect(constraintsOf(editor, ConstraintKind.Radius)).toHaveLength(1);
+            expect(editor.commit).toHaveBeenCalledTimes(1);
+        }),
+    );
+
+    test(
+        "a mixed selection is refused with a message and nothing changes",
+        withEditor(async (editor) => {
+            const pub = rs.spyOn(PubSub.default, "pub").mockImplementation(() => {});
+            try {
+                const line = editor.solver.addLine(0, 0, 10, 0);
+                const circle = editor.solver.addCircle(30, 0, 4);
+                select(editor, [entity(line), entity(circle)]);
+                await runCommand(new EqualConstraintCommand(), editor);
+                select(editor, [entity(line), entity(circle)]);
+                await runCommand(new HorizontalConstraintCommand(), editor);
+
+                expect(pub.mock.calls.filter(([channel]) => channel === "displayError")).toHaveLength(2);
+                expect(editor.solver.toData().constraints).toEqual([]);
+                expect(editor.commit).not.toHaveBeenCalled();
+            } finally {
+                pub.mockRestore();
+            }
+        }),
+    );
+
+    test(
+        "only the missing constraints are added; a fully present batch commits nothing",
+        withEditor(async (editor) => {
+            const pub = rs.spyOn(PubSub.default, "pub").mockImplementation(() => {});
+            try {
+                const a = editor.solver.addLine(0, 0, 10, 0);
+                const b = editor.solver.addLine(0, 5, 10, 6);
+                editor.solver.addConstraint({
+                    kind: ConstraintKind.Horizontal,
+                    refs: [ref(a, 0), ref(a, 1)],
+                });
+                select(editor, [entity(a), entity(b)]);
+                await runCommand(new HorizontalConstraintCommand(), editor);
+                expect(constraintsOf(editor, ConstraintKind.Horizontal)).toHaveLength(2);
+                expect(editor.commit).toHaveBeenCalledTimes(1);
+
+                select(editor, [entity(a), entity(b)]);
+                await runCommand(new HorizontalConstraintCommand(), editor);
+                expect(constraintsOf(editor, ConstraintKind.Horizontal)).toHaveLength(2);
+                expect(editor.commit).toHaveBeenCalledTimes(1);
+                expect(pub).toHaveBeenCalledWith("statusBarTip", "sketch.constraintExists");
+            } finally {
+                pub.mockRestore();
+            }
+        }),
+    );
+
+    test(
+        "a single selected line for Parallel is the first pick; the tool picks the second",
+        withEditor(async (editor) => {
+            const a = editor.solver.addLine(0, 0, 10, 0);
+            const b = editor.solver.addLine(0, 5, 10, 9);
+            select(editor, [entity(a)]);
+            editor.entityQueue.push(a, b);
+
+            await runCommand(new ParallelConstraintCommand(), editor);
+
+            expect(constraintsOf(editor, ConstraintKind.Parallel)).toHaveLength(1);
+            expect(editor.pickEntity).toHaveBeenCalledTimes(2);
+        }),
+    );
 });

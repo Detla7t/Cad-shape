@@ -18,7 +18,7 @@ export interface MeshNodeOptions {
     id?: string;
 }
 
-@serializable()
+@serializable({ id: "MeshNode" })
 export class MeshNode extends VisualNode {
     override display(): I18nKeys {
         return "body.meshNode";

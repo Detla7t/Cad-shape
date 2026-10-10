@@ -21,7 +21,7 @@ export interface RectOptions {
     dy: number;
 }
 
-@serializable()
+@serializable({ id: "RectNode" })
 export class RectNode extends FacebaseNode {
     override display(): I18nKeys {
         return "body.rect";

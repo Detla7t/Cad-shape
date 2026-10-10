@@ -1,8 +1,9 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
+import { escapeXml } from "@chili3d/office-io";
+import { sanitizeHtml } from "@chili3d/richtext/sanitize";
 import { Marked } from "marked";
-import { sanitizeHtml } from "./sanitize";
 
 /**
  * Markdown (GitHub flavored, via `marked`) to sanitized HTML for the preview, and to a
@@ -16,9 +17,6 @@ export function renderMarkdown(source: string): string {
     return sanitizeHtml(markdown.parse(source, { async: false }) as string);
 }
 
-const escapeHtml = (text: string) =>
-    text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-
 const PAGE_STYLE = `body{font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif;max-width:52em;margin:2em auto;padding:0 1em;color:#1f2328}
 table{border-collapse:collapse}th,td{border:1px solid #d0d7de;padding:.3em .7em}
 pre,code{font-family:ui-monospace,Consolas,monospace;background:#f6f8fa}pre{padding:1em;overflow:auto}
@@ -31,7 +29,7 @@ export function htmlPage(title: string, body: string): string {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escapeHtml(title)}</title>
+<title>${escapeXml(title)}</title>
 <style>${PAGE_STYLE}</style>
 </head>
 <body>

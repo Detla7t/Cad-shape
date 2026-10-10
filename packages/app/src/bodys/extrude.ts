@@ -36,7 +36,7 @@ export function closedProfileToFace(section: IShape): Result<IFace> {
     return shapeFactory.face([wire.value]);
 }
 
-@serializable()
+@serializable({ id: "ExtrudeNode" })
 export class ExtrudeNode extends ParameterShapeNode {
     override display(): I18nKeys {
         return "body.extrude";

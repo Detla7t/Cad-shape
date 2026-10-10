@@ -80,7 +80,7 @@ export abstract class Annotation extends VisualNode {
     }
 }
 
-@serializable()
+@serializable({ id: "TextAnnotation" })
 export class TextAnnotation extends Annotation {
     declare readonly annotationType: "text";
 
@@ -107,7 +107,7 @@ export class TextAnnotation extends Annotation {
     }
 }
 
-@serializable()
+@serializable({ id: "RefInfiniteLineAnnotation" })
 export class RefInfiniteLineAnnotation extends Annotation {
     declare readonly annotationType: "refInfiniteLine";
 
@@ -134,7 +134,7 @@ export class RefInfiniteLineAnnotation extends Annotation {
     }
 }
 
-@serializable()
+@serializable({ id: "RefSegmentAnnotation" })
 export class RefSegmentAnnotation extends Annotation {
     declare readonly annotationType: "refSegment";
 

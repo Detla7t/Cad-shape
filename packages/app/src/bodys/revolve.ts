@@ -21,7 +21,7 @@ export interface RevolveOptions {
     angle: number;
 }
 
-@serializable()
+@serializable({ id: "RevolvedNode" })
 export class RevolvedNode extends ParameterShapeNode {
     override display(): I18nKeys {
         return "body.revol";

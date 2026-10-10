@@ -8,6 +8,7 @@ import {
     Constants,
     type DocumentSnapshot,
     type IStorage,
+    LEGACY_DOCUMENT_VERSION,
     MemoryObjectStore,
     Repository,
     Result,
@@ -170,9 +171,12 @@ export class SourceHistory {
         return readTree(this.store, this.repository.getCommit(commit).tree);
     }
 
-    /** The document as it was at `commit`, in the form `Document.serialize` writes. */
+    /**
+     * The document as it was at `commit`, in the form `Document.serialize` writes. Commits do not
+     * record a document schema; every one so far is schema 1 (the legacy version marker).
+     */
     serializedAt(commit: string): Serialized {
-        return snapshotToSerialized(this.snapshot(commit), this.documentId, __DOCUMENT_VERSION__);
+        return snapshotToSerialized(this.snapshot(commit), this.documentId, LEGACY_DOCUMENT_VERSION);
     }
 
     /** The linkable nodes of the snapshot at `commit`, in tree order. */

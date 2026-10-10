@@ -196,9 +196,14 @@ async function inspectRebuild(
     document: IDocument,
     issues: ModelValidationIssue[],
 ): Promise<RebuiltShapeSummary[]> {
-    const { SketchNode, SketchSolver, ParametricBodyNode, FeatureStudioNode, compileDocumentStudio } =
-        await import("@chili3d/parametric");
-    const { resolveFacePlane } = await import("@chili3d/parametric/src/sketch/planeRef");
+    const {
+        SketchNode,
+        SketchSolver,
+        ParametricBodyNode,
+        FeatureStudioNode,
+        compileDocumentStudio,
+        resolveFacePlane,
+    } = await import("@chili3d/parametric");
     const { AssemblyNode, LinkedPartNode, evaluateAssembly, solveAssembly } = await import(
         "@chili3d/assembly"
     );

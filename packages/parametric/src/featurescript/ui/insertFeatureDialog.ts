@@ -2,10 +2,10 @@
 // See LICENSE file in the project root for full license information.
 
 import { I18n, type IDocument, PubSub, showPartStudio } from "@chili3d/core";
+import { providedOnshapeStd } from "@chili3d/featurescript";
 import { ParametricBodyNode } from "../../parametricBodyNode";
 import type { FeatureStudioNode } from "../featureStudioNode";
 import { customFeatures, insertCustomFeature } from "../insertFeature";
-import { providedOnshapeStd } from "../runtime";
 import { insertStandardFeature, STANDARD_FEATURES } from "../standardFeatures";
 import style from "./insertFeatureDialog.module.css";
 

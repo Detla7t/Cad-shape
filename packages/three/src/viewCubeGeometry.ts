@@ -17,7 +17,33 @@ const names = [
     ["Front", "Back"],
     ["Bottom", "Top"],
 ];
-const bevel = 0.78;
+/** Where the flat faces end: the rest of each edge and corner is the fillet. */
+export const CUBE_BEVEL = 0.78;
+const bevel = CUBE_BEVEL;
+
+/**
+ * A corner of the cube is a flat round facet: the disc in the plane through the corner's three
+ * fillet seams (x + y + z = 1 + 2·bevel for the +++ corner), a little inside them so it never
+ * spills onto the edge strips. Center and radius are in cube units; `normal` is (±1, ±1, ±1).
+ */
+export function cornerDisc(normal: Vector3): { center: Vector3; radius: number } {
+    return {
+        center: normal.clone().multiplyScalar((1 + 2 * bevel) / 3),
+        radius: ((1 - bevel) * Math.sqrt(6) * 0.72) / 3,
+    };
+}
+
+/**
+ * The orthographic screen ellipse of a flat disc of `radius` whose camera-space normal is
+ * `normal` (+Z towards the viewer, screen y down): the full radius across the tilt, foreshortened
+ * by |n·z| along it. `angle` (degrees) turns the ellipse's x axis onto the foreshortened one.
+ */
+export function discEllipse(normal: Vector3, radius: number): { rx: number; ry: number; angle: number } {
+    const n = normal.clone().normalize();
+    const tilt = Math.hypot(n.x, n.y);
+    const angle = tilt < 1e-9 ? 0 : (Math.atan2(-n.y, n.x) * 180) / Math.PI;
+    return { rx: radius * Math.abs(n.z), ry: radius, angle };
+}
 
 /** Visible pieces of an axis in camera space (+Z faces the viewer), behind a convex cube. */
 export function visibleCubeAxis(
@@ -89,7 +115,10 @@ export function roundedCubePatch(points: readonly { x: number; y: number }[], ra
         .join(" ")} Z`;
 }
 
-/** A chamfered cube: six face targets, twelve edges, and eight corners. */
+/**
+ * A filleted cube: six face targets, twelve edge strips and eight corners (each corner a
+ * flat round facet across its fillet, see `cornerDisc`).
+ */
 export function createCubeRegions(): CubeRegion[] {
     const regions: CubeRegion[] = [];
     for (let axis = 0; axis < 3; axis++) {

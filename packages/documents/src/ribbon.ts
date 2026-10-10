@@ -13,6 +13,7 @@ export const DocumentsRibbonProfiles: RibbonProfileExtra[] = [
             {
                 groupName: "ribbon.group.documents",
                 items: [
+                    "documents.newDrawing",
                     "documents.newMarkdown",
                     "documents.newSpreadsheet",
                     ["documents.newRichText", "documents.newText"],
@@ -21,6 +22,29 @@ export const DocumentsRibbonProfiles: RibbonProfileExtra[] = [
             {
                 groupName: "ribbon.group.export2d",
                 items: ["drawing.exportViews"],
+            },
+        ],
+    },
+    // The Drawing element's own toolbar (Onshape's drawing tools replace the Part Studio's).
+    {
+        tabName: "ribbon.tab.drawing",
+        contextual: true,
+        groups: [
+            {
+                groupName: "ribbon.group.drawing",
+                items: ["drawing.insertViews", "drawing.createSketch", "drawing.fit", "drawing.preferences"],
+            },
+            {
+                groupName: "ribbon.group.annotation2d",
+                items: ["drawing.dimension", "drawing.note", "drawing.titleBlock"],
+            },
+            {
+                groupName: "ribbon.group.templates",
+                items: ["drawing.saveTemplate", "drawing.importTemplate"],
+            },
+            {
+                groupName: "ribbon.group.export2d",
+                items: ["drawing.exportDxf", "drawing.exportDwg", "drawing.exportSvg"],
             },
         ],
     },

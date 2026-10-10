@@ -13,10 +13,27 @@
     color: var(--foreground-color);
     border-right: 1px solid var(--border-color);
     font-size: 13px;
+    /* Restarts each time the browser opens (hidden → shown). */
+    animation: tabs-sidebar-in 180ms ease-out;
 }
 .root[hidden],
 .root [hidden] {
     display: none;
+}
+@keyframes tabs-sidebar-in {
+    from {
+        opacity: 0;
+        transform: translateX(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .root {
+        animation: none;
+    }
 }
 .root * {
     box-sizing: border-box;

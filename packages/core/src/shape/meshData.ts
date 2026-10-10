@@ -13,7 +13,7 @@ export interface MeshGroupOptions {
     materialIndex: number;
 }
 
-@serializable()
+@serializable({ id: "MeshGroup" })
 export class MeshGroup {
     @serialize()
     start: number;
@@ -41,7 +41,7 @@ export interface MeshOptions {
     groups?: MeshGroup[];
 }
 
-@serializable()
+@serializable({ id: "Mesh" })
 export class Mesh {
     constructor(options?: MeshOptions) {
         this.meshType = options?.meshType ?? "linesegments";

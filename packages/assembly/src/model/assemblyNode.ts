@@ -44,7 +44,7 @@ export interface AssemblyNodeOptions {
  *
  * It is also the link consumer for its linked instances (one slot per instance).
  */
-@serializable()
+@serializable({ id: "AssemblyNode" })
 export class AssemblyNode extends Node implements INodeIcon, INodeSceneless, INodeWarning, ILinkConsumer {
     /**
      * Runs inside the transaction that moves a linked instance to a new version, so mates follow

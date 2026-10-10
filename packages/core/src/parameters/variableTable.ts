@@ -4,6 +4,7 @@
 import type { IDocument } from "../document";
 import type { NodeRecord } from "../foundation/history";
 import { HistoryObservable } from "../foundation/observer";
+import { Result } from "../foundation/result";
 import { type INode, NodeUtils } from "../model/node";
 import {
     type ActiveConfigurationData,
@@ -13,10 +14,14 @@ import {
     parseActiveConfiguration,
     parseConfigurationInputs,
 } from "./configuration";
+import { configurationDependentNames } from "./configurationDependencies";
+import { selectConfiguredArm } from "./configuredValue";
 import { dataTablesKey, isDataTableNode } from "./dataTable";
+import { documentUnit } from "./documentUnits";
 import {
     EMPTY_SCOPE,
     type EvaluatedValue,
+    evaluateExpression,
     isConstantName,
     resolveUnitSpec,
     type Scope,
@@ -24,8 +29,16 @@ import {
     scopeContext,
     withScopeContext,
 } from "./expression";
-import { isVariableType, unitSpecOfType } from "./unitSpec";
 import {
+    isVariableType,
+    UNITLESS,
+    type UnitSpec,
+    unitSpecEquals,
+    unitSpecLabel,
+    unitSpecOfType,
+} from "./unitSpec";
+import {
+    type FunctionVariable,
     type IVariableFeatureNode,
     type IVariableSource,
     isVariableFeatureNode,
@@ -53,6 +66,8 @@ export interface VariableLayer {
     /** Names the layer in the shadowing warnings of the layers above it. */
     readonly name: string;
     readonly items: readonly VariableData[];
+    /** The values of the layer's `function` rows, by name (a feature's `setVariable`). */
+    readonly functions?: ReadonlyMap<string, FunctionVariable>;
 }
 
 interface Accumulator {
@@ -126,7 +141,7 @@ export function evaluateDocumentScope(
 ): EvaluatedVariables {
     const result = accumulator(base, context ?? scopeContext(base));
     if (configuration !== undefined) evaluateConfigurationLayer(configuration, result);
-    for (const layer of layers) evaluateLayer(layer.items, layer.name, result);
+    for (const layer of layers) evaluateLayer(layer.items, layer.name, result, layer.functions);
     return result;
 }
 
@@ -165,13 +180,18 @@ function evaluateConfigurationInput(
     return undefined;
 }
 
-function evaluateLayer(items: readonly VariableData[], layer: string | undefined, result: Accumulator): void {
+function evaluateLayer(
+    items: readonly VariableData[],
+    layer: string | undefined,
+    result: Accumulator,
+    functions?: ReadonlyMap<string, FunctionVariable>,
+): void {
     const defined = new Set<string>();
     for (const item of items) {
         // A row that is not an object at all has no id to report against — skip it rather
         // than let it take down the pass every other row depends on.
         if (item === null || typeof item !== "object") continue;
-        const error = evaluateVariable(item, layer, result, defined);
+        const error = evaluateVariable(item, layer, result, defined, functions?.get(item.name));
         if (error !== undefined) result.errors.set(String(item.id), error);
     }
 }
@@ -182,6 +202,7 @@ function evaluateVariable(
     layer: string | undefined,
     result: Accumulator,
     defined: Set<string>,
+    fn?: FunctionVariable,
 ): string | undefined {
     // The fields are typed by the interface but arrive from JSON — a hand-edited or
     // truncated table entry must report on its own row, not throw on `name.length`.
@@ -196,14 +217,27 @@ function evaluateVariable(
     if (!isVariableType(item.type)) return `Unknown variable type: ${String(item.type)}`;
     if (typeof item.expression !== "string") return `Missing expression: ${item.name}`;
     if (item.evaluationError) return item.evaluationError;
+    const id = String(item.id);
+    if (item.type === "function") {
+        // A function a feature stored: it is called, never computed here.
+        if (fn === undefined) return `${item.name} has no function value yet`;
+        const value: EvaluatedValue = { value: Number.NaN, unit: UNITLESS, call: fn.call, native: fn.native };
+        if (result.scope.has(item.name)) {
+            const origin = result.origins.get(item.name) ?? "a lower layer";
+            result.warnings.set(id, `Shadows ${item.name} from ${origin}`);
+        }
+        result.scope.set(item.name, value);
+        result.values.set(id, value);
+        if (layer !== undefined) result.origins.set(item.name, layer);
+        return undefined;
+    }
 
     // The declared unit, not the expression's — `w = 5` is a length because the
     // user said so, which is what makes `sin(a)` work when `a` is declared an angle.
     const declared = unitSpecOfType(item.type);
-    const resolved = resolveUnitSpec(item.expression, result.scope, declared);
+    const resolved = resolveDeclared(item.expression, result.scope, declared);
     if (!resolved.isOk) return resolved.error;
     const value = { value: resolved.value, unit: declared };
-    const id = String(item.id);
     if (result.scope.has(item.name)) {
         const origin = result.origins.get(item.name) ?? "a lower layer";
         result.warnings.set(id, `Shadows ${item.name} from ${origin}`);
@@ -212,6 +246,35 @@ function evaluateVariable(
     result.values.set(id, value);
     if (layer !== undefined) result.origins.set(item.name, layer);
     return undefined;
+}
+
+/**
+ * A row's expression against its declared unit. A result without a unit is read in the
+ * DOCUMENT's units, as Onshape reads a Length row written `1` (an inch document: 1 in) —
+ * the app's millimetres only when no document is at hand.
+ */
+function resolveDeclared(expression: string, scope: Scope, declared: UnitSpec): Result<number> {
+    const selected = selectConfiguredArm(expression, scope);
+    if (!selected.isOk) return Result.err(selected.error);
+    if (typeof selected.value === "number")
+        return Result.ok(selected.value * documentFactor(scope, declared));
+    const evaluated = evaluateExpression(selected.value, scope);
+    if (!evaluated.isOk) return Result.err(evaluated.error);
+    const actual = evaluated.value.unit;
+    if (unitSpecEquals(actual, UNITLESS))
+        return Result.ok(evaluated.value.value * documentFactor(scope, declared));
+    if (!unitSpecEquals(actual, declared))
+        return Result.err(
+            `Dimension mismatch: expected ${unitSpecLabel(declared)}, got ${unitSpecLabel(actual)}`,
+        );
+    return Result.ok(evaluated.value.value);
+}
+
+/** App units per document unit for `declared` (1 for a unitless row or a bare scope). */
+function documentFactor(scope: Scope, declared: UnitSpec): number {
+    if (unitSpecEquals(declared, UNITLESS)) return 1;
+    const document = scopeContext(scope)?.document;
+    return document === undefined ? 1 : documentUnit(document, declared).factor;
 }
 
 /**
@@ -276,6 +339,12 @@ export interface IVariableTable extends IVariableSource {
     /** The whole layered scope, memoized per revision; rows of every layer report by id. */
     evaluate(): EvaluatedVariables;
     /**
+     * The variable names whose values follow the configuration — a `configure(...)` value, an
+     * input's name, or a variable reading one of those — memoized per revision. What the
+     * tables and the sketch outline as configured.
+     */
+    configurationDependentNames(): ReadonlySet<string>;
+    /**
      * Called by a layer outside the table (a Variable Studio) after its variables changed;
      * re-scopes and notifies when the layers actually differ.
      */
@@ -313,6 +382,7 @@ const TABLE_LAYER = "the parameter table";
 export class VariableTable extends HistoryObservable implements IVariableTable {
     private _revision = 0;
     private _evaluated: { readonly revision: number; readonly result: EvaluatedVariables } | undefined;
+    private _dependent: { readonly revision: number; readonly names: ReadonlySet<string> } | undefined;
     /** The studio layers as of the last notification, to tell a real change from a no-op. */
     private _layersKey = "";
 
@@ -406,11 +476,27 @@ export class VariableTable extends HistoryObservable implements IVariableTable {
         this.variablesJson = JSON.stringify(items);
     }
 
+    configurationDependentNames(): ReadonlySet<string> {
+        if (this._dependent?.revision !== this._revision) {
+            const layers: VariableLayer[] = this.studios().map((studio) => ({
+                name: studio.name,
+                items: studio.items,
+            }));
+            layers.push({ name: TABLE_LAYER, items: this.items });
+            this._dependent = {
+                revision: this._revision,
+                names: configurationDependentNames(this.configurationInputs, layers),
+            };
+        }
+        return this._dependent.names;
+    }
+
     evaluate(): EvaluatedVariables {
         if (this._evaluated?.revision !== this._revision) {
             const layers: VariableLayer[] = this.studios().map((studio) => ({
                 name: studio.name,
                 items: studio.items,
+                functions: isVariableFeatureNode(studio) ? studio.functionValues?.() : undefined,
             }));
             layers.push({ name: TABLE_LAYER, items: this.items });
             const configuration = { inputs: this.configurationInputs, active: this.activeConfiguration };

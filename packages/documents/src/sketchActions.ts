@@ -1,11 +1,11 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { download, NodeActions, openElement, PubSub, ShapeNode, Transaction } from "@chili3d/core";
+import { I18n, NodeActions, openElement, PubSub, ShapeNode, Transaction } from "@chili3d/core";
 import { SketchNode, sketchDrawing, writeDxf } from "@chili3d/parametric";
-import { writeDwg } from "./cad/dwg";
 import { projectionDrawing } from "./cad/projection";
 import { DocumentFileNode } from "./documentFileNode";
+import { showExportDrawingDialog } from "./ui/exportDialog";
 
 NodeActions.register((node) => {
     if (!(node instanceof ShapeNode) || node instanceof SketchNode) return [];
@@ -37,6 +37,30 @@ NodeActions.register((node) => {
                 }
             },
         },
+        {
+            id: "exportDrawing",
+            order: 66,
+            icon: "export",
+            label: I18n.translate("command.documents.exportDrawing"),
+            run: () => {
+                if (!node.shape.isOk) {
+                    PubSub.default.pub("displayError", node.shape.error);
+                    return;
+                }
+                showExportDrawingDialog({
+                    document: node.document,
+                    name: node.name,
+                    drawing: () => {
+                        const shape = node.shape.value.transformedMul(node.worldTransform());
+                        try {
+                            return projectionDrawing([shape], { angle: "third", iso: true });
+                        } finally {
+                            shape.dispose();
+                        }
+                    },
+                });
+            },
+        },
     ];
 });
 
@@ -60,14 +84,17 @@ NodeActions.register((node) => {
             },
         },
         {
-            id: "dwg",
-            order: 65,
-            label: "Export as DWG…",
-            run: async () => {
-                const result = await writeDwg(sketchDrawing(node.data));
-                if (result.isOk) download([new Uint8Array(result.value)], `${node.name}.dwg`);
-                else PubSub.default.pub("displayError", result.error);
-            },
+            // Onshape's "Export as DXF/DWG…": replaces the parametric module's plain export (same id).
+            id: "export",
+            order: 60,
+            icon: "export",
+            label: I18n.translate("command.documents.exportDrawing"),
+            run: () =>
+                showExportDrawingDialog({
+                    document: node.document,
+                    name: node.name,
+                    drawing: () => sketchDrawing(node.data),
+                }),
         },
     ];
 });

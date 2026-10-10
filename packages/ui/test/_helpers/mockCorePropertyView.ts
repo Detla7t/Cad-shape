@@ -22,11 +22,15 @@ rs.mock("@chili3d/core", () => {
     // Pure helpers the feature list uses; the partial snapshot can miss them (see below).
     const configuredValue = rs.hoisted(() => require("../../../core/src/parameters/configuredValue"));
     const documentUnits = rs.hoisted(() => require("../../../core/src/parameters/documentUnits"));
+    const evaluationState = rs.hoisted(() => require("../../../core/src/model/evaluationState"));
+    const featureEvaluation = rs.hoisted(() => require("../../../core/src/model/featureEvaluation"));
 
     return {
         ...actual,
         ...configuredValue,
         ...documentUnits,
+        ...evaluationState,
+        ...featureEvaluation,
         I18n: I18nMock,
         Localize: LocalizeMock,
         Binding: BindingMock,

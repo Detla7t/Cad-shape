@@ -11,7 +11,7 @@ export interface ResultOptions<T, E = string> {
     error: E | undefined;
 }
 
-@serializable()
+@serializable({ id: "Result" })
 export class Result<T, E = string> {
     readonly #isOk: boolean;
     readonly #value: T | undefined;

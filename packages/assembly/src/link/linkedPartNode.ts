@@ -48,7 +48,7 @@ export const LINK_SLOT = "link";
  * It is a shape node like any other: it can be moved (`transform`), colored, measured,
  * exported, used by booleans or instanced in an assembly.
  */
-@serializable()
+@serializable({ id: "LinkedPartNode" })
 export class LinkedPartNode extends ShapeNode implements ILinkConsumer, INodeWarning {
     private _state: LinkState = { status: "pending" };
     private readonly _registration: IDisposable | undefined;

@@ -24,11 +24,6 @@ const PICK_LABELS: Record<PickKind, I18nKeys> = {
     body: "cam.pick.body",
 };
 
-export function statusText(status: OperationStatus): string {
-    if (status.state === "ok" && status.stale) return t("cam.status.stale");
-    return t(`cam.status.${status.state}` as I18nKeys);
-}
-
 export function statusDetail(status: OperationStatus): string | undefined {
     if (status.stats === undefined) return undefined;
     const ms =
@@ -171,8 +166,19 @@ export function renderOperationStatus(
     const result = div({ className: style.section });
     result.dataset["opStatus"] = operation.id;
     result.dataset["state"] = status.stale ? "stale" : status.state;
-    result.append(div({ className: style.sectionTitle, textContent: statusText(status) }));
-    if (status.error !== undefined) result.append(div({ className: style.error, textContent: status.error }));
+    result.append(
+        div(
+            { className: style.sectionTitle },
+            host.detailIndicators.element(
+                `status:${operation.id}`,
+                host.generator.evaluationSource(operation.id),
+            ),
+        ),
+    );
+    if (status.stale && status.staleReason !== undefined)
+        result.append(div({ className: style.note, textContent: status.staleReason }));
+    if (status.error !== undefined && !status.stale)
+        result.append(div({ className: style.error, textContent: status.error }));
     const detail = statusDetail(status);
     if (detail !== undefined) result.append(div({ className: style.note, textContent: detail }));
     result.append(

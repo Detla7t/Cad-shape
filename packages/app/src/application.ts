@@ -8,6 +8,7 @@ import {
     DocumentLibrary,
     type DocumentUnits,
     DocumentVersionControl,
+    EditorBuffers,
     I18n,
     type IApplication,
     type ICommand,
@@ -108,8 +109,9 @@ export class Application extends Observable implements IApplication {
         }
     };
 
+    /** Leaving the page with a document open, or an editor's unsaved draft, asks first. */
     private readonly handleWindowUnload = (event: BeforeUnloadEvent) => {
-        if (this.activeView) {
+        if (this.activeView || EditorBuffers.dirtyBuffers().length > 0) {
             // Cancel the event as stated by the standard.
             event.preventDefault();
             // Chrome requires returnValue to be set.
@@ -213,10 +215,15 @@ export class Application extends Observable implements IApplication {
     async openDocument(id: string): Promise<IDocument | undefined> {
         const document = await Document.open(this, id);
         await this.createActiveView(document);
-        if (document)
+        if (document) {
             await new DocumentLibrary(this.storage)
                 .update(id, { lastOpened: Date.now() })
                 .catch((error) => Logger.warn("Could not record last opened time", error));
+            // Editor drafts stored with it (unsaved when it was last open) are offered back.
+            EditorBuffers.offerRecovery(document).catch((error) =>
+                Logger.warn("Could not offer the recovered editor drafts", error),
+            );
+        }
         return document;
     }
 

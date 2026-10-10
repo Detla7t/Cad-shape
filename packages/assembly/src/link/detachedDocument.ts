@@ -4,6 +4,7 @@
 import {
     type Act,
     documentConfiguration,
+    documentSchemaHeader,
     History,
     type IApplication,
     type IDocument,
@@ -20,6 +21,7 @@ import {
     ModelManager,
     Observable,
     ObservableCollection,
+    prepareDocumentForLoad,
     Result,
     restoreConfiguration,
     type Serialized,
@@ -71,7 +73,7 @@ export class DetachedDocument extends Observable implements IDocument {
     serialize(): Serialized {
         return {
             __cla$$__: "Document",
-            version: __DOCUMENT_VERSION__,
+            ...documentSchemaHeader(__APP_VERSION__),
             id: this.id,
             name: this.name,
             models: this.modelManager.serialize(),
@@ -98,7 +100,10 @@ export class DetachedDocument extends Observable implements IDocument {
     }
 
     /** Loads a serialized document (what `Document.serialize` writes) without views. */
-    static async load(application: IApplication, data: Serialized): Promise<DetachedDocument> {
+    static async load(application: IApplication, serialized: Serialized): Promise<DetachedDocument> {
+        const prepared = prepareDocumentForLoad(serialized);
+        if (!prepared.isOk) throw new Error(prepared.error.message);
+        const data = prepared.value.document;
         const document = new DetachedDocument(application, data["name"] ?? "", data["id"]);
         document.history.disabled = true;
         try {

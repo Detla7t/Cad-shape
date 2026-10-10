@@ -22,7 +22,7 @@ export interface FaceOptions {
     shapes: IEdge[] | IWire[];
 }
 
-@serializable()
+@serializable({ id: "FaceNode" })
 export class FaceNode extends ParameterShapeNode {
     override display(): I18nKeys {
         return "body.face";

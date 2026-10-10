@@ -95,6 +95,7 @@ function occShapeDeserialize(properties: Serialized) {
 }
 
 @serializable({
+    id: "OccShape",
     deserialize: occShapeDeserialize,
     serialize: occShapeSerialize,
 })
@@ -441,6 +442,7 @@ export interface OccVertexOptions {
 }
 
 @serializable({
+    id: "OccVertex",
     deserialize: occShapeDeserialize,
     serialize: occShapeSerialize,
 })
@@ -463,6 +465,7 @@ export interface OccEdgeOptions {
 }
 
 @serializable({
+    id: "OccEdge",
     deserialize: occShapeDeserialize,
     serialize: occShapeSerialize,
 })
@@ -607,6 +610,7 @@ export interface OccWireOptions {
 }
 
 @serializable({
+    id: "OccWire",
     deserialize: occShapeDeserialize,
     serialize: occShapeSerialize,
 })
@@ -648,6 +652,7 @@ export interface OccFaceOptions {
 }
 
 @serializable({
+    id: "OccFace",
     deserialize: occShapeDeserialize,
     serialize: occShapeSerialize,
 })
@@ -716,6 +721,7 @@ export interface OccShellOptions {
 }
 
 @serializable({
+    id: "OccShell",
     deserialize: occShapeDeserialize,
     serialize: occShapeSerialize,
 })
@@ -731,6 +737,7 @@ export interface OccSolidOptions {
 }
 
 @serializable({
+    id: "OccSolid",
     deserialize: occShapeDeserialize,
     serialize: occShapeSerialize,
 })
@@ -753,6 +760,7 @@ export interface OccCompSolidOptions {
 }
 
 @serializable({
+    id: "OccCompSolid",
     deserialize: occShapeDeserialize,
     serialize: occShapeSerialize,
 })
@@ -768,6 +776,7 @@ export interface OccCompoundOptions {
 }
 
 @serializable({
+    id: "OccCompound",
     deserialize: occShapeDeserialize,
     serialize: occShapeSerialize,
 })

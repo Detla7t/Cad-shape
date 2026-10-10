@@ -191,6 +191,7 @@ export default {
         "command.sketch.circularPattern": "Circular pattern",
         "command.sketch.transform": "Transform",
         "command.sketch.arc3Point": "3 point arc",
+        "command.sketch.tangentArc": "Касательная дуга",
         "command.sketch.importDrawing": "Insert DXF or DWG",
         "command.sketch.insertImage": "Insert image",
         "command.sketch.line": "Линия",

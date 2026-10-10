@@ -3,9 +3,11 @@
 
 import { FolderNode, type IDocument, Plane, quoteConfiguredString, Transaction } from "@chili3d/core";
 import {
+    axisLineRefs,
     ConstraintKind,
     MeasuredVariableNode,
     originRef,
+    SKETCH_Y_AXIS_ID,
     type SketchConstraintData,
     type SketchConstraintRole,
     type SketchData,
@@ -199,6 +201,26 @@ class SketchBuilder {
         this.add(ConstraintKind.P2PCoincident, [p(a, 0), p(b, 0)], { role: "concentric" });
     }
 
+    /** Two arcs share a radius — one dimension drives both. */
+    equalRadius(a: number, b: number) {
+        this.add(ConstraintKind.EqualRadius, [p(a, 0), p(b, 0)]);
+    }
+
+    /** Two lines share a length. */
+    equalLength(a: number, b: number) {
+        this.add(ConstraintKind.EqualLength, [p(a, 0), p(a, 1), p(b, 0), p(b, 1)]);
+    }
+
+    /** Two points mirror each other across the sketch's Y axis — the halves' centre line. */
+    symmetricY(a: SketchPointRef, b: SketchPointRef) {
+        this.add(ConstraintKind.Symmetric, [a, b, ...axisLineRefs(SKETCH_Y_AXIS_ID)]);
+    }
+
+    /** The point lies on the sketch's Y axis. */
+    onYAxis(point: SketchPointRef) {
+        this.add(ConstraintKind.PointOnLine, [point, ...axisLineRefs(SKETCH_Y_AXIS_ID)]);
+    }
+
     /** The point lies on the (infinite) line. */
     onLine(point: SketchPointRef, line: number) {
         this.add(ConstraintKind.PointOnLine, [point, p(line, 0), p(line, 1)]);
@@ -224,15 +246,27 @@ const end = (arc: number) => p(arc, 2);
  * bend arc (construction), concentric, their radii the variables. Returns the arcs; the caller
  * closes the straight edge.
  */
-function halfDisc(b: SketchBuilder, cy: number, radii: { cap: number; bend: number; hole?: number }) {
+function halfDisc(
+    b: SketchBuilder,
+    cy: number,
+    radii: { cap: number; bend: number; hole?: number },
+    match?: { outer: number; bend: number; hole?: number },
+) {
     const outer = b.arc([0, cy], radii.cap, 180, 360);
     const bend = b.arc([0, cy], radii.bend, 180, 360, true);
     const hole = radii.hole === undefined ? undefined : b.arc([0, cy], radii.hole, 180, 360);
     b.concentric(bend, outer);
     if (hole !== undefined) b.concentric(hole, outer);
-    b.radius(outer, "cap_radius");
-    b.radius(bend, "bend_radius");
-    if (hole !== undefined) b.radius(hole, "hole_radius");
+    if (match === undefined) {
+        b.radius(outer, "cap_radius");
+        b.radius(bend, "bend_radius");
+        if (hole !== undefined) b.radius(hole, "hole_radius");
+    } else {
+        // The second half is the first one's twin: equal radii, as Onshape's sketch has them.
+        b.equalRadius(outer, match.outer);
+        b.equalRadius(bend, match.bend);
+        if (hole !== undefined && match.hole !== undefined) b.equalRadius(hole, match.hole);
+    }
     return { outer, bend, hole };
 }
 
@@ -311,11 +345,14 @@ export function reducingEndCapSketch(
 
     // ---- Half with the lap seam: center straight above, the OD up
     const cy = g.od;
-    const s = halfDisc(b, cy, { cap: g.cap, bend: g.bend, hole: g.hole });
+    const s = halfDisc(b, cy, { cap: g.cap, bend: g.bend, hole: g.hole }, a);
     b.dy(origin, center(s.outer), "duct_od");
-    b.dx(origin, center(s.outer), "0 in");
-    const side = (sign: 1 | -1) => {
-        // cap → bend, up the tab, across, down to the tab start, over to the hole
+    b.onYAxis(center(s.outer));
+    /**
+     * One side of the seam: cap → bend, up the tab, across, down to the tab start, over to
+     * the hole. The right side is dimensioned; the left mirrors it across the centre line.
+     */
+    const side = (sign: 1 | -1, mirror?: { top: number; inner: number }) => {
         const lines = chain(b, [
             [sign * g.cap, cy],
             [sign * g.bend, cy],
@@ -333,14 +370,19 @@ export function reducingEndCapSketch(
         b.horizontal(inner);
         b.onLine(center(s.outer), rim);
         b.onLine(center(s.outer), inner);
-        const x = (expression: string) => (sign > 0 ? expression : `-(${expression})`);
-        b.dy(center(s.outer), p(top, 0), "tab");
-        b.dx(center(s.outer), p(top, 0), x("tab_outer"));
-        b.dx(center(s.outer), p(top, 1), x("tab_inner"));
-        b.dx(center(s.outer), p(inner, 0), x("tab_start"));
+        if (mirror === undefined) {
+            b.dy(center(s.outer), p(top, 0), "tab");
+            b.dx(center(s.outer), p(top, 0), "tab_outer");
+            b.dx(center(s.outer), p(top, 1), "tab_inner");
+            b.dx(center(s.outer), p(inner, 0), "tab_start");
+        } else {
+            b.symmetricY(p(mirror.top, 0), p(top, 0));
+            b.symmetricY(p(mirror.top, 1), p(top, 1));
+            b.symmetricY(p(mirror.inner, 0), p(inner, 0));
+        }
+        return { top, inner };
     };
-    side(1);
-    side(-1);
+    side(-1, side(1));
 
     // ---- Collar strips (the walls), centered on the axis above the halves
     const y1 = g.od + 2 * g.height;
@@ -357,7 +399,7 @@ export function reducingEndCapSketch(
     b.vertical(c2);
     b.vertical(c4);
     b.dy(origin, p(c1, 0), "duct_od + 2 * collar_height");
-    b.dx(origin, p(c1, 1), "collar_length / 2");
+    b.symmetricY(p(c1, 0), p(c1, 1));
     b.dx(p(c1, 0), p(c1, 1), "collar_length");
     b.dy(p(c2, 0), p(c2, 1), "collar_height");
 
@@ -377,12 +419,13 @@ export function reducingEndCapSketch(
     b.coincident(p(lap[7], 1), p(lap[0], 0));
     for (const [i, line] of lap.entries()) i % 2 === 0 ? b.horizontal(line) : b.vertical(line);
     b.dy(origin, p(lap[0], 0), "duct_od + 4 * collar_height");
-    b.dx(origin, p(lap[0], 0), "-(lap_length / 2)");
-    b.dx(origin, p(lap[0], 1), "lap_length / 2");
+    // The lap strip is centred like the collar, its band equal both sides, its inner width the collar's.
+    b.symmetricY(p(lap[0], 0), p(lap[0], 1));
+    b.dx(p(lap[0], 0), p(lap[0], 1), "lap_length");
     b.dy(p(lap[1], 0), p(lap[1], 1), "lap_band");
-    b.dy(p(lap[0], 0), p(lap[6], 1), "lap_band");
-    b.dx(origin, p(lap[3], 0), "collar_length / 2");
-    b.dx(origin, p(lap[5], 0), "-(collar_length / 2)");
+    b.equalLength(lap[7], lap[1]);
+    b.symmetricY(p(lap[5], 1), p(lap[3], 0));
+    b.equalLength(lap[4], c1);
     b.dy(p(lap[3], 0), p(lap[3], 1), "collar_height - lap_band");
     return b.data();
 }
@@ -409,9 +452,9 @@ export function plainEndCapSketch(initial: EndCapParams = { reducing: false, od:
     b.onLine(center(a.outer), l2);
 
     const cy = g.od + 1;
-    const s = halfDisc(b, cy, { cap: g.cap, bend: g.bend });
+    const s = halfDisc(b, cy, { cap: g.cap, bend: g.bend }, a);
     b.dy(origin, center(s.outer), "duct_od + seam_tab");
-    b.dx(origin, center(s.outer), "0 in");
+    b.onYAxis(center(s.outer));
     // The tab's top edge is two lines meeting on the axis, as the Onshape sketch drew it.
     const [rimL, , topL, topR, , rimR] = chain(b, [
         [-g.cap, cy],
@@ -429,10 +472,10 @@ export function plainEndCapSketch(initial: EndCapParams = { reducing: false, od:
     for (const line of [rimL, topL, topR, rimR]) b.horizontal(line);
     b.onLine(center(s.outer), rimL);
     b.onLine(center(s.outer), rimR);
-    b.dy(center(s.outer), p(topL, 0), "seam_tab");
-    b.dx(center(s.outer), p(topL, 0), "-(tab_end)");
-    b.dx(center(s.outer), p(topL, 1), "0 in");
+    b.dy(center(s.outer), p(topR, 1), "seam_tab");
     b.dx(center(s.outer), p(topR, 1), "tab_end");
+    b.onYAxis(p(topL, 1));
+    b.symmetricY(p(topR, 1), p(topL, 0));
     return b.data();
 }
 

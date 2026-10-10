@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type IDocument, type INode, type IShape, Matrix4, ShapeNode } from "@chili3d/core";
+import { type IDocument, type INode, type IShape, Matrix4, ShapeNode, serializedTypeId } from "@chili3d/core";
 import { type ILinkService, linkService } from "../link/linkRegistry";
 import type { LinkState } from "../link/linkTypes";
 import { AssemblyNode } from "./assemblyNode";
@@ -59,7 +59,8 @@ const NOT_PARTS = new Set(["SketchNode", "MultiShapeNode"]);
 
 /** Whether a node of a Part Studio is a part an assembly can place. */
 export function isPartNode(node: INode): node is ShapeNode {
-    if (!(node instanceof ShapeNode) || NOT_PARTS.has(node.constructor.name)) return false;
+    if (!(node instanceof ShapeNode) || NOT_PARTS.has(serializedTypeId(node) ?? node.constructor.name))
+        return false;
     // A parametric body's children are its consumed boolean tools, not parts of their own.
     return !(node.parent instanceof ShapeNode);
 }

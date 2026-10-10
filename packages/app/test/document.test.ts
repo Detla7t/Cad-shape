@@ -4,10 +4,12 @@
 import {
     type ConfigurationInputData,
     Constants,
+    DOCUMENT_SCHEMA_VERSION,
     documentUnits,
     History,
     type IApplication,
     InternalClassName,
+    LEGACY_DOCUMENT_VERSION,
     ModelManager,
     ObservableCollection,
     setDocumentUnits,
@@ -102,6 +104,14 @@ describe("Document", () => {
             expect(serialized["models"]).toBeDefined();
             expect(serialized["acts"]).toEqual([]);
             expect(serialized["userData"]).toBeDefined();
+        });
+
+        test("writes the document schema apart from the application version", () => {
+            const serialized = document.serialize();
+
+            expect(serialized["schemaVersion"]).toBe(DOCUMENT_SCHEMA_VERSION);
+            expect(serialized["version"]).toBe(LEGACY_DOCUMENT_VERSION);
+            expect(serialized["appVersion"]).toBe(__APP_VERSION__);
         });
 
         test("should include userData in serialization", () => {

@@ -2,7 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import { Vector3 } from "three";
-import { visibleCubeAxis } from "../src/viewCubeGeometry";
+import { CUBE_BEVEL, cornerDisc, discEllipse, visibleCubeAxis } from "../src/viewCubeGeometry";
 
 const face = [new Vector3(-1, -1, 0), new Vector3(1, -1, 0), new Vector3(1, 1, 0), new Vector3(-1, 1, 0)];
 
@@ -48,4 +48,29 @@ test("occlusion from overlapping projected faces is merged", () => {
             [3, 0, -1],
         ],
     ]);
+});
+
+test("a corner disc lies on the plane through its three fillet seams, inside them", () => {
+    const { center, radius } = cornerDisc(new Vector3(1, -1, 1));
+    const seams = [
+        new Vector3(1, -CUBE_BEVEL, CUBE_BEVEL),
+        new Vector3(CUBE_BEVEL, -1, CUBE_BEVEL),
+        new Vector3(CUBE_BEVEL, -CUBE_BEVEL, 1),
+    ];
+    const normal = new Vector3(1, -1, 1).normalize();
+    for (const seam of seams) {
+        expect(Math.abs(seam.clone().sub(center).dot(normal))).toBeLessThan(1e-12);
+        expect(seam.distanceTo(center)).toBeGreaterThan(radius);
+    }
+});
+
+test.each([
+    ["facing the viewer", new Vector3(0, 0, 1), 5, 5, 0],
+    ["edge-on", new Vector3(1, 0, 0), 0, 5, 0],
+    ["tilted up the screen", new Vector3(0, 1, 1), 5 / Math.SQRT2, 5, -90],
+])("a flat disc %s projects to the foreshortened ellipse", (_name, normal, rx, ry, angle) => {
+    const ellipse = discEllipse(normal, 5);
+    expect(ellipse.rx).toBeCloseTo(rx, 12);
+    expect(ellipse.ry).toBeCloseTo(ry, 12);
+    expect(ellipse.angle).toBeCloseTo(angle, 12);
 });

@@ -96,6 +96,16 @@ export class History implements IDisposable {
         return this._redos.length;
     }
 
+    /** The names of the undo steps, oldest first (the last one is what Undo reverts). */
+    undoNames(): string[] {
+        return this._undos.map((record) => record.name);
+    }
+
+    /** The names of the redo steps, the next one to redo last. */
+    redoNames(): string[] {
+        return this._redos.map((record) => record.name);
+    }
+
     undo() {
         this.#isUndoing = true;
         let undone: IHistoryRecord | undefined;

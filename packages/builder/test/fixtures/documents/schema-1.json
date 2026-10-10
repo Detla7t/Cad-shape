@@ -1,0 +1,181 @@
+{
+    "__cla$$__": "Document",
+    "version": "0.7.1",
+    "schemaVersion": 1,
+    "appVersion": "0.7.1",
+    "id": "golden-document",
+    "name": "Golden duct job",
+    "models": {
+        "components": [],
+        "nodes": [
+            {
+                "id": "Xdpir_AKOVyq_WKG2llQE",
+                "name": "Golden duct job",
+                "visible": true,
+                "__cla$$__": "FolderNode"
+            },
+            {
+                "suppression": false,
+                "comment": "",
+                "plane": {
+                    "origin": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0,
+                        "__cla$$__": "XYZ"
+                    },
+                    "normal": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 1,
+                        "__cla$$__": "XYZ"
+                    },
+                    "xvec": {
+                        "x": 1,
+                        "y": 0,
+                        "z": 0,
+                        "__cla$$__": "XYZ"
+                    },
+                    "__cla$$__": "Plane"
+                },
+                "dataJson": "{\"entities\":[{\"id\":1,\"type\":\"line\",\"params\":[0,0,50,0]},{\"id\":2,\"type\":\"line\",\"params\":[50,0,50,20]},{\"id\":3,\"type\":\"line\",\"params\":[50,20,0,20]},{\"id\":4,\"type\":\"line\",\"params\":[0,20,0,0]}],\"constraints\":[{\"id\":10,\"kind\":0,\"refs\":[{\"entityId\":1,\"pointIndex\":1},{\"entityId\":2,\"pointIndex\":0}]},{\"id\":11,\"kind\":0,\"refs\":[{\"entityId\":2,\"pointIndex\":1},{\"entityId\":3,\"pointIndex\":0}]},{\"id\":12,\"kind\":0,\"refs\":[{\"entityId\":3,\"pointIndex\":1},{\"entityId\":4,\"pointIndex\":0}]},{\"id\":13,\"kind\":0,\"refs\":[{\"entityId\":4,\"pointIndex\":1},{\"entityId\":1,\"pointIndex\":0}]},{\"id\":14,\"kind\":4,\"refs\":[{\"entityId\":1,\"pointIndex\":0},{\"entityId\":1,\"pointIndex\":1}]},{\"id\":15,\"kind\":5,\"refs\":[{\"entityId\":2,\"pointIndex\":0},{\"entityId\":2,\"pointIndex\":1}]},{\"id\":16,\"kind\":4,\"refs\":[{\"entityId\":3,\"pointIndex\":0},{\"entityId\":3,\"pointIndex\":1}]},{\"id\":17,\"kind\":5,\"refs\":[{\"entityId\":4,\"pointIndex\":0},{\"entityId\":4,\"pointIndex\":1}]},{\"id\":18,\"kind\":1,\"refs\":[{\"entityId\":1,\"pointIndex\":0},{\"entityId\":1,\"pointIndex\":1}],\"datum\":\"w\"},{\"id\":19,\"kind\":1,\"refs\":[{\"entityId\":4,\"pointIndex\":0},{\"entityId\":4,\"pointIndex\":1}],\"datum\":\"20 mm\"}]}",
+                "partComment": "",
+                "inspectionJson": "{}",
+                "materialId": "Jc0TwlNWKaNv3ZVK2-FUN",
+                "faceMaterialPair": [],
+                "transform": {
+                    "array": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+                    "__cla$$__": "Matrix4"
+                },
+                "id": "1P0_tSHdW30tvQStQaybp",
+                "name": "body.sketch1",
+                "visible": true,
+                "__cla$$__": "SketchNode",
+                "parentId": "Xdpir_AKOVyq_WKG2llQE"
+            },
+            {
+                "featuresJson": "[{\"id\":\"f1\",\"type\":\"extrude\",\"sketchId\":\"1P0_tSHdW30tvQStQaybp\",\"depth\":\"h\"},{\"id\":\"f2\",\"type\":\"fillet\",\"radius\":2,\"edges\":[{\"kind\":\"line\",\"start\":{\"x\":50,\"y\":20,\"z\":12},\"end\":{\"x\":50,\"y\":20,\"z\":0},\"edgeId\":\"sketch:1P0_tSHdW30tvQStQaybp:e1.2.3.4:ent2&sketch:1P0_tSHdW30tvQStQaybp:e1.2.3.4:ent3:sweep\"}]}]",
+                "partComment": "",
+                "inspectionJson": "{}",
+                "materialId": "Jc0TwlNWKaNv3ZVK2-FUN",
+                "faceMaterialPair": [],
+                "transform": {
+                    "array": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+                    "__cla$$__": "Matrix4"
+                },
+                "id": "XSLCOiNFtoOBl4ErAnhGe",
+                "name": "body.parametricBody1",
+                "visible": true,
+                "__cla$$__": "ParametricBodyNode",
+                "parentId": "Xdpir_AKOVyq_WKG2llQE"
+            },
+            {
+                "fileName": "Notes.md",
+                "format": "markdown",
+                "encoding": "text",
+                "content": "# Duct job\n\n- 26 ga galvanized\n- seams: Pittsburgh\n",
+                "id": "ysK0k5VpWEIdx_iZ5PygR",
+                "name": "Notes",
+                "visible": true,
+                "__cla$$__": "DocumentFileNode",
+                "parentId": "Xdpir_AKOVyq_WKG2llQE"
+            },
+            {
+                "fileName": "Photo.png",
+                "format": "png",
+                "encoding": "base64",
+                "content": "iVBORw0KGgoAAQID/v8=",
+                "id": "HacEsqPX2sFxOH9VyLHaq",
+                "name": "Photo",
+                "visible": true,
+                "__cla$$__": "DocumentFileNode",
+                "parentId": "Xdpir_AKOVyq_WKG2llQE"
+            }
+        ],
+        "materials": [
+            {
+                "vertexColors": false,
+                "transparent": true,
+                "id": "Jc0TwlNWKaNv3ZVK2-FUN",
+                "name": "Galvanized",
+                "color": 11581632,
+                "opacity": 1,
+                "map": {
+                    "image": "",
+                    "wrapS": 1000,
+                    "wrapT": 1000,
+                    "rotation": 0,
+                    "offset": {
+                        "x": 0,
+                        "y": 0,
+                        "__cla$$__": "XY"
+                    },
+                    "repeat": {
+                        "x": 1,
+                        "y": 1,
+                        "__cla$$__": "XY"
+                    },
+                    "center": {
+                        "x": 0.5,
+                        "y": 0.5,
+                        "__cla$$__": "XY"
+                    },
+                    "__cla$$__": "Texture"
+                },
+                "__cla$$__": "Material"
+            }
+        ]
+    },
+    "variables": [
+        {
+            "id": "v1",
+            "name": "w",
+            "type": "length",
+            "expression": "configure(Size, \"S\": 40, \"L\": 50)"
+        },
+        {
+            "id": "v2",
+            "name": "h",
+            "type": "length",
+            "expression": "12"
+        },
+        {
+            "id": "v3",
+            "name": "half",
+            "type": "length",
+            "expression": "w / 2"
+        }
+    ],
+    "acts": [],
+    "userData": {},
+    "configuration": {
+        "inputs": [
+            {
+                "kind": "list",
+                "id": "c1",
+                "name": "Size",
+                "options": [
+                    {
+                        "id": "s",
+                        "name": "S"
+                    },
+                    {
+                        "id": "l",
+                        "name": "L"
+                    }
+                ],
+                "defaultOption": "s"
+            },
+            {
+                "kind": "checkbox",
+                "id": "c2",
+                "name": "Holes",
+                "defaultValue": false
+            }
+        ],
+        "active": {
+            "Size": "L",
+            "Holes": true
+        }
+    }
+}

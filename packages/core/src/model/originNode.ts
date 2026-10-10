@@ -7,7 +7,7 @@ import { serializable } from "../serialize";
 import { ParameterShapeNode, type ParameterShapeNodeOptions } from "./shapeNode";
 
 /** The document's fixed datum vertex, usable by picking and parametric references. */
-@serializable()
+@serializable({ id: "OriginNode" })
 export class OriginNode extends ParameterShapeNode {
     constructor(options: ParameterShapeNodeOptions) {
         super({ ...options, name: options.name ?? I18n.translate("body.origin") });

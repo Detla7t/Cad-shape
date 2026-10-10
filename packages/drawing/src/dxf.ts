@@ -83,16 +83,40 @@ function entityGroups(entity: DrawingEntity): Group[] {
     }
 }
 
-export function writeDxf(drawing: Drawing): string {
+export interface DxfOptions {
+    /**
+     * Properties to travel with the file: as `999` comments at its head (which every DXF
+     * reader skips and a person reads), and as `$CUSTOMPROPERTYTAG`/`$CUSTOMPROPERTY` header
+     * pairs (AutoCAD's custom drawing properties).
+     */
+    readonly properties?: Readonly<Record<string, string>>;
+}
+
+/** The file's DXF release, as AutoCAD names it: Release 11-12 (`AC1009`), the one this writer produces. */
+export const DXF_VERSIONS = [{ id: "AC1009", name: "Release 11-12" }] as const;
+
+export function writeDxf(drawing: Drawing, options: DxfOptions = {}): string {
     const bounds = drawingBounds(drawing) ?? { min: [0, 0], max: [0, 0] };
     const inch = drawing.units === "inch";
     // The dash pattern is 6 mm (4 on, 2 off) in millimetre files and its nearest ¼ in in inch ones.
     const dash = inch ? 0.25 : 6;
+    const properties = Object.entries(options.properties ?? {}).filter(([key]) => key.trim() !== "");
+    const comments: Group[] = properties.map(([key, value]) => [
+        999,
+        `${key}=${value}`.replace(/[\r\n]+/g, " "),
+    ]);
     const header: Group[] = [
+        ...comments,
         [0, "SECTION"],
         [2, "HEADER"],
         [9, "$ACADVER"],
         [1, "AC1009"],
+        ...properties.flatMap(([key, value]): Group[] => [
+            [9, "$CUSTOMPROPERTYTAG"],
+            [1, key],
+            [9, "$CUSTOMPROPERTY"],
+            [1, value.replace(/[\r\n]+/g, " ")],
+        ]),
         [9, "$INSUNITS"],
         [70, inch ? 1 : 4],
         [9, "$MEASUREMENT"],

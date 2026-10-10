@@ -1,0 +1,25 @@
+{
+    "name": "@chili3d/featurescript",
+    "version": "0.7.1",
+    "description": "Onshape-dialect FeatureScript engine: lexer, parser and interpreter, the native and Onshape std runtimes, the modeling context over the geometry kernel, and the language service / CodeMirror IDE pieces (./ide)",
+    "main": "src/index.ts",
+    "type": "module",
+    "exports": {
+        ".": "./src/index.ts",
+        "./ide": "./src/ide/index.ts",
+        "./*": "./src/*.ts"
+    },
+    "devDependencies": {
+        "@chili3d/core": "*"
+    },
+    "dependencies": {
+        "@codemirror/autocomplete": "^6.20.3",
+        "@codemirror/commands": "^6.11.1",
+        "@codemirror/language": "^6.13.1",
+        "@codemirror/lint": "^6.9.7",
+        "@codemirror/search": "^6.7.2",
+        "@codemirror/state": "^6.7.6",
+        "@codemirror/view": "^6.43.14",
+        "@lezer/highlight": "^1.2.5"
+    }
+}

@@ -368,3 +368,78 @@ test("a superseded job cannot overwrite the newer successful generation", async 
     expect(generator.toolpath("op")?.moves).toEqual([{ kind: "rapid", to: [20, 0, 5] }]);
     expect(generator.status("op").state).toBe("ok");
 });
+
+test("a stale result says what changed, and posting refuses with the same reasons it lists", async () => {
+    const { document, part, generator, studio, update } = fixture();
+    const [missing] = generator.postBlockers("setup");
+    expect(missing).toMatchObject({
+        kind: "missing",
+        operationId: "op",
+        state: { kind: "changed", reason: "Not generated yet" },
+    });
+    expect(generator.post("setup").error).toBe(missing.message);
+
+    await generator.generateOperation("setup", "op");
+    expect(generator.postBlockers("setup")).toEqual([]);
+    expect(generator.post("setup").isOk).toBe(true);
+
+    Transaction.execute(document, "move", () => {
+        part.transform = Matrix4.fromTranslation(5, 0, 0);
+    });
+    expect(generator.status("op").staleReason).toBe('"Part" was rebuilt or moved');
+    const [stale] = generator.postBlockers("setup");
+    expect(stale).toMatchObject({
+        kind: "stale",
+        operationId: "op",
+        state: { kind: "changed", reason: '"Part" was rebuilt or moved' },
+    });
+    expect(stale.message).toBe('"Operation" changed since it was generated: "Part" was rebuilt or moved');
+    expect(generator.post("setup").error).toBe(stale.message);
+
+    document.history.undo();
+    expect(generator.postBlockers("setup")).toEqual([]);
+    update({ operations: [{ ...studio.setups[0].operations[0], params: { edited: 1 } }] });
+    expect(generator.status("op").staleReason).toBe("The operation was edited");
+    update({
+        operations: [{ ...studio.setups[0].operations[0], params: {} }],
+        wcs: { ...studio.setups[0].wcs, origin: [0, 0, 1] },
+    });
+    expect(generator.status("op").staleReason).toBe("The setup changed (WCS, stock or parts)");
+});
+
+test("a failed part rebuild blocks posting first, by name, and the failure reaches the operation", async () => {
+    const { document, generator, update } = fixture();
+    const { body } = addBody(document);
+    update({ partIds: [body.id] });
+    await generator.generateOperation("setup", "op");
+    body.setFeatureParameter("extrude", "depth", "missingDepth");
+    expect(body.evaluationError).toBeDefined();
+
+    const blockers = generator.postBlockers("setup");
+    expect(blockers.map((blocker) => blocker.kind)).toEqual(["part", "stale"]);
+    expect(blockers[0].message).toContain("failed to rebuild");
+    expect(blockers[0].state).toMatchObject({ kind: "failed", lastGoodShown: false });
+    expect(generator.status("op").staleReason).toBe(`"${body.name}" failed to rebuild`);
+    expect(generator.post("setup").error).toBe(blockers[0].message);
+
+    const failed = await generator.generateOperation("setup", "op");
+    expect(generator.evaluationSource("op").state()).toEqual({
+        kind: "failed",
+        message: failed.error,
+        lastGoodShown: false,
+    });
+    expect(generator.postBlockers("setup").map((blocker) => blocker.kind)).toEqual(["part", "failed"]);
+});
+
+test("the evaluation source follows the operation through generation", async () => {
+    const { generator } = fixture();
+    const source = generator.evaluationSource("op");
+    const seen: (string | undefined)[] = [];
+    const stop = source.subscribe(() => seen.push(source.state()?.kind));
+    expect(source.state()).toEqual({ kind: "changed", reason: "Not generated yet" });
+    await generator.generateOperation("setup", "op");
+    stop();
+    expect(seen).toContain("computing");
+    expect(seen.at(-1)).toBe("ready");
+    expect(source.state()).toEqual({ kind: "ready" });
+});

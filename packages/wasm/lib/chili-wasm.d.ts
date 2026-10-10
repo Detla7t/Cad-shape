@@ -672,6 +672,7 @@ interface EmbindModule {
     chamferTracked(_0: TopoDS_Shape, _1: Array<number>, _2: number): TrackedShapeResult;
     sweep(_0: Array<TopoDS_Shape>, _1: TopoDS_Wire, _2: boolean, _3: boolean): ShapeResult;
     fillSurface(_0: Array<TopoDS_Shape>, _1: Array<number>, _2: Array<TopoDS_Shape>, _3: Array<Vector3>): TrackedShapeResult;
+    normalProjection(_0: Array<TopoDS_Shape>, _1: TopoDS_Shape): ShapeResult;
     makeThickSolidByJoin(_0: TopoDS_Shape, _1: Array<TopoDS_Shape>, _2: number, _3: GeomAbs_JoinType, _4: BRepOffset_Mode, _5: boolean): ShapeResult;
     simplifyShape(_0: TopoDS_Shape, _1: boolean, _2: boolean, _3: Array<TopoDS_Shape>, _4: number, _5: number): ShapeResult;
     booleanCommon(_0: Array<TopoDS_Shape>, _1: Array<TopoDS_Shape>): ShapeResult;
@@ -687,6 +688,8 @@ interface EmbindModule {
     removeSubShape(_0: TopoDS_Shape, _1: Array<TopoDS_Shape>): ShapeResult;
     replaceSubShapes(_0: TopoDS_Shape, _1: Array<TopoDS_Shape>, _2: Array<TopoDS_Shape>): ShapeResult;
     sewing(_0: Array<TopoDS_Shape>): ShapeResult;
+    splineThroughEdges(_0: Array<TopoDS_Edge>): ShapeResult;
+    coonsSurface(_0: Array<TopoDS_Edge>): ShapeResult;
     wire(_0: Array<TopoDS_Edge>): ShapeResult;
     shell(_0: Array<TopoDS_Face>): ShapeResult;
     face(_0: Array<TopoDS_Wire>): ShapeResult;

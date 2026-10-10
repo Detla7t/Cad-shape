@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { download } from "../src";
+import { browserDownload, download, setDownloadDelivery } from "../src";
 
 describe("download function", () => {
     let originalCreateObjectURL: typeof URL.createObjectURL;
@@ -162,5 +162,65 @@ describe("download function", () => {
         download([jsonData], "data.json");
         expect(createdObjectUrls.length).toBe(1);
         expect(anchorDownload).toBe("data.json");
+    });
+
+    describe("delivery", () => {
+        afterEach(() => setDownloadDelivery(undefined));
+
+        test("a delivery that declines keeps the browser download, synchronously", () => {
+            const seen: string[] = [];
+            setDownloadDelivery((file) => {
+                seen.push(file.name);
+                return false;
+            });
+            download(["data"], "part.step");
+            expect(seen).toEqual(["part.step"]);
+            expect(clickCalled).toBe(true);
+        });
+
+        test("a delivery that takes the file replaces the browser download", async () => {
+            let received: Blob | undefined;
+            setDownloadDelivery(async (file) => {
+                received = file.blob;
+                return true;
+            });
+            download(["abc"], "part.step");
+            await Promise.resolve();
+            await Promise.resolve();
+            expect(received).not.toBeUndefined();
+            expect(await received!.text()).toBe("abc");
+            expect(clickCalled).toBe(false);
+            expect(createdObjectUrls).toEqual([]);
+        });
+
+        test("an async decline or a failure falls back to the browser download", async () => {
+            setDownloadDelivery(() => Promise.resolve(false));
+            download(["data"], "a.step");
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            expect(clickCalled).toBe(true);
+            expect(anchorDownload).toBe("a.step");
+
+            clickCalled = false;
+            setDownloadDelivery(() => Promise.reject(new Error("bridge gone")));
+            download(["data"], "b.step");
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            expect(clickCalled).toBe(true);
+            expect(anchorDownload).toBe("b.step");
+
+            clickCalled = false;
+            setDownloadDelivery(() => {
+                throw new Error("sync failure");
+            });
+            download(["data"], "c.step");
+            expect(clickCalled).toBe(true);
+            expect(anchorDownload).toBe("c.step");
+        });
+
+        test("browserDownload is the plain download", () => {
+            browserDownload(new Blob(["x"]), "plain.txt");
+            expect(clickCalled).toBe(true);
+            expect(anchorDownload).toBe("plain.txt");
+            expect(revokedObjectUrls.length).toBe(1);
+        });
     });
 });

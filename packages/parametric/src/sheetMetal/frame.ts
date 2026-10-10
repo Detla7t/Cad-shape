@@ -19,7 +19,7 @@ import {
     rotationAffine,
     type Vec3,
     vec,
-} from "../featurescript/std/geometry";
+} from "@chili3d/featurescript";
 import type { Loop2, V2 } from "./model";
 
 /**

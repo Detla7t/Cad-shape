@@ -24,6 +24,10 @@ import { installDocumentIcons } from "./documentIcons";
 import { registerDocumentImporters } from "./importers";
 import { registerDocumentElements } from "./ui/documentElements";
 
+export { WorkbookEvaluator } from "@chili3d/sheet/formula";
+export type { CellData, SheetData, WorkbookData } from "@chili3d/sheet/model";
+export { formatCellValue } from "@chili3d/sheet/numberFormat";
+export { readWorkbook, type WorkbookFormat, writeWorkbook, XLS_UNSUPPORTED } from "@chili3d/sheet/workbookIo";
 export * from "./api";
 export * from "./cad/drawingToSketch";
 export { type DwgBackend, importDwg, setDwgBackends, writeDwg } from "./cad/dwg";
@@ -36,10 +40,6 @@ export * from "./documentFileNode";
 export * from "./documentFormats";
 export * from "./importers";
 export * from "./ribbon";
-export { WorkbookEvaluator } from "./sheet/formula";
-export type { CellData, SheetData, WorkbookData } from "./sheet/model";
-export { formatCellValue } from "./sheet/numberFormat";
-export { readWorkbook, type WorkbookFormat, writeWorkbook, XLS_UNSUPPORTED } from "./sheet/workbookIo";
 
 let registered: IDisposable | undefined;
 

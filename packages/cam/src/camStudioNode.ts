@@ -35,7 +35,7 @@ export interface CamStudioNodeOptions {
  *
  * `setupsJson` is a recorded property: an edit is one undo step (and one microversion).
  */
-@serializable()
+@serializable({ id: "CamStudioNode" })
 export class CamStudioNode extends Node implements INodeIcon, INodeSceneless {
     private readonly disposalListeners = new Set<() => void>();
 

@@ -2,9 +2,8 @@
 // See LICENSE file in the project root for full license information.
 
 import { type IDisposable, type INode, Logger, Result, sha256Hex } from "@chili3d/core";
-import { DocumentFileNode } from "./documentFileNode";
-import { csvToWorkbook } from "./sheet/csv";
-import { isFormulaError, type Scalar, WorkbookEvaluator } from "./sheet/formula";
+import { csvToWorkbook } from "@chili3d/sheet/csv";
+import { isFormulaError, type Scalar, WorkbookEvaluator } from "@chili3d/sheet/formula";
 import {
     type CellRange,
     columnName,
@@ -12,8 +11,9 @@ import {
     rangeText,
     usedSize,
     type WorkbookData,
-} from "./sheet/model";
-import { isWorkbookFormat, readWorkbook } from "./sheet/workbookIo";
+} from "@chili3d/sheet/model";
+import { isWorkbookFormat, readWorkbook } from "@chili3d/sheet/workbookIo";
+import { DocumentFileNode } from "./documentFileNode";
 
 /**
  * Reading a document element's content from other modules — the stable API data
@@ -328,11 +328,11 @@ export async function readDocumentText(input: INode): Promise<Result<string>> {
         case "html":
             return Result.ok(htmlToText(node.text));
         case "docx": {
-            const { docxToHtml } = await import("./richtext/docx");
+            const { docxToHtml } = await import("@chili3d/richtext/docx");
             return Result.ok(htmlToText((await docxToHtml(node.bytes)).html));
         }
         case "odt": {
-            const { odtToHtml } = await import("./richtext/odt");
+            const { odtToHtml } = await import("@chili3d/richtext/odt");
             return Result.ok(htmlToText(await odtToHtml(node.bytes)));
         }
         case "pdf": {

@@ -12,3 +12,4 @@ export * from "./mockShape";
 export * from "./mockView";
 export * from "./mockVisual";
 export * from "./testDocument";
+export * from "./timelineNodes";

@@ -24,19 +24,19 @@ describe("materials", () => {
     describe("vertex materials", () => {
         test("defaultVertexMaterial is PointsMaterial with correct size", () => {
             expect(defaultVertexMaterial).toBeInstanceOf(PointsMaterial);
-            expect(defaultVertexMaterial.size).toBe(3);
+            expect(defaultVertexMaterial.size).toBe(5);
             expect(defaultVertexMaterial.sizeAttenuation).toBe(false);
         });
 
         test("highlightVertexMaterial has larger size", () => {
             expect(highlightVertexMaterial).toBeInstanceOf(PointsMaterial);
-            expect(highlightVertexMaterial.size).toBe(5);
+            expect(highlightVertexMaterial.size).toBe(7);
             expect(highlightVertexMaterial.sizeAttenuation).toBe(false);
         });
 
         test("selectedVertexMaterial has larger size", () => {
             expect(selectedVertexMaterial).toBeInstanceOf(PointsMaterial);
-            expect(selectedVertexMaterial.size).toBe(5);
+            expect(selectedVertexMaterial.size).toBe(7);
             expect(selectedVertexMaterial.sizeAttenuation).toBe(false);
         });
     });

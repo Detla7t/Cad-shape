@@ -17,6 +17,9 @@ export function createMockView(overrides?: Partial<IView>): IView {
         cameraController: {
             onPropertyChanged: () => {},
             removePropertyChanged: () => {},
+            lookAt: () => {},
+            animateLookAt: () => Promise.resolve(),
+            fitContent: () => {},
         } as never,
         isClosed: false,
         width: 800,

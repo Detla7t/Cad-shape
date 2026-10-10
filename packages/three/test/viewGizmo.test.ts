@@ -174,6 +174,42 @@ describe("View cube", () => {
         }
     });
 
+    test("the far faces show through the cube and their names turn the view; corners are flat discs", () => {
+        const { gizmo, cc } = createGizmo();
+        // the camera looks down -Z: Top faces it, Bottom is on the far side
+        const through = (name: string) =>
+            gizmo.querySelector<SVGElement>(`[data-role="through-labels"] [aria-label="${name} view"]`)!;
+        expect(through("Bottom").style.display).toBe("");
+        expect(through("Bottom").getAttribute("tabindex")).toBe("0");
+        expect(through("Top").style.display).toBe("none");
+        expect(button(gizmo, "Bottom view").dataset["back"]).toBe("true");
+        expect(button(gizmo, "Top view").dataset["back"]).toBe("false");
+        // every region stays drawn (the cube is translucent); the far ones — the bottom and the
+        // four side faces seen edge-on, their edges and corners — take no pointer
+        expect(gizmo.querySelectorAll('[data-kind][data-back="true"]').length).toBe(17);
+        // a corner is a disc tilted with the cube: looking down Z it is foreshortened, not round
+        const corners = gizmo.querySelectorAll<SVGEllipseElement>('[data-kind="corner"] ellipse');
+        expect(corners.length).toBe(8);
+        const rx = Number(corners[0].getAttribute("rx"));
+        const ry = Number(corners[0].getAttribute("ry"));
+        expect(rx).toBeGreaterThan(0);
+        expect(rx / ry).toBeCloseTo(1 / Math.sqrt(3), 6);
+        // Z points at the viewer: no stub of a line and no label at the origin
+        const z = gizmo.querySelector<SVGPathElement>('[data-axis="Z"]')!;
+        expect(z).not.toBeNull();
+        expect(z.getAttribute("d")).toBe("");
+        expect(gizmo.querySelector<SVGPathElement>('[data-axis="X"]')!.getAttribute("d")).not.toBe("");
+        through("Bottom").dispatchEvent(new PointerEvent("pointerenter"));
+        expect(button(gizmo, "Bottom view").dataset["hover"]).toBe("true");
+        through("Bottom").dispatchEvent(new PointerEvent("pointerleave"));
+        expect(button(gizmo, "Bottom view").dataset["hover"]).toBeUndefined();
+        through("Bottom").dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        const expected = cc.target.clone().add(new Vector3(0, 0, -100));
+        expect(cc.camera.position.distanceTo(expected)).toBeLessThan(1e-10);
+        expect(through("Bottom").style.display).toBe("none");
+        expect(through("Top").style.display).toBe("");
+    });
+
     test("camera changes reproject the face polygons and dispose removes the control", () => {
         const { gizmo } = createGizmo();
         const top = button(gizmo, "Top view").querySelector("polygon")!;

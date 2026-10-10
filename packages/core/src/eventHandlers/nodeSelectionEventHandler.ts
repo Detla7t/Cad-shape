@@ -3,15 +3,19 @@
 
 import type { IDocument } from "../document";
 import type { AsyncController } from "../foundation";
+import type { INode } from "../model/node";
 import type { INodeFilter } from "../selectionFilter";
 import { ShapeTypes } from "../shape";
-import { type IView, type IVisualObject, VisualStates } from "../visual";
+import { selectsSubShapes } from "../subShapeSelection";
+import { type IView, type IVisualObject, type VisualShapeData, VisualStates } from "../visual";
 import { SelectionHandler } from "./selectionEventHandler";
 
 export class NodeSelectionHandler extends SelectionHandler {
     private _highlights: IVisualObject[] | undefined;
     private _detectAtMouse: IVisualObject[] | undefined;
     private _lockDetected: IVisualObject | undefined; // 用于切换捕获的对象
+    /** The curve or point under the cursor of a node that selects its parts (a sketch), highlighted on its own. */
+    private _subShape: VisualShapeData | undefined;
     protected highlighState = VisualStates.edgeHighlight;
 
     constructor(
@@ -28,11 +32,18 @@ export class NodeSelectionHandler extends SelectionHandler {
             this.clearSelected(this.document);
             return 0;
         }
+        const click = Math.hypot(this.mouse.x - event.offsetX, this.mouse.y - event.offsetY) <= 3;
+        // A click on a sketch's curve selects that curve (Onshape), not the sketch.
+        if (click && this._subShape !== undefined) {
+            const pick = this._subShape;
+            const toggle = this.toggleSelect(event);
+            if (!toggle) this.document.selection.clearSelection();
+            return this.document.selection.setSelectedShapes([pick], VisualStates.edgeSelected, toggle);
+        }
         const models = this._highlights
             .map((x) => view.document.visual.context.getNode(x))
             .filter((x) => x !== undefined);
 
-        const click = Math.hypot(this.mouse.x - event.offsetX, this.mouse.y - event.offsetY) <= 3;
         const alreadySelected =
             click && models.length === 1 && this.document.selection.getSelectedNodes().includes(models[0]);
         return this.document.selection.setSelectedNodes(models, alreadySelected || this.toggleSelect(event));
@@ -84,24 +95,67 @@ export class NodeSelectionHandler extends SelectionHandler {
 
     protected override setHighlight(view: IView, event: PointerEvent) {
         const detecteds = this.getDetecteds(view, event);
-        this.highlightDetecteds(view, detecteds);
+        this.highlightDetecteds(view, detecteds, event);
     }
 
-    private highlightDetecteds(view: IView, detecteds: IVisualObject[]) {
+    private highlightDetecteds(view: IView, detecteds: IVisualObject[], event?: PointerEvent) {
         if (detecteds.length === 0 && !this._highlights?.length) return;
         this.cleanHighlights();
         detecteds.forEach((x) => {
+            const pick = event === undefined || this.rect ? undefined : this.subShapeAt(view, x, event);
+            if (pick !== undefined) {
+                // Only the curve under the cursor lights up, as the click will take it alone.
+                this._subShape = pick;
+                view.document.visual.highlighter.addState(
+                    x,
+                    this.highlighState,
+                    pick.shape.shapeType,
+                    ...pick.indexes,
+                );
+                return;
+            }
             view.document.visual.highlighter.addState(x, this.highlighState, ShapeTypes.shape);
         });
         this._highlights = detecteds;
         view.update();
     }
 
+    /** The part of a sub-shape-selecting node under the cursor, when the visual is such a node's. */
+    private subShapeAt(view: IView, visual: IVisualObject, event: PointerEvent): VisualShapeData | undefined {
+        const node = view.document.visual.context.getNode(visual);
+        if (!selectsSubShapes(node) || typeof view.detectShapes !== "function") return undefined;
+        const picks = view.detectShapes(
+            node.selectsSubShapes,
+            event.offsetX,
+            event.offsetY,
+            undefined,
+            this.filter,
+        );
+        const own = picks.filter((pick) => pick.owner === visual || (pick.owner.node as INode) === node);
+        // A point is the smaller target: when the cursor is on one, it wins over the curve it ends.
+        return own.find((pick) => pick.shape.shapeType === ShapeTypes.vertex) ?? own[0];
+    }
+
     protected override cleanHighlights(): void {
         this._highlights?.forEach((x) => {
+            const subShape = this._subShape;
+            if (
+                subShape !== undefined &&
+                (subShape.owner === x ||
+                    (subShape.owner.node as INode) === this.document.visual.context.getNode(x))
+            ) {
+                this.document.visual.highlighter.removeState(
+                    x,
+                    this.highlighState,
+                    subShape.shape.shapeType,
+                    ...subShape.indexes,
+                );
+                return;
+            }
             this.document.visual.highlighter.removeState(x, this.highlighState, ShapeTypes.shape);
         });
         this._highlights = undefined;
+        this._subShape = undefined;
     }
 
     protected override highlightNext(view: IView): void {

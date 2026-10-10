@@ -4,6 +4,7 @@
 import {
     CommandStore,
     Config,
+    DOCUMENT_SCHEMA_VERSION,
     DocumentVersionControl,
     documentUnits,
     type IApplication,
@@ -25,7 +26,7 @@ import {
 export function installDiagnostics(app: IApplication): IDisposable {
     OperationLog.setSessionContext({
         appVersion: __APP_VERSION__,
-        documentFormat: __DOCUMENT_VERSION__,
+        documentSchema: DOCUMENT_SCHEMA_VERSION,
         production: __IS_PRODUCTION__,
         userAgent: globalThis.navigator?.userAgent,
         language: globalThis.navigator?.language,

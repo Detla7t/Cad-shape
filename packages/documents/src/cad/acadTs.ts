@@ -19,6 +19,13 @@ interface AcadEntity {
 }
 interface AcadDocument {
     header: { version: number; insUnits: number } | null;
+    /** Drawing properties, when the port carries them. */
+    summaryInfo?: {
+        title?: string;
+        subject?: string;
+        comments?: string;
+        properties?: Map<string, string>;
+    } | null;
     layers: { tryGetValue(name: string): AcadLayer | undefined; add(layer: AcadLayer): void } | null;
     modelSpace: { entities: { add(entity: AcadEntity): void } } | null;
 }
@@ -27,7 +34,7 @@ interface AcadLayer {
 }
 interface AcadTs {
     ACadVersion: { AC1018: number };
-    UnitsType: { Millimeters: number };
+    UnitsType: { Millimeters: number; Inches: number };
     TextHorizontalAlignment: { Center: number };
     TextVerticalAlignmentType: { Middle: number };
     CadDocument: new () => AcadDocument;
@@ -67,13 +74,29 @@ export async function acadDwgToDxf(bytes: Uint8Array): Promise<Result<{ dxf: str
 
 const radians = (degrees: number) => (degrees * Math.PI) / 180;
 
-/** `drawing` (millimetres) as an AutoCAD 2004 (AC1018) DWG, units millimetres. */
-export async function drawingToDwg(drawing: Drawing): Promise<Uint8Array> {
+export interface DwgOptions {
+    /** Drawing properties, stored in the file's summary info when the writer supports it. */
+    readonly properties?: Readonly<Record<string, string>>;
+}
+
+/** `drawing` as an AutoCAD 2004 (AC1018) DWG in the drawing's units (millimetres unless `inch`). */
+export async function drawingToDwg(drawing: Drawing, options: DwgOptions = {}): Promise<Uint8Array> {
     const acad = await load();
     const document = new acad.CadDocument();
+    const properties = Object.entries(options.properties ?? {});
+    if (properties.length > 0 && document.summaryInfo) {
+        try {
+            document.summaryInfo.comments = properties.map(([key, value]) => `${key}=${value}`).join("\n");
+            document.summaryInfo.properties ??= new Map();
+            for (const [key, value] of properties) document.summaryInfo.properties.set(key, value);
+        } catch {
+            // The port carries no custom properties: the comments line above is all it keeps.
+        }
+    }
     if (document.header !== null) {
         document.header.version = acad.ACadVersion.AC1018;
-        document.header.insUnits = acad.UnitsType.Millimeters;
+        document.header.insUnits =
+            drawing.units === "inch" ? acad.UnitsType.Inches : acad.UnitsType.Millimeters;
     }
     const layers = new Map<string, AcadLayer>();
     for (const info of drawing.layers) {

@@ -7,8 +7,8 @@ import {
     safeProjectFileName,
     Transaction,
 } from "@chili3d/core";
+import { onshapeStdVersion } from "@chili3d/featurescript";
 import { FEATURE_STUDIO_EXTENSION, FeatureStudioNode } from "./featureStudioNode";
-import { onshapeStdVersion } from "./runtime";
 import { documentStudios } from "./studioCompiler";
 
 /**

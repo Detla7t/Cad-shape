@@ -328,8 +328,24 @@ describe("CameraController — fitContent", () => {
         expect(cc.target.y).toBeCloseTo(0);
         expect(cc.target.z).toBeCloseTo(0);
         expect(cc.cameraPosition.distanceTo(cc.cameraTarget)).toBeCloseTo(expectedDistance);
-        expect(cc.camera.near).toBeCloseTo(expectedDistance / 1000);
+        // the default camera is orthographic: its near plane sits as far behind it as the far plane is in front
         expect(cc.camera.far).toBeCloseTo(expectedDistance * 100);
+        expect(cc.camera.near).toBe(-cc.camera.far);
+    });
+
+    test("an orthographic view keeps what lies behind the camera plane; a perspective view clips a thousandth in", () => {
+        const view = createFakeView();
+        addBoxMesh(view, 10);
+        const cc = new CameraController(view);
+        cc.fitContent();
+        const distance = cc.cameraPosition.distanceTo(cc.cameraTarget);
+        expect(cc.camera.near).toBe(-cc.camera.far);
+        expect(cc.camera.far).toBeCloseTo(Math.max(1000, distance * 100));
+        cc.cameraType = "perspective";
+        expect(cc.camera.near).toBeCloseTo(distance / 1000);
+        expect(cc.camera.far).toBeCloseTo(Math.max(1000, distance * 100));
+        cc.cameraType = "orthographic";
+        expect(cc.camera.near).toBe(-cc.camera.far);
     });
 
     test("fitContent frames the bounding sphere of the scene content", () => {

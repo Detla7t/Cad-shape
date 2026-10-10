@@ -68,31 +68,32 @@ test("variable table sections fold independently, preserve draft cells and track
     const panel = new VariableTablePanel(doc);
     window.document.body.append(panel.element);
     try {
+        // Onshape's order: the Variable Studios, then the Part Studio's own variables.
         const sections = panel.element.querySelectorAll<HTMLButtonElement>(".v-section-toggle");
         expect(sections).toHaveLength(2);
-        expect(sections[0].textContent).toContain(I18n.translate("elements.partStudio{0}", 1));
-        expect(sections[1].textContent).toContain("Stock");
+        expect(sections[0].textContent).toContain("Stock");
+        expect(sections[1].textContent).toContain(I18n.translate("elements.partStudio{0}", 1));
         const tables = panel.element.querySelectorAll<HTMLElement>(".v-table");
         expect(tables).toHaveLength(2);
-        const draft = mustQuery<HTMLInputElement>(tables[0], ".v-value");
+        const draft = mustQuery<HTMLInputElement>(tables[1], ".v-value");
         draft.value = "width *";
-        sections[0].click();
-        expect(sections[0].getAttribute("aria-expanded")).toBe("false");
-        expect(tables[0].hidden).toBe(true);
-        expect(tables[1].hidden).toBe(false);
-        sections[0].click();
+        sections[1].click();
+        expect(sections[1].getAttribute("aria-expanded")).toBe("false");
+        expect(tables[1].hidden).toBe(true);
         expect(tables[0].hidden).toBe(false);
-        expect(mustQuery<HTMLInputElement>(tables[0], ".v-value")).toBe(draft);
+        sections[1].click();
+        expect(tables[1].hidden).toBe(false);
+        expect(mustQuery<HTMLInputElement>(tables[1], ".v-value")).toBe(draft);
         expect(draft.value).toBe("width *");
         draft.focus();
         studio.name = "Material";
-        expect(sections[1].textContent).toContain("Material");
-        sections[1].click();
+        expect(sections[0].textContent).toContain("Material");
+        sections[0].click();
         doc.modelManager.addNode(new VariableStudioNode({ document: doc, name: "Dimensions" }));
         expect(panel.element.querySelectorAll(".v-section-toggle")).toHaveLength(3);
-        expect(panel.element.querySelector(".v-value")).toBe(draft);
+        expect(tables[1].querySelector(".v-value")).toBe(draft);
         expect(draft.value).toBe("width *");
-        expect(tables[1].hidden).toBe(true);
+        expect(tables[0].hidden).toBe(true);
     } finally {
         panel.dispose();
         panel.element.remove();
@@ -100,8 +101,9 @@ test("variable table sections fold independently, preserve draft cells and track
     const reopened = new VariableTablePanel(doc);
     try {
         const tables = reopened.element.querySelectorAll<HTMLElement>(".v-table");
-        expect(tables[0].hidden).toBe(false);
-        expect(tables[1].hidden).toBe(true);
+        expect(tables).toHaveLength(3);
+        expect(tables[0].hidden).toBe(true);
+        expect(tables[2].hidden).toBe(false);
         expect(doc.variables.items[0].expression).toBe("10");
     } finally {
         reopened.dispose();

@@ -3,8 +3,11 @@
 
 import {
     ANGLE_UNITS,
+    type EvaluatedValue,
+    type ExpressionArgument,
     type FeatureParameter,
     type FeaturePickKind,
+    type FunctionVariable,
     findDataTable,
     type IDocument,
     type IFace,
@@ -22,8 +25,37 @@ import {
     selectConfiguredArm,
     UNITLESS,
     type UnitSpec,
+    unitSpecEquals,
+    type VariableData,
     XYZ,
 } from "@chili3d/core";
+import {
+    ANGLE,
+    describeError,
+    type EntityRef,
+    type FeatureExport,
+    type FeatureSpec,
+    FsArray,
+    type FsBody,
+    type FsCallable,
+    type FsContext,
+    FsMap,
+    type FsParameterSpec,
+    FsQuantity,
+    type FsValue,
+    type Interpreter,
+    isCallable,
+    isParameterVisible,
+    LENGTH,
+    MM_PER_METER,
+    makePlaneData,
+    query,
+    runFeature,
+    toKernelPlane,
+    transientQuery,
+    type Units,
+    type Vec3,
+} from "@chili3d/featurescript";
 import { matchEdgeIndexes, matchEdgesAnchored } from "../features/edgeMatcher";
 import type { EdgeRef } from "../features/edgeRef";
 import {
@@ -35,23 +67,11 @@ import {
     type FeatureScriptParameterValue,
     type FeatureScriptPlaneRef,
     type FeatureScriptQueryValue,
+    type FeatureVariables,
     registerFeature,
     type ShapeTracking,
 } from "../features/feature";
 import { captureFaceFingerprint } from "../features/historyCompletion";
-import {
-    type EntityRef,
-    type FsBody,
-    type FsContext,
-    MM_PER_METER,
-    toKernelPlane,
-} from "./context/fsContext";
-import { query, transientQuery } from "./context/queries";
-import { type FeatureSpec, type FsParameterSpec, isParameterVisible } from "./featureSpec";
-import type { FeatureExport } from "./lang/interpreter";
-import { ANGLE, FsArray, FsMap, FsQuantity, type FsValue, LENGTH } from "./lang/values";
-import { describeError, runFeature } from "./runtime";
-import { makePlaneData, type Vec3 } from "./std/geometry";
 import {
     type CompiledStudio,
     compileDocumentStudio,
@@ -59,6 +79,8 @@ import {
     studioDependencies,
     studioToken,
 } from "./studioCompiler";
+// The engine runs here with parametric's history completion, sketch solver and loop rules.
+import "./modelingHost";
 
 /**
  * The `featurescript` feature: runs one custom feature of a Feature Studio against the
@@ -261,8 +283,13 @@ function convertValue(
  */
 export function documentVariables(scope: Scope): Map<string, FsValue> {
     const variables = new Map<string, FsValue>();
-    for (const [name, { value, unit, option }] of scope) {
+    for (const [name, { value, unit, option, native }] of scope) {
         if (option !== undefined) continue;
+        // A function another feature stored goes back as the closure it was.
+        if (native !== undefined) {
+            variables.set(name, native as FsValue);
+            continue;
+        }
         if (unit.length === 1 && unit.angle === 0)
             variables.set(name, new FsQuantity(value / MM_PER_METER, LENGTH));
         else if (unit.angle === 1 && unit.length === 0)
@@ -510,13 +537,15 @@ function evaluateFeatureScript(feature: FeatureScriptFeatureData, context: Featu
     let anchorsComplete = true;
 
     let run: ReturnType<typeof runFeature>;
+    // One map for the run and for telling the stored variables from the seeded ones by identity.
+    const seeded = documentVariables(context.scope);
     try {
         run = runFeature({
             interpreter,
             feature: exported,
             input: context.input,
             instanceId: instanceIdOf(feature),
-            variables: documentVariables(context.scope),
+            variables: seeded,
             configurationVariables: configurationVariableNames(context.scope),
             dataTables: (reference) => findDataTable(context.document, reference),
             definition: (fsContext) =>
@@ -534,7 +563,24 @@ function evaluateFeatureScript(feature: FeatureScriptFeatureData, context: Featu
     }
     try {
         const bodies = run.bodies;
-        if (bodies.length === 0) return Result.err(`"${spec.displayName}" produced no geometry`);
+        const stored = storedVariables(run.context, interpreter, seeded);
+        if (stored !== undefined) context.setVariables?.(stored);
+        if (bodies.length === 0) {
+            // A feature that stores variables and draws nothing (Onshape's "Add My Functions")
+            // passes the chain through: its input, or an empty compound at the head.
+            if (stored === undefined) return Result.err(`"${spec.displayName}" produced no geometry`);
+            const passthrough =
+                context.input === undefined
+                    ? shapeFactory.combine([])
+                    : Result.ok(context.input.transformedMul(Matrix4.identity()));
+            if (!passthrough.isOk) return passthrough;
+            if (tracking !== undefined) {
+                tracking.outputFaceIds = [...tracking.inputFaceIds];
+                tracking.outputEdgeIds = [...tracking.inputEdgeIds];
+            }
+            run.context.dispose([passthrough.value]);
+            return passthrough;
+        }
         const shape = outputShape(bodies, context.input);
         if (!shape.isOk) return shape;
         if (tracking !== undefined) {
@@ -548,6 +594,86 @@ function evaluateFeatureScript(feature: FeatureScriptFeatureData, context: Featu
         run.context.dispose();
         return Result.err(describeError(error).error);
     }
+}
+
+/**
+ * The variables the run stored with `setVariable` — those the context did not start with —
+ * as variable-table rows: a quantity in the app's units, a number, or a `function` row whose
+ * value calls the FeatureScript closure (arguments in, result out, through the std's own
+ * representation of quantities). Undefined when the run stored nothing.
+ */
+function storedVariables(
+    context: FsContext,
+    interpreter: Interpreter,
+    seeded: ReadonlyMap<string, FsValue>,
+): FeatureVariables | undefined {
+    const items: VariableData[] = [];
+    const functions = new Map<string, FunctionVariable>();
+    for (const [name, raw] of context.variables) {
+        if (seeded.get(name) === raw) continue;
+        const id = `fs:${name}`;
+        if (isCallable(raw)) {
+            items.push({ id, name, type: "function", expression: "function" });
+            functions.set(name, { native: raw, call: (args) => callStored(interpreter, name, raw, args) });
+            continue;
+        }
+        const value = interpreter.adaptStdValue(raw);
+        if (typeof value === "number") items.push({ id, name, type: "unitless", expression: String(value) });
+        else if (value instanceof FsQuantity && isLength(value.units))
+            items.push({ id, name, type: "length", expression: `${value.value * MM_PER_METER} mm` });
+        else if (value instanceof FsQuantity && isAngle(value.units))
+            items.push({ id, name, type: "angle", expression: `${(value.value * 180) / Math.PI} deg` });
+        // Other values (maps, strings, queries) are FeatureScript's own; the table has no row for them.
+    }
+    return items.length === 0 ? undefined : { items, functions };
+}
+
+const isLength = (units: Units) =>
+    units.meter === 1 && units.radian === 0 && units.kilogram === 0 && units.second === 0;
+const isAngle = (units: Units) =>
+    units.meter === 0 && units.radian === 1 && units.kilogram === 0 && units.second === 0;
+
+/** `#f(a, b)` from an expression: arguments to FeatureScript quantities, the result back. */
+function callStored(
+    interpreter: Interpreter,
+    name: string,
+    fn: FsCallable,
+    args: readonly ExpressionArgument[],
+): Result<EvaluatedValue> {
+    const values: FsValue[] = [];
+    for (const arg of args) {
+        if (typeof arg === "string") {
+            values.push(arg);
+            continue;
+        }
+        if (arg.native !== undefined) values.push(arg.native as FsValue);
+        else if (arg.unit.length === 1 && arg.unit.angle === 0)
+            values.push(interpreter.adaptHostValue(new FsQuantity(arg.value / MM_PER_METER, LENGTH)));
+        else if (arg.unit.angle === 1 && arg.unit.length === 0)
+            values.push(interpreter.adaptHostValue(new FsQuantity((arg.value * Math.PI) / 180, ANGLE)));
+        else if (unitSpecEquals(arg.unit, UNITLESS)) values.push(arg.value);
+        else return Result.err(`${name}() takes lengths, angles and numbers`);
+    }
+    let result: FsValue;
+    try {
+        result = interpreter.adaptStdValue(interpreter.callFunction(fn, values));
+    } catch (error) {
+        return Result.err(describeError(error).error);
+    }
+    if (typeof result === "number") return Result.ok({ value: result, unit: UNITLESS });
+    if (typeof result === "boolean") return Result.ok({ value: result ? 1 : 0, unit: UNITLESS });
+    if (result instanceof FsQuantity && isLength(result.units))
+        return Result.ok({ value: result.value * MM_PER_METER, unit: LENGTH_UNITS });
+    if (result instanceof FsQuantity && isAngle(result.units))
+        return Result.ok({ value: (result.value * 180) / Math.PI, unit: ANGLE_UNITS });
+    if (isCallable(result))
+        return Result.ok({
+            value: Number.NaN,
+            unit: UNITLESS,
+            native: result,
+            call: (inner) => callStored(interpreter, name, result, inner),
+        });
+    return Result.err(`${name}() returned a value an expression cannot hold`);
 }
 
 /** A FeatureScript-safe Id component for this feature instance. */

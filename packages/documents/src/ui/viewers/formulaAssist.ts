@@ -6,8 +6,8 @@ import {
     type FormulaCompletion,
     formulaArgumentHelp,
     formulaCompletion,
-} from "../../sheet/formulaSuggestions";
-import { FUNCTION_INFO } from "../../sheet/functionInfo";
+} from "@chili3d/sheet/formulaSuggestions";
+import { FUNCTION_INFO } from "@chili3d/sheet/functionInfo";
 import style from "../spreadsheet.module.css";
 
 let nextId = 0;

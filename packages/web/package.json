@@ -11,6 +11,7 @@
     },
     "dependencies": {
         "@chili3d/builder": "*",
+        "@chili3d/core": "*",
         "@chili3d/react": "*",
         "next": "^16.4.0",
         "react": "^19.2.8",

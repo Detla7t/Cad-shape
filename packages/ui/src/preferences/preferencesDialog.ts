@@ -5,11 +5,15 @@ import {
     type CommandKeys,
     CommandStore,
     Config,
+    DEFAULT_AUTOMATION_PREFERENCES,
+    DEFAULT_DESKTOP_PREFERENCES,
     DEFAULT_GRAPHICS,
+    type DesktopBridgeInfo,
     type DocumentUnits,
     defaultUserPreferences,
     documentQuantityUnits,
     documentUnits,
+    EXPORT_NAME_PLACEHOLDER,
     effectiveShortcuts,
     formatShortcutKey,
     I18n,
@@ -19,6 +23,7 @@ import {
     Navigation3D,
     Navigation3DTypes,
     PubSub,
+    probeDesktopBridge,
     QUANTITY_UNITS,
     type QuantityKind,
     type QuantityPreferences,
@@ -30,6 +35,8 @@ import {
     type UserPreferences,
 } from "@chili3d/core";
 import { createCadIcon } from "@chili3d/element";
+import { automationSession } from "../automation/automationSession";
+import { exportDelivery } from "../desktop/exportDelivery";
 import { RibbonCustomization, toolCategories } from "../ribbon/customization";
 import style from "./preferencesDialog.module.css";
 import { defaultShortcutTools, shortcutBindingCommand, shortcutCategory } from "./shortcutToolbar";
@@ -135,12 +142,15 @@ export class PreferencesDialog {
         this.mouse();
         this.environment();
         this.assembly();
+        this.modelTree();
         this.saving();
         this.shortcuts();
         this.toolbars();
         this.drawings();
         this.materials();
         this.exports();
+        this.desktop();
+        this.automation();
         const labs = this.section("labs", "Chili3D Labs");
         labs.append(note("No experimental features are currently installed."));
     }
@@ -500,6 +510,36 @@ export class PreferencesDialog {
         });
     }
 
+    private modelTree() {
+        const section = this.section("tree", "Model tree");
+        const owners = choice(
+            "Colour features by what uses them",
+            [
+                ["off", "Off"],
+                ["solid", "Per solid (each sketch or body)"],
+                ["part", "Per part (each top-level part)"],
+            ],
+            Config.instance.preferences.treeOwnerColors,
+        );
+        section.append(field("Colour features by what uses them", owners));
+        section.append(
+            note(
+                "Each owner takes a colour and a lane on the left of the tree; a feature shows a bar for every owner that uses it, so bars of different owners never share a lane.",
+            ),
+        );
+        const timeline = check(
+            "Show the timeline under the viewport",
+            Config.instance.preferences.showTimeline,
+        );
+        section.append(timeline.row);
+        this.save(section, "Save model tree settings", () =>
+            patchPreferences({
+                treeOwnerColors: owners.value as "off" | "solid" | "part",
+                showTimeline: timeline.input.checked,
+            }),
+        );
+    }
+
     private assembly() {
         const section = this.section("assembly", "Assembly settings");
         const props = check(
@@ -808,7 +848,7 @@ export class PreferencesDialog {
         const list = element("div");
         section.append(
             note(
-                "Customize CAD export filenames. Use {name} for the part or drawing name and {date} for today’s date. The file extension is added automatically.",
+                "Customize CAD export filenames. Use {name} for the part or drawing name, {date} for today’s date, {document} for the document, {format} for the file type, {#variable} for a variable’s value and {config:Input} or {config} for the active configuration. The file extension is added automatically.",
             ),
             list,
         );
@@ -857,10 +897,122 @@ export class PreferencesDialog {
         const dirty = this.save(section, "Save export rules", () => {
             if (new Set(rules.map((rule) => rule.extension)).size !== rules.length)
                 throw new Error("Use one rule per export format.");
-            if (rules.some((rule) => !rule.template.trim() || /\{(?!name\}|date\})/.test(rule.template)))
-                throw new Error("Use a filename with {name} and/or {date} placeholders.");
+            // Every `{…}` must be a known placeholder: name, date, document, format, a variable, a configuration input.
+            if (
+                rules.some(
+                    (rule) =>
+                        !rule.template.trim() ||
+                        rule.template.replace(EXPORT_NAME_PLACEHOLDER, "").includes("{"),
+                )
+            )
+                throw new Error(
+                    "Use a filename with {name}, {date}, {document}, {format}, {#variable}, {config:Input} or {config} placeholders.",
+                );
             patchPreferences({ exportRules: rules });
         });
         render();
+    }
+
+    private desktop() {
+        const section = this.section("desktop", "Desktop apps");
+        const current = Config.instance.preferences.desktop;
+        const url = element("input");
+        url.value = current.bridgeUrl;
+        url.placeholder = DEFAULT_DESKTOP_PREFERENCES.bridgeUrl;
+        url.setAttribute("aria-label", "Desktop bridge URL");
+        const auto = check(
+            "Open exports in the desktop app automatically: the bridge saves the file to its folder and opens it in the default program instead of a browser download.",
+            current.openExports,
+        );
+        const status = element("p", "", style.note);
+        status.setAttribute("role", "status");
+        const describe = (info: DesktopBridgeInfo) =>
+            `Connected. Exports are saved to ${info.exportsDir}. Programs found: ${
+                info.apps.map((app) => app.name).join(", ") || "none (the default program only)"
+            }.`;
+        const probe = action("Check connection", async () => {
+            status.textContent = "Checking…";
+            const result = await probeDesktopBridge(url.value, { timeoutMs: 3000 });
+            status.textContent = result.isOk ? describe(result.value) : `Not connected: ${result.error}`;
+        });
+        const row = element("div", "", style.actions);
+        row.append(probe);
+        section.append(
+            note(
+                'Run "node scripts/desktop-bridge.mjs" on this computer and exported files can open in FreeCAD, PrusaSlicer, Bambu Studio, OrcaSlicer, Cura, LibreCAD, Inkscape, … or in the system\'s default program. After each export a message offers the programs the bridge found.',
+            ),
+            field("Bridge URL", url),
+            auto.row,
+            row,
+            status,
+        );
+        this.save(section, "Save desktop settings", () => {
+            const bridgeUrl = url.value.trim().replace(/\/+$/, "") || DEFAULT_DESKTOP_PREFERENCES.bridgeUrl;
+            let parsed: URL;
+            try {
+                parsed = new URL(bridgeUrl);
+            } catch {
+                throw new Error("Enter the bridge URL, e.g. http://127.0.0.1:7781.");
+            }
+            if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+                throw new Error("The bridge URL must start with http:// or https://.");
+            }
+            url.value = bridgeUrl;
+            patchPreferences({ desktop: { bridgeUrl, openExports: auto.input.checked } });
+            exportDelivery.refresh();
+        });
+    }
+
+    private automation() {
+        const section = this.section("automation", "Automation");
+        const current = Config.instance.preferences.automation;
+        const url = element("input");
+        url.value = current.bridgeUrl;
+        url.placeholder = DEFAULT_AUTOMATION_PREFERENCES.bridgeUrl;
+        url.setAttribute("aria-label", "Automation bridge URL");
+        const enabled = check(
+            "Let the local automation bridge drive this app: Claude Code (or a shell with the bridge's token) can then use every tool the in-app assistant has, click and type in the UI, move the camera and run scripts in this tab.",
+            current.enabled,
+        );
+        const status = element("p", "", style.note);
+        status.setAttribute("role", "status");
+        const describe = () => {
+            const state = automationSession.state;
+            status.textContent =
+                state === "connected"
+                    ? "Connected to the bridge."
+                    : state === "connecting"
+                      ? "Waiting for the bridge (start it with npm run automation, or let Claude Code start it)."
+                      : "Off.";
+        };
+        describe();
+        section.append(
+            note(
+                'Run "npm run automation" (or open Claude Code in the project, which starts it from .mcp.json). Adding ?automation=1 to the address enables it for one session only. A badge shows while the bridge is connected, with a Disconnect button.',
+            ),
+            field("Bridge URL", url),
+            enabled.row,
+            status,
+        );
+        this.save(section, "Save automation settings", () => {
+            const bridgeUrl =
+                url.value.trim().replace(/\/+$/, "") || DEFAULT_AUTOMATION_PREFERENCES.bridgeUrl;
+            let parsed: URL;
+            try {
+                parsed = new URL(bridgeUrl);
+            } catch {
+                throw new Error("Enter the bridge URL, e.g. http://127.0.0.1:7782.");
+            }
+            if (
+                parsed.protocol !== "http:" ||
+                !["127.0.0.1", "localhost", "[::1]"].includes(parsed.hostname)
+            ) {
+                throw new Error("The automation bridge runs on this computer: use http://127.0.0.1:<port>.");
+            }
+            url.value = bridgeUrl;
+            patchPreferences({ automation: { bridgeUrl, enabled: enabled.input.checked } });
+            automationSession.apply();
+            describe();
+        });
     }
 }

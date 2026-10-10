@@ -2,16 +2,20 @@
 // See LICENSE file in the project root for full license information.
 
 import type { IDisposable, IDocument } from "@chili3d/core";
-import { analyzeFeature, analyzeTable, type FeatureSpec } from "./featureSpec";
-import { FeatureStudioNode } from "./featureStudioNode";
 import {
+    analyzeFeature,
+    analyzeTable,
+    createInterpreter,
+    describeError,
     type FeatureExport,
+    type FeatureSpec,
+    featureScriptRuntimeRevision,
     Interpreter,
     type ModuleInstance,
     type ModuleSource,
     type TableExport,
-} from "./lang/interpreter";
-import { createInterpreter, describeError, featureScriptRuntimeRevision } from "./runtime";
+} from "@chili3d/featurescript";
+import { FeatureStudioNode } from "./featureStudioNode";
 
 /**
  * Compiles the Feature Studios of a document, cached by source. A studio imports another

@@ -12,6 +12,25 @@ export function isHistoryHidden(node: INode): boolean {
 export function setHistoryHidden(document: IDocument, node: INode, value: boolean): void {
     if (value) hidden.add(node);
     else hidden.delete(node);
+    refreshHistoryVisibility(document);
+}
+
+/** Sets several nodes at once with one visibility pass; nothing happens when none changes. */
+export function setHistoryHiddenNodes(
+    document: IDocument,
+    changes: Iterable<readonly [node: INode, hidden: boolean]>,
+): void {
+    let changed = false;
+    for (const [node, value] of changes) {
+        if (hidden.has(node) === value) continue;
+        if (value) hidden.add(node);
+        else hidden.delete(node);
+        changed = true;
+    }
+    if (changed) refreshHistoryVisibility(document);
+}
+
+function refreshHistoryVisibility(document: IDocument): void {
     for (const candidate of document.modelManager.findNodes())
         document.visual.context.setVisible(
             candidate,

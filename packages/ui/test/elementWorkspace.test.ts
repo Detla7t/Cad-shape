@@ -4,6 +4,7 @@
 import {
     type CommandKeys,
     type DialogButton,
+    EditorBuffers,
     type I18nKeys,
     type IApplication,
     type IDisposable,
@@ -15,6 +16,7 @@ import {
     Node,
     openElement,
     PubSub,
+    Result,
     registerElementKind,
     registerElementView,
     serializable,
@@ -44,6 +46,7 @@ rs.mock("../src/elements/elements.module.css", () => ({
     frame: "el-frame",
     placeholder: "el-placeholder",
     confirm: "el-confirm",
+    unsaved: "el-unsaved",
     variableStudio: "el-variable-studio",
     studioHeader: "el-studio-header",
     studioIcon: "el-studio-icon",
@@ -639,10 +642,18 @@ describe("renaming, duplicating and deleting from the strip", () => {
             mustQuery<HTMLButtonElement>(strip, ".el-add").click();
             const menu = mustQuery<HTMLElement>(document.body, ".el-menu");
             const labels = [...menu.querySelectorAll(".el-menu-item")].map((item) => item.textContent);
-            expect(labels).toContain("command.featurescript.newStudio");
-            expect(labels).toContain("command.variable.newStudio");
+            // "Create <kind>" rows: the applications first, then the core elements.
+            expect(labels).toContain("elements.createfeaturescript.studio");
+            expect(labels).toContain("elements.createelements.variableStudio");
+            expect(labels.indexOf("elements.createfeaturescript.studio")).toBeLessThan(
+                labels.indexOf("elements.createelements.variableStudio"),
+            );
+            const partStudio = [...menu.querySelectorAll<HTMLElement>(".el-menu-item")].find((item) =>
+                item.textContent?.includes("elements.partStudio"),
+            );
+            expect(partStudio?.title).toBe("elements.partStudio.one");
 
-            menuItem(menu, "command.variable.newStudio").click();
+            menuItem(menu, "elements.createelements.variableStudio" as I18nKeys).click();
             expect(executed).toEqual(["variable.newStudio"]);
         } finally {
             PubSub.default.remove("executeCommand", capture);
@@ -699,5 +710,105 @@ describe("the Variable Studio element", () => {
         expect(row.classList.contains("v-warning-row")).toBe(false);
         expect(mustQuery<HTMLInputElement>(row, ".v-value").value).toBe("40");
         expect(doc.variables.evaluate().warnings.get("t1")).toBe("Shadows w from Variable Studio 1");
+    });
+});
+
+describe("unsaved editor drafts on the element tabs", () => {
+    /** A draft held by a script element's editor. */
+    function draftOf(doc: TestDocument, node: INode) {
+        const state = { draft: "saved", committed: "saved" };
+        const buffer = {
+            document: doc as IDocument,
+            node,
+            editor: "script",
+            isDirty: () => state.draft !== state.committed,
+            commit: async () => {
+                state.committed = state.draft;
+                return Result.ok(undefined);
+            },
+            revert: () => {
+                state.draft = state.committed;
+            },
+        };
+        const registration = EditorBuffers.register(buffer);
+        registrations.push(registration);
+        return {
+            state,
+            buffer,
+            type: (text: string) => {
+                state.draft = text;
+                registration.changed();
+            },
+        };
+    }
+
+    function captureDialogs() {
+        const dialogs: { title: I18nKeys; content: HTMLElement; buttons: DialogButton[] }[] = [];
+        const capture = (title: I18nKeys, content: HTMLElement, buttons?: DialogButton[] | (() => void)) => {
+            dialogs.push({ title, content, buttons: buttons as DialogButton[] });
+        };
+        PubSub.default.sub("showDialog", capture);
+        return { dialogs, dispose: () => PubSub.default.remove("showDialog", capture) };
+    }
+
+    const marked = (strip: HTMLElement, id: string) => tabOf(strip, id).querySelector(".el-unsaved") !== null;
+
+    test("a tab is marked while its editor holds unsaved edits", async () => {
+        const { doc, strip } = setup();
+        const script = add(doc, new ScriptNode({ document: doc, name: "Script 1" }));
+        const draft = draftOf(doc, script);
+        expect(marked(strip, script.id)).toBe(false);
+
+        draft.type("edited");
+        expect(marked(strip, script.id)).toBe(true);
+        expect(marked(strip, PART_STUDIO_ID)).toBe(false);
+
+        await draft.buffer.commit();
+        draft.type("edited");
+        expect(marked(strip, script.id)).toBe(false);
+    });
+
+    test("deleting an element with unsaved edits says so, and discards them", async () => {
+        const { doc, strip, workspace } = setup();
+        const script = add(doc, new ScriptNode({ document: doc, name: "Script 1" }));
+        const draft = draftOf(doc, script);
+        draft.type("edited");
+        const { dialogs, dispose } = captureDialogs();
+        try {
+            workspace.confirmDelete(script);
+            expect(dialogs[0].content.textContent).toBe(
+                "elements.delete.unsaved{0}".replace("{0}", "Script 1"),
+            );
+            await dialogs[0].buttons.find((button) => button.content === "common.confirm")?.onclick?.();
+        } finally {
+            dispose();
+        }
+        expect(draft.state.draft).toBe("saved");
+        expect(tabNames(strip)).toEqual(["elements.partStudio1"]);
+    });
+
+    test("while connected, unsaved edits are asked about with Save / Discard / Cancel dialogs", async () => {
+        const { doc } = setup();
+        const script = add(doc, new ScriptNode({ document: doc, name: "Script 1" }));
+        const draft = draftOf(doc, script);
+        draft.type("edited");
+        const { dialogs, dispose } = captureDialogs();
+        try {
+            const decision = EditorBuffers.ask([draft.buffer]);
+            expect(dialogs).toHaveLength(1);
+            expect(dialogs[0].title).toBe("editorBuffers.unsaved.title");
+            expect(dialogs[0].content.textContent).toBe(
+                "editorBuffers.unsaved{0}".replace("{0}", "Script 1"),
+            );
+            expect(dialogs[0].buttons.map((button) => button.content)).toEqual([
+                "editorBuffers.save",
+                "editorBuffers.discard",
+                "common.cancel",
+            ]);
+            await dialogs[0].buttons[1].onclick?.();
+            expect(await decision).toBe("discard");
+        } finally {
+            dispose();
+        }
     });
 });

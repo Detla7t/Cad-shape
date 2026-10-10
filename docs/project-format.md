@@ -32,7 +32,7 @@ Paths use `/`, are relative, never contain `..`. Text files are UTF-8.
   "app": { "name": "Chili3D", "version": "0.7.1" },
   "createdAt": "2026-10-07T12:00:00.000Z",     // kept across saves
   "modifiedAt": "2026-10-07T12:30:00.000Z",
-  "document": { "id": "…", "name": "Duct job", "version": "0.7.1" },  // version = document schema
+  "document": { "id": "…", "name": "Duct job", "version": "0.7.1", "schemaVersion": 1 },  // see "Document schema"
   "featureScript": { "std": "onshape", "version": 3083 },  // only when Onshape's std is in use
   "elements": [                                  // the document's tabs
     { "id": "<root node id>", "kind": "partStudio", "name": "Duct job" },
@@ -108,7 +108,72 @@ file without any extra machinery.
 - Unknown entries and unknown manifest fields are ignored (forward compatibility).
   `formatVersion` changes only for changes an older reader cannot safely ignore.
 - Caches under `geometry/` are never read back; Chili3D always rebuilds from the features.
-- `document.version` is checked by the document loader as for `.cd` files.
+- The document itself is checked and migrated by the document loader as for `.cd` files and
+  the browser's document store (see "Document schema" below); a document with a newer schema
+  is refused with a message.
+
+## Document schema
+
+`document.json` (like a `.cd` file and every document in the browser's IndexedDB store) is
+`Document.serialize()` and starts with three version fields, separate from the archive's
+`formatVersion`:
+
+```jsonc
+{
+  "__cla$$__": "Document",
+  "version": "0.7.1",      // legacy marker, see below
+  "schemaVersion": 1,      // the document schema (DOCUMENT_SCHEMA_VERSION in @chili3d/core)
+  "appVersion": "0.7.1",   // the application that wrote it — informational only
+  "id": "…", "name": "…", "models": { … }, "variables": [ … ], "acts": [], "userData": { … }
+}
+```
+
+- `schemaVersion` is the only field the loader decides on. It changes with the serialized
+  form of a document, never with the application's version. A document without it is a
+  schema-1 document when `version` is `"0.7.1"` (every build before the field existed wrote
+  exactly that), and refused otherwise.
+- `version` is kept for builds that predate `schemaVersion`: they open a document only when
+  `version` is exactly `"0.7.1"`. Schema-1 documents keep writing it; a document of schema n ≥ 2
+  writes `"schema-n"` there, so those builds refuse it instead of misreading it.
+- **Newer schema → refused.** A document whose `schemaVersion` is above what the build reads
+  does not load at all (opening a file returns the reason; opening from the document store
+  shows it), so it can never be loaded partially and saved back over in an older form. Every
+  loader goes through `prepareDocumentForLoad` (`Document.load`, `.chili3d`/`.cd` open, link
+  sources and detached documents).
+- **Older schema → migrated.** Migrations are pure functions over the serialized JSON,
+  registered by any package through core:
+
+  ```ts
+  import { registerDocumentMigration } from "@chili3d/core";
+
+  registerDocumentMigration({
+      version: 2,                                  // the schema it produces
+      id: "parametric: <what changes>",            // unique; named in errors
+      migrate: (document) => { /* edit a private copy */ return document; },
+  });
+  ```
+
+  On load the migrations above the document's schema run in order (by `version`, then by
+  registration) on a copy, before anything is deserialized; the result is stamped with the
+  current schema. A migration may only target 2…`DOCUMENT_SCHEMA_VERSION`, so a schema change
+  bumps that constant in core together with its migration(s).
+- Golden documents for every schema live in `packages/builder/test/fixtures/documents/`
+  (`schema-<n>.json`); `documentFixtures.kernel.test.ts` loads each of them (through the
+  migrations) and checks that the current one serializes back exactly. A schema bump adds
+  the new fixture and keeps the old ones.
+
+### Serialized type ids
+
+Every object in the document carries its type in `__cla$$__`. A class declares the
+identifier as a string literal — `@serializable({ id: "ParametricBodyNode" })` — so saved
+documents do not depend on runtime class names (which minification would change); existing
+classes use their current class name as id, which is what saved documents already hold.
+`aliases: ["OldName"]` adds identifiers a class is also read by (after a rename). Changing
+the identifier an existing class *writes* is a schema change: older builds would not know the
+new identifier, and registries keyed by it (`registerProjectSourceElement`, version-control
+property splitters) must follow — bump the schema, keep the old name as an alias, and let a
+migration rename it. `serializedTypeId(objectOrClass)` gives the written identifier; use it
+instead of `constructor.name` for anything keyed by serialized type.
 
 ## Extension folders (`ProjectEntryProvider`)
 

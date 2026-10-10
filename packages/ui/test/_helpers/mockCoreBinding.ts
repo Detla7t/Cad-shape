@@ -22,8 +22,15 @@ rs.mock("@chili3d/core", () => {
         isNodeScenelessMock,
         isNodeWarningMock,
     } = rs.hoisted(() => require("./coreMocks"));
+    // The tree's evaluation indicator: the partial `actual` snapshot can miss these.
+    const evaluationState = rs.hoisted(() => require("../../../core/src/model/evaluationState"));
+    const featureEvaluation = rs.hoisted(() => require("../../../core/src/model/featureEvaluation"));
+    const { ShapeNode } = rs.hoisted(() => require("../../../core/src/model/shapeNode"));
     return {
         ...actual,
+        ...evaluationState,
+        ...featureEvaluation,
+        ShapeNode,
         Binding: BindingMock,
         Transaction: TransactionMock,
         FolderNode: FolderNodeMock,

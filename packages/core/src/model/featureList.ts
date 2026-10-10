@@ -125,6 +125,11 @@ export interface FeatureItem {
     readonly reselectable?: boolean;
     /** Nodes this feature holds (e.g. its sketch), shown as link rows above the parameters. */
     readonly references?: readonly FeatureReference[];
+    /**
+     * Ids of every node the feature reads when it rebuilds (its sketches, boolean tools) — a
+     * superset of `references`. The Part Studio timeline orders the feature after them.
+     */
+    readonly nodeIds?: readonly string[];
     readonly parameters: readonly FeatureParameter[];
 }
 

@@ -45,7 +45,7 @@ export interface EndCapSketchNodeOptions extends Omit<SketchNodeOptions, "plane"
  * editor last until the configuration changes the cap. A linked drawing element (the
  * template's "End Cap Drawing") is rewritten with the cut-ready DXF on every regeneration.
  */
-@serializable()
+@serializable({ id: "EndCapSketchNode" })
 export class EndCapSketchNode extends SketchNode {
     private _error: string | undefined;
 

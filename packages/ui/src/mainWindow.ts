@@ -14,6 +14,8 @@ import {
     type RibbonTabProfile,
     VisualConfig,
 } from "@chili3d/core";
+import { automationSession } from "./automation/automationSession";
+import { exportDelivery } from "./desktop/exportDelivery";
 import { showDialog } from "./dialog";
 import { Editor } from "./editor";
 import { showFloatPanel } from "./floatPanel";
@@ -89,6 +91,10 @@ export class MainWindow extends HTMLElement implements IWindow {
         const displayHome = debounce(this.displayHome, 100);
         PubSub.default.sub("showToast", Toast.info);
         PubSub.default.sub("displayError", Toast.error);
+        // Exports go to the desktop bridge when it runs, or download with "Open in …" offers.
+        exportDelivery.install();
+        // The automation bridge, when the user enabled it (Preferences or ?automation=1).
+        automationSession.install(app);
         PubSub.default.sub("showDialog", showDialog);
         PubSub.default.sub("showFloatPanel", showFloatPanel);
         PubSub.default.sub("showPermanent", Permanent.show);

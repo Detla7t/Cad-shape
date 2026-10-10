@@ -22,7 +22,7 @@ export interface RegularPolygonOptions {
     sides: number;
 }
 
-@serializable()
+@serializable({ id: "RegularPolygonNode" })
 export class RegularPolygonNode extends FacebaseNode {
     override display(): I18nKeys {
         return "body.regularPolygon";

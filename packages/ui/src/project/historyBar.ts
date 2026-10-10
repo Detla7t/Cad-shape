@@ -9,10 +9,16 @@ export class HistoryBar {
         this.stopDrag?.();
     }
     readonly element = document.createElement("div");
+    /**
+     * `isFuture` overrides which rows show as rolled back (default: every row at or after the
+     * marker) — the tree's document bar leaves a body the marker splits to that body's own bar.
+     */
     constructor(
         private readonly rows: () => HTMLElement[],
         private readonly read: () => number,
         private readonly apply: (position: number) => void,
+        private readonly isFuture: (index: number, position: number) => boolean = (index, position) =>
+            index >= position,
     ) {
         const bar = this.element;
         bar.className = style.bar;
@@ -51,7 +57,7 @@ export class HistoryBar {
         const focused = document.activeElement === this.element;
         parent.insertBefore(this.element, rows[position] ?? null);
         if (focused) this.element.focus();
-        rows.forEach((row, i) => row.classList.toggle(style.future, i >= position));
+        rows.forEach((row, i) => row.classList.toggle(style.future, this.isFuture(i, position)));
     }
     private readonly down = (event: PointerEvent) => {
         if (event.button !== 0) return;

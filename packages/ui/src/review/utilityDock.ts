@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import { type IApplication, type IView, PubSub, type ReviewTarget } from "@chili3d/core";
+import { leave } from "../motion";
 import { CommentsPanel } from "./commentsPanel";
 import { action, textElement } from "./helpers";
 import { PerformancePanel } from "./performancePanel";
@@ -71,8 +72,9 @@ export class UtilityDock {
     hide() {
         this.panel?.dispose();
         this.panel = undefined;
-        this.dock?.remove();
+        const dock = this.dock;
         this.dock = undefined;
+        if (dock !== undefined) leave(dock, () => dock.remove());
         this.kind = undefined;
         this.documentId = undefined;
     }

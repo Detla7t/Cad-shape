@@ -124,7 +124,7 @@ test("sketch interpolation matches the saved planar Onshape opFitSpline result",
         readFileSync(
             path.resolve(
                 path.dirname(fileURLToPath(import.meta.url)),
-                "../featurescript/fixtures/conformance/onshape-reference.json",
+                "../../../featurescript/test/fixtures/conformance/onshape-reference.json",
             ),
             "utf8",
         ),

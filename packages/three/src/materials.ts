@@ -7,10 +7,11 @@ import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
 import { RoundPointsMaterial } from "./roundPointsMaterial";
 import { ThreeHelper } from "./threeHelper";
 
+/** Vertices read as dots a cursor can land on (Onshape's), not specks: 5 px, 7 px when lit. */
 export const defaultVertexMaterial = new RoundPointsMaterial({
     color: ThreeHelper.fromColor(VisualConfig.defaultEdgeColor),
     sizeAttenuation: false,
-    size: 3,
+    size: 5,
 });
 
 export const originVertexMaterial = new RoundPointsMaterial({
@@ -22,13 +23,13 @@ export const originVertexMaterial = new RoundPointsMaterial({
 export const highlightVertexMaterial = new RoundPointsMaterial({
     color: ThreeHelper.fromColor(VisualConfig.highlightEdgeColor),
     sizeAttenuation: false,
-    size: 5,
+    size: 7,
 });
 
 export const selectedVertexMaterial = new RoundPointsMaterial({
     color: ThreeHelper.fromColor(VisualConfig.selectedEdgeColor),
     sizeAttenuation: false,
-    size: 5,
+    size: 7,
 });
 
 const defaultEdgeMaterialOptions = {

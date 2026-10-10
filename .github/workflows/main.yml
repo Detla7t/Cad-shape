@@ -32,6 +32,9 @@ jobs:
             - name: Check formatting and lint
               run: npm run check:ci
 
+            - name: Check package boundaries
+              run: npm run check:boundaries
+
             - name: Verify checked-in native artifacts
               run: npm run check:wasm
 

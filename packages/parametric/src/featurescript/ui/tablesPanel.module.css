@@ -13,10 +13,21 @@
     font-size: 12px;
 }
 
+/* Onshape's Custom tables header: the table picker, with the studio's mark. */
 .toolbar {
     display: flex;
     align-items: center;
     gap: 6px;
+
+    & > span {
+        flex: 0 0 auto;
+        padding: 2px 5px;
+        border: 1px solid var(--border-color);
+        border-radius: 2px;
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+    }
 
     & select {
         flex: 1 1 auto;
@@ -29,8 +40,8 @@
     padding: 3px 6px;
     font-size: 12px;
     border: 1px solid var(--border-color);
-    border-radius: 4px;
-    background-color: transparent;
+    border-radius: 2px;
+    background-color: var(--panel-background-color);
     color: inherit;
 }
 
@@ -53,19 +64,43 @@
     flex: 1 1 auto;
     min-height: 0;
     overflow: auto;
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    padding: 6px;
+}
+
+/* One table: a folding title over a bordered grid. */
+.group {
+    margin-bottom: 10px;
 }
 
 .title {
-    margin: 6px 0 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 0 4px;
+    padding: 4px 2px;
     font-size: 13px;
     font-weight: 600;
+    cursor: pointer;
+    list-style: none;
 
-    &:first-child {
-        margin-top: 0;
+    &::-webkit-details-marker {
+        display: none;
     }
+
+    &::before {
+        content: "";
+        flex: 0 0 5px;
+        width: 5px;
+        height: 5px;
+        margin: 0 3px;
+        border-right: 1.5px solid currentColor;
+        border-bottom: 1.5px solid currentColor;
+        transform: rotate(-45deg);
+        transition: transform 150ms ease;
+    }
+}
+
+.group[open] > .title::before {
+    transform: rotate(45deg) translateY(-2px);
 }
 
 .table {
@@ -75,15 +110,20 @@
 
     & th,
     & td {
-        padding: 3px 8px;
-        border-bottom: 1px solid var(--border-color);
+        height: 22px;
+        padding: 2px 8px;
+        border: 1px solid var(--border-color);
         text-align: left;
         white-space: nowrap;
     }
 
     & th {
         font-weight: 600;
-        opacity: 0.85;
+        background: var(--title-background);
+    }
+
+    & tbody tr:hover {
+        background: var(--panel-hover-background-color);
     }
 
     & .alignCenter {

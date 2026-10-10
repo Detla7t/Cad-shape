@@ -38,3 +38,23 @@
     flex-direction: row;
     align-items: center;
 }
+
+/* Owner bars: three lanes on the left edge, one per owner (Fusion's component colours in the tree). */
+.header {
+    position: relative;
+}
+.header[data-owners]::before {
+    content: "";
+    position: absolute;
+    left: 1px;
+    top: 2px;
+    bottom: 2px;
+    width: 11px;
+    background: linear-gradient(to right, var(--owner-bars));
+}
+.header[data-owners="many"]::before {
+    background: repeating-linear-gradient(to bottom, #8a8a8a 0 3px, #d9d9d9 3px 6px);
+}
+.header[data-owners] {
+    padding-left: 15px;
+}

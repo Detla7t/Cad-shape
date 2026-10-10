@@ -84,6 +84,12 @@ export interface IShapeFactory {
         supports: (IFace | undefined)[],
         points: XYZLike[],
     ): Result<TrackedShape>;
+    /** Edges or wires projected along the target's face normals: a compound of edges. */
+    normalProjection?(curves: (IEdge | IWire)[], target: IShape): Result<IShape>;
+    /** One B-spline edge running exactly along a chain of tangent-continuous edges. */
+    splineThroughEdges?(edges: IEdge[]): Result<IEdge>;
+    /** The Coons patch bounded by four edges forming a closed loop, in any order and sense. */
+    coonsSurface?(edges: IEdge[]): Result<IFace>;
     /** Neutral-plane draft; angle in degrees, lengths in mm. */
     draftTracked?(
         shape: IShape,

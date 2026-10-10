@@ -13,7 +13,7 @@ export interface FolderNodeOptions {
     id?: string;
 }
 
-@serializable()
+@serializable({ id: "FolderNode" })
 export class FolderNode extends Node implements INodeLinkedList {
     /** `INodeIcon`: the folder glyph, so a group reads apart from the shapes it holds. */
     get icon(): string {

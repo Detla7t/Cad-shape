@@ -7,11 +7,15 @@ import style from "./elements.module.css";
 
 export interface ElementMenuItem {
     readonly label: I18nKeys;
+    /** The row's text when it is not a translation key (a node's name, "Create {kind}"). */
+    readonly text?: string;
     readonly icon?: string;
     readonly cadIcon?: string;
     readonly disabled?: boolean;
     /** Why a disabled item is disabled. */
     readonly tooltip?: I18nKeys;
+    /** A rule above this row: the start of a group. */
+    readonly separator?: boolean;
     readonly onSelect: () => void;
 }
 
@@ -33,11 +37,13 @@ export function showElementMenu(
 ): HTMLElement {
     closeElementMenu();
     const menu = div(
-        { className: style.menu },
-        ...items.map((item) =>
+        { className: style.menu, role: "menu" },
+        ...items.flatMap((item) => [
+            ...(item.separator ? [div({ className: style.menuSeparator, role: "separator" })] : []),
             div(
                 {
                     className: item.disabled ? `${style.menuItem} ${style.disabled}` : style.menuItem,
+                    role: "menuitem",
                     title: item.disabled && item.tooltip ? new Localize(item.tooltip) : "",
                     onclick: (e: MouseEvent) => {
                         e.stopPropagation();
@@ -49,9 +55,11 @@ export function showElementMenu(
                 item.cadIcon
                     ? createCadIcon(item.cadIcon, item.icon)
                     : svg({ className: style.menuIcon, icon: item.icon ?? "icon-check" }),
-                span({ textContent: new Localize(item.label) }),
+                item.text === undefined
+                    ? span({ textContent: new Localize(item.label) })
+                    : span({ textContent: item.text }),
             ),
-        ),
+        ]),
     );
     menu.dataset["menu"] = "element";
     menu.style.left = `${Math.max(4, Math.min(at.x, window.innerWidth - 200))}px`;

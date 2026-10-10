@@ -1,10 +1,15 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { command, Dimensions, type IStep, Precision, PubSub, type XYZ } from "@chili3d/core";
-import type { TentativeEntity } from "../autoConstraints";
-import { arcAngles, rawArcSweep, toUV } from "../sketchModel";
+import { command, Dimensions, type IStep, Precision, PubSub, VisualConfig, type XYZ } from "@chili3d/core";
+import type { DragSnap, TentativeEntity } from "../autoConstraints";
+import { entityDisplayMesh } from "../entityMesh";
+import { arcAngles, ConstraintKind, rawArcSweep, type SketchPointRef, toUV } from "../sketchModel";
+import type { SketchSolver } from "../solver";
+import { tangentConstraintFor } from "../solverEntities";
+import { endTangent, type TangentArc, tangentArc } from "../tangentArc";
 import { SketchMultistepCommand } from "./sketchMultistepCommand";
+import type { SketchPointSnapResult } from "./sketchPointSnapEventHandler";
 import { type SketchPointSnapData, SketchPointStep } from "./sketchPointStep";
 
 /** Arc params in sketch uv, the end projected onto the circle center/start define. */
@@ -105,4 +110,98 @@ export class SketchArcCommand extends SketchMultistepCommand {
         meshes.push(this.meshCreatedShape("arc", plane.normal, center, start, (sweep * 180) / Math.PI));
         return meshes;
     };
+}
+
+/**
+ * Onshape's Tangent arc: starts on the end of a line or arc and leaves it tangentially,
+ * ending where the second pick lands. The start is coincident with that end and the
+ * arc tangent to its curve — the tool's own constraints, kept even under Shift; the
+ * free end is inferred like any drawn point.
+ */
+@command({ key: "sketch.tangentArc", icon: "icon-arc" })
+export class SketchTangentArcCommand extends SketchMultistepCommand {
+    getSteps(): IStep[] {
+        return [
+            new SketchPointStep("prompt.pickFistPoint", this.getStartData),
+            new SketchPointStep("prompt.pickArcEnd", this.getEndData),
+        ];
+    }
+
+    protected executeMainTask(): void {
+        const source = this.source();
+        if (source === undefined) {
+            PubSub.default.pub("displayError", "Start a tangent arc on the end of a line or arc");
+            return;
+        }
+        const arc = this.arcTo(this.uvOf(1));
+        if (arc === undefined) {
+            PubSub.default.pub("displayError", "The arc end is on the tangent line (no arc)");
+            return;
+        }
+        const solver = this.editor.solver;
+        const id = solver.addArc(...arc.params);
+        solver.addConstraint({
+            kind: ConstraintKind.P2PCoincident,
+            refs: [{ entityId: id, pointIndex: arc.startIndex }, source],
+        });
+        const tangent = tangentConstraintFor(
+            "arc",
+            id,
+            solver.entity(source.entityId)?.type,
+            source.entityId,
+        );
+        if (tangent !== undefined) solver.addConstraint(tangent);
+        // the center and the free end are inferred; the start is attached above
+        this.commitNewEntity(id, [0, arc.startIndex === 1 ? 2 : 1]);
+    }
+
+    /** The line or arc end the first pick snapped onto, or undefined. */
+    private source(): SketchPointRef | undefined {
+        return tangentSource(this.editor.solver, (this.stepDatas[0] as SketchPointSnapResult).sketchSnap);
+    }
+
+    private arcTo(end: [number, number]): TangentArc | undefined {
+        const source = this.source();
+        const entity = source && this.editor.solver.entity(source.entityId);
+        const direction = source && entity && endTangent(entity, source.pointIndex);
+        return direction && tangentArc(this.uvOf(0), direction, end);
+    }
+
+    private readonly getStartData = (): SketchPointSnapData => ({
+        dimension: Dimensions.D1D2D3,
+        acceptSnap: (snap) => tangentSource(this.editor.solver, snap) !== undefined,
+    });
+
+    private readonly getEndData = (): SketchPointSnapData => ({
+        refPoint: () => this.stepDatas[0].point!,
+        dimension: Dimensions.D1D2,
+        preview: this.endPreview,
+        tentative: (probe) => {
+            const arc = this.arcTo(probe);
+            return arc === undefined ? undefined : { type: "arc", params: arc.params };
+        },
+    });
+
+    private readonly endPreview = (point: XYZ | undefined) => {
+        const start = this.meshPoint(this.stepDatas[0].point!);
+        const arc = point === undefined ? undefined : this.arcTo(toUV(this.editor.node.plane, point));
+        if (arc === undefined) return [start];
+        return [
+            start,
+            entityDisplayMesh(
+                this.editor.node.plane,
+                { id: 0, type: "arc", params: arc.params },
+                VisualConfig.defaultEdgeColor,
+            ),
+        ];
+    };
+}
+
+/** The end of a line or arc a snap landed on: where a tangent arc can start. */
+function tangentSource(solver: SketchSolver, snap: DragSnap | undefined): SketchPointRef | undefined {
+    if (snap?.kind !== "point") return undefined;
+    const entity = solver.entity(snap.point.entityId);
+    return entity !== undefined && endTangent(entity, snap.point.pointIndex) !== undefined
+        ? snap.point
+        : undefined;
 }

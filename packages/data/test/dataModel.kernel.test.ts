@@ -12,15 +12,18 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { type IFace, Plane, ShapeTypes, VariableStudioNode } from "@chili3d/core";
 import type { TestDocument } from "@chili3d/core/test-utils";
+import {
+    ConstraintKind,
+    captureProfileRef,
+    FeatureStudioNode,
+    newFeatureScriptFeature,
+    ParametricBodyNode,
+    provideOnshapeStd,
+    type SketchData,
+    SketchNode,
+} from "@chili3d/parametric";
 import { initWasm, ShapeFactory } from "@chili3d/wasm";
 import { rs } from "@rstest/core";
-import { captureProfileRef } from "../../parametric/src/features/profileRef";
-import { FeatureStudioNode } from "../../parametric/src/featurescript/featureStudioNode";
-import { newFeatureScriptFeature } from "../../parametric/src/featurescript/insertFeature";
-import { provideOnshapeStd } from "../../parametric/src/featurescript/runtime";
-import { ParametricBodyNode } from "../../parametric/src/parametricBodyNode";
-import { ConstraintKind, type SketchData } from "../../parametric/src/sketch/sketchModel";
-import { SketchNode } from "../../parametric/src/sketch/sketchNode";
 import { ONSHAPE_STD } from "../../parametric/test/featurescript/_helpers/onshapeStd";
 import "../../parametric/test/sketch/setup";
 import { collectDataDependencies, DataSourceNode } from "../src";

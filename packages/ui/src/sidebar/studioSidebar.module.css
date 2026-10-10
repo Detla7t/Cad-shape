@@ -7,6 +7,11 @@
     z-index: 35;
     font-size: 12px;
     color: var(--foreground-color);
+    /* The dock slides open and shut; the content fades in behind the slide. */
+    transition: width 200ms ease-out;
+}
+.root[data-closing] {
+    pointer-events: none;
 }
 .rail {
     position: absolute;
@@ -53,9 +58,29 @@
     min-width: 0;
     border-left: 1px solid var(--border-color);
     background: var(--panel-background-color);
+    overflow: hidden;
+    animation: dock-panel-in 220ms ease-out;
 }
 .panel[hidden] {
     display: none;
+}
+@keyframes dock-panel-in {
+    from {
+        opacity: 0;
+        transform: translateX(12px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .root {
+        transition: none;
+    }
+    .panel {
+        animation: none;
+    }
 }
 .header {
     flex: 0 0 34px;

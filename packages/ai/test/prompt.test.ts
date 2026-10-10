@@ -8,9 +8,21 @@ import { buildTools } from "../src/tools";
 describe("buildSystemPrompt", () => {
     test("indexes every registered tool (the prompt can never drift from the registry)", () => {
         const { stable } = buildSystemPrompt();
+        const indexLines = stable.split("\n").filter((line) => line.startsWith("- "));
         for (const tool of buildTools()) {
-            expect(stable).toContain(`- ${tool.name}: `);
+            // A tool is listed alone (`- name: …`) or in its family's line (`- a, name, b: …`).
+            const listed = indexLines.some((line) =>
+                line.slice(2, line.indexOf(": ")).split(", ").includes(tool.name),
+            );
+            expect(listed, tool.name).toBe(true);
         }
+    });
+
+    test("keeps tools the in-app assistant may not call out of its prompt", () => {
+        const { stable } = buildSystemPrompt();
+        expect(buildTools("automation").some((tool) => tool.name === "evaluate_script")).toBe(true);
+        expect(buildTools().some((tool) => tool.name === "evaluate_script")).toBe(false);
+        expect(stable).not.toContain("evaluate_script");
     });
 
     test("index entries are whole sentences, never cut at an abbreviation", () => {
@@ -25,9 +37,11 @@ describe("buildSystemPrompt", () => {
 
     test("keeps the resident prompt compact", () => {
         // The creation-method catalog moved into the modeling-api skill, which took the
-        // resident half from ~11.9k to ~7k. This bound guards against creeping back.
+        // resident half from ~11.9k to ~7k. This bound guards against creeping back. The tools
+        // that drive the app like the user (camera, commands, input, UI, state, waits) added
+        // one shared index line of ~400 characters, hence 8250 rather than 8000.
         const { stable, volatile } = buildSystemPrompt();
-        expect(stable.length + volatile.length).toBeLessThan(8000);
+        expect(stable.length + volatile.length).toBeLessThan(8250);
     });
 
     test("keeps the creation-method catalog out of the resident half", () => {

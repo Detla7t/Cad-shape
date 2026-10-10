@@ -12,7 +12,8 @@ import {
     isNodeWarning,
     Transaction,
 } from "@chili3d/core";
-import { createCadIcon, label, setSVGIcon, span, svg } from "@chili3d/element";
+import { label, setSVGIcon, span, svg } from "@chili3d/element";
+import { createTypeIcon } from "../typeIcon";
 import style from "./treeItem.module.css";
 
 export abstract class TreeItem extends HTMLElement {
@@ -29,6 +30,30 @@ export abstract class TreeItem extends HTMLElement {
     private _node: INode;
     get node() {
         return this._node;
+    }
+
+    /**
+     * The bars of the results that own this row: one lane per owner on its left edge (a
+     * lane stays empty where that owner has no part in the row), or one striped bar when
+     * more owners than lanes have. No lanes removes the bars.
+     */
+    setOwnerBars(bars: { readonly lanes: readonly (string | undefined)[]; readonly many: boolean }): void {
+        const main = this.mainElement();
+        if (!bars.many && bars.lanes.every((lane) => lane === undefined)) {
+            delete main.dataset["owners"];
+            main.style.removeProperty("--owner-bars");
+            return;
+        }
+        if (bars.many) {
+            main.dataset["owners"] = "many";
+            main.style.removeProperty("--owner-bars");
+            return;
+        }
+        main.dataset["owners"] = "lanes";
+        // Lanes of 3px with 1px gaps, drawn as one horizontal gradient: 0–3, 4–7, 8–11 px.
+        const stops = bars.lanes.map((lane, i) => `${lane ?? "transparent"} ${i * 4}px ${i * 4 + 3}px`);
+        const gaps = bars.lanes.slice(1).map((_, i) => `transparent ${i * 4 + 3}px ${i * 4 + 4}px`);
+        main.style.setProperty("--owner-bars", [...stops, ...gaps].join(", "));
     }
 
     constructor(
@@ -119,19 +144,7 @@ export abstract class TreeItem extends HTMLElement {
      */
     protected createTypeIcon(): SVGSVGElement | undefined {
         if (!isNodeIcon(this.node)) return undefined;
-        const mapped: Record<string, string> = {
-            "icon-setWorkingPlane": "plane",
-            "icon-sketchEdit": "sketch",
-            "icon-box": "part",
-            "icon-tag": "variable",
-            "icon-folder": "folder",
-        };
-        if (mapped[this.node.icon]) {
-            const icon = createCadIcon(mapped[this.node.icon]) as SVGSVGElement;
-            icon.classList.add(style.typeIcon);
-            return icon;
-        }
-        return svg({ className: style.typeIcon, icon: this.node.icon });
+        return createTypeIcon(this.node.icon, style.typeIcon);
     }
 
     abstract mainElement(): HTMLElement;
