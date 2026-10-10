@@ -2,8 +2,15 @@
 // See LICENSE file in the project root for full license information.
 
 import { rs } from "@rstest/core";
-import type { INode, INodeFilter, ISelection, IVisualObject } from "../src";
-import { AsyncController, Matrix4, NodeSelectionHandler, ShapeTypes, VisualStates } from "../src";
+import type { IHistoryRecord, INode, INodeFilter, ISelection, IVisualObject } from "../src";
+import {
+    AsyncController,
+    Matrix4,
+    NodeSelectionHandler,
+    ShapeTypes,
+    Transaction,
+    VisualStates,
+} from "../src";
 import {
     createMockHighlighter,
     createMockSelection,
@@ -742,7 +749,7 @@ describe("a node that selects its parts (a sketch's curves)", () => {
         });
         handler.pointerDown(view, createPointerEvent({ button: 0, offsetX: 10, offsetY: 10 }));
         handler.pointerUp(view, createPointerEvent({ button: 0, offsetX: 10, offsetY: 10 }));
-        expect(setSelectedShapes).toHaveBeenCalledWith([pick], VisualStates.edgeSelected, false);
+        expect(setSelectedShapes).toHaveBeenCalledWith([pick], VisualStates.edgeSelected, true);
         expect(setSelectedNodes).not.toHaveBeenCalled();
         expect(removeCalls.at(-1)).toEqual({
             shape: visual,
@@ -791,7 +798,76 @@ describe("a node that selects its parts (a sketch's curves)", () => {
         });
         handler.pointerDown(view, createPointerEvent({ button: 0, offsetX: 10, offsetY: 10 }));
         handler.pointerUp(view, createPointerEvent({ button: 0, offsetX: 10, offsetY: 10 }));
-        expect(setSelectedShapes).toHaveBeenCalledWith([vertex], VisualStates.edgeSelected, false);
+        expect(setSelectedShapes).toHaveBeenCalledWith([vertex], VisualStates.edgeSelected, true);
+    });
+
+    test("picked parts gather click by click; a click into the void clears them as an undo step", () => {
+        const { handler, view, selection, nodesByVisual, document } = setupNodeSelectionHandler();
+        const visual = createMockVisualObject();
+        const sketch = {
+            ...createMockNode("Sketch 1"),
+            selectsSubShapes: ShapeTypes.edge | ShapeTypes.vertex,
+        } as INode;
+        nodesByVisual.set(visual, sketch);
+        const pickAt = (index: number) => ({
+            shape: { shapeType: ShapeTypes.vertex },
+            owner: { node: sketch },
+            indexes: [index],
+            transform: Matrix4.identity(),
+        });
+        const selected: unknown[] = [];
+        selection.getSelectedShapes = () => [...selected] as never;
+        const setSelectedShapes = rs.fn((shapes: unknown[], _state: unknown, toggle: boolean) => {
+            if (!toggle) selected.length = 0;
+            selected.push(...shapes);
+            return selected.length;
+        });
+        selection.setSelectedShapes = setSelectedShapes as never;
+        const clearSelection = rs.fn(() => {
+            selected.length = 0;
+        });
+        selection.clearSelection = clearSelection;
+        const records: IHistoryRecord[] = [];
+        const add = rs.spyOn(Transaction, "add").mockImplementation((_doc, record) => {
+            records.push(record);
+        });
+        try {
+            view.detectVisual = () => [visual];
+            const clickAt = (index: number) => {
+                view.detectShapes = rs.fn(() => [pickAt(index)]);
+                handler.pointerMove(view, createPointerEvent({ buttons: 0, offsetX: 10, offsetY: 10 }));
+                handler.pointerDown(view, createPointerEvent({ button: 0, offsetX: 10, offsetY: 10 }));
+                handler.pointerUp(view, createPointerEvent({ button: 0, offsetX: 10, offsetY: 10 }));
+            };
+            clickAt(1);
+            clickAt(2);
+            // no modifier: both parts are selected, each click toggling one
+            expect(setSelectedShapes).toHaveBeenCalledTimes(2);
+            expect(setSelectedShapes.mock.calls.every((call) => call[2] === true)).toBe(true);
+            expect(selected).toHaveLength(2);
+            // the first click, with nothing picked yet, dropped any node selection first
+            expect(clearSelection).toHaveBeenCalledTimes(1);
+            // a click on nothing clears them, and the clearing is on the undo stack
+            view.detectVisual = () => [];
+            view.detectShapes = rs.fn(() => []);
+            handler.pointerMove(view, createPointerEvent({ buttons: 0, offsetX: 50, offsetY: 50 }));
+            handler.pointerDown(view, createPointerEvent({ button: 0, offsetX: 50, offsetY: 50 }));
+            handler.pointerUp(view, createPointerEvent({ button: 0, offsetX: 50, offsetY: 50 }));
+            expect(selected).toHaveLength(0);
+            expect(records).toHaveLength(1);
+            expect(records[0].name).toBe("selection.clear");
+            expect(add).toHaveBeenCalledWith(document, records[0]);
+            records[0].undo();
+            expect(selected.map((pick) => (pick as { indexes: number[] }).indexes[0])).toEqual([1, 2]);
+            records[0].redo();
+            expect(selected).toHaveLength(0);
+            // clearing an already empty selection records nothing
+            handler.pointerDown(view, createPointerEvent({ button: 0, offsetX: 50, offsetY: 50 }));
+            handler.pointerUp(view, createPointerEvent({ button: 0, offsetX: 50, offsetY: 50 }));
+            expect(records).toHaveLength(1);
+        } finally {
+            add.mockRestore();
+        }
     });
 
     test("a node without the marker still selects as a whole", () => {

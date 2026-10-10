@@ -188,3 +188,16 @@ export function formatNumber(value: number): string {
     const text = (Math.round(value * 1e9) / 1e9).toFixed(9).replace(/\.?0+$/, "");
     return text === "-0" ? "0" : text;
 }
+
+/**
+ * The drawing with only the named layers: their entities, in order, and their layer records
+ * (an unknown name is ignored). Export dialogs use it to leave construction or notes out.
+ */
+export function filterDrawingLayers(drawing: Drawing, names: readonly string[]): Drawing {
+    const wanted = new Set(names);
+    return {
+        ...drawing,
+        layers: drawing.layers.filter((layer) => wanted.has(layer.name)),
+        entities: drawing.entities.filter((entity) => wanted.has(entity.layer)),
+    };
+}

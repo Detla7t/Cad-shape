@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { Config, Plane } from "@chili3d/core";
+import { Config, DisplayScale, Plane } from "@chili3d/core";
 import { entityDisplayMesh } from "../../src/sketch/entityMesh";
 import { sketchDrawing } from "../../src/sketch/sketchDrawing";
 import { ConstraintKind, shapeEntityIds } from "../../src/sketch/sketchModel";
@@ -61,9 +61,14 @@ test("curve display gains segments when zoomed in and construction uses visible 
     expect(fine.lineType).toBe("solid"); // Gaps are geometry so the four-part pattern survives tessellation.
     const start = fine.position.slice(0, 3),
         end = fine.position.slice(3, 6);
-    // The first dash is Graphics ▸ first dash, in pixels, at the 0.01 world-units-per-pixel scale.
-    const firstDash = Config.instance.graphics.firstDash * 0.01;
+    // The first dash is Graphics ▸ first dash, in pixels, at the 0.01 world-units-per-pixel
+    // scale — the pattern's period snapped to a 1-2-5 step of model units.
+    const g = Config.instance.graphics;
+    const unit = DisplayScale.dashUnit(0.01, g.firstDash + g.firstGap + g.secondDash + g.secondGap);
+    const firstDash = g.firstDash * unit;
     expect(Math.hypot(end[0] - start[0], end[1] - start[1], end[2] - start[2])).toBeCloseTo(firstDash, 4);
+    expect(firstDash / (g.firstDash * 0.01)).toBeGreaterThan(0.6);
+    expect(firstDash / (g.firstDash * 0.01)).toBeLessThan(1.7);
 });
 
 test("fixed entities remain solved beside flexible geometry, without changing live data", () => {

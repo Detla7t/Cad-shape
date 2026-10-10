@@ -1,8 +1,10 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { Transaction } from "@chili3d/core";
+import { AsyncController, type IEventHandler, PubSub, Transaction } from "@chili3d/core";
 import { createCadIcon, createEditableTitle } from "@chili3d/element";
+import { type PickedPlane, resolvePlane } from "../commands/pickedPlane";
+import { PlanePickHandler } from "../commands/planePickHandler";
 import type { SketchLayer } from "../sketchModel";
 import type { SolveOutcome } from "../solver";
 import { showSketchDiagnostics } from "./sketchDiagnostics";
@@ -27,6 +29,143 @@ export class SketchPanel {
     private readonly layers = element("div");
     private readonly color = element("input");
     private layerSignature = "";
+
+    /** What the plane box says: the reference plane or face it follows, else its orientation. */
+    private planeName(): string {
+        const node = this.editor.node;
+        const normal = node.plane.normal;
+        const ref = node.planeRef;
+        const source = ref && node.document.modelManager.findNode((n) => n.id === ref.nodeId);
+        return (
+            source?.name ??
+            (Math.abs(normal.z) > 0.999
+                ? "Top (XY)"
+                : Math.abs(normal.y) > 0.999
+                  ? "Front (XZ)"
+                  : Math.abs(normal.x) > 0.999
+                    ? "Right (YZ)"
+                    : "Custom plane")
+        );
+    }
+
+    /**
+     * The sketch plane as Onshape's query box: the plane's name with an × that drops it.
+     * Clicking the box (or the ×) highlights it and turns the viewport into a plane pick —
+     * a reference plane, a datum or a planar face of a solid — while the sketch stays
+     * open; the pick moves the sketch onto that plane (one undo step), re-solves and
+     * turns the view to it. Escape, or clicking the box again, ends the pick; after an ×
+     * without a pick the sketch keeps its plane (a sketch always has one).
+     */
+    private readonly planeBox = element("div");
+    private readonly planeValue = element("span");
+    private readonly planeClear = element("button");
+    private planePick?: { controller: AsyncController; handler: PlanePickHandler; previous: IEventHandler };
+
+    private buildPlaneBox(): HTMLDivElement {
+        const box = this.planeBox;
+        box.className = style.plane;
+        box.setAttribute("role", "button");
+        box.setAttribute("tabindex", "0");
+        box.setAttribute("aria-label", "Sketch plane");
+        box.title = "Click, then select a plane or planar face in the viewport";
+        const row = element("div");
+        row.className = style.planeRow;
+        this.planeValue.className = style.planeValue;
+        this.planeClear.type = "button";
+        this.planeClear.className = style.planeClear;
+        this.planeClear.textContent = "×";
+        row.append(this.planeValue, this.planeClear);
+        box.append(element("small", "Sketch plane"), row);
+        box.addEventListener("click", (event) => {
+            event.stopPropagation();
+            if (this.planePick) this.planePick.controller.cancel();
+            else this.startPlanePick(false);
+        });
+        box.addEventListener("keydown", (event) => {
+            if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                if (this.planePick) this.planePick.controller.cancel();
+                else this.startPlanePick(false);
+            } else if (event.key === "Delete" || event.key === "Backspace") {
+                event.preventDefault();
+                this.startPlanePick(true);
+            } else if (event.key === "Escape" && this.planePick) {
+                this.planePick.controller.cancel();
+            }
+        });
+        this.planeClear.addEventListener("click", (event) => {
+            event.stopPropagation();
+            this.startPlanePick(true);
+        });
+        this.refreshPlaneBox();
+        return box;
+    }
+
+    /** Shows the plane the sketch lies on, or the empty prompt while a cleared pick is pending. */
+    private refreshPlaneBox(cleared = false): void {
+        const name = this.planeName();
+        const picking = this.planePick !== undefined;
+        if (picking) this.planeBox.dataset["picking"] = "true";
+        else delete this.planeBox.dataset["picking"];
+        if (cleared) {
+            this.planeBox.dataset["empty"] = "true";
+            this.planeValue.textContent = "Select a plane or planar face";
+            this.planeClear.hidden = true;
+        } else {
+            delete this.planeBox.dataset["empty"];
+            this.planeValue.textContent = name;
+            this.planeClear.hidden = false;
+            this.planeClear.title = `Delete ${name}`;
+            this.planeClear.setAttribute("aria-label", `Delete ${name}`);
+        }
+    }
+
+    /**
+     * Swaps the sketch's event handler for a plane pick until it completes or is cancelled.
+     * The swap is undone synchronously on either outcome (and only if the pick's handler is
+     * still installed), so a sketch that finishes mid-pick restores its own handler cleanly.
+     */
+    private startPlanePick(cleared: boolean): void {
+        if (this.planePick) {
+            this.refreshPlaneBox(cleared);
+            return;
+        }
+        const node = this.editor.node;
+        const document = node.document;
+        const controller = new AsyncController();
+        const handler = new PlanePickHandler(document, controller);
+        const previous = document.visual.eventHandler;
+        this.planePick = { controller, handler, previous };
+        document.visual.eventHandler = handler;
+        PubSub.default.pub("viewCursor", "select.default");
+        PubSub.default.pub("statusBarTip", "prompt.select.plane");
+        this.refreshPlaneBox(cleared);
+        const finish = () => {
+            if (this.planePick?.controller !== controller) return;
+            this.planePick = undefined;
+            if (document.visual.eventHandler === handler) document.visual.eventHandler = previous;
+            handler.dispose();
+            controller.dispose();
+            PubSub.default.pub("clearStatusBarTip");
+            PubSub.default.pub("viewCursor", "default");
+            const picked = resolvePlane(document, handler.result);
+            if (picked) this.applyPlane(picked);
+            this.refreshPlaneBox();
+        };
+        controller.onCompleted(finish);
+        controller.onCancelled(finish);
+        controller.onFailed(finish);
+    }
+
+    private applyPlane(picked: PickedPlane): void {
+        const node = this.editor.node;
+        Transaction.execute(node.document, "Change sketch plane", () => {
+            node.setPlane(picked.plane, picked.planeRef);
+        });
+        this.editor.refreshExternalDisplay();
+        this.editor.solve(true);
+        this.editor.normalView();
+    }
 
     constructor(private readonly editor: SketchEditor) {
         this.root.className = style.panel;
@@ -54,21 +193,7 @@ export class SketchPanel {
         cancel.setAttribute("aria-label", "Cancel sketch");
         cancel.replaceChildren(createCadIcon("close"));
         header.append(this.title.element, finish, cancel);
-        const plane = element("div");
-        plane.className = style.plane;
-        const normal = this.editor.node.plane.normal;
-        const ref = this.editor.node.planeRef;
-        const source = ref && this.editor.node.document.modelManager.findNode((n) => n.id === ref.nodeId);
-        const planeName =
-            source?.name ??
-            (Math.abs(normal.z) > 0.999
-                ? "Top (XY)"
-                : Math.abs(normal.y) > 0.999
-                  ? "Front (XZ)"
-                  : Math.abs(normal.x) > 0.999
-                    ? "Right (YZ)"
-                    : "Custom plane");
-        plane.append(element("small", "Sketch plane"), element("div", planeName));
+        const plane = this.buildPlaneBox();
         this.status.className = style.status;
         this.status.setAttribute("role", "status");
         this.detail.className = style.hint;
@@ -305,6 +430,7 @@ export class SketchPanel {
     }
 
     dispose(): void {
+        this.planePick?.controller.cancel();
         this.root.remove();
         if (this.editor.view.dom) delete this.editor.view.dom.dataset["sketchEditing"];
     }

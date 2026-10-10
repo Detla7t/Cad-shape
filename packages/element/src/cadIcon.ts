@@ -53,9 +53,29 @@ const paths: Record<string, string> = {
     undo: "M7 3 2 7l5 4 M2 7h9q7 0 6 9",
     redo: "M13 3l5 4-5 4 M18 7h-9q-7 0-6 9",
     save: "M3 2h12l3 3v13H2V2Z M6 2v6h8V2 M6 18v-6h8v6",
+    note: "M2 4h11v8H7l-3 3v-3H2Z M4 7h7 M4 9h5 M13 8l5 6 M17 12l1 2-2 0",
+    flag: "M6 2h8l4 8-4 8H6L2 10Z M8 7l2-1v8",
+    diameter: "M16 10a6 6 0 1 1-12 0 6 6 0 0 1 12 0Z M3 17 17 3",
+    gdt: "M2 6h16v8H2Z M8 6v8 M13 6v8 M5 8v4 M3 10h4 M15 8h2v4h-2",
+    datum: "M4 2h8v6H4Z M8 8v5 M5 18l3-5 3 5Z M2 18h16",
+    // Fusion's component: an isometric cube, its top face white and its sides tinted.
+    component: "M10 2 17 6v8l-7 4-7-4V6Z M3 6l7 4 7-4 M10 10v8",
+    annotation: "M2 3h10v7H6l-3 3v-3H2Z M4 5h6 M4 7h4 M12 10l5 7 M14 17h3v-3",
+    // The quick access file tools, drawn like a CAD toolbar's: page, folder, floppy, printer.
+    new: "M5 2h7l4 4v12H5Z M12 2v4h4 M8 12h5 M10.5 9.5v5",
+    open: "M2 4h6l2 2h8v11H2Z M2 9h16",
+    saveAs: "M3 2h10l3 3v4 M3 2v16h6 M6 2v5h7V2 M11 18l1-4 5-5 3 3-5 5Z M13 13l3 3",
+    print: "M5 7V2h10v5 M3 7h14v8h-3 M6 15H3 M6 12h8v6H6Z M6 15h8",
+    export: "M4 2h8l4 4v4 M12 2v4h4 M4 2v16h7 M12 16h7 M16 13l3 3-3 3",
+    import: "M4 2h8l4 4v12H4Z M12 2v4h4 M7 12l3 3 3-3 M10 7v8",
+    console: "M2 3h16v14H2Z M5 7l3 3-3 3 M10 13h5",
+    settings:
+        "M10 2.5l1.3 2.2 2.5-.4.6 2.5 2.3 1.1-1 2.3 1 2.3-2.3 1.1-.6 2.5-2.5-.4L10 17.5l-1.3-2.3-2.5.4-.6-2.5-2.3-1.1 1-2.3-1-2.3 2.3-1.1.6-2.5 2.5.4Z M10 7.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5Z",
     delete: "M3 5h14 M7 5V2h6v3 M5 5l1 13h8l1-13 M8 8v7 M12 8v7",
     search: "M13 8a5 5 0 1 1-10 0 5 5 0 0 1 10 0Z M12 12l6 6",
     menu: "M3 5h14 M3 10h14 M3 15h14",
+    // Onshape's "Features and parts" handle: a collapse chevron over an outline list.
+    featuresTree: "M8 2.5 5.5 4.5 8 6.5 M3 9.5h2 M8 9.5h9 M3 13h2 M8 13h9 M3 16.5h2 M8 16.5h9",
     check: "M3 10l5 5L17 5",
     close: "M5 5l10 10 M15 5 5 15",
     variable: "M8 2Q4 2 4 6v2l-2 2 2 2v2q0 4 4 4 M12 2q4 0 4 4v2l2 2-2 2v2q0 4-4 4 M8 8l4 4 M12 8l-4 4",
@@ -79,6 +99,10 @@ const aliases: Record<string, string> = {
     toggleExternal: "projectEdges",
     insert: "newStudio",
     editStudio: "newStudio",
+    saveToFile: "saveAs",
+    commandWindow: "console",
+    generalNote: "note",
+    dimension: "distance",
 };
 const handles: Record<string, number[][]> = {
     line: [
@@ -97,6 +121,20 @@ const handles: Record<string, number[][]> = {
     ],
     circle: [[10, 10]],
     coincident: [[9, 9]],
+};
+
+/** Faces drawn under an icon's strokes, each with its own fill (the cube of a component). */
+const fills: Record<string, [string, string][]> = {
+    component: [
+        ["M10 2 17 6 10 10 3 6Z", "var(--panel-background-color, white)"],
+        ["M3 6l7 4v8l-7-4Z", "#e4edf4"],
+        ["M10 10l7-4v8l-7 4Z", "#cfdce7"],
+    ],
+};
+
+/** Icons drawn in a colour of their own instead of the text colour. */
+const strokes: Record<string, string> = {
+    component: "#6d9bb9",
 };
 
 export function createCadIcon(command: string, fallback?: CommandIcon): Element {
@@ -121,10 +159,17 @@ export function createCadIcon(command: string, fallback?: CommandIcon): Element 
     icon.setAttribute("aria-hidden", "true");
     icon.setAttribute("fill", "none");
     icon.style.fill = "none";
-    icon.setAttribute("stroke", "currentColor");
+    icon.setAttribute("stroke", strokes[key] ?? "currentColor");
     icon.setAttribute("stroke-width", "1.25");
     icon.setAttribute("stroke-linecap", "round");
     icon.setAttribute("stroke-linejoin", "round");
+    for (const [d, fill] of fills[key] ?? []) {
+        const face = document.createElementNS(ns, "path");
+        face.setAttribute("d", d);
+        face.setAttribute("fill", fill);
+        face.setAttribute("stroke", "none");
+        icon.append(face);
+    }
     const path = document.createElementNS(ns, "path");
     path.setAttribute("d", paths[key] ?? paths["box"]);
     icon.append(path);

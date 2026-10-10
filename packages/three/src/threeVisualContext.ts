@@ -24,6 +24,7 @@ import {
     type MeshOption,
     type NodeRecord,
     NodeUtils,
+    PmiAnnotation,
     ReferencePlaneNode,
     RefSegmentAnnotation,
     type ShapeMeshData,
@@ -55,6 +56,7 @@ import { ThreeRefSegmentAnnotation } from "./threeAnnotation";
 import { ThreeGeometry } from "./threeGeometry";
 import { ThreeGeometryFactory } from "./threeGeometryFactory";
 import { ThreeHelper } from "./threeHelper";
+import { ThreePmiAnnotation } from "./threePmiAnnotation";
 import { ThreeReferencePlane } from "./threeReferencePlane";
 import { GroupVisualObject, ThreeComponentObject, ThreeMeshObject } from "./threeVisualObject";
 
@@ -65,6 +67,8 @@ export class ThreeVisualContext implements IVisualContext {
 
     readonly visualShapes: Group;
     readonly tempShapes: Group;
+    /** The PMI annotations on display; each view hosts their HTML frames (`ThreeView.syncPmiLabels`). */
+    readonly pmiAnnotations = new Set<ThreePmiAnnotation>();
     readonly cssObjects: Group;
 
     constructor(
@@ -248,7 +252,8 @@ export class ThreeVisualContext implements IVisualContext {
             obj instanceof ThreeMeshObject ||
             obj instanceof ThreeReferencePlane ||
             obj instanceof ThreeComponentObject ||
-            obj instanceof ThreeRefSegmentAnnotation
+            obj instanceof ThreeRefSegmentAnnotation ||
+            obj instanceof ThreePmiAnnotation
         ) {
             visuals.push(obj);
         }
@@ -417,6 +422,8 @@ export class ThreeVisualContext implements IVisualContext {
             visualObject = new ThreeComponentObject(node, this);
         } else if (node instanceof RefSegmentAnnotation) {
             visualObject = new ThreeRefSegmentAnnotation(this, node);
+        } else if (node instanceof PmiAnnotation) {
+            visualObject = new ThreePmiAnnotation(this, node);
         }
 
         if (visualObject) {

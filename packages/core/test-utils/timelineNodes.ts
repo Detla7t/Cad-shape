@@ -79,6 +79,21 @@ export class TestFeatureListNode extends Node implements IFeatureListNode {
 
     setFeatureParameter(): void {}
     setFeatureSuppressed(): void {}
-    moveFeature(): void {}
+    moveFeature(featureId: string, offset: -1 | 1): void {
+        const index = this.features.findIndex((feature) => feature.id === featureId);
+        const target = index + offset;
+        if (index < 0 || target < 0 || target >= this.features.length) return;
+        const features = [...this.features];
+        [features[index], features[target]] = [features[target], features[index]];
+        this.setFeatures(features);
+    }
+    moveFeatureTo(featureId: string, index: number): void {
+        const from = this.features.findIndex((feature) => feature.id === featureId);
+        if (from < 0) return;
+        const features = [...this.features];
+        const [feature] = features.splice(from, 1);
+        features.splice(Math.max(0, Math.min(index, features.length)), 0, feature);
+        this.setFeatures(features);
+    }
     removeFeature(): void {}
 }

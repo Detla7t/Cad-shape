@@ -2,7 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import { MathUtils, type Matrix4 } from "../math";
-import type { EdgeMeshData, FaceMeshData, Mesh, ShapeMeshData } from "./meshData";
+import type { EdgeMeshData, FaceMeshData, Mesh, ShapeMeshData, VertexMeshData } from "./meshData";
 import { concatTypedArrays, MeshDataUtils } from "./meshData";
 
 export class MeshUtils {
@@ -291,6 +291,14 @@ export class MeshUtils {
     }
 
     static subEdge(mesh: EdgeMeshData, index: number) {
+        const group = mesh?.range[index];
+        if (!group) return undefined;
+
+        return mesh.position.slice(group.start * 3, (group.start + group.count) * 3);
+    }
+
+    /** The positions of one vertex range (a sketch's entity point), for a highlight of its own. */
+    static subVertex(mesh: VertexMeshData, index: number) {
         const group = mesh?.range[index];
         if (!group) return undefined;
 

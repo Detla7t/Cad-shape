@@ -12,3 +12,9 @@ export {
 export { ChatPanel, createChatPanel } from "./chatPanel";
 export type { Tool, ToolAudience } from "./llm/types";
 export { buildTools } from "./tools";
+export {
+    nearestStandardView,
+    type StandardView,
+    standardView,
+    standardViewNames,
+} from "./tools/standardViews";

@@ -1,12 +1,20 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type I18nKeys, type IDocument, type ModelManager, Texture } from "@chili3d/core";
+import {
+    Combobox,
+    type I18nKeys,
+    type IDocument,
+    type ModelManager,
+    Texture,
+    Transaction,
+} from "@chili3d/core";
 import { createMockDocument } from "@chili3d/core/test-utils";
 import { describe, expect, test } from "@rstest/core";
 import { basicPropertyControl } from "../src/property/basicPropertyControl";
 import { CheckProperty } from "../src/property/check";
 import { ColorProperty } from "../src/property/colorProperty";
+import { ComboboxProperty } from "../src/property/comboboxProperty";
 import { propertyControl } from "../src/property/complexPropertyUtils";
 import { InputProperty } from "../src/property/input";
 import { MaterialProperty } from "../src/property/materialProperty";
@@ -222,5 +230,35 @@ describe("basicPropertyControl", () => {
             } as any);
             expect(result).toBeInstanceOf(InputProperty);
         });
+    });
+});
+
+describe("ComboboxProperty", () => {
+    test("a property with a combobox edits through a select of its items and writes the chosen item", () => {
+        const obj = createTestObj({ terminator: "dot" });
+        const control = basicPropertyControl(mockDocument, [obj], {
+            name: "terminator",
+            display: "annotation.terminator",
+            combobox: Combobox.from(["arrow", "dot", "none"], {
+                convert: (value: string) => ({ unchecked: () => value.toUpperCase() }),
+            } as never),
+        } as never);
+        expect(control).toBeInstanceOf(ComboboxProperty);
+        const update = rs.fn();
+        mockDocument.visual.update = update;
+        const select = (control as ComboboxProperty).select;
+        expect([...select.options].map((option) => option.textContent)).toEqual(["ARROW", "DOT", "NONE"]);
+        expect(select.selectedIndex).toBe(1);
+        const original = Transaction.execute;
+        Transaction.execute = ((_doc: unknown, _name: string, action: () => void) =>
+            action()) as typeof Transaction.execute;
+        try {
+            select.value = "2";
+            select.dispatchEvent(new Event("change"));
+        } finally {
+            Transaction.execute = original;
+        }
+        expect((obj as Record<string, unknown>)["terminator"]).toBe("none");
+        expect(update).toHaveBeenCalled();
     });
 });

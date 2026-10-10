@@ -4,6 +4,7 @@
 import { type IDocument, Logger, type Property } from "@chili3d/core";
 import { CheckProperty } from "./check";
 import { ColorProperty } from "./colorProperty";
+import { ComboboxProperty } from "./comboboxProperty";
 import { InputProperty } from "./input";
 import { MaterialProperty } from "./materialProperty";
 
@@ -16,6 +17,10 @@ export function basicPropertyControl(document: IDocument, objs: any[], prop: Pro
 
     if (prop.type === "materialId" && canShowMaterialProperty(objs, prop)) {
         return new MaterialProperty(document, objs, prop);
+    }
+
+    if (prop.combobox !== undefined) {
+        return new ComboboxProperty(document, objs, prop, prop.combobox);
     }
 
     const value = objs[0][prop.name];

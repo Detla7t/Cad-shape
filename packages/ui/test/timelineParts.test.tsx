@@ -17,7 +17,8 @@ rs.mock("../src/property/featureContextMenu", () => ({
 
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { TimelineBar } from "../src/project/timeline/partStudioTimelineBar";
+import { ownershipLanes, TimelineBar } from "../src/project/timeline/partStudioTimelineBar";
+import { OWNER_PALETTE } from "../src/project/tree/ownerColors";
 import { mustQuery } from "./_helpers/domHelpers";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -74,7 +75,8 @@ const step = (key: string) => mustQuery<HTMLElement>(host, `[data-key="${key}"]`
 const lanesOf = (key: string) => mustQuery<HTMLElement>(step(key), "[data-lanes]");
 const marker = () => mustQuery<HTMLElement>(host, '[role="slider"]');
 const groupButton = () => mustQuery<HTMLButtonElement>(host, 'button[aria-label="timeline.group"]');
-const chip = () => host.querySelector<HTMLElement>("button[data-group]");
+const chip = () => host.querySelector<HTMLElement>("[data-group] > button");
+const chipSlot = () => host.querySelector<HTMLElement>("[data-group]");
 
 function mouse(target: HTMLElement, type: string, init: MouseEventInit = {}) {
     act(() => {
@@ -194,7 +196,7 @@ describe("picking and groups", () => {
         expect(doc.userData?.[TIMELINE_GROUPS_KEY]).toHaveLength(1);
         // Collapsed: one chip stands for the three steps, which are gone from the track.
         expect(chip()?.getAttribute("aria-expanded")).toBe("false");
-        expect(chip()?.dataset["span"]).toBe("3");
+        expect(chipSlot()?.dataset["span"]).toBe("3");
         expect(chip()?.textContent).toContain("timeline.groupName1");
         expect(steps().map((element) => element.dataset["key"])).toEqual(["S1", "B/g2", "S2", "C/h1"]);
         expect(groupButton().disabled).toBe(true);
@@ -203,7 +205,7 @@ describe("picking and groups", () => {
         mouse(chip()!, "click");
         expect(timeline.groups[0].collapsed).toBe(false);
         expect(chip()?.getAttribute("aria-expanded")).toBe("true");
-        expect(chip()?.dataset["span"]).toBe("0");
+        expect(chipSlot()?.dataset["span"]).toBe("0");
         expect(steps().map((element) => element.dataset["grouped"] ?? "")).toEqual([
             "",
             "start",
@@ -213,7 +215,7 @@ describe("picking and groups", () => {
             "",
             "",
         ]);
-        expect(chip()?.nextElementSibling).toBe(step("A/f1"));
+        expect(chipSlot()?.nextElementSibling).toBe(step("A/f1"));
     });
 
     test("a chip renames on a double-click and its menu ungroups; the marker inside a collapsed group opens it", () => {
@@ -286,5 +288,29 @@ describe("picking and groups", () => {
             window.dispatchEvent(new PointerEvent("pointerup"));
         });
         expect(timeline.position).toBe(4);
+    });
+});
+
+describe("tree colours on the timeline", () => {
+    test("steps take the owner colours the Features tree draws, in the tree's palette", () => {
+        const { document: doc, timeline, s1, a, b } = parts();
+        // The tree's ownership: S1 owns itself; A and B read it (B reads A too).
+        const ownership = {
+            owners: [s1, a, b],
+            ownersOf: new Map([
+                [s1.id, [0, 1, 2]],
+                [a.id, [1, 2]],
+                [b.id, [2]],
+            ]),
+        };
+        const lanes = ownershipLanes(ownership, timeline.entries)!;
+        expect(lanes.colors.get(s1)).toBe(OWNER_PALETTE[0]);
+        expect(lanes.colors.get(a)).toBe(OWNER_PALETTE[1]);
+        expect(lanes.lanes[0]).toEqual({ owner: s1, users: [a, b] });
+        expect(lanes.lanes[1]).toEqual({ owner: a, users: [b] });
+        expect(lanes.lanes[3]).toEqual({ owner: b, users: [] });
+        // Nothing owned (the tree's colouring off): the timeline uses its own lanes.
+        expect(ownershipLanes({ owners: [], ownersOf: new Map() }, timeline.entries)).toBeUndefined();
+        expect(doc).toBeDefined();
     });
 });

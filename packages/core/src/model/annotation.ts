@@ -5,11 +5,12 @@ import type { IDocument } from "../document";
 import { Id } from "../foundation";
 import type { I18nKeys } from "../i18n";
 import { BoundingBox, type XYZ } from "../math";
+import { property } from "../property";
 import { serializable, serialize } from "../serialize";
 import { Node } from "./node";
 import { VisualNode } from "./visualNode";
 
-export const AnnotationTypes = ["dimension", "text", "refInfiniteLine", "refSegment"] as const;
+export const AnnotationTypes = ["dimension", "text", "refInfiniteLine", "refSegment", "pmi"] as const;
 export type AnnotationType = (typeof AnnotationTypes)[number];
 
 interface AnnotationOptionsBase {
@@ -58,6 +59,7 @@ export abstract class Annotation extends VisualNode {
     readonly annotationType: AnnotationType;
 
     @serialize()
+    @property("common.color", { type: "color" })
     get color(): number {
         return this.getPrivateValue("color", 0xffff00);
     }

@@ -2,9 +2,12 @@
 // See LICENSE file in the project root for full license information.
 
 export * from "./aiChatCommand";
+export * from "./annotation";
 export * from "./application";
 export * from "./boolean";
 export * from "./checkShape";
+export * from "./commandWindowCommand";
+export * from "./component";
 export * from "./configuration";
 export * from "./create";
 export * from "./createActCommand";

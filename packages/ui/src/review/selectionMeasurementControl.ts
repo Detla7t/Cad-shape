@@ -22,6 +22,9 @@ import { createCadIcon } from "@chili3d/element";
 import { MeasurementGuide } from "./measurementGuide";
 import style from "./viewportUtilities.module.css";
 
+/** The distances two entities measure at once; each gets a row of the card besides the main one. */
+const DISTANCE_MODES = new Set<MeasurementMode>(["distance", "maxDistance", "centerDistance"]);
+
 function textNode(text: string): HTMLSpanElement {
     const span = document.createElement("span");
     span.textContent = text;
@@ -143,8 +146,14 @@ export class SelectionMeasurementControl {
         this.guide.show(
             result === undefined ? this.current?.measurement : (result ?? undefined),
             result === undefined ? this.current?.details : undefined,
+            { outline: this.outlined() },
         );
     };
+    /** Whether the guide traces the extent: for picked sub-shapes, not for a whole node already outlined by its selection. */
+    private outlined(): boolean {
+        return this.view.document.selection.getSelectedShapes().length > 0;
+    }
+
     private readonly schedule = () => {
         if (this.queued || this.disposed) return;
         this.queued = true;
@@ -209,9 +218,46 @@ export class SelectionMeasurementControl {
         );
         this.method.hidden = result.value.modes.length < 2;
         if (measured) this.method.value = measured.mode;
-        // a lone point's coordinates are the readout itself; otherwise the card lists the rest
-        this.renderCard(measured ? details : []);
-        this.guide.show(this.preview === undefined ? measured : (this.preview ?? undefined), details);
+        // a lone point's coordinates are the readout itself; otherwise the card lists the rest:
+        // the other distances first (two curves measure a minimum, a maximum and a centre
+        // distance at once), then the components and the rest
+        this.renderCard(measured ? [...this.otherDistances(result.value, measured), ...details] : []);
+        this.showCurrent();
+    }
+
+    /** The guide of the selection as it stands: a preview, else the main value with its details. */
+    private showCurrent() {
+        const measured = this.current?.measurement;
+        this.guide.show(
+            this.preview === undefined ? measured : (this.preview ?? undefined),
+            this.current?.details,
+            {
+                outline: this.outlined(),
+            },
+        );
+    }
+
+    /** The distance modes the selection offers besides the one shown, each measured, as card rows. */
+    private otherDistances(
+        selection: SelectionMeasurement,
+        measured: MeasurementResult,
+    ): MeasurementDetail[] {
+        const rows: MeasurementDetail[] = [];
+        for (const mode of selection.modes) {
+            if (mode === measured.mode || !DISTANCE_MODES.has(mode)) continue;
+            const other = evaluateSelectionMeasurement(this.view.document, mode);
+            const result = other.isOk ? other.value.measurement : undefined;
+            // two points measure the same distance every way: no row repeats the main value
+            if (result === undefined || Math.abs(result.value - measured.value) < 1e-6) continue;
+            rows.push({
+                label: result.label,
+                value: result.value,
+                quantity: "length",
+                mode,
+                segments: result.segments,
+            });
+        }
+        return rows;
     }
 
     private renderCard(details: readonly MeasurementDetail[]) {
@@ -223,6 +269,24 @@ export class SelectionMeasurementControl {
                 if (detail.axis) term.dataset["axis"] = detail.axis;
                 const value = document.createElement("dd");
                 value.append(textNode(formatMeasurementDetail(detail, doc)));
+                // hovering a row traces that value in the viewport until the pointer leaves
+                if (detail.segments?.length) {
+                    const trace = () =>
+                        this.guide.show(
+                            {
+                                mode: detail.mode ?? "distance",
+                                value: detail.value,
+                                label: detail.label,
+                                segments: detail.segments ?? [],
+                            },
+                            [],
+                            { outline: true },
+                        );
+                    term.addEventListener("pointerenter", trace);
+                    value.addEventListener("pointerenter", trace);
+                    term.addEventListener("pointerleave", () => this.showCurrent());
+                    value.addEventListener("pointerleave", () => this.showCurrent());
+                }
                 const mode = detail.mode;
                 if (mode !== undefined) {
                     const make = document.createElement("button");

@@ -15,14 +15,28 @@
     top: 0;
     right: 0;
     bottom: 0;
-    width: 6px;
+    width: 5px;
     z-index: 10;
     cursor: ew-resize;
     touch-action: none;
-    background: var(--resizer-gradient);
+    background: transparent;
 
-    &:hover {
-        background: var(--resizer-gradient-hover);
+    &::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        right: 1px;
+        width: 1px;
+        background: var(--resizer-line-color);
+        transition:
+            background 0.2s,
+            width 0.2s;
+    }
+
+    &:hover::after {
+        width: 2px;
+        background: var(--primary-color);
     }
 }
 

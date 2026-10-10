@@ -161,6 +161,40 @@ export interface OwnerBars {
     readonly many: boolean;
 }
 
+/** Per lane, whether a row's bar continues into the row above (`up`) and below (`down`). */
+export interface OwnerJoins {
+    readonly up: readonly boolean[];
+    readonly down: readonly boolean[];
+}
+
+/**
+ * Where the bars of consecutive rows (in visible order) join into one continuous strip: a
+ * lane joins across a row boundary when both rows carry the same owner's colour in it at
+ * the same depth. A row the owner has no part in breaks the strip, as does a change of
+ * depth (a folder's row and its contents are drawn at different indents).
+ */
+export function joinOwnerBars(rows: readonly { bars: OwnerBars; depth: number }[]): OwnerJoins[] {
+    const sameLane = (
+        a: { bars: OwnerBars; depth: number },
+        b: { bars: OwnerBars; depth: number },
+        lane: number,
+    ) =>
+        a.depth === b.depth &&
+        !a.bars.many &&
+        !b.bars.many &&
+        a.bars.lanes[lane] !== undefined &&
+        a.bars.lanes[lane] === b.bars.lanes[lane];
+    return rows.map((row, index) => {
+        const previous = rows[index - 1];
+        const next = rows[index + 1];
+        const lanes = Array.from({ length: OWNER_LANES }, (_, lane) => lane);
+        return {
+            up: lanes.map((lane) => previous !== undefined && sameLane(previous, row, lane)),
+            down: lanes.map((lane) => next !== undefined && sameLane(row, next, lane)),
+        };
+    });
+}
+
 export function ownerBars(ownership: Ownership, node: INode): OwnerBars {
     const owners = ownership.ownersOf.get(node.id) ?? [];
     if (owners.length === 0) return { lanes: [], many: false };

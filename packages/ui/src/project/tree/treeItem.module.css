@@ -1,3 +1,25 @@
+/* An owner's lane bar (see `TreeItem.setOwnerBars`): full row height, rounded only at a strip's ends. */
+.lane {
+    position: absolute;
+    top: 1px;
+    bottom: 1px;
+    width: 3px;
+    border-radius: 1.5px;
+    pointer-events: none;
+}
+.lane[data-join="up"],
+.lane[data-join="both"] {
+    top: 0;
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+}
+.lane[data-join="down"],
+.lane[data-join="both"] {
+    bottom: 0;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
 .name {
     flex: 1 1 auto;
     font-size: 12px;

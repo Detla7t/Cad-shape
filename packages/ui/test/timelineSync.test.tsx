@@ -71,3 +71,31 @@ test("the feature list's bar and the timeline move together", () => {
     press(horizontalMarker(), "End");
     expect(mustQuery<HTMLElement>(list, '[role="slider"]').ariaValueNow).toBe("2");
 });
+
+test("inside the tree a body's own bar shows only while the marker splits its features", () => {
+    const { doc, body, timeline } = fixture();
+    const list = new FeatureListProperty(doc, body as unknown as INode & IFeatureListNode, undefined, true);
+    document.body.append(list);
+    try {
+        // Fully applied: the tree's document bar is the one bar.
+        expect(list.querySelector('[role="slider"]')).toBeNull();
+        // The marker between f1 and f2: the body's list shows it.
+        act(() => {
+            timeline.rollTo(3);
+        });
+        const bar = list.querySelector<HTMLElement>('[role="slider"]');
+        expect(bar).not.toBeNull();
+        expect(bar!.ariaValueNow).toBe("1");
+        act(() => {
+            timeline.end();
+        });
+        expect(list.querySelector('[role="slider"]')).toBeNull();
+        // Rolled before the whole body: nothing of it applied, still no bar of its own.
+        act(() => {
+            timeline.rollTo(1);
+        });
+        expect(list.querySelector('[role="slider"]')).toBeNull();
+    } finally {
+        list.remove();
+    }
+});

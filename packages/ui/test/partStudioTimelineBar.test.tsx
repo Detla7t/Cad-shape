@@ -194,8 +194,12 @@ describe("TimelineBar", () => {
         mouse(step("S1"), "click", { ctrlKey: true });
         expect(selected.at(-1)).toEqual([body, s1]);
 
+        const timeline = PartStudioTimeline.of(doc);
         mouse(step("B/f2"), "dblclick");
+        // the marker is pulled to right after the opened step before the editor is asked
+        expect(timeline.position).toBe(timeline.indexOf(body, "f2") + 1);
         mouse(step("S1"), "dblclick");
+        expect(timeline.position).toBe(timeline.indexOf(s1) + 1);
         expect(published).toEqual([
             ["editFeature", body, "f2"],
             ["nodeDoubleClicked", s1],
@@ -272,7 +276,13 @@ describe("PartStudioTimelineBar", () => {
             );
             expect(host.querySelector('[role="toolbar"]')).not.toBeNull();
             mouse(mustQuery(host, '[aria-haspopup="menu"]'), "click");
-            const show = mustQuery(host, '[role="menuitemcheckbox"]');
+            // the menu is portalled to the body (out of the timeline's stacking context) and
+            // fixed to the viewport, anchored above the cog's right edge
+            expect(host.querySelector('[role="menu"]')).toBeNull();
+            const menu = mustQuery<HTMLElement>(globalThis.document.body, '[role="menu"]');
+            expect(menu.style.right).toMatch(/^\d+px$/);
+            expect(menu.style.bottom).toMatch(/^\d+px$/);
+            const show = mustQuery(globalThis.document.body, '[role="menuitemcheckbox"]');
             expect(show.getAttribute("aria-checked")).toBe("true");
             mouse(show, "click");
             expect(Config.instance.preferences.showTimeline).toBe(false);

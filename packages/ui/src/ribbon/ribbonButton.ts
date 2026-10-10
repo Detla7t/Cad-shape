@@ -68,9 +68,12 @@ export class RibbonPushButton extends HTMLElement {
     }
 
     private initHTML(display: I18nKeys, icon: CommandIcon, size: ButtonSize) {
-        const image = this.commandName.startsWith("constraint.")
-            ? createCadIcon(this.commandName, icon)
-            : createIcon(icon);
+        const image =
+            this.commandName.startsWith("constraint.") ||
+            this.commandName.startsWith("annotation.") ||
+            this.commandName === "create.component"
+                ? createCadIcon(this.commandName, icon)
+                : createIcon(icon);
         this.className = size === "large" ? style.normal : style.small;
         image.classList.add(size === "large" ? style.icon : style.smallIcon);
         const text = label({

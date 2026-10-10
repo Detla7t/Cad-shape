@@ -50,8 +50,16 @@ export const DEFAULT_GRAPHICS: Readonly<GraphicsPreferences> = Object.freeze({
     inactiveColor: "#999999",
     inactiveRegionOpacity: 12,
     inactivePointSize: 4,
+    firstDash: 36,
+    firstGap: 54,
+    secondDash: 270,
+    secondGap: 54,
+});
+
+/** The construction pattern before 10 October 2026, three times denser: saved copies of it read as the default. */
+export const LEGACY_CONSTRUCTION_PATTERN = {
     firstDash: 12,
     firstGap: 18,
     secondDash: 90,
     secondGap: 18,
-});
+} as const;

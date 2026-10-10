@@ -30,6 +30,7 @@ export type Translation = Record<I18nKeys, string>;
 
 const DATASET_LINK_KEY = "_:_";
 const languages = new Map<string, Locale>();
+const i18nKeySet: ReadonlySet<string> = new Set<string>(I18N_KEYS);
 let _currentLanguage: string | undefined;
 
 export class I18n {
@@ -108,8 +109,9 @@ export class I18n {
         return text;
     }
 
+    /** Whether `key` is one of the declared keys (`I18N_KEYS`), whatever locales are loaded. */
     static isI18nKey(key: string): key is I18nKeys {
-        return key in languages.get("zh-CN")!.translation;
+        return i18nKeySet.has(key);
     }
 
     static set(dom: HTMLElement, path: I18nPath, key: I18nKeys, ...args: any[]) {

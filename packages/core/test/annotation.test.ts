@@ -12,8 +12,9 @@ import {
 import { TestDocument } from "../test-utils";
 
 describe("AnnotationTypes", () => {
-    test("should contain four annotation types", () => {
-        expect(AnnotationTypes).toHaveLength(4);
+    test("should contain five annotation types", () => {
+        expect(AnnotationTypes).toHaveLength(5);
+        expect(AnnotationTypes).toContain("pmi");
         expect(AnnotationTypes).toContain("dimension");
         expect(AnnotationTypes).toContain("text");
         expect(AnnotationTypes).toContain("refInfiniteLine");

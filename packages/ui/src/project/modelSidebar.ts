@@ -7,6 +7,7 @@ import { ConfigurationBar } from "../property/configuration/configurationBar";
 import { showConfigurationVisibility } from "../property/configuration/visibilityEditor";
 import { PropertyView } from "../property/propertyView";
 import style from "./modelSidebar.module.css";
+import { showActionMenu } from "./nodeContextMenu";
 import { PartsList } from "./partsList";
 import { ProjectView } from "./projectView";
 import { SidebarAccordions } from "./sidebarAccordions";
@@ -47,25 +48,37 @@ export class ModelSidebar extends HTMLElement {
             if (model) PubSub.default.pub("editConfiguration", model);
         };
         accordions.sections[0].actions.append(edit);
-        const menu = document.createElement("select");
+        // Onshape's split button: the table icon opens the editor, its arrow the options.
+        const menu = document.createElement("button");
+        menu.type = "button";
         menu.setAttribute("aria-label", "Configuration options");
+        menu.setAttribute("aria-haspopup", "menu");
         menu.title = "Configuration options";
-        for (const [value, label] of [
-            ["", "▾"],
-            ["visibility", "Modify visibility conditions…"],
-            ["reset", "Reset to default"],
-        ]) {
-            const option = document.createElement("option");
-            option.value = value;
-            option.textContent = label;
-            menu.append(option);
-        }
+        menu.textContent = "▾";
         menu.className = style.configurationOptions;
-        menu.onchange = () => {
+        menu.onclick = () => {
             const model = this.configuration.document;
-            if (model && menu.value === "visibility") showConfigurationVisibility(model);
-            if (model && menu.value === "reset") model.variables.setActiveConfiguration({});
-            menu.value = "";
+            if (!model) return;
+            const rect = menu.getBoundingClientRect();
+            showActionMenu(
+                [
+                    {
+                        id: "visibility",
+                        label: "Modify visibility conditions…",
+                        icon: "configuration",
+                        run: () => showConfigurationVisibility(model),
+                    },
+                    {
+                        id: "reset",
+                        label: "Reset to default",
+                        icon: "undo",
+                        run: () => model.variables.setActiveConfiguration({}),
+                    },
+                ],
+                rect.left,
+                rect.bottom + 2,
+                { label: "Configuration options" },
+            );
         };
         accordions.sections[0].actions.append(menu);
         accordions.sections[1].actions.append(new ToolBar(this.project));

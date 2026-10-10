@@ -27,6 +27,7 @@ import { PreferencesDialog } from "../preferences/preferencesDialog";
 import { ShortcutToolbar } from "../preferences/shortcutToolbar";
 import { ContextToolbar } from "./contextToolbar";
 import { RibbonCustomization, tabLabel } from "./customization";
+import { showDocumentTabMenu } from "./documentTabMenu";
 import style from "./ribbon.module.css";
 import type { RibbonPushButton } from "./ribbonButton";
 import { RibbonGroupElement } from "./ribbonGroup";
@@ -256,8 +257,14 @@ export class RibbonUI extends HTMLElement {
                     new ViewActiveConverter(view, style.tab, style.active),
                 ),
                 dataset: { viewDocument: view.document.id },
+                title: "Right-click for save, print, export and document settings",
                 onclick: () => {
                     this.app.activeView = view;
+                },
+                oncontextmenu: (e: MouseEvent) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    showDocumentTabMenu(this.app, view, e.clientX, e.clientY);
                 },
             },
             div({ className: style.name }, span({ textContent: new Binding(view.document, "name") })),

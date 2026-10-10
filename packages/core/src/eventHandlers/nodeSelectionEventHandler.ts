@@ -2,7 +2,8 @@
 // See LICENSE file in the project root for full license information.
 
 import type { IDocument } from "../document";
-import type { AsyncController } from "../foundation";
+import type { AsyncController, IHistoryRecord } from "../foundation";
+import { Transaction } from "../foundation/transaction";
 import type { INode } from "../model/node";
 import type { INodeFilter } from "../selectionFilter";
 import { ShapeTypes } from "../shape";
@@ -29,16 +30,18 @@ export class NodeSelectionHandler extends SelectionHandler {
 
     protected override select(view: IView, event: PointerEvent): number {
         if (!this._highlights?.length) {
-            this.clearSelected(this.document);
+            this.clearIntoVoid();
             return 0;
         }
         const click = Math.hypot(this.mouse.x - event.offsetX, this.mouse.y - event.offsetY) <= 3;
-        // A click on a sketch's curve selects that curve (Onshape), not the sketch.
+        // A click on a sketch's curve or point selects that part (Onshape), not the sketch —
+        // and the parts gather: every click toggles one in or out, so two points or two
+        // curves are picked without a modifier, until a click into the void clears them.
         if (click && this._subShape !== undefined) {
             const pick = this._subShape;
-            const toggle = this.toggleSelect(event);
-            if (!toggle) this.document.selection.clearSelection();
-            return this.document.selection.setSelectedShapes([pick], VisualStates.edgeSelected, toggle);
+            const selection = this.document.selection;
+            if (selection.getSelectedShapes().length === 0) selection.clearSelection();
+            return selection.setSelectedShapes([pick], VisualStates.edgeSelected, true);
         }
         const models = this._highlights
             .map((x) => view.document.visual.context.getNode(x))
@@ -51,6 +54,28 @@ export class NodeSelectionHandler extends SelectionHandler {
 
     protected toggleSelect(event: PointerEvent) {
         return event.shiftKey;
+    }
+
+    /**
+     * A click on nothing clears the selection. Picked parts (a sketch's points and curves)
+     * took clicks to gather, so their clearing is an undo step: Ctrl+Z brings them back.
+     */
+    private clearIntoVoid(): void {
+        const selection = this.document.selection;
+        const shapes = [...selection.getSelectedShapes()];
+        this.clearSelected(this.document);
+        if (shapes.length === 0) return;
+        const document = this.document;
+        const record: IHistoryRecord = {
+            name: "selection.clear",
+            undo: () => {
+                document.selection.clearSelection();
+                document.selection.setSelectedShapes(shapes, VisualStates.edgeSelected, false);
+            },
+            redo: () => document.selection.clearSelection(),
+            dispose: () => {},
+        };
+        Transaction.add(document, record);
     }
 
     getDetecteds(view: IView, event: PointerEvent) {

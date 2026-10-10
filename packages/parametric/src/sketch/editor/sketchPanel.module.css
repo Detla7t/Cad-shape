@@ -62,13 +62,45 @@
     color: var(--danger-color);
     background: transparent;
 }
+/* Onshape's query box: the plane's name with an ×; lit while the viewport is picking another. */
 .plane {
     border: 1px solid var(--border-color);
+    border-radius: 3px;
     padding: 4px 6px;
     line-height: 18px;
+    background: var(--input-background-color);
+    cursor: pointer;
+    outline: none;
+}
+.plane:focus-visible,
+.plane[data-picking="true"] {
+    border-color: #7fb3e8;
+    background: color-mix(in srgb, #7fb3e8 14%, var(--input-background-color));
 }
 .plane small {
     color: var(--foreground-secondary-color);
+}
+.plane[data-empty="true"] .planeValue {
+    color: var(--foreground-muted-color);
+}
+.planeRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+}
+.planeClear {
+    border: 0;
+    background: transparent;
+    color: var(--danger-color, #c33);
+    font: inherit;
+    font-size: 14px;
+    line-height: 1;
+    padding: 0 2px;
+    cursor: pointer;
+}
+.planeClear:hover {
+    color: var(--foreground-color);
 }
 .panel footer {
     border-top: 1px solid var(--border-color);

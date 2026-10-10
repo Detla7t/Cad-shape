@@ -6,6 +6,7 @@ import type { IHistoryRecord, NodeRecord } from "../foundation/history";
 import { Id } from "../foundation/id";
 import { Observable } from "../foundation/observer";
 import { PubSub } from "../foundation/pubsub";
+import { Transaction } from "../foundation/transaction";
 import { I18n } from "../i18n";
 import { DocumentElements } from "../ui/documentElements";
 import { type FeatureItem, type IFeatureListNode, isFeatureListNode } from "./featureList";
@@ -42,6 +43,9 @@ import { OriginNode } from "./originNode";
  * - **Groups.** Steps can be grouped (Fusion's timeline groups): a group names a contiguous
  *   span of step keys and collapses to one chip. Groups are stored in the document's
  *   `userData` (saved with it) and grouping is an undo step; expanding is not.
+ * - **Reordering.** `move(keys, to)` drags steps to another place in the application order:
+ *   features move inside their body's list, nodes among their siblings, in one undo step —
+ *   refused when a step would come before something it reads.
  */
 
 interface TimelineEntryBase {
@@ -203,6 +207,41 @@ export class PartStudioTimeline extends Observable {
         this.writeGroups(this._groups.map((group) => (group.id === id ? { ...group, collapsed } : group)));
     }
 
+    /**
+     * The order with `keys` moved before the step at `to` (counted in the order without
+     * them), or undefined when a moved step would then precede something it reads.
+     */
+    reordered(keys: readonly string[], to: number): PartStudioTimelineEntry[] | undefined {
+        const wanted = new Set(keys);
+        const moving = this._entries.filter((entry) => wanted.has(entry.key));
+        if (moving.length === 0) return undefined;
+        const rest = this._entries.filter((entry) => !wanted.has(entry.key));
+        const at = Math.max(0, Math.min(rest.length, Math.round(to)));
+        const next = [...rest.slice(0, at), ...moving, ...rest.slice(at)];
+        return orderRespectsDependencies(next) && orderIsRealizable(next) ? next : undefined;
+    }
+
+    /** Whether `move(keys, to)` would be accepted. */
+    canMove(keys: readonly string[], to: number): boolean {
+        return this.reordered(keys, to) !== undefined;
+    }
+
+    /**
+     * Moves steps (one, or a group's, kept in their order) to another position in the
+     * application order: the document changes underneath — features inside their body's
+     * list, nodes among their siblings — as one undo step. Returns false, changing nothing,
+     * when a step would come before something it reads.
+     */
+    move(keys: readonly string[], to: number): boolean {
+        this.flush();
+        const next = this.reordered(keys, to);
+        if (next === undefined) return false;
+        if (next.every((entry, i) => entry === this._entries[i])) return true;
+        Transaction.execute(this.document, "timeline: reorder", () => applyOrder(this.document, next));
+        this.refresh();
+        return true;
+    }
+
     private writeGroups(groups: readonly TimelineGroup[], record?: string): void {
         const old = this._groups;
         const apply = (next: readonly TimelineGroup[]) => {
@@ -328,6 +367,17 @@ export class PartStudioTimeline extends Observable {
         if (featureIndex < indexes.length) return this.rollTo(indexes[Math.max(0, featureIndex)]);
         const after = indexes[indexes.length - 1] + 1;
         return this._position >= after ? true : this.rollTo(after);
+    }
+
+    /**
+     * The marker right after the entry of `node` (or of its feature `featureId`): the model as
+     * it stood with that step just applied — what opening a step shows (Onshape's Edit rolls
+     * back to the feature; Fusion's double-click too). False when the node has no entry.
+     */
+    rollAfter(node: INode, featureId?: string): boolean {
+        const index = this.indexOf(node, featureId);
+        if (index < 0) return false;
+        return this._position === index + 1 ? true : this.rollTo(index + 1);
     }
 
     /** The marker before the first entry of any of `nodes` (or their contents); the end when none has one. */
@@ -746,4 +796,122 @@ function readGroups(document: IDocument): TimelineGroup[] {
         groups.push({ id, name, keys: valid, collapsed: collapsed !== false });
     }
     return groups;
+}
+
+/** Whether every step of `order` comes after what it reads (the strong dependencies). */
+export function orderRespectsDependencies(order: readonly PartStudioTimelineEntry[]): boolean {
+    const positions = new Map<string, number[]>();
+    order.forEach((entry, index) => {
+        const list = positions.get(entry.node.id) ?? [];
+        list.push(index);
+        positions.set(entry.node.id, list);
+    });
+    const last = (id: string) => positions.get(id)?.at(-1);
+    return order.every((entry, index) => {
+        if (entry.kind === "feature") {
+            const ids = entry.feature.nodeIds ?? entry.feature.references?.map((ref) => ref.node.id) ?? [];
+            return ids.every((id) => {
+                if (id === entry.node.id) return true;
+                const at = last(id);
+                return at === undefined || at < index;
+            });
+        }
+        if (!isDependentNode(entry.node)) return true;
+        const dependencies = entry.node.dependencies();
+        return dependencies.nodeIds.every((id) => {
+            if (id === entry.node.id) return true;
+            const list = positions.get(id);
+            if (list === undefined) return true;
+            const anchor = dependencies.anchors?.[id];
+            if (anchor === undefined) return list[list.length - 1] < index;
+            return anchor === 0 || list[Math.min(anchor, list.length) - 1] < index;
+        });
+    });
+}
+
+/**
+ * Whether the document can hold `order`: a body's features stand together in the document, so
+ * a step of another node between two of them must be one a later feature of that body reads
+ * (the sort then interleaves it). Anything else would silently snap back.
+ */
+export function orderIsRealizable(order: readonly PartStudioTimelineEntry[]): boolean {
+    const bodies = new Set(order.filter((entry) => entry.kind === "feature").map((entry) => entry.node));
+    for (const body of bodies) {
+        const indexes = order.flatMap((entry, index) => (entry.node === body ? [index] : []));
+        for (let i = 1; i < indexes.length; i++) {
+            for (let between = indexes[i - 1] + 1; between < indexes[i]; between++) {
+                const stranger = order[between].node;
+                const read = order
+                    .slice(indexes[i])
+                    .some(
+                        (entry) =>
+                            entry.kind === "feature" &&
+                            entry.node === body &&
+                            (
+                                entry.feature.nodeIds ??
+                                entry.feature.references?.map((ref) => ref.node.id) ??
+                                []
+                            ).includes(stranger.id),
+                    );
+                if (!read) return false;
+            }
+        }
+    }
+    return true;
+}
+
+/**
+ * Makes the document follow `order`: each body's features take the order they have in it,
+ * and in every folder the children that are steps take the order their first step has —
+ * nodes that are no step (the datums) keep their places.
+ */
+export function applyOrder(document: IDocument, order: readonly PartStudioTimelineEntry[]): void {
+    const firstIndex = new Map<INode, number>();
+    const featureOrder = new Map<INode & IFeatureListNode, string[]>();
+    const root = document.modelManager.rootNode;
+    order.forEach((entry, index) => {
+        // A folder stands where its first step stands: it moves with its contents.
+        for (
+            let node: INode | undefined = entry.node;
+            node !== undefined && node !== root;
+            node = node.parent
+        )
+            if (!firstIndex.has(node)) firstIndex.set(node, index);
+        if (entry.kind === "feature") {
+            const ids = featureOrder.get(entry.node) ?? [];
+            ids.push(entry.feature.id);
+            featureOrder.set(entry.node, ids);
+        }
+    });
+    for (const [node, ids] of featureOrder) {
+        const current = node.featureItems().map((item) => item.id);
+        if (current.length === ids.length && current.every((id, i) => id === ids[i])) continue;
+        if (node.moveFeatureTo !== undefined) {
+            ids.forEach((id, i) => node.moveFeatureTo?.(id, i));
+            continue;
+        }
+        // Only steps of one: walk each feature up to its place.
+        ids.forEach((id, i) => {
+            for (let at = node.featureItems().findIndex((item) => item.id === id); at > i; at--)
+                node.moveFeature(id, -1);
+        });
+    }
+    const parents = new Set<INodeLinkedList>();
+    for (const node of firstIndex.keys()) if (node.parent !== undefined) parents.add(node.parent);
+    for (const parent of parents) {
+        const children: INode[] = [];
+        for (let child = parent.firstChild; child !== undefined; child = child.nextSibling)
+            children.push(child);
+        const steps = children.filter((child) => firstIndex.has(child));
+        const wanted = [...steps].sort((a, b) => firstIndex.get(a)! - firstIndex.get(b)!);
+        if (wanted.every((child, i) => child === steps[i])) continue;
+        // The run of steps starts where the first of them stands now: after the last fixed node before it.
+        let previous: INode | undefined = steps[0]?.previousSibling;
+        while (previous !== undefined && firstIndex.has(previous)) previous = previous.previousSibling;
+        for (const child of wanted) {
+            if (child.previousSibling !== previous || child.parent !== parent)
+                parent.move(child, parent, previous);
+            previous = child;
+        }
+    }
 }

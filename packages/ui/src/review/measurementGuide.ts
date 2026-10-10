@@ -31,7 +31,17 @@ export class MeasurementGuide {
 
     constructor(private readonly view: IView) {}
 
-    show(result?: MeasurementResult, details: readonly MeasurementDetail[] = []) {
+    /**
+     * `outline` (default true) draws the dashed trace of the measured extent. A whole node's
+     * selection (a sketch picked in the tree) already wears the selection outline, so its
+     * measurement shows only the label and the ΔX/ΔY/ΔZ legs — the dashes over its edges
+     * would stripe the highlight.
+     */
+    show(
+        result?: MeasurementResult,
+        details: readonly MeasurementDetail[] = [],
+        options: { readonly outline?: boolean } = {},
+    ) {
         this.clear();
         if (!result) return;
         this.showComponents(details);
@@ -41,19 +51,21 @@ export class MeasurementGuide {
         if (segments.length === 0) return;
         const context = this.view.document.visual.context;
         const length = segments.reduce((sum, [a, b]) => sum + new XYZ(a).distanceTo(new XYZ(b)), 0);
-        // Dashes are measured along the line in model units: size them to the guide so a long
-        // edge and a short one both read as dashed.
-        const dash = Math.max(length / 60, 1e-3);
-        const outline: EdgeMeshData = {
-            position: new Float32Array(segments.flatMap(([a, b]) => [a.x, a.y, a.z, b.x, b.y, b.z])),
-            range: [],
-            color: GUIDE_COLOR,
-            lineType: "dash",
-            dashSize: dash,
-            gapSize: dash * 0.6,
-            lineWidth: 1.5,
-        };
-        this.meshIds.push(context.displayMesh([outline], { onTop: true }));
+        if (options.outline !== false) {
+            // Dashes are measured along the line in model units: size them to the guide so a
+            // long edge and a short one both read as dashed.
+            const dash = Math.max(length / 60, 1e-3);
+            const outline: EdgeMeshData = {
+                position: new Float32Array(segments.flatMap(([a, b]) => [a.x, a.y, a.z, b.x, b.y, b.z])),
+                range: [],
+                color: GUIDE_COLOR,
+                lineType: "dash",
+                dashSize: dash,
+                gapSize: dash * 0.6,
+                lineWidth: 1.5,
+            };
+            this.meshIds.push(context.displayMesh([outline], { onTop: true }));
+        }
         if (result.mode !== "length") {
             for (const point of segments[0]) {
                 const marker = MeshDataUtils.createVertexMesh(new XYZ(point), 6, GUIDE_COLOR);

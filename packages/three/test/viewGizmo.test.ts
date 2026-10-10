@@ -174,16 +174,17 @@ describe("View cube", () => {
         }
     });
 
-    test("the far faces show through the cube and their names turn the view; corners are flat discs", () => {
-        const { gizmo, cc } = createGizmo();
+    test("only the near faces carry their names; the far side shows through unlabelled; corners are flat discs", () => {
+        const { gizmo } = createGizmo();
         // the camera looks down -Z: Top faces it, Bottom is on the far side
-        const through = (name: string) =>
-            gizmo.querySelector<SVGElement>(`[data-role="through-labels"] [aria-label="${name} view"]`)!;
-        expect(through("Bottom").style.display).toBe("");
-        expect(through("Bottom").getAttribute("tabindex")).toBe("0");
-        expect(through("Top").style.display).toBe("none");
+        expect(gizmo.querySelector('[data-role="through-labels"]')).toBeNull();
         expect(button(gizmo, "Bottom view").dataset["back"]).toBe("true");
         expect(button(gizmo, "Top view").dataset["back"]).toBe("false");
+        const label = (name: string) => button(gizmo, `${name} view`).querySelector("text") as SVGTextElement;
+        expect(label("Top").style.display).toBe("");
+        expect(label("Top").textContent).toBe("Top");
+        for (const name of ["Bottom", "Left", "Back", "Front", "Right"])
+            expect(label(name).style.display).toBe("none");
         // every region stays drawn (the cube is translucent); the far ones — the bottom and the
         // four side faces seen edge-on, their edges and corners — take no pointer
         expect(gizmo.querySelectorAll('[data-kind][data-back="true"]').length).toBe(17);
@@ -199,15 +200,55 @@ describe("View cube", () => {
         expect(z).not.toBeNull();
         expect(z.getAttribute("d")).toBe("");
         expect(gizmo.querySelector<SVGPathElement>('[data-axis="X"]')!.getAttribute("d")).not.toBe("");
-        through("Bottom").dispatchEvent(new PointerEvent("pointerenter"));
-        expect(button(gizmo, "Bottom view").dataset["hover"]).toBe("true");
-        through("Bottom").dispatchEvent(new PointerEvent("pointerleave"));
-        expect(button(gizmo, "Bottom view").dataset["hover"]).toBeUndefined();
-        through("Bottom").dispatchEvent(new MouseEvent("click", { bubbles: true }));
-        const expected = cc.target.clone().add(new Vector3(0, 0, -100));
-        expect(cc.camera.position.distanceTo(expected)).toBeLessThan(1e-10);
-        expect(through("Bottom").style.display).toBe("none");
-        expect(through("Top").style.display).toBe("");
+        // turned to the front, the names follow the visible faces
+        click(gizmo, "Front view");
+        expect(label("Front").style.display).toBe("");
+        expect(label("Back").style.display).toBe("none");
+        expect(label("Top").style.display).toBe("none");
+    });
+
+    test("a near corner takes the pointer through a wider circle over the cube; it lights the corner and turns to it", () => {
+        const { gizmo, cc } = createGizmo();
+        const circles = gizmo.querySelectorAll<SVGCircleElement>("[data-corner-hit]");
+        expect(circles.length).toBe(8);
+        // looking down -Z: the four top corners are near, the four bottom ones are not
+        const shown = [...circles]
+            .filter((c) => c.style.display !== "none")
+            .map((c) => c.dataset["cornerHit"]);
+        expect(shown).toHaveLength(4);
+        expect(shown.every((name) => name!.startsWith("Top"))).toBe(true);
+        expect([...circles].every((c) => c.getAttribute("r") === "8")).toBe(true);
+        const hit = gizmo.querySelector<SVGCircleElement>('[data-corner-hit="Top Front Right view"]')!;
+        const corner = button(gizmo, "Top Front Right view");
+        expect(Number(hit.getAttribute("cx"))).toBeCloseTo(
+            Number(corner.querySelector("ellipse")!.getAttribute("cx")),
+            6,
+        );
+        hit.dispatchEvent(new PointerEvent("pointerenter"));
+        expect(corner.dataset["hover"]).toBe("true");
+        hit.dispatchEvent(new PointerEvent("pointerleave"));
+        expect(corner.dataset["hover"]).toBeUndefined();
+        hit.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        const direction = cc.camera.position.clone().sub(cc.target).normalize();
+        const expected = new Vector3(1, -1, 1).normalize();
+        expect(direction.distanceTo(expected)).toBeLessThan(1e-6);
+    });
+
+    test("the face the camera looks at squarely is marked as facing; an oblique view marks the squarest", () => {
+        const { gizmo } = createGizmo();
+        // looking down -Z: Top faces the camera, no other region does
+        expect(button(gizmo, "Top view").dataset["facing"]).toBe("true");
+        expect(gizmo.querySelectorAll('[data-facing="true"]').length).toBe(1);
+        expect(button(gizmo, "Front view").dataset["facing"]).toBeUndefined();
+        click(gizmo, "Front view");
+        expect(button(gizmo, "Front view").dataset["facing"]).toBe("true");
+        expect(button(gizmo, "Top view").dataset["facing"]).toBeUndefined();
+        // from the Top Front Right corner the three faces tie; exactly one is white, and it is a face
+        click(gizmo, "Top Front Right view");
+        const facing = gizmo.querySelectorAll('[data-facing="true"]');
+        expect(facing.length).toBe(1);
+        expect(facing[0].getAttribute("data-kind")).toBe("face");
+        expect(facing[0].getAttribute("data-back")).toBe("false");
     });
 
     test("camera changes reproject the face polygons and dispose removes the control", () => {

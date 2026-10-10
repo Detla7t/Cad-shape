@@ -40,6 +40,7 @@ export function createThreeMockVisualContext(visualMap?: Map<VisualNode, Mesh>):
         visualShapes,
         tempShapes: new Group(),
         cssObjects: new Group(),
+        pmiAnnotations: new Set(),
         materialMap: new Map(),
         getVisual(node: VisualNode) {
             return visualMap?.get(node) as any;

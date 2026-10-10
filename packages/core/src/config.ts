@@ -3,7 +3,11 @@
 
 import type { CommandKeys } from "./command/commandKeys";
 import { ObjectStorage, Observable } from "./foundation";
-import { DEFAULT_GRAPHICS, type GraphicsPreferences } from "./graphicsPreferences";
+import {
+    DEFAULT_GRAPHICS,
+    type GraphicsPreferences,
+    LEGACY_CONSTRUCTION_PATTERN,
+} from "./graphicsPreferences";
 import { I18n } from "./i18n";
 import type { Navigation3DType } from "./navigation";
 import { type SerializedData, Serializer, serialize } from "./serialize";
@@ -61,7 +65,22 @@ export class Config extends Observable {
     }
 
     get graphics(): GraphicsPreferences {
-        return { ...DEFAULT_GRAPHICS, ...this.getPrivateValue("graphics", { ...DEFAULT_GRAPHICS }) };
+        const stored = this.getPrivateValue("graphics", {
+            ...DEFAULT_GRAPHICS,
+        }) as Partial<GraphicsPreferences>;
+        // A saved copy of the former (denser) construction pattern follows the new default.
+        const legacyPattern = (
+            Object.keys(LEGACY_CONSTRUCTION_PATTERN) as (keyof typeof LEGACY_CONSTRUCTION_PATTERN)[]
+        ).every((key) => stored[key] === undefined || stored[key] === LEGACY_CONSTRUCTION_PATTERN[key]);
+        const pattern = legacyPattern
+            ? {
+                  firstDash: DEFAULT_GRAPHICS.firstDash,
+                  firstGap: DEFAULT_GRAPHICS.firstGap,
+                  secondDash: DEFAULT_GRAPHICS.secondDash,
+                  secondGap: DEFAULT_GRAPHICS.secondGap,
+              }
+            : {};
+        return { ...DEFAULT_GRAPHICS, ...stored, ...pattern };
     }
     set graphics(value: GraphicsPreferences) {
         this.setProperty("graphics", { ...value });

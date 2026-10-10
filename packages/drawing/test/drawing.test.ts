@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { convertDrawing, type Drawing, readDxf, writeDxf, writeSvg } from "../src";
+import { convertDrawing, type Drawing, filterDrawingLayers, readDxf, writeDxf, writeSvg } from "../src";
 
 const inchDrawing: Drawing = {
     units: "inch",
@@ -48,5 +48,17 @@ describe("drawing units", () => {
         expect(mm.entities[2]).toMatchObject({ position: [25.4, 25.4], height: 6.35 });
         const back = convertDrawing(mm, "inch").entities[0];
         expect(back.kind === "line" ? back.b[0] : Number.NaN).toBeCloseTo(2, 12);
+    });
+});
+
+describe("filterDrawingLayers", () => {
+    test("keeps the named layers and their entities, in order; unknown names are ignored", () => {
+        const cut = filterDrawingLayers(inchDrawing, ["Cut", "Nope"]);
+        expect(cut.units).toBe("inch");
+        expect(cut.layers.map((layer) => layer.name)).toEqual(["Cut"]);
+        expect(cut.entities.map((entity) => entity.kind)).toEqual(["line", "text"]);
+        expect(filterDrawingLayers(inchDrawing, []).entities).toEqual([]);
+        // The input is untouched.
+        expect(inchDrawing.entities).toHaveLength(3);
     });
 });

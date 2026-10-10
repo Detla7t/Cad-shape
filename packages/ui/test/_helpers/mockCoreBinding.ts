@@ -14,6 +14,7 @@ rs.mock("@chili3d/core", () => {
     const actual = rs.hoisted(() => require("@chili3d/core"));
     const {
         BindingMock,
+        ComponentFolderNodeMock,
         FolderNodeMock,
         TransactionMock,
         I18nMock,
@@ -26,14 +27,18 @@ rs.mock("@chili3d/core", () => {
     const evaluationState = rs.hoisted(() => require("../../../core/src/model/evaluationState"));
     const featureEvaluation = rs.hoisted(() => require("../../../core/src/model/featureEvaluation"));
     const { ShapeNode } = rs.hoisted(() => require("../../../core/src/model/shapeNode"));
+    // The active component (the folder rows' activate ring reads it); the partial snapshot misses it.
+    const { ComponentContext } = rs.hoisted(() => require("../../../core/src/model/componentContext"));
     return {
         ...actual,
+        ComponentContext,
         ...evaluationState,
         ...featureEvaluation,
         ShapeNode,
         Binding: BindingMock,
         Transaction: TransactionMock,
         FolderNode: FolderNodeMock,
+        ComponentFolderNode: ComponentFolderNodeMock,
         I18n: I18nMock,
         isFeatureListNode: isFeatureListNodeMock,
         isNodeIcon: isNodeIconMock,

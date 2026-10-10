@@ -6,6 +6,7 @@ import {
     type CommandKeys,
     Config,
     DefaultDarkEdgeColor,
+    DisplayScale,
     debounce,
     type EdgeMeshData,
     type IDisposable,
@@ -1359,7 +1360,7 @@ export function sketchEntityMesh(
 ): EdgeMeshData {
     const plane = editor.node.plane;
     if (["point", "bezier", "spline"].includes(entity.type))
-        return entityDisplayMesh(plane, entity, color, lineType === "dash");
+        return entityDisplayMesh(plane, entity, color, lineType === "dash", DisplayScale.value);
     const [x1, y1, x2, y2] = entity.params;
     let mesh: EdgeMeshData;
     if (entity.type === "line") {

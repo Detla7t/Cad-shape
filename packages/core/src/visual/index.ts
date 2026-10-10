@@ -5,6 +5,7 @@ export * from "./act";
 export * from "./cameraController";
 export * from "./cursorType";
 export * from "./detectedData";
+export * from "./displayScale";
 export * from "./eventHandler";
 export * from "./highlighter";
 export * from "./meshExporter";

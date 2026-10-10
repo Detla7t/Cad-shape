@@ -5,7 +5,7 @@ import type { CommandKeys, ICommand } from "../command";
 import type { IDocument } from "../document";
 import type { I18nKeys } from "../i18n";
 import type { Material } from "../material";
-import type { FeatureEditOptions, IFeatureListNode, INode } from "../model";
+import type { FeatureEditOptions, IFeatureListNode, INode, INodeLinkedList } from "../model";
 import type { DialogButton, FloatPanelOptions } from "../ui";
 import type { CursorType, IView } from "../visual";
 import type { AsyncController } from "./asyncController";
@@ -21,6 +21,10 @@ export interface PubSubEventMap {
     clearStatusBarTip: () => void;
     closeCommandContext: () => void;
     displayError: (message: string) => void;
+    /** The component being worked in changed (a folder, or undefined for the whole document). */
+    activeComponentChanged: (document: IDocument, component: INodeLinkedList | undefined) => void;
+    /** The view's pixel size (model units per pixel) moved to another band; see `DisplayScale`. */
+    displayScaleChanged: (unitsPerPixel: number) => void;
     displayHome: (show: boolean) => void;
     openNewDocument: () => void;
     documentClosed: (document: IDocument) => void;
@@ -56,6 +60,7 @@ export interface PubSubEventMap {
     showToast: (message: I18nKeys, ...args: any[]) => void;
     statusBarTip: (tip: I18nKeys) => void;
     toggleChatPanel: () => void;
+    toggleCommandWindow: () => void;
     toggleVersionsPanel: () => void;
     viewClosed: (view: IView) => void;
     viewCursor: (cursor: CursorType) => void;

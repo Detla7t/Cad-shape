@@ -570,3 +570,61 @@
     color: var(--foreground-secondary-color);
     font-size: 12px;
 }
+
+/* The "Layers to export" dialog: one checkbox per layer with its colour. */
+.layerDialog {
+    min-width: 260px;
+    padding: 14px 16px;
+    color: var(--foreground-color);
+    background: var(--panel-background-color);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+}
+.layerDialog::backdrop {
+    background: var(--backdrop-color, rgba(0, 0, 0, 0.45));
+}
+.layerDialog h3 {
+    margin: 0 0 10px;
+    font-size: 13px;
+}
+.layerChoices {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 50vh;
+    overflow: auto;
+}
+.layerChoices label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    cursor: pointer;
+}
+.layerSwatch {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 2px;
+}
+.layerActions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 14px;
+}
+.layerActions button {
+    padding: 4px 12px;
+    font: inherit;
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    background: var(--button-secondary-background);
+    color: var(--foreground-color);
+    cursor: pointer;
+}
+.layerActions .primary {
+    background: var(--button-primary-background);
+    border-color: var(--button-primary-background);
+    color: #fff;
+}

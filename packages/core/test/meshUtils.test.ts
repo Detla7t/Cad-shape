@@ -411,6 +411,22 @@ describe("MeshUtils", () => {
         });
     });
 
+    describe("subVertex", () => {
+        test("returns the positions of one vertex range, and nothing for an index without one", () => {
+            const mesh = {
+                position: new Float32Array([0, 0, 0, 1, 2, 3, 4, 5, 6]),
+                range: [
+                    { start: 0, count: 1, shape: {} as any },
+                    { start: 1, count: 2, shape: {} as any },
+                ],
+                size: 5,
+            } as any;
+            expect(Array.from(MeshUtils.subVertex(mesh, 0)!)).toEqual([0, 0, 0]);
+            expect(Array.from(MeshUtils.subVertex(mesh, 1)!)).toEqual([1, 2, 3, 4, 5, 6]);
+            expect(MeshUtils.subVertex(mesh, 2)).toBeUndefined();
+        });
+    });
+
     describe("subEdge", () => {
         test("should return undefined if index is out of range", () => {
             const mesh: EdgeMeshData = {

@@ -10,6 +10,8 @@ const CAD_ICONS: Readonly<Record<string, string>> = {
     "icon-box": "part",
     "icon-tag": "variable",
     "icon-folder": "folder",
+    "icon-component": "component",
+    "icon-annotation": "annotation",
 };
 
 /**

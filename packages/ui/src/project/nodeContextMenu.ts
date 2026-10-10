@@ -84,10 +84,22 @@ export function showNodeContextMenu(node: INode, x: number, y: number, context?:
             }));
     }
     if (!actions.length) return;
+    showActionMenu(actions, x, y, { className: isPlane ? style.planeMenu : undefined });
+}
+
+/** A menu of actions at a screen point (the tree's and the document tabs' context menus). */
+export function showActionMenu(
+    actions: readonly NodeMenuAction[],
+    x: number,
+    y: number,
+    options: { readonly className?: string; readonly label?: string } = {},
+): void {
+    if (!actions.length) return;
     closeMenu?.();
     const menu = document.createElement("div");
-    menu.className = isPlane ? `${style.menu} ${style.planeMenu}` : style.menu;
+    menu.className = options.className ? `${style.menu} ${options.className}` : style.menu;
     menu.setAttribute("role", "menu");
+    if (options.label) menu.setAttribute("aria-label", options.label);
     const controller = new AbortController();
     const close = () => {
         controller.abort();
@@ -95,7 +107,7 @@ export function showNodeContextMenu(node: INode, x: number, y: number, context?:
         closeMenu = undefined;
     };
     closeMenu = close;
-    const render = (items: NodeMenuAction[], back?: () => void) => {
+    const render = (items: readonly NodeMenuAction[], back?: () => void) => {
         menu.replaceChildren();
         if (back) {
             const b = document.createElement("button");

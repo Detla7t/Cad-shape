@@ -87,18 +87,74 @@
     scrollbar-width: thin;
 }
 
-/* The grey band the steps sit on. */
+/* The grey band the steps sit on; the rail along its bottom carries a tick under each step. */
 .steps {
     position: relative;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     width: max-content;
     min-width: 100%;
-    height: 30px;
-    padding: 0 6px;
+    height: 34px;
+    padding: 2px 6px 0;
     box-sizing: border-box;
     background: var(--timeline-band);
     border-radius: 6px;
+}
+
+.steps::before {
+    content: "";
+    position: absolute;
+    left: 6px;
+    right: 6px;
+    bottom: 3px;
+    height: 1px;
+    background: var(--timeline-marker);
+    opacity: 0.55;
+    pointer-events: none;
+}
+
+.step::after,
+.group::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: -5px;
+    width: 1px;
+    height: 4px;
+    background: var(--timeline-marker);
+    opacity: 0.7;
+    pointer-events: none;
+}
+
+/* A dragged block rides over its neighbours, which slide aside. */
+.step {
+    transition: transform 120ms ease-out;
+}
+
+.dragged {
+    z-index: 2;
+    transition: none;
+    opacity: 0.85;
+    box-shadow: var(--panel-shadow, 0 2px 8px rgba(0, 0, 0, 0.15));
+    background: var(--panel-background-color, #ffffff);
+}
+
+/* The active component's name with the way back to its parent. */
+.context {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex: 0 0 auto;
+    max-width: 180px;
+    padding-right: 4px;
+    border-right: 1px solid var(--border-color, #dddddd);
+}
+
+.contextName {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-weight: 600;
 }
 
 /* One step: a chip on the band; its part bars run along the band's top edge (grey when it is
@@ -189,15 +245,25 @@
     border-right: 2px solid var(--timeline-marker);
 }
 
-/* A group chip: collapsed it stands for its steps, open it heads them. */
+/* A group chip: collapsed it stands for its steps, open it heads them. The +/− on the rail
+   under it (where its tick would be) opens and closes it. */
+.groupSlot {
+    position: relative;
+    display: inline-flex;
+    flex: 0 0 auto;
+    margin: 1px 1px 0;
+    transition: transform 120ms ease-out;
+}
+
 .group {
+    position: relative;
     display: inline-flex;
     align-items: center;
     gap: 3px;
     flex: 0 0 auto;
     max-width: 140px;
     height: 24px;
-    margin: 0 1px;
+    margin: 0;
     padding: 0 6px 0 4px;
     box-sizing: border-box;
     color: inherit;
@@ -206,6 +272,37 @@
     border: 1px solid var(--border-color, #dddddd);
     border-radius: 4px;
     cursor: pointer;
+    user-select: none;
+}
+
+.group::after {
+    display: none;
+}
+
+.groupToggle {
+    position: absolute;
+    left: 50%;
+    bottom: -8px;
+    width: 11px;
+    height: 11px;
+    padding: 0;
+    transform: translateX(-50%);
+    display: grid;
+    place-items: center;
+    font:
+        700 10px / 1 ui-monospace,
+        Menlo,
+        Consolas,
+        monospace;
+    color: var(--foreground-color, #333333);
+    background: var(--panel-background-color, #ffffff);
+    border: 1px solid var(--timeline-marker);
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+.groupToggle:hover {
+    background: var(--timeline-band-hover);
 }
 
 .group:hover {
@@ -377,11 +474,12 @@
     flex: 0 0 auto;
 }
 
+/* Fixed to the viewport (anchored by `TimelineSettings`), over the viewport's own controls. */
 .menu {
-    position: absolute;
+    position: fixed;
     right: 0;
-    bottom: calc(100% + 4px);
-    z-index: 50;
+    bottom: 0;
+    z-index: 1200;
     min-width: 160px;
     padding: 4px 0;
     background: var(--panel-background-color, #ffffff);
@@ -429,7 +527,10 @@
     min-height: 0;
 }
 
+/* Above the viewport in stacking order, so the settings menu opens over it. */
 .host {
+    position: relative;
+    z-index: 3;
     flex: 0 0 auto;
 }
 

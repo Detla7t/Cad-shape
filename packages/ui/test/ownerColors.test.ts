@@ -13,7 +13,13 @@ import {
     type VariableData,
 } from "@chili3d/core";
 import { createMockEdge, TestDocument } from "@chili3d/core/test-utils";
-import { computeOwnership, OWNER_PALETTE, ownerBars, ownerColors } from "../src/project/tree/ownerColors";
+import {
+    computeOwnership,
+    joinOwnerBars,
+    OWNER_PALETTE,
+    ownerBars,
+    ownerColors,
+} from "../src/project/tree/ownerColors";
 
 /** A variable feature, like `MeasuredVariableNode`: one named row, reading other variables. */
 class VariableFeature extends Node implements IVariableFeatureNode {
@@ -191,5 +197,39 @@ describe("owner colours", () => {
         } finally {
             doc.history.disabled = true;
         }
+    });
+});
+
+describe("owner bar joins", () => {
+    const bars = (...lanes: (string | undefined)[]) => ({ lanes, many: false });
+
+    test("consecutive rows with the same owner in a lane join into one strip; a gap or a depth change breaks it", () => {
+        const g = "#9bd36a";
+        const r = "#f28c7a";
+        const joins = joinOwnerBars([
+            { bars: bars(g, r, undefined), depth: 2 }, // 0: both start
+            { bars: bars(g, r, undefined), depth: 2 }, // 1: both continue
+            { bars: bars(undefined, r, undefined), depth: 2 }, // 2: green breaks, red continues
+            { bars: bars(g, r, undefined), depth: 2 }, // 3: green starts again
+            { bars: bars(g, r, undefined), depth: 1 }, // 4: a shallower row: nothing joins across
+            { bars: { lanes: [], many: true }, depth: 1 }, // 5: a striped row never joins
+        ]);
+        expect(joins.map((j) => j.up)).toEqual([
+            [false, false, false],
+            [true, true, false],
+            [false, true, false],
+            [false, true, false],
+            [false, false, false],
+            [false, false, false],
+        ]);
+        expect(joins.map((j) => j.down)).toEqual([
+            [true, true, false],
+            [false, true, false],
+            [false, true, false],
+            [false, false, false],
+            [false, false, false],
+            [false, false, false],
+        ]);
+        expect(joinOwnerBars([])).toEqual([]);
     });
 });

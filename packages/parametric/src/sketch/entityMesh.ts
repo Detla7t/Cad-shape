@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { Config, type EdgeMeshData, type Plane } from "@chili3d/core";
+import { Config, DisplayScale, type EdgeMeshData, type Plane } from "@chili3d/core";
 import { sampleCurve } from "./curveGeometry";
 import { arcAngles, type SketchEntityData, toWorld } from "./sketchModel";
 
@@ -90,9 +90,19 @@ export function dashedPositions(position: Float32Array, dash = 1.4, gap = 0.8): 
 }
 
 /** Four-part construction pattern in world units for a known pixel scale. */
+/**
+ * The construction dash pattern in model units at `pixel` units per pixel: the preference's
+ * pixel lengths, with the period snapped to a 1-2-5 step of model units (`DisplayScale.dashUnit`),
+ * so the density of the dashes follows the zoom in steps.
+ */
 export function constructionPattern(pixel: number): number[] {
     const g = Config.instance.graphics;
-    return [g.firstDash, g.firstGap, g.secondDash, g.secondGap].map((n) => Math.max(1e-6, n * pixel));
+    const parts = [g.firstDash, g.firstGap, g.secondDash, g.secondGap];
+    const unit = DisplayScale.dashUnit(
+        pixel,
+        parts.reduce((sum, n) => sum + n, 0),
+    );
+    return parts.map((n) => Math.max(1e-6, n * unit));
 }
 export function patternedPositions(position: Float32Array, pattern: readonly number[]): Float32Array {
     const result: number[] = [];

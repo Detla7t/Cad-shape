@@ -62,8 +62,41 @@
     }
 
     & .partStudio[data-viewport-only] .sidebar,
-    & .partStudio[data-tabs-open] .sidebar {
+    & .partStudio[data-tabs-open] .sidebar,
+    & .partStudio[data-sidebar-collapsed="true"] .sidebar {
         display: none;
+    }
+
+    /* The sidebar's handle on the viewport's left edge: a tab with the list icon. */
+    /* Onshape's square "Features and parts" button on the viewport's left edge. */
+    & .sidebarToggle {
+        position: absolute;
+        left: 4px;
+        top: 50%;
+        z-index: 15;
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        display: grid;
+        place-items: center;
+        transform: translateY(-50%);
+        color: var(--foreground-secondary-color, #666);
+        background: var(--panel-background-color);
+        border: 1px solid var(--border-color);
+        border-radius: 3px;
+        box-shadow: 0 1px 2px #0002;
+        cursor: pointer;
+    }
+
+    & .sidebarToggle:hover {
+        opacity: 1;
+        color: var(--foreground-color);
+        background: var(--hover-background-color);
+    }
+
+    & .sidebarToggle svg {
+        width: 18px;
+        height: 18px;
     }
 
     & .viewportContainer {
@@ -92,37 +125,52 @@
     }
 }
 
-.chatResizer {
-    width: 6px;
+/* A resizer is a 5px grab zone drawing one dark line a pixel inside the edge it moves. */
+.chatResizer,
+.sidebarResizer {
+    width: 5px;
     cursor: ew-resize;
     position: absolute;
     top: 0;
-    left: 0;
     bottom: 0;
     z-index: 10;
     touch-action: none;
-    background: var(--resizer-gradient);
-    transition: background 0.2s;
+    background: transparent;
 }
 
-.chatResizer:hover {
-    background: var(--resizer-gradient-hover);
+.chatResizer {
+    left: 0;
 }
 
 .sidebarResizer {
-    width: 6px;
-    cursor: ew-resize;
+    right: 0;
+}
+
+.chatResizer::after,
+.sidebarResizer::after {
+    content: "";
     position: absolute;
     top: 0;
-    right: 0;
     bottom: 0;
-    z-index: 10;
-    touch-action: none;
-    background: var(--resizer-gradient);
-    transition: background 0.2s;
+    width: 1px;
+    background: var(--resizer-line-color);
+    transition:
+        background 0.2s,
+        width 0.2s;
 }
-.sidebarResizer:hover {
-    background: var(--resizer-gradient-hover);
+
+.chatResizer::after {
+    left: 1px;
+}
+
+.sidebarResizer::after {
+    right: 1px;
+}
+
+.chatResizer:hover::after,
+.sidebarResizer:hover::after {
+    width: 2px;
+    background: var(--primary-color);
 }
 
 .statusbar {
@@ -235,4 +283,46 @@
     .root .partStudio {
         animation: none;
     }
+}
+
+/* The command window's slot under the timeline (see `Editor.setCommandWindowShown`). */
+.consoleHost {
+    flex: 0 0 auto;
+    position: relative;
+    z-index: 3;
+}
+
+.consoleMount {
+    display: contents;
+}
+
+/* The grab zone on the window's top edge: drag it to make the window taller or shorter. */
+.consoleResizer {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: -3px;
+    height: 6px;
+    cursor: ns-resize;
+    z-index: 10;
+    touch-action: none;
+    background: transparent;
+}
+.consoleResizer::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 3px;
+    height: 1px;
+    background: var(--resizer-line-color);
+    transition:
+        background 0.2s,
+        height 0.2s;
+}
+.consoleResizer:hover::after,
+.consoleHost[data-resizing="true"] .consoleResizer::after {
+    background: var(--primary-color);
+    height: 2px;
+    top: 2px;
 }

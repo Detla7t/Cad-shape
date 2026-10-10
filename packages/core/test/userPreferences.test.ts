@@ -4,6 +4,7 @@
 import {
     Config,
     DEFAULT_DESKTOP_PREFERENCES,
+    DEFAULT_GRAPHICS,
     defaultUserPreferences,
     displayPixelRatio,
     documentParameterInput,
@@ -14,6 +15,7 @@ import {
     formatDocumentQuantity,
     formatDocumentValue,
     initializeDocumentPreferences,
+    LEGACY_CONSTRUCTION_PATTERN,
     LENGTH_UNITS,
     mergeUserPreferences,
     resolveUnitSpec,
@@ -112,4 +114,24 @@ test("desktop bridge preferences default to the local bridge and merge with what
         desktop: { bridgeUrl: "http://pc:1", openExports: true },
     };
     expect(Config.instance.preferences.desktop).toEqual({ bridgeUrl: "http://pc:1", openExports: true });
+});
+
+test("a saved copy of the former construction pattern follows the coarser default; other values stay", () => {
+    const saved = Config.instance.graphics;
+    try {
+        Config.instance.graphics = { ...DEFAULT_GRAPHICS, ...LEGACY_CONSTRUCTION_PATTERN };
+        expect(Config.instance.graphics.firstDash).toBe(DEFAULT_GRAPHICS.firstDash);
+        expect(Config.instance.graphics.secondDash).toBe(DEFAULT_GRAPHICS.secondDash);
+        Config.instance.graphics = {
+            ...DEFAULT_GRAPHICS,
+            firstDash: 20,
+            firstGap: 18,
+            secondDash: 90,
+            secondGap: 18,
+        };
+        expect(Config.instance.graphics.firstDash).toBe(20);
+        expect(Config.instance.graphics.secondDash).toBe(90);
+    } finally {
+        Config.instance.graphics = saved;
+    }
 });

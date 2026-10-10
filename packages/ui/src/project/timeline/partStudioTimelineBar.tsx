@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    ComponentContext,
     Config,
     GeometryNode,
     I18n,
@@ -9,6 +10,7 @@ import {
     type IApplication,
     type IDocument,
     type INode,
+    type INodeLinkedList,
     isFeatureListNode,
     isNodeIcon,
     NodeEvaluation,
@@ -27,6 +29,7 @@ import {
     useObservable,
 } from "@chili3d/react";
 import {
+    type CSSProperties,
     type KeyboardEvent,
     type MouseEvent,
     type PointerEvent,
@@ -40,9 +43,11 @@ import {
     useState,
     useSyncExternalStore,
 } from "react";
+import { createPortal } from "react-dom";
 import { showFeatureContextMenu } from "../../property/featureContextMenu";
 import { featureDisplayName } from "../../property/featureName";
 import { showNodeContextMenu } from "../nodeContextMenu";
+import { computeOwnership, OWNER_PALETTE, type Ownership } from "../tree/ownerColors";
 import { canSelectNodes } from "../treeSelection";
 import { createTypeIcon } from "../typeIcon";
 import style from "./partStudioTimelineBar.module.css";
@@ -57,7 +62,11 @@ import style from "./partStudioTimelineBar.module.css";
  * sketch, a tool body) carries that part's thinner bar stacked above its own — three bars at
  * most; past that a cross-hatched bar stands for all of them, and clicking it lists the parts.
  * Steps can be picked (click, Ctrl, Shift for a range) and grouped into one chip
- * (`PartStudioTimeline.group`), which opens with a click and renames with a double-click.
+ * (`PartStudioTimeline.group`), which opens with the +/− on the rail under it and renames with
+ * a double-click. A drag on a step or a group's head reorders the timeline: the other steps
+ * shift aside as it moves and the document follows on release (`PartStudioTimeline.move`).
+ * With a component active (a folder, Fusion's components), only its steps show and a control
+ * at the left goes back to the parent.
  */
 
 const t = (key: I18nKeys, ...args: unknown[]) => I18n.translate(key, ...args);
@@ -121,6 +130,29 @@ function cssColor(color: number | string): string {
 }
 
 /**
+ * The parts behind a step as the Features tree colours them (`computeOwnership`): a result —
+ * a sketch, a body — owns itself and what it reads, so a step's first bar is its own node's
+ * colour and the others are the parts relying on it, in the tree's palette. The two views
+ * then match colour for colour. With the tree's colouring off, the timeline falls back to
+ * `timelineLanes` and its own palette.
+ */
+export function ownershipLanes(
+    ownership: Ownership,
+    entries: readonly PartStudioTimelineEntry[],
+): { lanes: TimelineLanes[]; colors: Map<INode, string> } | undefined {
+    if (ownership.owners.length === 0) return undefined;
+    const colors = new Map<INode, string>();
+    ownership.owners.forEach((owner, index) =>
+        colors.set(owner, OWNER_PALETTE[index % OWNER_PALETTE.length]),
+    );
+    const lanes = entries.map((entry) => {
+        const owners = (ownership.ownersOf.get(entry.node.id) ?? []).map((index) => ownership.owners[index]);
+        return { owner: owners[0], users: owners.slice(1) };
+    });
+    return { lanes, colors };
+}
+
+/**
  * The bar colour of every part: its material's colour when that is not the document's default
  * material colour (every part looks the same otherwise), else the palette by first appearance.
  */
@@ -153,6 +185,47 @@ interface GroupSpan {
     readonly count: number;
 }
 
+/** A visible item of the track: a step (one key) or a group's head (its keys). */
+interface TrackSlot {
+    readonly keys: readonly string[];
+    readonly entryIndex: number;
+}
+
+interface PendingDrag {
+    readonly keys: readonly string[];
+    readonly slot: number;
+    readonly startX: number;
+    rects: { left: number; width: number }[] | undefined;
+}
+
+export interface DragState {
+    readonly keys: readonly string[];
+    /** The first dragged slot and how many slots the block spans. */
+    readonly from: number;
+    readonly count: number;
+    /** Where the block lands, counted among the slots without it. */
+    readonly to: number;
+    readonly dx: number;
+    readonly width: number;
+}
+
+/** How far a slot moves aside (or the dragged block follows the pointer) during a drag. */
+export function dragShift(drag: DragState | undefined, slot: number): number {
+    if (drag === undefined) return 0;
+    if (slot >= drag.from && slot < drag.from + drag.count) return drag.dx;
+    const rest = slot < drag.from ? slot : slot - drag.count;
+    if (drag.to <= rest && rest < drag.from) return drag.width;
+    if (drag.from <= rest && rest < drag.to) return -drag.width;
+    return 0;
+}
+
+function within(node: INode | undefined, container: INode): boolean {
+    for (let current = node; current !== undefined; current = current.parent) {
+        if (current === container) return true;
+    }
+    return false;
+}
+
 export function TimelineBar({ document, playInterval = 400 }: TimelineBarProps) {
     const timeline = useMemo(() => PartStudioTimeline.of(document), [document]);
     const entries = useObservable(timeline, "entries");
@@ -161,8 +234,13 @@ export function TimelineBar({ document, playInterval = 400 }: TimelineBarProps) 
     const [preview, setPreview] = useState<number | undefined>();
     const shown = preview ?? position;
     const selected = useSelectedNodes(document);
-    const lanes = useMemo(() => timelineLanes(entries), [entries]);
-    const colors = useMemo(() => partColors(document, lanes), [document, lanes]);
+    const { lanes, colors } = useMemo(() => {
+        const mode = Config.instance.preferences.treeOwnerColors;
+        const owned = mode === "off" ? undefined : ownershipLanes(computeOwnership(document, mode), entries);
+        if (owned !== undefined) return owned;
+        const fallback = timelineLanes(entries);
+        return { lanes: fallback, colors: partColors(document, fallback) };
+    }, [document, entries]);
     const evaluations = useMemo(() => new Map<INode, NodeEvaluation>(), [document]);
     const evaluationOf = (node: INode) => {
         let evaluation = evaluations.get(node);
@@ -220,6 +298,20 @@ export function TimelineBar({ document, playInterval = 400 }: TimelineBarProps) 
     const [shared, setShared] = useState<{ index: number; x: number; y: number } | undefined>();
     const [menu, setMenu] = useState<{ group: TimelineGroup; x: number; y: number } | undefined>();
     const [renaming, setRenaming] = useState<string | undefined>();
+
+    // The active component (a folder, Fusion's activated component): only its steps show.
+    const scoped = useActiveComponent(document);
+    const root = document.modelManager.rootNode;
+    const inContext = (node: INode) => scoped === undefined || within(node, scoped);
+
+    // A drag on a step or a group's head: the block follows the pointer, the others shift aside.
+    const [dragging, setDragging] = useState<DragState | undefined>();
+    const suppressClick = useRef(false);
+    const dragRef = useRef<PendingDrag | undefined>(undefined);
+    // The window's pointer handlers were made by the render the press happened in: they read refs.
+    const dragStateRef = useRef<DragState | undefined>(undefined);
+    const entriesRef = useRef(entries);
+    entriesRef.current = entries;
 
     const [playing, setPlaying] = usePlayback(timeline, playInterval);
     const scroller = useRef<HTMLDivElement>(null);
@@ -308,6 +400,7 @@ export function TimelineBar({ document, playInterval = 400 }: TimelineBarProps) 
     const isOpen = (group: TimelineGroup, span: GroupSpan) =>
         !group.collapsed || (span.first < shown && shown <= span.last);
     const visible = entries.map((entry) => {
+        if (!inContext(entry.node)) return false;
         const group = groupByKey.get(entry.key);
         return group === undefined || isOpen(group, spans.get(group.id)!);
     });
@@ -329,14 +422,33 @@ export function TimelineBar({ document, playInterval = 400 }: TimelineBarProps) 
         return lines.join("\n");
     };
 
+    // The visible items in track order (a step or a group's head), with the entry each stands at.
+    const slots: TrackSlot[] = [];
+    const slotOf = (keys: readonly string[], entryIndex: number) => {
+        slots.push({ keys, entryIndex });
+        return slots.length - 1;
+    };
+    const shiftOf = (slot: number) => dragShift(dragging, slot);
+    const isDragged = (slot: number) =>
+        dragging !== undefined && slot >= dragging.from && slot < dragging.from + dragging.count;
+    const beginDrag = (keys: readonly string[], slot: number, event: PointerEvent<HTMLElement>) => {
+        if (event.button !== 0 || dragging !== undefined) return;
+        if ((event.target as Element).closest("[data-shared]") !== null) return;
+        dragRef.current = { keys, slot, startX: event.clientX, rects: undefined };
+        window.addEventListener("pointermove", onDragMove);
+        window.addEventListener("pointerup", onDragEnd);
+        window.addEventListener("pointercancel", onDragCancel);
+    };
+
     const track: ReactNode[] = [];
     entries.forEach((entry, index) => {
-        if (index === shown) track.push(markerElement);
+        if (index === shown && inContext(entry.node)) track.push(markerElement);
         const group = groupByKey.get(entry.key);
         const span = group === undefined ? undefined : spans.get(group.id);
-        if (group !== undefined && span !== undefined) {
+        if (group !== undefined && span !== undefined && inContext(entry.node)) {
             const open = isOpen(group, span);
             if (index === span.first) {
+                const slot = slotOf(group.keys, index);
                 track.push(
                     <GroupChip
                         key={`group:${group.id}`}
@@ -345,6 +457,8 @@ export function TimelineBar({ document, playInterval = 400 }: TimelineBarProps) 
                         count={span.count}
                         future={span.first >= shown}
                         renaming={renaming === group.id}
+                        shift={shiftOf(slot)}
+                        dragged={isDragged(slot)}
                         onToggle={() => timeline.setGroupCollapsed(group.id, !group.collapsed)}
                         onRename={() => setRenaming(group.id)}
                         onRenamed={(name) => {
@@ -352,25 +466,32 @@ export function TimelineBar({ document, playInterval = 400 }: TimelineBarProps) 
                             if (name !== undefined) timeline.renameGroup(group.id, name);
                         }}
                         onMenu={(event) => setMenu({ group, x: event.clientX, y: event.clientY })}
+                        onDragStart={(event) => beginDrag(group.keys, slot, event)}
+                        suppressClick={suppressClick}
                     />,
                 );
             }
             if (!open) return;
         }
+        if (!visible[index]) return;
         const label = labelOf(entry);
         const previous = previousVisible(index);
         const following = nextVisible(index);
+        const slot = slotOf([entry.key], index);
         track.push(
             <TimelineStep
                 key={entry.key}
                 entry={entry}
                 label={label}
-                title={titleOf(index, label)}
+                title={`${titleOf(index, label)}\n${t("timeline.dragToReorder")}`}
                 future={index >= shown}
                 selected={selected.includes(entry.node)}
                 picked={picked.includes(entry.key)}
                 lanes={lanes[index]}
                 colors={colors}
+                shift={shiftOf(slot)}
+                dragged={isDragged(slot)}
+                onDragStart={(event) => beginDrag([entry.key], slot, event)}
                 joinLeft={sameOwner(previous, index)}
                 joinRight={sameOwner(index, following)}
                 grouped={
@@ -385,9 +506,17 @@ export function TimelineBar({ document, playInterval = 400 }: TimelineBarProps) 
                               : "middle"
                 }
                 evaluation={evaluationOf(entry.node)}
-                onSelect={(event) => pick(index, event)}
+                onSelect={(event) => {
+                    if (suppressClick.current) {
+                        suppressClick.current = false;
+                        return;
+                    }
+                    pick(index, event);
+                }}
                 onShared={(event) => setShared({ index, x: event.clientX, y: event.clientY })}
                 onOpen={() => {
+                    // the marker follows the opened step: the model with it just applied
+                    timeline.rollAfter(entry.node, entry.kind === "feature" ? entry.feature.id : undefined);
                     if (entry.kind === "feature")
                         PubSub.default.pub("editFeature", entry.node, entry.feature.id);
                     else PubSub.default.pub("nodeDoubleClicked", entry.node);
@@ -403,7 +532,64 @@ export function TimelineBar({ document, playInterval = 400 }: TimelineBarProps) 
             />,
         );
     });
-    if (shown >= entries.length) track.push(markerElement);
+    if (shown >= entries.length || !track.includes(markerElement)) track.push(markerElement);
+
+    // The drag's pointer handlers read the slots of the render they started in.
+    const slotsRef = useRef(slots);
+    slotsRef.current = slots;
+    const onDragMove = (event: globalThis.PointerEvent) => {
+        const pending = dragRef.current;
+        if (pending === undefined) return;
+        const dx = event.clientX - pending.startX;
+        if (pending.rects === undefined) {
+            if (Math.abs(dx) < 4) return;
+            const elements = scroller.current?.querySelectorAll<HTMLElement>("[data-slot]") ?? [];
+            pending.rects = [...elements].map((element) => {
+                const rect = element.getBoundingClientRect();
+                return { left: rect.left, width: rect.width + 2 };
+            });
+            suppressClick.current = true;
+        }
+        const rects = pending.rects;
+        const count = slotsRef.current.filter(
+            (slot, i) => i >= pending.slot && pending.keys.includes(slot.keys[0]),
+        ).length;
+        const width = rects
+            .slice(pending.slot, pending.slot + count)
+            .reduce((sum, rect) => sum + rect.width, 0);
+        const rest = rects.filter((_, i) => i < pending.slot || i >= pending.slot + count);
+        let to = 0;
+        for (const rect of rest)
+            if (event.clientX > rect.left + rect.width / 2 + (to >= pending.slot ? -width : 0)) to++;
+        const state: DragState = { keys: pending.keys, from: pending.slot, count, to, dx, width };
+        dragStateRef.current = state;
+        setDragging(state);
+    };
+    const finishDrag = () => {
+        window.removeEventListener("pointermove", onDragMove);
+        window.removeEventListener("pointerup", onDragEnd);
+        window.removeEventListener("pointercancel", onDragCancel);
+        dragRef.current = undefined;
+        dragStateRef.current = undefined;
+        setDragging(undefined);
+    };
+    const onDragCancel = () => finishDrag();
+    const onDragEnd = () => {
+        const pending = dragRef.current;
+        const state = dragStateRef.current;
+        finishDrag();
+        if (pending === undefined || pending.rects === undefined || state === undefined) return;
+        const all = entriesRef.current;
+        const restSlots = slotsRef.current.filter((_, i) => i < state.from || i >= state.from + state.count);
+        const target = restSlots[state.to];
+        const moved = new Set(state.keys);
+        const restEntries = all.filter((entry) => !moved.has(entry.key));
+        const to =
+            target === undefined
+                ? restEntries.length
+                : restEntries.filter((entry) => all.indexOf(entry) < target.entryIndex).length;
+        if (!timeline.move(state.keys, to)) PubSub.default.pub("displayError", t("timeline.reorderRefused"));
+    };
 
     const atStart = position === 0;
     const atEnd = position >= entries.length;
@@ -415,6 +601,24 @@ export function TimelineBar({ document, playInterval = 400 }: TimelineBarProps) 
             onPointerDown={(event) => event.stopPropagation()}
             onContextMenu={(event) => event.preventDefault()}
         >
+            {scoped !== undefined ? (
+                <div className={style.context}>
+                    <ControlButton
+                        label={t(
+                            "timeline.backToParent{0}",
+                            scoped.parent === root || scoped.parent === undefined
+                                ? root.name
+                                : scoped.parent.name,
+                        )}
+                        onClick={() => ComponentContext.activateParent(document)}
+                    >
+                        <path d="M7 12V3M3 7l4-4 4 4" />
+                    </ControlButton>
+                    <span className={style.contextName} title={scoped.name}>
+                        {scoped.name}
+                    </span>
+                </div>
+            ) : null}
             <div className={style.controls}>
                 <ControlButton
                     label={t("timeline.start")}
@@ -520,6 +724,10 @@ interface TimelineStepProps {
     readonly joinLeft: boolean;
     readonly joinRight: boolean;
     readonly grouped: "start" | "middle" | "end" | "only" | undefined;
+    /** Pixels the step moves aside while another is dragged past it. */
+    readonly shift: number;
+    readonly dragged: boolean;
+    readonly onDragStart: (event: PointerEvent<HTMLElement>) => void;
     readonly evaluation: NodeEvaluation;
     readonly onSelect: (event: MouseEvent) => void;
     /** A click on the cross-hatched bar. */
@@ -547,10 +755,14 @@ function TimelineStep(props: TimelineStepProps) {
                 future && style.future,
                 selected && style.selected,
                 picked && style.picked,
+                props.dragged && style.dragged,
                 entry.kind === "feature" && entry.feature.suppressed && style.suppressed,
             )}
+            style={props.shift !== 0 ? { transform: `translateX(${props.shift}px)` } : undefined}
             data-key={entry.key}
             data-span="1"
+            data-slot=""
+            onPointerDown={props.onDragStart}
             data-future={future}
             data-picked={picked || undefined}
             data-grouped={props.grouped}
@@ -604,11 +816,15 @@ interface GroupChipProps {
     readonly count: number;
     readonly future: boolean;
     readonly renaming: boolean;
+    readonly shift: number;
+    readonly dragged: boolean;
     readonly onToggle: () => void;
     readonly onRename: () => void;
     /** The new name, or undefined when renaming was cancelled. */
     readonly onRenamed: (name: string | undefined) => void;
     readonly onMenu: (event: MouseEvent) => void;
+    readonly onDragStart: (event: PointerEvent<HTMLElement>) => void;
+    readonly suppressClick: RefObject<boolean>;
 }
 
 /** A group on the track: collapsed, it stands for all its steps; open, it heads them. */
@@ -635,33 +851,59 @@ function GroupChip(props: GroupChipProps) {
             />
         );
     }
+    const toggle = (event: { stopPropagation: () => void }) => {
+        event.stopPropagation();
+        props.onToggle();
+    };
     return (
-        <button
-            type="button"
-            className={join(style.group, open && style.groupOpen, props.future && style.future)}
+        <span
+            className={join(style.groupSlot, props.dragged && style.dragged)}
+            style={props.shift !== 0 ? { transform: `translateX(${props.shift}px)` } : undefined}
             data-group={group.id}
             data-span={open ? 0 : count}
-            aria-expanded={open}
-            aria-label={title}
-            title={title}
-            onClick={(event) => {
-                event.stopPropagation();
-                props.onToggle();
-            }}
-            onDoubleClick={(event) => {
-                event.stopPropagation();
-                props.onRename();
-            }}
-            onContextMenu={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                props.onMenu(event);
-            }}
+            data-slot=""
         >
-            <TypeIcon icon="icon-folder" />
-            <span className={style.groupName}>{group.name}</span>
-            {open ? null : <span className={style.count}>{count}</span>}
-        </button>
+            <button
+                type="button"
+                className={join(style.group, open && style.groupOpen, props.future && style.future)}
+                aria-expanded={open}
+                aria-label={title}
+                title={`${title}\n${t("timeline.dragToReorder")}`}
+                onPointerDown={props.onDragStart}
+                onClick={(event) => {
+                    event.stopPropagation();
+                    if (props.suppressClick.current) {
+                        props.suppressClick.current = false;
+                        return;
+                    }
+                    props.onToggle();
+                }}
+                onDoubleClick={(event) => {
+                    event.stopPropagation();
+                    props.onRename();
+                }}
+                onContextMenu={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    props.onMenu(event);
+                }}
+            >
+                <TypeIcon icon="icon-folder" />
+                <span className={style.groupName}>{group.name}</span>
+                {open ? null : <span className={style.count}>{count}</span>}
+            </button>
+            <button
+                type="button"
+                className={style.groupToggle}
+                aria-label={open ? t("timeline.collapse") : t("timeline.expand")}
+                title={open ? t("timeline.collapse") : t("timeline.expand")}
+                onPointerDown={(event) => event.stopPropagation()}
+                onDoubleClick={(event) => event.stopPropagation()}
+                onClick={toggle}
+            >
+                {open ? "−" : "+"}
+            </button>
+        </span>
     );
 }
 
@@ -805,10 +1047,25 @@ function TimelineSettings() {
     const [open, setOpen] = useState(false);
     const shown = useShowTimeline();
     const root = useRef<HTMLDivElement>(null);
+    const cog = useRef<HTMLButtonElement>(null);
+    const menu = useRef<HTMLDivElement>(null);
+    // The menu is portalled to the body and fixed above the cog's right edge: the timeline
+    // host is its own low stacking context, so a menu drawn inside it would sit under the
+    // viewport's own controls (the utilities in its corner, the view cube, the sidebar handle)
+    // whatever its z-index.
+    const anchor = (): CSSProperties => {
+        const rect = cog.current?.getBoundingClientRect();
+        if (rect === undefined) return {};
+        return {
+            right: `${Math.max(0, window.innerWidth - rect.right)}px`,
+            bottom: `${Math.max(0, window.innerHeight - rect.top + 4)}px`,
+        };
+    };
     useEffect(() => {
         if (!open) return;
         const close = (event: Event) => {
-            if (!root.current?.contains(event.target as Node)) setOpen(false);
+            const target = event.target as Node;
+            if (!root.current?.contains(target) && !menu.current?.contains(target)) setOpen(false);
         };
         const onKeyDown = (event: globalThis.KeyboardEvent) => {
             if (event.key === "Escape") setOpen(false);
@@ -824,6 +1081,7 @@ function TimelineSettings() {
         <div className={style.settings} ref={root}>
             <button
                 type="button"
+                ref={cog}
                 className={style.control}
                 aria-label={t("timeline.settings")}
                 aria-haspopup="menu"
@@ -835,26 +1093,43 @@ function TimelineSettings() {
                     <use href="#icon-cog" />
                 </svg>
             </button>
-            {open ? (
-                <div className={style.menu} role="menu">
-                    <button
-                        type="button"
-                        role="menuitemcheckbox"
-                        aria-checked={shown}
-                        onClick={() => {
-                            setOpen(false);
-                            setShowTimeline(!shown);
-                        }}
-                    >
-                        <span className={style.check} aria-hidden="true">
-                            {shown ? "✓" : ""}
-                        </span>
-                        {t("timeline.show")}
-                    </button>
-                </div>
-            ) : null}
+            {open
+                ? createPortal(
+                      <div className={style.menu} role="menu" style={anchor()} ref={menu}>
+                          <button
+                              type="button"
+                              role="menuitemcheckbox"
+                              aria-checked={shown}
+                              onClick={() => {
+                                  setOpen(false);
+                                  setShowTimeline(!shown);
+                              }}
+                          >
+                              <span className={style.check} aria-hidden="true">
+                                  {shown ? "✓" : ""}
+                              </span>
+                              {t("timeline.show")}
+                          </button>
+                      </div>,
+                      globalThis.document.body,
+                  )
+                : null}
         </div>
     );
+}
+
+/** The active component of the document (`ComponentContext`), as it changes. */
+function useActiveComponent(document: IDocument): INodeLinkedList | undefined {
+    const [active, setActive] = useState(() => ComponentContext.activeOf(document));
+    useEffect(() => {
+        setActive(ComponentContext.activeOf(document));
+        const handler = (changed: IDocument, component: INodeLinkedList | undefined) => {
+            if (changed === document) setActive(component);
+        };
+        PubSub.default.sub("activeComponentChanged", handler);
+        return () => PubSub.default.remove("activeComponentChanged", handler);
+    }, [document]);
+    return active;
 }
 
 /** The selected nodes, following the document's selection. */

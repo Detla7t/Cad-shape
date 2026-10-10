@@ -4,6 +4,8 @@
 export * from "./annotation";
 export * from "./childList";
 export * from "./component";
+export * from "./componentContext";
+export * from "./componentFolderNode";
 export * from "./evaluationState";
 export * from "./facebaseNode";
 export * from "./featureEvaluation";
@@ -20,6 +22,7 @@ export * from "./nodeSceneless";
 export * from "./nodeWarning";
 export * from "./originNode";
 export * from "./partStudioTimeline";
+export * from "./pmiAnnotation";
 export * from "./referencePlaneNode";
 export * from "./shapeNode";
 export * from "./visualNode";

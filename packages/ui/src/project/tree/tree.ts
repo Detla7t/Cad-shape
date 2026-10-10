@@ -21,7 +21,7 @@ import {
 import { HistoryBar } from "../historyBar";
 import { showNodeContextMenu } from "../nodeContextMenu";
 import { canSelectNodes } from "../treeSelection";
-import { computeOwnership, ownerBars } from "./ownerColors";
+import { computeOwnership, joinOwnerBars, ownerBars } from "./ownerColors";
 
 /** The configuration, when one exists (UI tests may run the tree over a stand-in core). */
 function config(): Config | undefined {
@@ -156,7 +156,38 @@ export class Tree extends HTMLElement {
         if (typeof this.document.modelManager?.findNodes !== "function") return;
         const mode = config()?.preferences.treeOwnerColors ?? "solid";
         const ownership = computeOwnership(this.document, mode);
-        for (const [node, row] of this.nodeMap) row.setOwnerBars?.(ownerBars(ownership, node));
+        // The bars join across consecutive visible rows: a run of rows the same owner uses
+        // reads as one continuous strip, broken only by a row it has no part in.
+        const rows = this.visibleRowsInOrder().map((row) => ({
+            row,
+            bars: ownerBars(ownership, row.node),
+            depth: nodeDepth(row.node),
+        }));
+        const joins = joinOwnerBars(rows);
+        const seen = new Set<TreeItem>();
+        rows.forEach(({ row, bars }, index) => {
+            seen.add(row);
+            row.setOwnerBars?.(bars, joins[index]);
+        });
+        for (const [node, row] of this.nodeMap)
+            if (!seen.has(row)) row.setOwnerBars?.(ownerBars(ownership, node));
+    }
+
+    /** Every row shown now — not filtered out, not inside a collapsed group — in reading order. */
+    private visibleRowsInOrder(): TreeItem[] {
+        const rows = [...this.nodeMap.values()].filter((row) => {
+            if (row.hidden) return false;
+            for (
+                let parent = row.parentElement;
+                parent !== null && parent !== this;
+                parent = parent.parentElement
+            )
+                if (parent instanceof TreeGroup && !parent.isExpanded) return false;
+            return true;
+        });
+        return rows.sort((a, b) =>
+            a === b ? 0 : a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1,
+        );
     }
 
     private readonly handleCurrentNodeChanged = (
@@ -381,6 +412,9 @@ export class Tree extends HTMLElement {
         const node = this.getTreeItem(event.target as HTMLElement)?.node;
         if (node === undefined) return;
         event.stopPropagation();
+        // The marker follows the step being opened (a sketch, a plain node): the model shows
+        // the state with it just applied, before the editors react to the double-click.
+        partStudioTimeline(this.document)?.rollAfter(node);
         PubSub.default.pub("nodeDoubleClicked", node);
     };
 
@@ -419,18 +453,13 @@ export class Tree extends HTMLElement {
         return canSelectNodes(this.document);
     }
 
+    /**
+     * Remembers the clicked row for Shift ranges. Clicking never moves the model manager's
+     * `currentNode`: where new parts go is the active component's business alone
+     * (`ComponentContext`), so a click on a folder only selects it.
+     */
     private handleLastClickItem(item: INode | undefined) {
         this.lastClicked = item;
-        if (item !== undefined) {
-            // Only folders accept new nodes: a parametric body is a linked list too,
-            // but its children are consumed boolean tools hidden from the scene.
-            // Walk up to the nearest folder ancestor when clicking inside such a body.
-            let node: INodeLinkedList | undefined = item instanceof FolderNode ? item : item.parent;
-            while (node !== undefined && !(node instanceof FolderNode)) {
-                node = node.parent;
-            }
-            this.document.modelManager.currentNode = node;
-        }
     }
 
     private canDrop(event: DragEvent) {
@@ -512,3 +541,10 @@ export class Tree extends HTMLElement {
 }
 
 customElements.define("ui-tree", Tree);
+
+/** How deep a node sits in the model tree (the root at 0). */
+function nodeDepth(node: INode): number {
+    let depth = 0;
+    for (let parent = node.parent; parent !== undefined; parent = parent.parent) depth++;
+    return depth;
+}

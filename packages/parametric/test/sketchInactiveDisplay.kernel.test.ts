@@ -73,6 +73,33 @@ describe("inactive sketch display", () => {
         expect(color.slice(0, 3).map((c) => Math.round(c * 255))).toEqual([0x99, 0x99, 0x99]);
     });
 
+    test("each entity point carries a kernel vertex in its range, so it picks and measures on its own", () => {
+        const node = sketch();
+        const vertexs = node.mesh.vertexs!;
+        expect(vertexs.range).toHaveLength(3);
+        vertexs.range.forEach((range, index) => {
+            expect(range.start).toBe(index);
+            expect(range.count).toBe(1);
+            const point = (
+                range.shape as unknown as { point(): { x: number; y: number; z: number } }
+            ).point();
+            expect([point.x, point.y, point.z]).toEqual([
+                vertexs.position[index * 3],
+                vertexs.position[index * 3 + 1],
+                vertexs.position[index * 3 + 2],
+            ]);
+            expect((range.shape as unknown as { parent: unknown }).parent).toBe(range.shape);
+        });
+        // the circle's centre is the first point: a centre is a pick target like a line's end
+        const centre = (vertexs.range[0].shape as unknown as { point(): { x: number; y: number } }).point();
+        expect([centre.x, centre.y]).toEqual([0, 0]);
+        // the vertices are cached by position: an unchanged point keeps its kernel vertex
+        const before = vertexs.range.map((range) => range.shape);
+        node.setShowProfileFaces(false);
+        node.setShowProfileFaces(true);
+        expect(node.mesh.vertexs!.range.map((range) => range.shape)).toEqual(before);
+    });
+
     test("the graphics preferences drive the fill opacity and point size, and 0 hides them", () => {
         const node = sketch();
         Config.instance.graphics = { ...original, inactiveRegionOpacity: 40, inactivePointSize: 6 };

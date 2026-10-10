@@ -5,6 +5,7 @@ import {
     FolderNode,
     isHistoryHidden,
     OriginNode,
+    orderRespectsDependencies,
     PartStudioTimeline,
     PubSub,
     TIMELINE_GROUPS_KEY,
@@ -142,6 +143,25 @@ describe("PartStudioTimeline rollback", () => {
         // The tree's document bar: before a row.
         expect(tree.rollBefore([body])).toBe(true);
         expect(timeline.position).toBe(1);
+    });
+
+    test("opening a step pulls the marker to right after it: the model with that step just applied", () => {
+        const { document, s1, s2, body, timeline } = fixture();
+        // S1, B/f1, S2, B/f2
+        expect(timeline.rollAfter(body, "f1")).toBe(true);
+        expect(timeline.position).toBe(2);
+        expect(timeline.isFuture(2)).toBe(true);
+        expect(timeline.rollAfter(s1)).toBe(true);
+        expect(timeline.position).toBe(1);
+        // forward as well as back
+        expect(timeline.rollAfter(body, "f2")).toBe(true);
+        expect(timeline.position).toBe(4);
+        expect(timeline.rollAfter(s2)).toBe(true);
+        expect(timeline.position).toBe(3);
+        // a node without an entry (a folder) leaves the marker alone
+        const other = new StepNode(document, "Loose");
+        expect(timeline.rollAfter(other)).toBe(false);
+        expect(timeline.position).toBe(3);
     });
 
     test("a position the kernel cannot rebuild restores the previous one and reports it", () => {
@@ -361,5 +381,67 @@ describe("PartStudioTimeline groups", () => {
         const timeline = PartStudioTimeline.of(document);
         timeline.refresh();
         expect(timeline.groups).toEqual([{ id: "g1", name: "Kept", keys: ["S1"], collapsed: false }]);
+    });
+});
+
+describe("PartStudioTimeline reordering", () => {
+    test("a feature moves inside its body and a sketch among its siblings (an undo step)", () => {
+        const { document, timeline, body } = fixture();
+        const names = () => {
+            const result: string[] = [];
+            for (let child = document.modelManager.rootNode.firstChild; child; child = child.nextSibling)
+                result.push(child.name);
+            return result;
+        };
+        // S1, B/f1, S2, B/f2 — f1 after f2 inside the body (f1 reads S1, which stays ahead).
+        expect(timeline.move(["B/f1"], 3)).toBe(true);
+        expect(body.features.map((feature) => feature.id)).toEqual(["f2", "f1"]);
+        expect(keys(timeline)).toEqual(["S1", "S2", "B/f2", "B/f1"]);
+        // S2 up front of the body: the document order becomes S1, S2, B.
+        expect(timeline.move(["S2"], 1)).toBe(true);
+        expect(names()).toEqual(["S1", "S2", "B"]);
+        expect(keys(timeline)).toEqual(["S1", "S2", "B/f2", "B/f1"]);
+        document.history.undo();
+        expect(names()).toEqual(["S1", "B", "S2"]);
+    });
+
+    test("a step cannot move before what it reads; a group's steps move as a block", () => {
+        const { document, timeline } = fixture();
+        // f1 reads S1: before S1 is refused, nothing changes.
+        expect(timeline.canMove(["B/f1"], 0)).toBe(false);
+        expect(timeline.move(["B/f1"], 0)).toBe(false);
+        expect(keys(timeline)).toEqual(["S1", "B/f1", "S2", "B/f2"]);
+        // A sketch cannot pass the feature reading it.
+        expect(timeline.canMove(["S1"], 3)).toBe(false);
+        // The group S2 + f2 moves together before f1 — f1 does not read them, f2 still follows S2.
+        timeline.group(["S2", "B/f2"], "Tail");
+        expect(timeline.move(["S2", "B/f2"], 1)).toBe(true);
+        expect(keys(timeline)).toEqual(["S1", "S2", "B/f2", "B/f1"]);
+        expect(timeline.groups[0].keys).toEqual(["S2", "B/f2"]);
+        expect(timeline.move(["nope"], 0)).toBe(false);
+        // A sketch nothing later reads cannot sit between two features of one body.
+        document.modelManager.addNode(new StepNode(document, "S3"));
+        timeline.refresh();
+        expect(keys(timeline)).toEqual(["S1", "S2", "B/f2", "B/f1", "S3"]);
+        expect(timeline.canMove(["S3"], 3)).toBe(false);
+        expect(timeline.canMove(["S3"], 2)).toBe(true);
+    });
+
+    test("orderRespectsDependencies checks features' sources and anchored sketches", () => {
+        const document = new TestDocument();
+        const s = new StepNode(document, "S");
+        s.nodeIds = ["B"];
+        s.anchors = { B: 1 };
+        const body = new BodyNode(document, "B", [{ id: "f1" }, { id: "f2", nodeIds: ["S"] }]);
+        document.modelManager.addNode(body, s);
+        const timeline = PartStudioTimeline.of(document);
+        timeline.refresh();
+        const [f1, sketch, f2] = timeline.entries;
+        expect(keys(timeline)).toEqual(["B/f1", "S", "B/f2"]);
+        expect(orderRespectsDependencies([f1, sketch, f2])).toBe(true);
+        // The sketch is drawn on f1: it cannot come first.
+        expect(orderRespectsDependencies([sketch, f1, f2])).toBe(false);
+        // f2 reads the sketch.
+        expect(orderRespectsDependencies([f1, f2, sketch])).toBe(false);
     });
 });

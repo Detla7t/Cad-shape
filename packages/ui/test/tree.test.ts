@@ -348,8 +348,8 @@ describe("Tree", () => {
             model1El.click();
 
             expect(fixture.doc.selection.setSelectedNodes).toHaveBeenCalledWith([fixture.model1], false);
-            // current node becomes the clicked model's parent group
-            expect(fixture.doc.modelManager.currentNode).toBe(fixture.groupA);
+            // where new parts go is the active component's business, never a click's
+            expect(fixture.doc.modelManager.currentNode).toBeUndefined();
         });
 
         test("should not select via click without an active selection handler", () => {
@@ -404,40 +404,17 @@ describe("Tree", () => {
             expect(model2El.classList.contains("tree-current")).toBe(true);
         });
 
-        test("should set a clicked folder as current node", () => {
+        test("clicking a folder, a body or a consumed tool never moves the current node", () => {
             fixture = createFixture();
             fixture.doc.visual.eventHandler = new (
                 NodeSelectionHandler as unknown as new () => unknown
             )() as typeof fixture.doc.visual.eventHandler;
-            const groupEl = fixture.tree.treeItem(fixture.groupA as unknown as INode) as HTMLElement;
-
-            groupEl.click();
-
-            expect(fixture.doc.modelManager.currentNode).toBe(fixture.groupA);
-        });
-
-        test("should keep the parent as current node when clicking a non-folder group", () => {
-            fixture = createFixture();
-            fixture.doc.visual.eventHandler = new (
-                NodeSelectionHandler as unknown as new () => unknown
-            )() as typeof fixture.doc.visual.eventHandler;
-            // A parametric body renders as a group (consumed tools) but is not a folder.
-            const body = new MockNode("body");
-            body.isGroup = true;
-            body.parent = fixture.root;
-            fixture.doc.emitNodeChanged([{ node: body, newParent: fixture.root } as unknown as NodeRecord]);
-            const bodyEl = fixture.tree.treeItem(body as unknown as INode) as HTMLElement;
-
-            bodyEl.click();
-
-            expect(fixture.doc.modelManager.currentNode).toBe(fixture.root);
-        });
-
-        test("should climb to the nearest folder when clicking a consumed tool under a body", () => {
-            fixture = createFixture();
-            fixture.doc.visual.eventHandler = new (
-                NodeSelectionHandler as unknown as new () => unknown
-            )() as typeof fixture.doc.visual.eventHandler;
+            // where new parts go is the active component's business (`ComponentContext`)
+            const active = new MockNode("component");
+            active.isGroup = true;
+            active.isFolder = true;
+            fixture.doc.modelManager.currentNode = active as unknown as INodeLinkedList;
+            expect(fixture.doc.modelManager.currentNode).toBe(active);
             const body = new MockNode("body");
             body.isGroup = true;
             body.parent = fixture.root;
@@ -446,11 +423,11 @@ describe("Tree", () => {
             tool.parent = body;
             body.firstChild = tool;
             fixture.doc.emitNodeChanged([{ node: tool, newParent: body } as unknown as NodeRecord]);
-            const toolEl = fixture.tree.treeItem(tool as unknown as INode) as HTMLElement;
-
-            toolEl.click();
-
-            expect(fixture.doc.modelManager.currentNode).toBe(fixture.root);
+            for (const node of [fixture.groupA, fixture.model1, body, tool]) {
+                (fixture.tree.treeItem(node as unknown as INode) as HTMLElement).click();
+                expect(fixture.doc.modelManager.currentNode).toBe(active);
+            }
+            expect(fixture.doc.selection.setSelectedNodes).toHaveBeenCalledTimes(4);
         });
     });
 

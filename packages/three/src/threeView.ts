@@ -4,6 +4,7 @@
 import {
     BoundingBox,
     Config,
+    DisplayScale,
     debounce,
     displayPixelRatio,
     type HtmlTextOptions,
@@ -23,6 +24,7 @@ import {
     MultiShapeNode,
     Observable,
     type Plane,
+    type PmiAnnotation,
     PubSub,
     Ray,
     type RenderQualityState,
@@ -32,11 +34,12 @@ import {
     type ShapeType,
     ShapeTypes,
     ShapeTypeUtils,
+    Transaction,
     type ViewMode,
     type VisualNode,
     type VisualShapeData,
     XY,
-    type XYZ,
+    XYZ,
     type XYZLike,
 } from "@chili3d/core";
 import { div, span, svg } from "@chili3d/element";
@@ -56,6 +59,7 @@ import {
     WebGLRenderer,
 } from "three";
 import { Line2 } from "three/examples/jsm/lines/Line2.js";
+import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
 import { CSS2DObject, CSS2DRenderer } from "three/examples/jsm/renderers/CSS2DRenderer.js";
 import { CameraController } from "./cameraController";
@@ -66,6 +70,8 @@ import { ThreeRefSegmentAnnotation } from "./threeAnnotation";
 import { ThreeGeometry } from "./threeGeometry";
 import { ThreeHelper } from "./threeHelper";
 import type { ThreeHighlighter } from "./threeHighlighter";
+import pmiStyle from "./threePmi.module.css";
+import { type PmiLabel, ThreePmiAnnotation } from "./threePmiAnnotation";
 import style from "./threeView.module.css";
 import type { ThreeVisualContext } from "./threeVisualContext";
 import { ThreeComponentObject, ThreeMeshObject, ThreeVisualObject } from "./threeVisualObject";
@@ -134,8 +140,41 @@ export class ThreeView extends Observable implements IView {
     private settleTimer?: ReturnType<typeof setTimeout>;
     private readonly cameraChanged = () => {
         this.interactingUntil = performance.now() + CAMERA_SETTLE_MS;
+        this.publishDisplayScale();
         this.update();
     };
+
+    /** Model units per screen pixel at the camera's target. */
+    pixelSize(): number {
+        const camera = this.camera;
+        const height = Math.max(1, this.height);
+        if (camera instanceof OrthographicCamera)
+            return (camera.top - camera.bottom) / (camera.zoom * height);
+        const distance = camera.position.distanceTo(this.cameraController.target);
+        return (2 * distance * Math.tan((camera.fov * Math.PI) / 360)) / height;
+    }
+
+    /**
+     * Reports the pixel size to `DisplayScale`; on a band change every dashed line material is
+     * rescaled so its dashes keep their length on screen (the graphics preference's first dash,
+     * in pixels), and the sketches redraw their patterned construction lines.
+     */
+    private publishDisplayScale(): void {
+        const pixel = this.pixelSize();
+        if (!DisplayScale.update(pixel)) return;
+        const g = Config.instance.graphics;
+        const dashPixels = Math.max(1, g.firstDash);
+        // the same 1-2-5 steps of model units the sketches' patterned lines use
+        const unit = DisplayScale.dashUnit(
+            DisplayScale.value,
+            g.firstDash + g.firstGap + g.secondDash + g.secondGap,
+        );
+        this._scene.traverse((object) => {
+            const material = (object as { material?: unknown }).material;
+            if (!(material instanceof LineMaterial) || !material.dashed) return;
+            material.dashScale = material.dashSize / (dashPixels * unit);
+        });
+    }
     private readonly visibilityChanged = () => {
         if (globalThis.document.visibilityState === "hidden") this.cancelFrame();
         else this.requestFrame();
@@ -279,6 +318,7 @@ export class ThreeView extends Observable implements IView {
         this._renderer.domElement.remove();
         this._cssRenderer.domElement.remove();
         this.labelScene.clear();
+        this.pmiLabels.clear();
     }
 
     close(): void {
@@ -355,6 +395,137 @@ export class ThreeView extends Observable implements IView {
         this._resizeObserver.observe(element);
         this.visibilityObserver?.observe(element);
         this.cameraController.updateCameraPosionTarget();
+    }
+
+    private readonly pmiLabels = new Map<ThreePmiAnnotation, { revision: number; objects: CSS2DObject[] }>();
+
+    /**
+     * Each view hosts its own HTML frames and markers for the PMI annotations in the scene
+     * (`ThreeVisualContext.pmiAnnotations`), rebuilt when an annotation's revision changes
+     * and following its visibility and highlight; run before every CSS render.
+     */
+    private syncPmiLabels(): void {
+        const live = this.content.pmiAnnotations;
+        for (const [visual, entry] of this.pmiLabels) {
+            if (live.has(visual)) continue;
+            this.dropPmiLabels(entry.objects);
+            this.pmiLabels.delete(visual);
+        }
+        for (const visual of live) {
+            let entry = this.pmiLabels.get(visual);
+            if (entry === undefined || entry.revision !== visual.revision) {
+                if (entry !== undefined) this.dropPmiLabels(entry.objects);
+                entry = {
+                    revision: visual.revision,
+                    objects: visual.labels().map((label) => this.pmiLabel(label)),
+                };
+                this.pmiLabels.set(visual, entry);
+            }
+            const visible = ThreeView.visibleInScene(visual);
+            for (const object of entry.objects) {
+                object.visible = visible;
+                object.element.classList.toggle(pmiStyle.selected, visual.highlighted);
+            }
+        }
+    }
+
+    private static visibleInScene(object: Object3D): boolean {
+        for (let current: Object3D | null = object; current !== null; current = current.parent) {
+            if (!current.visible) return false;
+        }
+        return true;
+    }
+
+    private pmiLabel(label: PmiLabel): CSS2DObject {
+        const object = new CSS2DObject(label.build());
+        object.position.set(label.position.x, label.position.y, label.position.z);
+        object.center.set(label.center.x, label.center.y);
+        if (label.annotation !== undefined) this.wirePmiDrag(object.element, label.annotation);
+        if (label.beforeRender) {
+            const beforeRender = label.beforeRender;
+            object.onBeforeRender = (renderer, _scene, camera) => {
+                const size = (renderer as unknown as CSS2DRenderer).getSize();
+                beforeRender(camera, object, size);
+            };
+        }
+        this.labelScene.add(object);
+        return object;
+    }
+
+    /**
+     * Dragging a frame moves the annotation's frame point in the view plane (a general note,
+     * anchorless, moves whole), at the depth it already has; a locked annotation stays. The
+     * moves during the drag bypass the history, and the release records the whole move as
+     * one undo step.
+     */
+    private wirePmiDrag(element: HTMLElement, annotation: PmiAnnotation): void {
+        element.addEventListener("pointerdown", (event: PointerEvent) => {
+            if (event.button !== 0 || annotation.locked) return;
+            const host = this.dom ?? this.renderer.domElement;
+            const rect = host.getBoundingClientRect();
+            if (!(rect.width > 0 && rect.height > 0)) return;
+            const origin = annotation.position;
+            const originAnchor = annotation.anchor;
+            this.camera.updateMatrixWorld(true);
+            const depth = new Vector3(origin.x, origin.y, origin.z).project(this.camera).z;
+            const toWorld = (clientX: number, clientY: number) => {
+                const point = new Vector3(
+                    ((clientX - rect.left) / rect.width) * 2 - 1,
+                    -((clientY - rect.top) / rect.height) * 2 + 1,
+                    depth,
+                ).unproject(this.camera);
+                return new XYZ({ x: point.x, y: point.y, z: point.z });
+            };
+            const startWorld = toWorld(event.clientX, event.clientY);
+            const start = { x: event.clientX, y: event.clientY };
+            let moved = false;
+            const history = this.document.history;
+            const wasDisabled = history.disabled;
+            const move = (ev: PointerEvent) => {
+                if (!moved && Math.hypot(ev.clientX - start.x, ev.clientY - start.y) < 3) return;
+                moved = true;
+                element.dataset["dragging"] = "true";
+                history.disabled = true;
+                const delta = toWorld(ev.clientX, ev.clientY).sub(startWorld);
+                annotation.position = origin.add(delta);
+                if (!annotation.hasLeader) annotation.anchor = originAnchor.add(delta);
+                history.disabled = wasDisabled;
+                this.update();
+            };
+            const up = () => {
+                element.removeEventListener("pointermove", move);
+                element.removeEventListener("pointerup", up);
+                element.removeEventListener("pointercancel", up);
+                delete element.dataset["dragging"];
+                if (!moved) return;
+                const final = annotation.position;
+                const finalAnchor = annotation.anchor;
+                history.disabled = true;
+                annotation.position = origin;
+                annotation.anchor = originAnchor;
+                history.disabled = wasDisabled;
+                Transaction.execute(this.document, "annotation.move", () => {
+                    annotation.position = final;
+                    if (!annotation.hasLeader) annotation.anchor = finalAnchor;
+                });
+                this.update();
+            };
+            try {
+                element.setPointerCapture?.(event.pointerId);
+            } catch {
+                /* synthetic pointers have no capture */
+            }
+            element.addEventListener("pointermove", move);
+            element.addEventListener("pointerup", up);
+            element.addEventListener("pointercancel", up);
+        });
+    }
+
+    private dropPmiLabels(objects: CSS2DObject[]): void {
+        for (const object of objects) {
+            this.labelScene.remove(object);
+            object.element.remove();
+        }
     }
 
     htmlText(text: string, point: XYZLike, options?: HtmlTextOptions): IDisposable {
@@ -520,6 +691,7 @@ export class ThreeView extends Observable implements IView {
             this.lastMovingFrameAt = now;
         } else this.lastMovingFrameAt = undefined;
         this.renderFrame(interactive ? "interactive" : "final");
+        this.syncPmiLabels();
         this._cssRenderer.render(this.labelScene, this.camera);
         this._gizmo?.update();
         // an interactive frame is a draft: redraw once at full quality when the motion stops
@@ -750,7 +922,10 @@ export class ThreeView extends Observable implements IView {
             node = threeObject.geometryNode;
         } else if (threeObject instanceof ThreeComponentObject) {
             node = threeObject.componentNode;
-        } else if (threeObject instanceof ThreeRefSegmentAnnotation) {
+        } else if (
+            threeObject instanceof ThreeRefSegmentAnnotation ||
+            threeObject instanceof ThreePmiAnnotation
+        ) {
             node = threeObject.annotation;
         } else if (threeObject instanceof ThreeVisualObject) {
             node = threeObject.node;
@@ -1205,7 +1380,7 @@ export class ThreeView extends Observable implements IView {
             if (!x.visible) return;
             if (x instanceof ThreeVisualObject && x.node.visible && x.node.parentVisible) {
                 visuals.push(...x.wholeVisual());
-            } else if (x instanceof ThreeRefSegmentAnnotation) {
+            } else if (x instanceof ThreeRefSegmentAnnotation || x instanceof ThreePmiAnnotation) {
                 visuals.push(...x.wholeVisual());
             }
         });
@@ -1250,11 +1425,13 @@ export class ThreeView extends Observable implements IView {
         // renders what lies behind the camera plane; the ray starts there, so it is picked too.
         if (this.camera instanceof OrthographicCamera && this.camera.near < 0)
             raycaster.ray.origin.addScaledVector(raycaster.ray.direction, this.camera.near);
+        // Line2's threshold is in pixels; a Points threshold is a world radius: give points
+        // the snap distance and a half, in pixels at this zoom, so a vertex is a fair target.
         raycaster.params = {
             ...raycaster.params,
             Line2: { threshold },
             Line: { threshold },
-            Points: { threshold },
+            Points: { threshold: threshold * 1.5 * this.pixelSize() },
         };
         return raycaster;
     }

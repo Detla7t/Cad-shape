@@ -68,13 +68,19 @@
     overflow: hidden;
 }
 
+/* Narrow scrollbars everywhere: a slim thumb on a transparent track. */
+:global(*) {
+    scrollbar-width: thin;
+    scrollbar-color: var(--foreground-muted-color) transparent;
+}
+
 ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+    width: 6px;
+    height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-    background: var(--control-background-color);
+    background: transparent;
     border-radius: 2em;
 }
 
@@ -123,6 +129,7 @@
     --panel-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
     --resizer-gradient: linear-gradient(to right, rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0.12));
     --resizer-gradient-hover: linear-gradient(to right, rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.18));
+    --resizer-line-color: rgba(0, 0, 0, 0.3);
     --error-color: #ff0000;
     --warning-color: #ffc107;
     --success-color: #15932e;
@@ -178,6 +185,7 @@
     --panel-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     --resizer-gradient: linear-gradient(to right, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.12));
     --resizer-gradient-hover: linear-gradient(to right, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.18));
+    --resizer-line-color: rgba(255, 255, 255, 0.32);
     --error-color: #ff6b6b;
     --warning-color: #ffd93d;
     --success-color: #4cc26a;

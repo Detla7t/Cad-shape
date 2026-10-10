@@ -38,28 +38,32 @@ export class ViewGizmo extends HTMLElement implements IViewGizmo {
         return { ...region, group, polygon, surface, label };
     });
     /**
-     * The cube is translucent, so the names of the faces on its far side show through it;
-     * each is a target of its own, drawn over the cube, so any face can be turned to at any
-     * moment without orbiting first (Onshape's cube). Hovering one lights its face.
+     * A corner's disc is a few pixels wide: each near corner also takes the pointer through a
+     * larger invisible circle drawn over the cube, so a click lands the isometric view of that
+     * corner without aiming at the seam. Hovering it lights the corner.
      */
-    private readonly through = svg("g", { "data-role": "through-labels" });
-    private readonly throughLabels = this.regions
-        .filter((region) => region.kind === "face")
+    private readonly cornerHits = svg("g", { "data-role": "corner-hits" });
+    private readonly cornerHitCircles = this.regions
+        .filter((region) => region.kind === "corner")
         .map((region) => {
-            const group = svg("g", { class: style.through });
-            const hit = svg("rect", { x: "-19", y: "-7", width: "38", height: "14", rx: "3" });
-            const text = svg("text", { "text-anchor": "middle", "dominant-baseline": "central" });
-            text.textContent = region.name;
-            group.append(hit, text);
-            this.button(group, `${region.name} view`, () => this.orient(region.normal));
-            group.addEventListener("pointerenter", () => {
+            const circle = svg("circle", {
+                class: style.cornerHit,
+                r: "8",
+                "data-corner-hit": `${region.name} view`,
+            });
+            circle.addEventListener("click", (event) => {
+                event.stopPropagation();
+                if (!this.suppressClick) this.orient(region.normal);
+                this.suppressClick = false;
+            });
+            circle.addEventListener("pointerenter", () => {
                 region.group.dataset["hover"] = "true";
             });
-            group.addEventListener("pointerleave", () => {
+            circle.addEventListener("pointerleave", () => {
                 delete region.group.dataset["hover"];
             });
-            this.through.append(group);
-            return { region, group };
+            this.cornerHits.append(circle);
+            return { region, circle };
         });
     private readonly axisLines = ["#e85b57", "#55ba65", "#608be9"].map((color, i) => {
         const line = svg("path", { stroke: color, fill: "none", "data-axis": "XYZ"[i] });
@@ -79,7 +83,7 @@ export class ViewGizmo extends HTMLElement implements IViewGizmo {
         this.menu = new ViewMenu(view, (direction) => this.orient(direction));
         this.className = style.root;
         const orientation = svg("g", { "data-role": "orientation-object" });
-        orientation.append(this.cube, this.axes, this.through);
+        orientation.append(this.cube, this.axes, this.cornerHits);
         this.drawing.append(orientation);
         this.append(this.drawing);
         this.addControls();
@@ -288,17 +292,29 @@ export class ViewGizmo extends HTMLElement implements IViewGizmo {
             .map((region) => ({ region, normal: region.normal.clone().applyQuaternion(inverse) }))
             .sort((a, b) => a.normal.z - b.normal.z);
         // Every region is drawn, far side first: the cube is translucent, so the back shows
-        // through. Only the near side takes the pointer; the far faces are reached by name.
-        const labelTransform = (region: (typeof this.regions)[number], mirrored: boolean) => {
+        // through, but only the near faces carry their names — a far face's name would read
+        // mirrored through the glass. Only the near side takes the pointer.
+        const labelTransform = (region: (typeof this.regions)[number]) => {
             const right = region.up!.clone().cross(region.normal).applyQuaternion(inverse);
-            if (mirrored) right.negate();
             const up = region.up!.clone().applyQuaternion(inverse);
             const center = project(region.normal);
             return `matrix(${right.x} ${-right.y} ${-up.x} ${up.y} ${center.x} ${center.y})`;
         };
+        // the face the camera looks at most squarely is white; the oblique faces stay grey
+        const facing = regions.reduce<(typeof regions)[number] | undefined>(
+            (best, item) =>
+                item.region.kind === "face" &&
+                item.normal.z > 0.001 &&
+                (!best || item.normal.z > best.normal.z)
+                    ? item
+                    : best,
+            undefined,
+        );
         for (const { region, normal } of regions) {
             const visible = normal.z > 0.001;
             region.group.dataset["back"] = String(!visible);
+            if (region === facing?.region) region.group.dataset["facing"] = "true";
+            else delete region.group.dataset["facing"];
             region.group.setAttribute("tabindex", visible ? "0" : "-1");
             region.group.setAttribute("aria-hidden", String(!visible));
             const points = region.vertices.map(project);
@@ -312,22 +328,20 @@ export class ViewGizmo extends HTMLElement implements IViewGizmo {
                 region.surface.setAttribute("rx", String(rx));
                 region.surface.setAttribute("ry", String(ry));
                 region.surface.setAttribute("transform", `rotate(${angle} ${center.x} ${center.y})`);
+                const hit = this.cornerHitCircles.find((item) => item.region === region)?.circle;
+                if (hit !== undefined) {
+                    hit.setAttribute("cx", String(center.x));
+                    hit.setAttribute("cy", String(center.y));
+                    hit.style.display = visible ? "" : "none";
+                }
             } else {
                 region.surface.setAttribute("d", roundedCubePatch(points, region.kind === "face" ? 6 : 2));
             }
             if (region.up) {
                 region.label.style.display = visible ? "" : "none";
-                if (visible) region.label.setAttribute("transform", labelTransform(region, false));
+                if (visible) region.label.setAttribute("transform", labelTransform(region));
             }
             this.cube.append(region.group);
-        }
-        for (const { region, group } of this.throughLabels) {
-            const back = region.normal.clone().applyQuaternion(inverse).z <= 0.001;
-            group.style.display = back ? "" : "none";
-            group.setAttribute("tabindex", back ? "0" : "-1");
-            group.setAttribute("aria-hidden", String(!back));
-            // seen from behind, the name would read mirrored: flip it back
-            if (back) group.setAttribute("transform", labelTransform(region, true));
         }
         // The triad starts off the cube's negative XYZ corner, clear of its shell, and runs past
         // the cube so each axis shows as a free line with its name beyond the cube (Onshape's

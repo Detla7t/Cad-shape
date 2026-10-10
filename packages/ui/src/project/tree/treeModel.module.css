@@ -14,16 +14,13 @@
 .panel {
     position: relative;
 }
-.panel[data-owners]::before {
+.panel[data-owners="many"]::before {
     content: "";
     position: absolute;
     left: 1px;
-    top: 2px;
-    bottom: 2px;
+    top: 1px;
+    bottom: 1px;
     width: 11px;
-    background: linear-gradient(to right, var(--owner-bars));
-}
-.panel[data-owners="many"]::before {
     background: repeating-linear-gradient(to bottom, #8a8a8a 0 3px, #d9d9d9 3px 6px);
 }
 .panel[data-owners] {

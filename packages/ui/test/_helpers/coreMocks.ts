@@ -49,6 +49,7 @@ export const TransactionMock = {
 
 /** FolderNode stub: tests opt a node into `instanceof` by linking its prototype. */
 export class FolderNodeMock {}
+export class ComponentFolderNodeMock extends FolderNodeMock {}
 
 /** Mirror of core's real guard (the mid-init snapshot can miss function exports). */
 export function isFeatureListNodeMock(node: unknown): boolean {

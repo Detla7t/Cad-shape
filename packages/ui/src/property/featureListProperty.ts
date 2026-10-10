@@ -137,8 +137,24 @@ export class FeatureListProperty extends HTMLElement {
     };
     /** The marker moved elsewhere (the timeline, the tree's bar): follow it. */
     private readonly handleTimelineChanged = (property: string) => {
-        if (property === "position") this.historyBar?.refresh();
+        if (property !== "position") return;
+        // In the tree the list's own bar appears only while the marker splits the body.
+        if (this.timeline && this.showsOwnBar() !== (this.historyBar !== undefined)) this.renderItems();
+        else this.historyBar?.refresh();
     };
+
+    /**
+     * Whether the list draws its own rollback bar. The feature dialog's single row never does;
+     * the properties panel always does; inside the tree the document's bar is the one bar, and
+     * the body's own appears only while the marker stands inside its features.
+     */
+    private showsOwnBar(): boolean {
+        if (this.featureId || !this.node.setRollbackIndex) return false;
+        if (!this.timeline) return true;
+        return (
+            (this.timelineModel ?? PartStudioTimeline.of(this.document)).nodeState(this.node) === "partial"
+        );
+    }
 
     private renderItems() {
         this.closeMenu();
@@ -162,12 +178,15 @@ export class FeatureListProperty extends HTMLElement {
         this.indicators.sweep();
         this.banner.sweep();
         if (this.picking) this.setInputsDisabled(true);
-        if (!this.featureId && this.node.setRollbackIndex) {
-            // The body's bar is a view of the Part Studio timeline: one marker for every view.
-            if (this.timelineModel === undefined) {
-                this.timelineModel = PartStudioTimeline.of(this.document);
-                if (this.isConnected) this.timelineModel.onPropertyChanged(this.handleTimelineChanged);
-            }
+        this.historyBar = undefined;
+        // The body's bar is a view of the Part Studio timeline: one marker for every view. A
+        // list inside the tree follows the timeline even without a bar, to grow one when the
+        // marker enters the body.
+        if (!this.featureId && this.node.setRollbackIndex && this.timelineModel === undefined) {
+            this.timelineModel = PartStudioTimeline.of(this.document);
+            if (this.isConnected) this.timelineModel.onPropertyChanged(this.handleTimelineChanged);
+        }
+        if (this.showsOwnBar() && this.timelineModel !== undefined) {
             const timeline = this.timelineModel;
             const bar = new HistoryBar(
                 () => rows,

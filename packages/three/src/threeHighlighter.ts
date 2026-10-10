@@ -8,12 +8,13 @@ import {
     MeshUtils,
     type ShapeMeshData,
     type ShapeType,
+    ShapeTypes,
     ShapeTypeUtils,
     type VisualState,
     VisualStates,
     VisualStateUtils,
 } from "@chili3d/core";
-import { Group, Mesh, Points } from "three";
+import { BufferAttribute, BufferGeometry, Group, Mesh, Points } from "three";
 import type { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js";
@@ -28,7 +29,7 @@ import {
     selectedVertexMaterial,
 } from "./materials";
 import { ThreeGeometry } from "./threeGeometry";
-import { ThreeGeometryFactory } from "./threeGeometryFactory";
+import { ThreeGeometryFactory, TopRenderOrder } from "./threeGeometryFactory";
 import type { ThreeVisualContext } from "./threeVisualContext";
 import type { ThreeVisualObject } from "./threeVisualObject";
 
@@ -42,6 +43,8 @@ interface SubGeometryState {
     state: VisualState;
     face?: Mesh;
     edge?: LineSegments2;
+    /** A point of its own (a sketch's entity point, a solid's vertex), drawn over the model. */
+    vertex?: Points;
 }
 
 export class GeometryState {
@@ -70,7 +73,10 @@ export class GeometryState {
     }
 
     private updateState(method: "add" | "remove", state: VisualState, type: ShapeType, index: number[]) {
-        if (index.length === 0 || ShapeTypeUtils.isWhole(type)) {
+        // A vertex counts as a whole shape elsewhere (it has no parts), but an indexed vertex
+        // state names one point of the visual: it is drawn alone, never as the whole node.
+        const whole = ShapeTypeUtils.isWhole(type) && type !== ShapeTypes.vertex;
+        if (index.length === 0 || whole) {
             this.setWholeState(method, state, type);
         } else {
             this.setSubGeometryState(method, state, type, index);
@@ -162,6 +168,7 @@ export class GeometryState {
             if (item !== undefined) {
                 this.removeSubObject(item.face);
                 this.removeSubObject(item.edge);
+                this.removeSubObject(item.vertex);
                 this._states.delete(key);
             }
         });
@@ -177,13 +184,14 @@ export class GeometryState {
         const previous = this._states.get(key);
         const face = this.subFacePart(previous?.face, type, key, index, newState);
         const edge = this.subEdgePart(previous?.edge, type, key, index, newState);
+        const vertex = this.subVertexPart(previous?.vertex, type, index, newState);
         // a state nothing could be drawn for — a visual with no sub-shape geometry, or an
         // index naming none — is not recorded
-        if (face === undefined && edge === undefined) {
+        if (face === undefined && edge === undefined && vertex === undefined) {
             this._states.delete(key);
             return;
         }
-        this._states.set(key, { state: newState, face, edge });
+        this._states.set(key, { state: newState, face, edge, vertex });
     }
 
     /** The fill object of the state: the one already there re-materialed, a new one, or none. */
@@ -241,6 +249,42 @@ export class GeometryState {
         return undefined;
     }
 
+    /**
+     * The point object of a vertex state: lit or selected, the point alone is drawn larger
+     * in the state's colour on top of the model, so a sketch's entity point (or a solid's
+     * vertex) answers the hover and the pick without its whole node lighting up.
+     */
+    private subVertexPart(
+        existing: Points | undefined,
+        type: ShapeType,
+        index: number,
+        state: VisualState,
+    ): Points | undefined {
+        const material = ShapeTypeUtils.hasVertex(type) ? vertexMaterialOf(state) : undefined;
+        if (material === undefined) {
+            this.removeSubObject(existing);
+            return undefined;
+        }
+        const vertex = existing ?? this.createSubVertex(index);
+        if (vertex === undefined) return undefined;
+        vertex.material = material;
+        return vertex;
+    }
+
+    private createSubVertex(index: number) {
+        if (!(this.visual instanceof ThreeGeometry)) return undefined;
+        const mesh = this.visual.geometryNode.mesh.vertexs;
+        const points = mesh === undefined ? undefined : MeshUtils.subVertex(mesh, index);
+        if (points === undefined) return undefined;
+        const geometry = new BufferGeometry();
+        geometry.setAttribute("position", new BufferAttribute(points, 3));
+        const vertex = new Points(geometry, highlightVertexMaterial);
+        vertex.renderOrder = TopRenderOrder;
+        this.highlighter.container.add(vertex);
+        vertex.applyMatrix4(this.visual.matrixWorld);
+        return vertex;
+    }
+
     private createSubEdge(type: ShapeType, key: string, index: number) {
         if (!(this.visual instanceof ThreeGeometry)) return undefined;
 
@@ -282,7 +326,7 @@ export class GeometryState {
         return face;
     }
 
-    private removeSubObject(object: Mesh | LineSegments2 | undefined) {
+    private removeSubObject(object: Mesh | LineSegments2 | Points | undefined) {
         if (object === undefined) return;
         this.highlighter.container.remove(object);
         object.geometry?.dispose();
@@ -301,6 +345,21 @@ function hasFaceState(state: VisualState): boolean {
         VisualStateUtils.hasState(state, VisualStates.faceHighlight) ||
         VisualStateUtils.hasState(state, VisualStates.faceSelected)
     );
+}
+
+/** Point material of a state: the selection colour, the hover highlight, or none. */
+function vertexMaterialOf(state: VisualState) {
+    if (
+        VisualStateUtils.hasState(state, VisualStates.edgeSelected) ||
+        VisualStateUtils.hasState(state, VisualStates.faceSelected)
+    )
+        return selectedVertexMaterial;
+    if (
+        VisualStateUtils.hasState(state, VisualStates.edgeHighlight) ||
+        VisualStateUtils.hasState(state, VisualStates.faceHighlight)
+    )
+        return highlightVertexMaterial;
+    return undefined;
 }
 
 /** Fill material of a state: the ghost tint, the selection colour, or the hover highlight. */

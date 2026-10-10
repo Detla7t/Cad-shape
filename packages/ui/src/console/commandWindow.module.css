@@ -1,0 +1,273 @@
+/* The command window under the viewport: the console log on the left, the input line on top
+   of the right pane with the suggestions, the explanation and the preview under it. */
+
+.root {
+    display: flex;
+    flex-direction: column;
+    height: var(--command-window-height, 260px);
+    min-height: 120px;
+    color: var(--foreground-color);
+    background: var(--panel-background-color);
+    border-top: 1px solid var(--border-color);
+    font-size: 12px;
+}
+
+.tabs {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 0 6px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.tabs button {
+    padding: 5px 10px;
+    font: inherit;
+    color: inherit;
+    background: transparent;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+}
+
+.tabs button[aria-selected="true"] {
+    border-bottom-color: var(--primary-color);
+}
+
+.tabs .close {
+    margin-left: auto;
+}
+
+.body {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.log {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: auto;
+    padding: 6px 8px;
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    border-right: 1px solid var(--border-color);
+}
+
+.log div {
+    display: flex;
+    gap: 10px;
+    white-space: pre-wrap;
+}
+
+.log .time {
+    color: var(--foreground-muted-color);
+    flex: 0 0 auto;
+}
+
+.log .input {
+    color: var(--primary-color);
+}
+
+.log .error {
+    color: var(--error-color);
+}
+
+.log .output {
+    color: var(--foreground-secondary-color);
+}
+
+.pane {
+    flex: 2 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.inputRow {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 6px 8px 0;
+    padding: 2px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--input-background-color);
+}
+
+.inputRow:focus-within {
+    border-color: var(--primary-color);
+}
+
+.prompt {
+    color: var(--foreground-muted-color);
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+}
+
+.inputRow input {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 4px 0;
+    font: inherit;
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 13px;
+    color: inherit;
+    background: transparent;
+    border: 0;
+    outline: none;
+}
+
+.hints {
+    display: flex;
+    gap: 8px;
+    color: var(--foreground-muted-color);
+    font-size: 11px;
+}
+
+.hints kbd {
+    padding: 0 4px;
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    font: inherit;
+}
+
+.preview {
+    margin: 2px 8px 0;
+    color: var(--foreground-secondary-color);
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+}
+
+.suggestions {
+    margin: 4px 8px 0;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--panel-background-color);
+    max-height: 120px;
+    overflow: auto;
+}
+
+.suggestions [role="option"] {
+    display: grid;
+    grid-template-columns: minmax(90px, auto) 1fr;
+    gap: 10px;
+    width: 100%;
+    padding: 3px 8px;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+}
+
+.suggestions [role="option"][aria-selected="true"],
+.suggestions [role="option"]:hover {
+    background: var(--hover-background-color);
+}
+
+.suggestions .name {
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    color: var(--primary-color);
+}
+
+.suggestions .about {
+    color: var(--foreground-secondary-color);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.details {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+    gap: 8px;
+    margin: 6px 8px 8px;
+}
+
+.explanation {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: auto;
+    padding: 6px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+}
+
+.explanation h4 {
+    margin: 0 0 4px;
+    font-size: 14px;
+    color: var(--primary-color);
+}
+
+.explanation h5 {
+    margin: 8px 0 2px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--foreground-muted-color);
+}
+
+.explanation code,
+.explanation pre {
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    background: var(--background-color);
+    border-radius: 3px;
+}
+
+.explanation pre {
+    margin: 0;
+    padding: 4px 6px;
+    white-space: pre-wrap;
+}
+
+.explanation dl {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 2px 10px;
+    margin: 0;
+}
+
+.explanation dt {
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+}
+
+.explanation dd {
+    margin: 0;
+    color: var(--foreground-secondary-color);
+}
+
+.previewPane {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: auto;
+    padding: 6px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+}
+
+.previewPane h4 {
+    margin: 0 0 4px;
+    font-size: 13px;
+}
+
+.previewPane table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.previewPane th,
+.previewPane td {
+    padding: 2px 6px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.previewPane th {
+    color: var(--foreground-muted-color);
+    font-weight: normal;
+}
+
+.empty {
+    color: var(--foreground-muted-color);
+}

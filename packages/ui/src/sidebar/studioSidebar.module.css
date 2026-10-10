@@ -129,10 +129,22 @@
     position: absolute;
     top: 0;
     bottom: 0;
-    left: -3px;
-    width: 6px;
+    left: -2px;
+    width: 5px;
     cursor: ew-resize;
     touch-action: none;
+}
+.resizer::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 3px;
+    width: 1px;
+    background: var(--resizer-line-color);
+    transition:
+        background 0.2s,
+        width 0.2s;
 }
 .root[data-open="configuration"] .header {
     display: none;
@@ -140,9 +152,10 @@
 .root[data-open="configuration"] .content {
     padding: 0;
 }
-.resizer:hover,
-.resizer:focus-visible {
-    background: #438dca55;
+.resizer:hover::after,
+.resizer:focus-visible::after {
+    width: 2px;
+    background: var(--primary-color);
 }
 @media (max-width: 680px) {
     .root[data-open] {

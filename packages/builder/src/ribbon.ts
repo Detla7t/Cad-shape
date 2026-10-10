@@ -100,7 +100,7 @@ export const DefaultRibbon: RibbonTabProfile[] = [
             },
             {
                 groupName: "ribbon.group.other",
-                items: ["wechat.group", "ai.toggleChat", "doc.history"],
+                items: ["wechat.group", "ai.toggleChat", "view.commandWindow", "doc.history"],
             },
         ],
     },
@@ -171,8 +171,25 @@ export const ParametricRibbonProfiles: RibbonProfileExtra[] = [
                 ],
             },
             {
+                // Model-based definition: the drawing's notes, dimensions, feature control
+                // frames and datums placed in the scene (`PmiAnnotation` nodes).
+                groupName: "ribbon.group.annotation",
+                items: [
+                    "annotation.note",
+                    "annotation.dimension",
+                    "annotation.gdt",
+                    "annotation.datum",
+                    [
+                        "annotation.diameter",
+                        "annotation.flag",
+                        "annotation.generalNote",
+                        "annotation.selectAll",
+                    ],
+                ],
+            },
+            {
                 groupName: "ribbon.group.other",
-                items: ["feature.variable", "variable.newStudio", "configuration.edit"],
+                items: ["create.component", "feature.variable", "variable.newStudio", "configuration.edit"],
             },
         ],
     },

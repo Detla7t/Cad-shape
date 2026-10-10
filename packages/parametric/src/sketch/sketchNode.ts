@@ -3,6 +3,7 @@
 
 import {
     Config,
+    DisplayScale,
     type EdgeMeshData,
     EMPTY_SCOPE,
     expressionIdentifiers,
@@ -13,6 +14,8 @@ import {
     type INode,
     type IShape,
     type IShapeMeshData,
+    type ISubEdgeShape,
+    type ISubVertexShape,
     isPropertyChanged,
     Matrix4,
     MultiShapeMesh,
@@ -29,6 +32,7 @@ import {
     serialize,
     type VertexMeshData,
     VisualConfig,
+    type XYZ,
 } from "@chili3d/core";
 import { allProfiles, sketchProfiles } from "../features/profileBuilder";
 import { syncNodeWatches } from "../nodeWatch";
@@ -140,9 +144,24 @@ export class SketchNode extends ParameterShapeNode {
         return this.getPrivateValue("planeRefJson");
     }
 
+    /** Undo/redo assigns through the property (PropertyHistoryRecord), so a setter is required. */
+    set planeRefJson(value: string | undefined) {
+        this.setPropertyEmitShapeChanged("planeRefJson", value);
+    }
+
     get planeRef(): PlaneFaceRef | undefined {
         const json = this.planeRefJson;
         return json === undefined ? undefined : (JSON.parse(json) as PlaneFaceRef);
+    }
+
+    /**
+     * Moves the sketch onto another plane: the entities keep their plane coordinates, so the
+     * whole sketch turns with it. `planeRef` names the reference plane or face it now follows
+     * (none for a plain plane). Two recorded property changes: one undo step inside a transaction.
+     */
+    setPlane(plane: Plane, planeRef?: PlaneFaceRef): void {
+        this.planeRefJson = planeRef === undefined ? undefined : JSON.stringify(planeRef);
+        this.plane = plane;
     }
 
     /**
@@ -208,7 +227,26 @@ export class SketchNode extends ParameterShapeNode {
         this._danglingSignature = danglingIds.join(",");
         ensureVariableSync(options.document);
         Config.instance.onPropertyChanged(this.graphicsChanged);
+        PubSub.default.sub("displayScaleChanged", this.displayScaleChanged);
     }
+
+    /** Dashes are drawn to the pixel: a zoom to another band redraws the construction lines. */
+    private readonly displayScaleChanged = () => {
+        if (this._mesh === undefined || this._editingSession) return;
+        const data = this.data;
+        if (
+            !data.entities.some((entity) => entity.construction || entity.dashed) &&
+            !data.layers?.some((layer) => layer.dashed)
+        )
+            return;
+        this._mesh = undefined;
+        this.emitPropertyChanged("shape", this._shape);
+    };
+
+    /** The kernel edges behind the construction entities' pick ranges, by entity signature. */
+    private readonly constructionEdges = new Map<string, ISubEdgeShape>();
+    /** The cached kernel vertex of each entity point (by world position), the pick target of the point. */
+    private readonly pointVertices = new Map<string, ISubVertexShape>();
 
     private readonly graphicsChanged = (key: keyof Config) => {
         if (key !== "graphics") return;
@@ -282,7 +320,7 @@ export class SketchNode extends ParameterShapeNode {
                 (range.start + range.count) * 3,
             );
             if (entity?.dashed || layer?.dashed)
-                position = patternedPositions(position, constructionPattern(0.1));
+                position = patternedPositions(position, constructionPattern(DisplayScale.value));
             ranges.push({ ...range, start: positions.length / 3, count: position.length / 3 });
             const layerColor =
                 layer?.id === "0" && layer.color === DEFAULT_SKETCH_LAYER.color ? undefined : layer?.color;
@@ -294,6 +332,9 @@ export class SketchNode extends ParameterShapeNode {
                     : Number.parseInt(Config.instance.graphics.inactiveColor.slice(1), 16),
             );
         });
+        // Construction lines pick like any other line: each carries a kernel edge of its own in
+        // its range (the sketch's shape never holds them), dashed to the current pixel size.
+        const kept = new Set<string>();
         for (const entity of data.entities.filter(
             (entity) => entity.construction || entity.type === "point",
         )) {
@@ -302,13 +343,21 @@ export class SketchNode extends ParameterShapeNode {
             const layerColor =
                 layer?.id === "0" && layer.color === DEFAULT_SKETCH_LAYER.color ? undefined : layer?.color;
             const color = entity.color ?? layerColor ?? Config.instance.graphics.inactiveColor;
-            append(
-                patternedPositions(
-                    entityDisplayMesh(this.plane, entity, 0).position,
-                    constructionPattern(0.1),
-                ),
-                Number.parseInt(color.slice(1), 16),
+            const position = patternedPositions(
+                entityDisplayMesh(this.plane, entity, 0).position,
+                constructionPattern(DisplayScale.value),
             );
+            if (entity.type !== "point") {
+                const edge = this.constructionEdge(entity, kept);
+                if (edge !== undefined)
+                    ranges.push({ start: positions.length / 3, count: position.length / 3, shape: edge });
+            }
+            append(position, Number.parseInt(color.slice(1), 16));
+        }
+        for (const [key, edge] of this.constructionEdges) {
+            if (kept.has(key)) continue;
+            edge.dispose();
+            this.constructionEdges.delete(key);
         }
         return {
             images,
@@ -347,13 +396,23 @@ export class SketchNode extends ParameterShapeNode {
      * visible outside the editing session. Hidden layers contribute none; a 0 px point
      * size turns them off.
      */
+    /**
+     * Every entity point — a line's ends, a circle's or arc's centre, an arc's ends — as a
+     * dot that picks on its own: each carries a kernel vertex in its range, so outside the
+     * editor the hover, the click and the measure read that point and never the whole sketch.
+     */
     private entityPointMesh(): VertexMeshData | undefined {
         const size = Config.instance.graphics.inactivePointSize;
-        if (!(size > 0)) return undefined;
+        if (!(size > 0)) {
+            this.prunePointVertices(new Set());
+            return undefined;
+        }
         const data = this.data;
         const inactive = Number.parseInt(Config.instance.graphics.inactiveColor.slice(1), 16);
         const position: number[] = [];
         const color: number[] = [];
+        const range: VertexMeshData["range"] = [];
+        const kept = new Set<string>();
         for (const entity of data.entities) {
             const layer = data.layers?.find((item) => item.id === (entity.layer ?? "0"));
             if (layer?.visible === false) continue;
@@ -363,12 +422,37 @@ export class SketchNode extends ParameterShapeNode {
             const rgb = own === undefined ? inactive : Number.parseInt(own.slice(1), 16);
             for (let index = 0; index < entityPointCount(entity.type, entity.params); index++) {
                 const point = toWorld(this.plane, entity.params[index * 2], entity.params[index * 2 + 1]);
+                const vertex = this.pointVertex(point, kept);
+                if (vertex !== undefined) range.push({ start: position.length / 3, count: 1, shape: vertex });
                 position.push(point.x, point.y, point.z);
                 color.push(((rgb >> 16) & 255) / 255, ((rgb >> 8) & 255) / 255, (rgb & 255) / 255);
             }
         }
+        this.prunePointVertices(kept);
         if (position.length === 0) return undefined;
-        return { position: new Float32Array(position), color, range: [], size };
+        return { position: new Float32Array(position), color, range, size };
+    }
+
+    /** The cached kernel vertex at a world point (none without a kernel, e.g. in unit tests). */
+    private pointVertex(point: XYZ, kept: Set<string>): ISubVertexShape | undefined {
+        const key = `${point.x},${point.y},${point.z}`;
+        kept.add(key);
+        const cached = this.pointVertices.get(key);
+        if (cached !== undefined) return cached;
+        const factory = globalThis.shapeFactory as typeof shapeFactory | undefined;
+        const vertex = factory?.point?.(point);
+        if (vertex === undefined || !vertex.isOk) return undefined;
+        const subShape = Object.assign(vertex.value, { index: 0, parent: vertex.value }) as ISubVertexShape;
+        this.pointVertices.set(key, subShape);
+        return subShape;
+    }
+
+    private prunePointVertices(kept: Set<string>): void {
+        for (const [key, vertex] of this.pointVertices) {
+            if (kept.has(key)) continue;
+            vertex.dispose();
+            this.pointVertices.delete(key);
+        }
     }
 
     /** Neutral region shading in the editor, separate from pickable modeling topology. */
@@ -438,6 +522,21 @@ export class SketchNode extends ParameterShapeNode {
             return Result.ok(edges.value[0]);
         }
         return shapeFactory.combine(edges.value);
+    }
+
+    /** The cached kernel edge of a construction entity on the current plane (built once per geometry). */
+    private constructionEdge(entity: SketchEntityData, kept: Set<string>): ISubEdgeShape | undefined {
+        const plane = this.plane;
+        const key = `${entity.type}|${entity.params.join(",")}|${plane.origin.x},${plane.origin.y},${plane.origin.z}|${plane.normal.x},${plane.normal.y},${plane.normal.z}|${plane.xvec.x},${plane.xvec.y},${plane.xvec.z}`;
+        kept.add(key);
+        const cached = this.constructionEdges.get(key);
+        if (cached !== undefined) return cached;
+        const edge = sketchEntityEdge(plane, entity);
+        if (!edge.isOk) return undefined;
+        // A sub-shape of its own: the pick, the highlight and the measure read it like a profile edge.
+        const subShape = Object.assign(edge.value, { index: 0, parent: edge.value }) as ISubEdgeShape;
+        this.constructionEdges.set(key, subShape);
+        return subShape;
     }
 
     /** The sketch's own entity edges, followed by the profile-role external refs. */
@@ -776,6 +875,10 @@ export class SketchNode extends ParameterShapeNode {
 
     override disposeInternal(): void {
         Config.instance.removePropertyChanged(this.graphicsChanged);
+        PubSub.default.remove("displayScaleChanged", this.displayScaleChanged);
+        for (const edge of this.constructionEdges.values()) edge.dispose();
+        this.constructionEdges.clear();
+        this.prunePointVertices(new Set());
         if (this._planeRefNode !== undefined && isPropertyChanged(this._planeRefNode)) {
             this._planeRefNode.removePropertyChanged(this.handlePlaneRefNodeChanged);
         }

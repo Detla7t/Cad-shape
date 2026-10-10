@@ -24,6 +24,10 @@ export const SKETCH_DRAWING_LAYERS = {
 export interface SketchDrawingOptions {
     /** Include the projected external edges (default true). */
     readonly external?: boolean;
+    /** Include construction geometry (default true); off, it stays out of the drawing. */
+    readonly construction?: boolean;
+    /** Only entities on these sketch layers (by name); every layer when absent. */
+    readonly layers?: readonly string[];
 }
 
 function entityOf(
@@ -84,8 +88,11 @@ export function sketchDrawing(data: SketchData, options: SketchDrawingOptions = 
             dashed: layer.dashed,
         });
     const entities: DrawingEntity[] = [];
+    const wanted = options.layers === undefined ? undefined : new Set(options.layers);
     for (const entity of data.entities) {
+        if (entity.construction && options.construction === false) continue;
         const layer = data.layers?.find((layer) => layer.id === (entity.layer ?? "0"));
+        if (wanted !== undefined && !wanted.has(layer?.name ?? layers.sketch.name)) continue;
         let name = layer?.name ?? layers.sketch.name;
         const color = entity.color ?? layer?.color ?? layers.sketch.color;
         if (entity.construction || entity.dashed || entity.color) {

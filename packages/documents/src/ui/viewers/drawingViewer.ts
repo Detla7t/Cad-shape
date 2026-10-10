@@ -13,7 +13,14 @@ import {
     readFilesAsync,
     Transaction,
 } from "@chili3d/core";
-import { type Drawing, type DrawingEntity, drawingBounds, type Point2, writePdf } from "@chili3d/drawing";
+import {
+    type Drawing,
+    type DrawingEntity,
+    drawingBounds,
+    filterDrawingLayers,
+    type Point2,
+    writePdf,
+} from "@chili3d/drawing";
 import { button, div, input, label, option, p, select, span } from "@chili3d/element";
 import { partStudioNodes, writeDxf, writeSvg } from "@chili3d/parametric";
 import { activeDrawing, type IActiveDrawing, setActiveDrawing } from "../../activeDrawing";
@@ -552,22 +559,30 @@ export function createDrawingViewer({ node, document, changed }: ViewerContext):
             if (drawing === undefined) throw new Error(I18n.translate("documents.loading"));
             return drawing;
         };
+        // Which layers go into the file: all of them unless the user unticks some (construction,
+        // notes, a colour's layer).
+        const chosen = async () => {
+            const drawing = current();
+            const names = await chooseLayers(drawing);
+            if (names === undefined) throw new Error(I18n.translate("documents.export.cancelled"));
+            return names.length === drawing.layers.length ? drawing : filterDrawingLayers(drawing, names);
+        };
         return [
             {
                 label: "documents.export.dxfR12",
                 extension: ".dxf",
-                produce: async () => writeDxf(current(), { properties }),
+                produce: async () => writeDxf(await chosen(), { properties }),
             },
             {
                 label: "documents.export.svg",
                 extension: ".svg",
-                produce: async () => writeSvg(current(), { title: node.name }),
+                produce: async () => writeSvg(await chosen(), { title: node.name }),
             },
             {
                 label: "documents.export.dwg",
                 extension: ".dwg",
                 produce: async () => {
-                    const bytes = await writeDwg(current(), { properties });
+                    const bytes = await writeDwg(await chosen(), { properties });
                     if (!bytes.isOk) throw new Error(bytes.error);
                     return bytes.value;
                 },
@@ -648,4 +663,59 @@ export function createDrawingViewer({ node, document, changed }: ViewerContext):
             canvasHost.replaceChildren();
         },
     };
+}
+
+/**
+ * A small dialog listing the drawing's layers with a checkbox each (all on); resolves with
+ * the ticked names, or undefined when cancelled. A drawing with one layer asks nothing.
+ */
+export function chooseLayers(drawing: Drawing): Promise<string[] | undefined> {
+    if (drawing.layers.length <= 1) return Promise.resolve(drawing.layers.map((layer) => layer.name));
+    return new Promise((resolve) => {
+        const dialog = document.createElement("dialog");
+        dialog.setAttribute("aria-label", I18n.translate("documents.export.layers"));
+        dialog.className = style.layerDialog;
+        const title = document.createElement("h3");
+        title.textContent = I18n.translate("documents.export.layers");
+        const list = document.createElement("div");
+        list.className = style.layerChoices;
+        const boxes: HTMLInputElement[] = [];
+        for (const layer of drawing.layers) {
+            const label = document.createElement("label");
+            const box = document.createElement("input");
+            box.type = "checkbox";
+            box.checked = true;
+            box.value = layer.name;
+            boxes.push(box);
+            const swatch = document.createElement("span");
+            swatch.className = style.layerSwatch;
+            swatch.style.background = layer.color;
+            label.append(box, swatch, document.createTextNode(layer.name));
+            list.append(label);
+        }
+        const actions = document.createElement("div");
+        actions.className = style.layerActions;
+        const cancel = document.createElement("button");
+        cancel.type = "button";
+        cancel.textContent = I18n.translate("common.cancel");
+        const ok = document.createElement("button");
+        ok.type = "button";
+        ok.textContent = I18n.translate("common.confirm");
+        ok.className = style.primary;
+        actions.append(cancel, ok);
+        dialog.append(title, list, actions);
+        const finish = (names: string[] | undefined) => {
+            dialog.close();
+            dialog.remove();
+            resolve(names);
+        };
+        cancel.onclick = () => finish(undefined);
+        ok.onclick = () => finish(boxes.filter((box) => box.checked).map((box) => box.value));
+        dialog.addEventListener("cancel", (event) => {
+            event.preventDefault();
+            finish(undefined);
+        });
+        document.body.append(dialog);
+        dialog.showModal();
+    });
 }

@@ -4,14 +4,17 @@
 import type { EdgeMeshData, FaceMeshData } from "@chili3d/core";
 import { ShapeTypes, VisualStates, VisualStateUtils } from "@chili3d/core";
 import type { Mesh } from "three";
+import { Points } from "three";
 import type { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
 import type { IHighlightable } from "../src/highlightable";
 import {
     defaultEdgeMaterial,
     faceTransparentMaterial,
     highlightFaceMaterial,
+    highlightVertexMaterial,
     hilightEdgeMaterial,
     selectedEdgeMaterial,
+    selectedVertexMaterial,
 } from "../src/materials";
 import { ThreeGeometry } from "../src/threeGeometry";
 import { ThreeHighlighter } from "../src/threeHighlighter";
@@ -557,6 +560,34 @@ describe("GeometryState with ThreeGeometry", () => {
         const s = highlighter.getState(geo, ShapeTypes.shape);
         expect(s).toBeDefined();
         expect(s! & VisualStates.edgeHighlight).toBe(VisualStates.edgeHighlight);
+    });
+
+    // A sketch's entity point or a solid's vertex: the point alone is drawn, lit then selected,
+    // and nothing of the node's own materials changes.
+    test("a vertex sub-shape state draws the one point on top, lit or selected, and removing it takes it away", () => {
+        const beforeCount = highlighter.container.children.length;
+        const edgeMaterial = geo.edges()?.material;
+        highlighter.addState(geo, VisualStates.edgeHighlight, ShapeTypes.vertex, 0);
+        const points = highlighter.container.children.filter((x) => x instanceof Points) as Points[];
+        expect(points).toHaveLength(1);
+        expect(points[0].material).toBe(highlightVertexMaterial);
+        expect(points[0].renderOrder).toBe(999);
+        expect(points[0].geometry.getAttribute("position").count).toBe(3);
+        expect(geo.edges()?.material).toBe(edgeMaterial);
+        expect(highlighter.getState(geo, ShapeTypes.vertex, 0)).toBe(VisualStates.edgeHighlight);
+
+        highlighter.addState(geo, VisualStates.edgeSelected, ShapeTypes.vertex, 0);
+        highlighter.removeState(geo, VisualStates.edgeHighlight, ShapeTypes.vertex, 0);
+        expect(highlighter.container.children.filter((x) => x instanceof Points)).toHaveLength(1);
+        expect(points[0].material).toBe(selectedVertexMaterial);
+
+        highlighter.removeState(geo, VisualStates.edgeSelected, ShapeTypes.vertex, 0);
+        expect(highlighter.container.children.length).toBe(beforeCount);
+        expect(highlighter.getState(geo, ShapeTypes.vertex, 0)).toBeUndefined();
+        // an index naming no vertex range draws nothing and records nothing
+        highlighter.addState(geo, VisualStates.edgeHighlight, ShapeTypes.vertex, 7);
+        expect(highlighter.container.children.length).toBe(beforeCount);
+        expect(highlighter.getState(geo, ShapeTypes.vertex, 7)).toBeUndefined();
     });
 
     test("addState with sub-geometry index clones the sub-edge into the container", () => {

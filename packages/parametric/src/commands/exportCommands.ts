@@ -101,16 +101,48 @@ export class ExportSketchCommand extends MultistepCommand {
         ];
     }
 
+    /** Construction geometry goes into the file only when asked (Onshape's DXF export leaves it out). */
+    @property("sketch.export.construction")
+    get includeConstruction(): boolean {
+        return this.getPrivateValue("includeConstruction", false);
+    }
+    set includeConstruction(value: boolean) {
+        this.setProperty("includeConstruction", value);
+    }
+
+    @property("sketch.export.external")
+    get includeExternal(): boolean {
+        return this.getPrivateValue("includeExternal", true);
+    }
+    set includeExternal(value: boolean) {
+        this.setProperty("includeExternal", value);
+    }
+
+    /** Sketch layer names, comma-separated; empty for every layer. */
+    @property("sketch.export.layers")
+    get layers(): string {
+        return this.getPrivateValue("layers", "");
+    }
+    set layers(value: string) {
+        this.setProperty("layers", value);
+    }
+
     protected override executeMainTask(): void {
         const editor = SketchEditor.getActive();
         const sketch = editor?.node ?? this.stepDatas[0]?.nodes?.[0];
         if (!(sketch instanceof SketchNode)) return;
         // While editing, the solver holds the latest geometry.
         const data = editor !== undefined ? editor.solver.toData() : sketch.data;
-        download(
-            [writeDrawing(sketchDrawing(data), this.format, sketch.name)],
-            `${sketch.name}${this.format}`,
-        );
+        const layers = this.layers
+            .split(",")
+            .map((name) => name.trim())
+            .filter((name) => name !== "");
+        const drawing = sketchDrawing(data, {
+            construction: this.includeConstruction,
+            external: this.includeExternal,
+            layers: layers.length === 0 ? undefined : layers,
+        });
+        download([writeDrawing(drawing, this.format, sketch.name)], `${sketch.name}${this.format}`);
     }
 }
 

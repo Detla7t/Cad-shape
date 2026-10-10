@@ -30,6 +30,8 @@ rs.mock("@chili3d/core", () => {
     const evaluationState = rs.hoisted(() => require("../../../core/src/model/evaluationState"));
     const featureEvaluation = rs.hoisted(() => require("../../../core/src/model/featureEvaluation"));
     const { ShapeNode } = rs.hoisted(() => require("../../../core/src/model/shapeNode"));
+    // The active component (the folder rows' activate ring reads it).
+    const { ComponentContext } = rs.hoisted(() => require("../../../core/src/model/componentContext"));
     const {
         BindingMock,
         TransactionMock,
@@ -53,8 +55,15 @@ rs.mock("@chili3d/core", () => {
             return node?.isFolder === true;
         }
     }
+    // A component is a folder a user added to work in: only it carries the activate ring.
+    class ComponentFolderNode {
+        static [Symbol.hasInstance](node: { isComponent?: boolean }) {
+            return node?.isComponent === true;
+        }
+    }
     return {
         ...actual,
+        ComponentContext,
         Binding: BindingMock,
         Transaction: TransactionMock,
         ...evaluationState,
@@ -71,6 +80,7 @@ rs.mock("@chili3d/core", () => {
         ReferencePlaneNode,
         Annotation,
         FolderNode,
+        ComponentFolderNode,
         NodeSelectionHandler,
         ShapeSelectionHandler,
         setHistoryHidden,

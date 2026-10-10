@@ -1,0 +1,118 @@
+/* Model-based definition labels, drawn like a drawing's: dark ink on a white-backed box
+   (frames, datums) or plain ink with a light halo (dimensions, notes) over the model. */
+.pmi {
+    --pmi-color: #3b2f8f;
+    --pmi-background: rgba(255, 255, 255, 0.9);
+    position: relative;
+    display: inline-flex;
+    align-items: stretch;
+    color: var(--pmi-color);
+    font-family:
+        "Segoe UI", "Segoe UI Symbol", "DejaVu Sans", "Noto Sans Symbols 2", "Apple Symbols", system-ui,
+        sans-serif;
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 1.3;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    pointer-events: auto;
+}
+
+.pmi.note {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 2px 4px;
+    text-shadow:
+        0 0 3px var(--pmi-background),
+        0 0 3px var(--pmi-background),
+        0 0 1px var(--pmi-background);
+}
+
+.pmi.gdt,
+.pmi.datum {
+    border: 1.5px solid var(--pmi-color);
+    background: var(--pmi-background);
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.6);
+}
+
+.pmi.dimension {
+    padding: 1px 4px 3px;
+    text-shadow:
+        0 0 3px var(--pmi-background),
+        0 0 3px var(--pmi-background),
+        0 0 1px var(--pmi-background);
+}
+
+.pmi.flag {
+    width: 34px;
+    height: 30px;
+    align-items: center;
+    justify-content: center;
+}
+
+.pmi.selected {
+    outline: 2px solid #ffd400;
+    outline-offset: 1px;
+}
+
+/* An unlocked frame drags; a locked one only selects. */
+.pmi:not([data-locked="true"]) {
+    cursor: grab;
+}
+.pmi[data-dragging="true"] {
+    cursor: grabbing;
+}
+
+.line {
+    display: block;
+}
+
+.cell {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    padding: 2px 7px;
+    border-right: 1.5px solid var(--pmi-color);
+}
+
+.cell:last-child {
+    border-right: none;
+}
+
+.symbol {
+    font-size: 17px;
+}
+
+.dimensionText {
+    display: inline-block;
+}
+
+.hexagon {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.flagText {
+    position: relative;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.terminator {
+    --pmi-color: #3b2f8f;
+    width: 32px;
+    height: 16px;
+    color: var(--pmi-color);
+    pointer-events: none;
+}
+
+.marker {
+    display: block;
+    width: 32px;
+    height: 16px;
+    transform-origin: 50% 50%;
+}

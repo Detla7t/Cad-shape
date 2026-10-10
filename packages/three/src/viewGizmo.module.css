@@ -20,12 +20,28 @@
     cursor: pointer;
     outline: none;
 
-    /* the fillets: the edge strips and the flat corner discs, a shade lighter than the faces */
+    /* the fillets: the edge strips a shade lighter than the faces, the flat corner discs white */
     &[data-kind="edge"] .surface,
     &[data-kind="corner"] .surface {
         fill: #e8edf3;
         fill-opacity: 0.62;
         stroke-width: 0.6px;
+    }
+    &[data-kind="corner"] .surface {
+        fill: #fff;
+        fill-opacity: 0.95;
+        stroke: #d6dde6;
+    }
+
+    /* the face the camera looks at squarely is white; the faces seen obliquely stay grey */
+    &[data-facing="true"] .surface {
+        fill: #fff;
+        fill-opacity: 0.92;
+    }
+
+    /* a corner's round facet is its target: the seam triangle alone is too small to hit */
+    &[data-kind="corner"]:not([data-back="true"]) .surface {
+        pointer-events: auto;
     }
 
     /* the far side shows through the translucent cube, and takes no pointer */
@@ -33,7 +49,8 @@
         pointer-events: none;
     }
     &[data-back="true"] .surface {
-        fill-opacity: 0.22;
+        fill: #c3ccd6;
+        fill-opacity: 0.3;
         stroke-opacity: 0.35;
     }
 
@@ -65,36 +82,23 @@
     stroke: none;
 }
 
-/* The cube: light grey glass — a face is a rounded square, white seams between the regions. */
+/* The generous, invisible click target of a near corner, drawn over the cube. */
+.cornerHit {
+    fill: transparent;
+    stroke: none;
+    cursor: pointer;
+    pointer-events: auto;
+}
+
+/* The cube: grey glass — a face is a rounded square, white seams between the regions. */
 .surface {
-    fill: #d6dde6;
-    fill-opacity: 0.55;
+    fill: #cdd5de;
+    fill-opacity: 0.68;
     stroke: #fff;
     stroke-opacity: 0.75;
     stroke-width: 0.9px;
     stroke-linejoin: round;
     pointer-events: none;
-}
-
-/* A far face's name, drawn over the cube: the one target that turns the view to that face. */
-.through {
-    cursor: pointer;
-    outline: none;
-
-    rect {
-        fill: transparent;
-    }
-    text {
-        fill: #4b6b8c;
-        font:
-            500 11px Arial,
-            sans-serif;
-        pointer-events: none;
-    }
-    &:hover text,
-    &:focus-visible text {
-        fill: #1f6fb2;
-    }
 }
 
 .control {

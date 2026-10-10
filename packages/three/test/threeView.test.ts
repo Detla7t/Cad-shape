@@ -1232,7 +1232,11 @@ describe("ThreeView — initRaycaster", () => {
         const raycaster = (view as any).initRaycaster(50, 50) as Raycaster;
         expect(raycaster.params.Line2?.threshold).toBe(Config.instance.SnapDistance);
         expect(raycaster.params.Line?.threshold).toBe(Config.instance.SnapDistance);
-        expect(raycaster.params.Points?.threshold).toBe(Config.instance.SnapDistance);
+        // a point's threshold is a world radius: the snap distance and a half, in pixels at this zoom
+        expect(raycaster.params.Points?.threshold).toBeCloseTo(
+            Config.instance.SnapDistance * 1.5 * view.pixelSize(),
+            9,
+        );
     });
 });
 

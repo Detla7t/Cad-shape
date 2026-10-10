@@ -12,10 +12,14 @@ import {
     type INode,
     type Material,
     OperationLog,
+    PartStudioTimeline,
     PubSub,
     type Ribbon,
 } from "@chili3d/core";
 import { createCadIcon, div } from "@chili3d/element";
+import type { ReactIsland } from "@chili3d/react";
+import { mountCommandWindow } from "./console/commandWindow";
+import { ConsoleEngine } from "./console/consoleEngine";
 import style from "./editor.module.css";
 import { ElementWorkspace } from "./elements";
 import { FloatPanel } from "./floatPanel";
@@ -55,6 +59,11 @@ export class Editor extends HTMLElement {
     private _chatWidth: number = 320;
     private _isResizingSidebar: boolean = false;
     private _sidebarEl: HTMLDivElement | null = null;
+    private _partStudioEl: HTMLDivElement | null = null;
+    private _consoleHost: HTMLDivElement | null = null;
+    private _consoleMount: HTMLDivElement | null = null;
+    private _console?: { engine: ConsoleEngine; island: ReactIsland };
+    private _sidebarToggle: HTMLButtonElement | null = null;
     private readonly versionsDock: VersionsDock;
     private readonly utilityDock: UtilityDock;
 
@@ -77,9 +86,22 @@ export class Editor extends HTMLElement {
         // The Part Studio timeline runs along the bottom of the viewport (Fusion's history bar).
         const timeline = div({ className: timelineStyle.host });
         mountPartStudioTimeline(timeline, app);
+        // The command window docks under the timeline; it mounts on first use.
+        // The React island owns its mount's children, so the resizer sits beside the mount.
+        this._consoleMount = div({ className: style.consoleMount });
+        this._consoleHost = div(
+            { className: style.consoleHost },
+            div({
+                className: style.consoleResizer,
+                title: "Drag to resize the command window",
+                onpointerdown: (e: PointerEvent) => this._startConsoleResize(e),
+            }),
+            this._consoleMount,
+        );
+        this._consoleHost.hidden = true;
         this._viewportContainer = div(
             { className: style.viewportContainer },
-            div({ className: timelineStyle.frame }, viewport, timeline),
+            div({ className: timelineStyle.frame }, viewport, timeline, this._consoleHost),
         );
         this.render();
     }
@@ -104,6 +126,19 @@ export class Editor extends HTMLElement {
             this._viewportContainer,
             new StudioSidebar(this.app),
         );
+        this._partStudioEl = partStudio;
+        // Onshape's handle on the sidebar's edge: hides the features and parts, brings them back.
+        const sidebarToggle = document.createElement("button");
+        sidebarToggle.type = "button";
+        sidebarToggle.className = style.sidebarToggle;
+        sidebarToggle.title = "Features and parts";
+        sidebarToggle.setAttribute("aria-label", "Features and parts");
+        sidebarToggle.setAttribute("aria-expanded", "true");
+        sidebarToggle.append(createCadIcon("featuresTree"));
+        sidebarToggle.onclick = () =>
+            this.setSidebarCollapsed(partStudio.dataset["sidebarCollapsed"] !== "true");
+        this._sidebarToggle = sidebarToggle;
+        this._viewportContainer.append(sidebarToggle);
         const elementViews = div({ className: style.elementViews });
         this._workspace = new ElementWorkspace(this.app, partStudio, elementViews);
         this._workspace.onTabsOpened = () => {
@@ -224,6 +259,27 @@ export class Editor extends HTMLElement {
         }
     }
 
+    /** Whether the command window is shown under the viewport. */
+    get commandWindowShown(): boolean {
+        return this._consoleHost !== null && !this._consoleHost.hidden;
+    }
+
+    private readonly toggleCommandWindow = () => this.setCommandWindowShown(!this.commandWindowShown);
+
+    setCommandWindowShown(shown: boolean): void {
+        const host = this._consoleHost;
+        if (host === null) return;
+        if (shown && this._console === undefined && this._consoleMount !== null) {
+            const engine = new ConsoleEngine(this.app);
+            const island = mountCommandWindow(this._consoleMount, this.app, engine, () =>
+                this.setCommandWindowShown(false),
+            );
+            this._console = { engine, island };
+        }
+        host.hidden = !shown;
+        if (shown) host.querySelector<HTMLInputElement>("input")?.focus();
+    }
+
     private readonly toggleChat = () => {
         if (this.chatDock || this.floatingChat) {
             this.hideChat();
@@ -305,6 +361,54 @@ export class Editor extends HTMLElement {
         );
     }
 
+    /** Whether the features-and-parts sidebar is folded away (the viewport takes its width). */
+    get sidebarCollapsed(): boolean {
+        return this._partStudioEl?.dataset["sidebarCollapsed"] === "true";
+    }
+
+    setSidebarCollapsed(collapsed: boolean): void {
+        if (!this._partStudioEl || !this._sidebarToggle) return;
+        this._partStudioEl.dataset["sidebarCollapsed"] = String(collapsed);
+        this._sidebarToggle.setAttribute("aria-expanded", String(!collapsed));
+        this._sidebarToggle.title = collapsed ? "Show features and parts" : "Hide features and parts";
+        this._sidebarToggle.setAttribute("aria-label", this._sidebarToggle.title);
+    }
+
+    /** The command window's height, dragged on its top edge; the window reads it as a CSS variable. */
+    private _consoleHeight = 260;
+
+    private _startConsoleResize(e: PointerEvent) {
+        e.preventDefault();
+        e.stopPropagation();
+        const host = this._consoleHost;
+        if (host === null) return;
+        const startY = e.clientY;
+        const startHeight = this._consoleHeight;
+        if (this.app.mainWindow) this.app.mainWindow.style.cursor = "ns-resize";
+        host.dataset["resizing"] = "true";
+        this.trackPointerDrag(
+            (ev) => this.setCommandWindowHeight(startHeight + (startY - ev.clientY)),
+            () => {
+                delete host.dataset["resizing"];
+                if (this.app.mainWindow) this.app.mainWindow.style.cursor = "";
+            },
+        );
+    }
+
+    /** Sets the command window's height, kept between 120px and most of the viewport's frame. */
+    setCommandWindowHeight(height: number): void {
+        const host = this._consoleHost;
+        if (host === null) return;
+        const frame = host.parentElement?.getBoundingClientRect().height ?? 0;
+        const max = frame > 0 ? Math.max(120, Math.floor(frame * 0.8)) : Number.POSITIVE_INFINITY;
+        this._consoleHeight = Math.round(Math.max(120, Math.min(max, height)));
+        host.style.setProperty("--command-window-height", `${this._consoleHeight}px`);
+    }
+
+    get commandWindowHeight(): number {
+        return this._consoleHeight;
+    }
+
     private _startSidebarResize(e: PointerEvent) {
         e.preventDefault();
         this._isResizingSidebar = true;
@@ -336,6 +440,7 @@ export class Editor extends HTMLElement {
         PubSub.default.sub("openCommandContext", this.openContext);
         PubSub.default.sub("closeCommandContext", this.closeContext);
         PubSub.default.sub("toggleChatPanel", this.toggleChat);
+        PubSub.default.sub("toggleCommandWindow", this.toggleCommandWindow);
         this._workspace?.connect();
         this.utilityDock.connect();
         PubSub.default.sub("toggleVersionsPanel", this.toggleVersions);
@@ -355,6 +460,7 @@ export class Editor extends HTMLElement {
         PubSub.default.remove("openCommandContext", this.openContext);
         PubSub.default.remove("closeCommandContext", this.closeContext);
         PubSub.default.remove("toggleChatPanel", this.toggleChat);
+        PubSub.default.remove("toggleCommandWindow", this.toggleCommandWindow);
         this._workspace?.disconnect();
         this.utilityDock.disconnect();
         PubSub.default.remove("toggleVersionsPanel", this.toggleVersions);
@@ -371,6 +477,9 @@ export class Editor extends HTMLElement {
     ) => {
         const model = this.app.activeView?.document;
         if (!model) return;
+        // The timeline marker follows the feature being opened: the model shows the state with
+        // that feature just applied, later steps rolled back (Onshape's Edit, Fusion's double-click).
+        PartStudioTimeline.of(model).rollAfter(node, featureId);
         if (node.beginFeatureEdit) {
             const session = await node.beginFeatureEdit(featureId, options);
             if (!session.isOk) {
