@@ -683,13 +683,13 @@ describe("the Variable Studio element", () => {
         const rows = () => [...frame.querySelectorAll<HTMLElement>(".v-row")];
         expect(rows()).toHaveLength(2);
         const values = () => rows().map((row) => mustQuery<HTMLInputElement>(row, ".v-value").value);
-        expect(values()).toEqual(["40", "10"]);
+        expect(values()).toEqual(["40.00 mm", "10.00 mm"]);
 
         // An edit made elsewhere (undo, another view) redraws the rows from the studio.
         Transaction.execute(doc, "edit", () => studio.setItems([variable("s1", "w", "80")]));
         expect(rows()).toHaveLength(1);
         await doc.history.undo();
-        expect(values()).toEqual(["40", "10"]);
+        expect(values()).toEqual(["40.00 mm", "10.00 mm"]);
     });
 
     test("a studio row the parameter table shadows is marked, and keeps its own value", () => {
@@ -708,7 +708,7 @@ describe("the Variable Studio element", () => {
         const row = mustQuery<HTMLElement>(viewArea, ".v-row");
         // The studio's row is not the shadowing one — the table's is (warning on the higher layer).
         expect(row.classList.contains("v-warning-row")).toBe(false);
-        expect(mustQuery<HTMLInputElement>(row, ".v-value").value).toBe("40");
+        expect(mustQuery<HTMLInputElement>(row, ".v-value").value).toBe("40.00 mm");
         expect(doc.variables.evaluate().warnings.get("t1")).toBe("Shadows w from Variable Studio 1");
     });
 });

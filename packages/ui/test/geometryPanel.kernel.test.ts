@@ -45,6 +45,7 @@ function inspector(
     shapes: IShape[],
     kind: "mass" | "analysis",
     tool: "geometry" | "interference" = "geometry",
+    userData?: Record<string, unknown>,
 ) {
     const doc = createMockDocument({
         history: { onChanged: () => {}, removeChanged: () => {} },
@@ -60,6 +61,7 @@ function inspector(
                 ),
         },
     });
+    if (userData) doc.userData = userData;
     const panel = new GeometryPanel(createMockView({ document: doc }), kind, tool);
     panels.push(panel);
     return panel.element;
@@ -70,15 +72,11 @@ function row(root: HTMLElement, label: string): string | undefined {
             ?.textContent ?? undefined
     );
 }
-function select(root: HTMLElement, label: string, value: string) {
-    const input = root.querySelector<HTMLSelectElement>(`select[aria-label="${label}"]`);
-    expect(input).not.toBeNull();
-    input!.value = value;
-    input!.dispatchEvent(new Event("change"));
-}
-
 test("part mass and all nine moments apply density with correct dimensions", () => {
-    const root = inspector([box()], "mass");
+    // The document shows mass in kg to six decimals (the default is three), so the density maths is visible.
+    const root = inspector([box()], "mass", "geometry", {
+        quantityUnits: { mass: { unit: "kg", precision: 6 } },
+    });
     const input = root.querySelector<HTMLInputElement>('input[aria-label="Density in g/cm³"]');
     expect(input).not.toBeNull();
     input!.value = "1";
