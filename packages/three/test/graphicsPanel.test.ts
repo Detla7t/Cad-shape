@@ -55,3 +55,26 @@ test("Apply persists graphics preferences as ordinary settings", () => {
         Config.instance.saveToStorage();
     }
 });
+
+test("every default graphics preference is within its field's min and max", () => {
+    const before = Config.instance.graphics;
+    Config.instance.graphics = { ...DEFAULT_GRAPHICS };
+    const host = document.createElement("div");
+    document.body.append(host);
+    const panel = new GraphicsPanel({ dom: host } as unknown as ThreeView);
+    try {
+        const invalid: string[] = [];
+        for (const tab of host.querySelectorAll<HTMLButtonElement>('[role="tab"]')) {
+            tab.click();
+            for (const input of host.querySelectorAll<HTMLInputElement>('input[type="number"]'))
+                if (input.validity.rangeOverflow || input.validity.rangeUnderflow)
+                    invalid.push(input.getAttribute("aria-label") ?? "");
+        }
+        expect(host.querySelector('[aria-label="Construction lines Second dash"]')).not.toBeNull();
+        expect(invalid).toEqual([]);
+    } finally {
+        panel.dispose();
+        host.remove();
+        Config.instance.graphics = before;
+    }
+});

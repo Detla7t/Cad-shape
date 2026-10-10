@@ -4,7 +4,7 @@
 import { OriginNode } from "@chili3d/core";
 import {
     Box3,
-    type BufferGeometry,
+    BufferGeometry,
     Color,
     type Object3D,
     OrthographicCamera,
@@ -64,11 +64,12 @@ function isDatum(object: Object3D) {
     );
 }
 
-function modelBounds(models: Object3D) {
+export function modelBounds(models: Object3D) {
     const bounds = new Box3();
     models.traverseVisible((object) => {
-        const geometry = (object as Object3D & { geometry?: BufferGeometry }).geometry;
-        if (!geometry) return;
+        // PMI annotations carry a PmiGeometry description, not a BufferGeometry.
+        const geometry = (object as Object3D & { geometry?: unknown }).geometry;
+        if (!(geometry instanceof BufferGeometry)) return;
         geometry.computeBoundingBox();
         if (geometry.boundingBox) bounds.union(geometry.boundingBox.clone().applyMatrix4(object.matrixWorld));
     });

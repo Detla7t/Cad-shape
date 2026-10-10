@@ -1,8 +1,17 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { Box3, OrthographicCamera, PerspectiveCamera, Vector3 } from "three";
-import { THUMBNAIL_HEIGHT, THUMBNAIL_WIDTH, thumbnailCamera } from "../src/modelThumbnail";
+import {
+    Box3,
+    BoxGeometry,
+    Group,
+    Mesh,
+    Object3D,
+    OrthographicCamera,
+    PerspectiveCamera,
+    Vector3,
+} from "three";
+import { modelBounds, THUMBNAIL_HEIGHT, THUMBNAIL_WIDTH, thumbnailCamera } from "../src/modelThumbnail";
 
 const ASPECT = THUMBNAIL_WIDTH / THUMBNAIL_HEIGHT;
 
@@ -54,4 +63,16 @@ test.each(["orthographic", "perspective"])("%s thumbnails preserve a circle's pr
     const bottom = new Vector3(0, -20, 0).project(camera);
     // NDC must be scaled by the actual thumbnail target, not the source viewport.
     expect((right.x - left.x) * THUMBNAIL_WIDTH).toBeCloseTo((top.y - bottom.y) * THUMBNAIL_HEIGHT, 8);
+});
+
+test("model bounds skip objects whose geometry is not a BufferGeometry", () => {
+    const models = new Group();
+    models.add(new Mesh(new BoxGeometry(10, 20, 30)));
+    // A PMI annotation's `geometry` is its PmiGeometry description.
+    const annotation = Object.assign(new Object3D(), { geometry: { lines: [] } });
+    models.add(annotation);
+    models.updateMatrixWorld(true);
+    const bounds = modelBounds(models);
+    expect(bounds.min.toArray()).toEqual([-5, -10, -15]);
+    expect(bounds.max.toArray()).toEqual([5, 10, 15]);
 });

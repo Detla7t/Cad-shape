@@ -199,10 +199,10 @@ export class GraphicsPanel {
             number(inactive, "Region opacity", "inactiveRegionOpacity", "%", 0, 100, 1);
             number(inactive, "Point size", "inactivePointSize", "px", 0, 8, 0.5);
             const construction = group("Construction lines");
-            number(construction, "First dash", "firstDash", "px", 1, 100, 1, false);
-            number(construction, "First gap", "firstGap", "px", 1, 100, 1, false);
-            number(construction, "Second dash", "secondDash", "px", 1, 100, 1, false);
-            number(construction, "Second gap", "secondGap", "px", 1, 100, 1, false);
+            number(construction, "First dash", "firstDash", "px", 1, 1000, 1, false);
+            number(construction, "First gap", "firstGap", "px", 1, 1000, 1, false);
+            number(construction, "Second dash", "secondDash", "px", 1, 1000, 1, false);
+            number(construction, "Second gap", "secondGap", "px", 1, 1000, 1, false);
         }
         const footer = document.createElement("footer");
         const reset = button("Reset to default", () => {
